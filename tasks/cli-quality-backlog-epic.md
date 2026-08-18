@@ -75,7 +75,7 @@ Allow independent artifact validations to run concurrently and reduce total wall
 
 ---
 
-## Add Configuration File Support
+## Add Configuration File Support ✅
 
 Let teams commit per-project defaults in `pyproject.toml` instead of relying solely on env vars.
 

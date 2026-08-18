@@ -97,6 +97,23 @@ ARTIFACT_ROOT = REPO_ROOT / ".fabric" / "artifacts"
 RESULTS_ROOT = REPO_ROOT / "analyzer-results"
 
 
+def _load_pyproject_config(path: Path) -> dict[str, Any]:
+    """Load the ``[tool.fab-test]`` table from ``pyproject.toml``, if present."""
+    if not path.exists():
+        return {}
+    try:
+        import tomllib
+
+        data = tomllib.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    config = data.get("tool", {}).get("fab-test", {})
+    return config if isinstance(config, dict) else {}
+
+
+_PYPROJECT_CONFIG = _load_pyproject_config(REPO_ROOT / "pyproject.toml")
+
+
 def _env(name: str, default: str = "") -> str:
     return os.environ.get(name, default)
 
@@ -146,8 +163,13 @@ def _verbosity_env(args: argparse.Namespace) -> str:
 _DEFAULT_SUBPROCESS_TIMEOUT = 120
 
 
-def _resolve_timeout(args: argparse.Namespace) -> int:
-    """Resolve the per-artifact subprocess timeout: CLI flag > env var > default."""
+def _resolve_timeout(
+    args: argparse.Namespace, config: dict[str, Any] | None = None
+) -> int:
+    """Resolve the per-artifact subprocess timeout.
+
+    Precedence: --timeout > ANALYZER_TIMEOUT > [tool.fab-test].timeout > default.
+    """
     cli_timeout = getattr(args, "timeout", None)
     if cli_timeout is not None:
         return cli_timeout
@@ -157,7 +179,25 @@ def _resolve_timeout(args: argparse.Namespace) -> int:
             return int(env_timeout)
         except ValueError:
             pass
+    config = _PYPROJECT_CONFIG if config is None else config
+    if "timeout" in config:
+        return config["timeout"]
     return _DEFAULT_SUBPROCESS_TIMEOUT
+
+
+def _apply_environment_default(
+    args: argparse.Namespace, config: dict[str, Any]
+) -> None:
+    """Fill --env from FABRIC_ENVIRONMENT or [tool.fab-test] when not passed.
+
+    No-op for subcommands without an --env flag. CLI values are never
+    overwritten; env var still takes precedence over the config file.
+    """
+    if not hasattr(args, "environment") or args.environment:
+        return
+    args.environment = os.environ.get("FABRIC_ENVIRONMENT") or config.get(
+        "environment", ""
+    )
 
 
 def _telemetry_enabled(args: argparse.Namespace) -> bool:
@@ -414,13 +454,13 @@ def _run_analyzer(name: str, args: argparse.Namespace, output_dir: Path) -> int:
 def _add_common_flags(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--artifact-dir",
-        default=str(ARTIFACT_ROOT),
+        default=str(_PYPROJECT_CONFIG.get("artifact_dir", ARTIFACT_ROOT)),
         metavar="DIR",
         help=f"Root for .fabric artifacts (default: {ARTIFACT_ROOT})",
     )
     parser.add_argument(
         "--output-dir",
-        default=str(RESULTS_ROOT),
+        default=str(_PYPROJECT_CONFIG.get("output_dir", RESULTS_ROOT)),
         metavar="DIR",
         help=f"Root for result envelopes (default: {RESULTS_ROOT})",
     )
@@ -448,7 +488,7 @@ def _add_common_flags(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--jobs",
         type=int,
-        default=1,
+        default=_PYPROJECT_CONFIG.get("jobs", 1),
         metavar="N",
         help="Run up to N artifacts in parallel for the same analyzer (default: 1)",
     )
@@ -479,7 +519,7 @@ def _add_common_flags(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--format",
         choices=["text", "json"],
-        default="text",
+        default=_PYPROJECT_CONFIG.get("format", "text"),
         dest="output_format",
         help="Output format for aggregate summaries (default: text)",
     )
@@ -782,6 +822,7 @@ def _all_analyzers(args: argparse.Namespace) -> tuple[str, ...]:
 def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
+    _apply_environment_default(args, _PYPROJECT_CONFIG)
     output_dir = Path(args.output_dir)
 
     artifact_dir = Path(args.artifact_dir)
