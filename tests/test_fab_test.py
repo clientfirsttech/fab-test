@@ -2313,6 +2313,109 @@ def test_all_dry_run_output_unaffected_by_aliases():
 
 
 # --------------------------------------------------------------------------- #
+# Show per-artifact progress
+# --------------------------------------------------------------------------- #
+
+
+def _stub_subprocess_run(*_args, **_kwargs):
+    return subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
+
+
+@pytest.mark.fab_test
+def test_progress_shown_non_ci_multiple_artifacts(tmp_path, monkeypatch, capsys):
+    """A non-CI run with multiple artifacts shows 'artifact N of M'."""
+    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+
+    artifact_dir = tmp_path / "artifacts"
+    for i in range(3):
+        (artifact_dir / f"Model{i}.SemanticModel").mkdir(parents=True)
+    output_dir = tmp_path / "analyzer-results"
+
+    monkeypatch.setattr(fab_test_module, "_is_ci", lambda: False)
+    monkeypatch.setattr(fab_test_module, "_send_telemetry", lambda *a, **k: None)
+    monkeypatch.setattr(fab_test_module.subprocess, "run", _stub_subprocess_run)
+
+    args = _RunAnalyzerArgs(artifact_dir, output_dir)
+    code = _run_analyzer("pql_lint", args, output_dir)
+    captured = capsys.readouterr()
+
+    assert code == 0
+    assert "artifact 1 of 3" in captured.out
+    assert "artifact 2 of 3" in captured.out
+    assert "artifact 3 of 3" in captured.out
+
+
+@pytest.mark.fab_test
+def test_progress_not_shown_for_single_artifact(tmp_path, monkeypatch, capsys):
+    """A single-artifact run shows no 'N of 1' progress noise."""
+    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+
+    artifact_dir = tmp_path / "artifacts"
+    (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
+    output_dir = tmp_path / "analyzer-results"
+
+    monkeypatch.setattr(fab_test_module, "_is_ci", lambda: False)
+    monkeypatch.setattr(fab_test_module, "_send_telemetry", lambda *a, **k: None)
+    monkeypatch.setattr(fab_test_module.subprocess, "run", _stub_subprocess_run)
+
+    args = _RunAnalyzerArgs(artifact_dir, output_dir)
+    code = _run_analyzer("pql_lint", args, output_dir)
+    captured = capsys.readouterr()
+
+    assert code == 0
+    assert "of 1" not in captured.out
+
+
+@pytest.mark.fab_test
+def test_progress_emitted_as_ci_notice(tmp_path, monkeypatch, capsys):
+    """In CI (GITHUB_ACTIONS), progress is a ::notice:: annotation, not plain text."""
+    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+
+    artifact_dir = tmp_path / "artifacts"
+    for i in range(2):
+        (artifact_dir / f"Model{i}.SemanticModel").mkdir(parents=True)
+    output_dir = tmp_path / "analyzer-results"
+
+    monkeypatch.setattr(fab_test_module, "_is_ci", lambda: True)
+    monkeypatch.setattr(fab_test_module, "_send_telemetry", lambda *a, **k: None)
+    monkeypatch.setattr(fab_test_module, "emit_workflow_annotations", lambda *a, **k: None)
+    monkeypatch.setattr(fab_test_module.subprocess, "run", _stub_subprocess_run)
+
+    args = _RunAnalyzerArgs(artifact_dir, output_dir)
+    code = _run_analyzer("pql_lint", args, output_dir)
+    captured = capsys.readouterr()
+
+    assert code == 0
+    assert "::notice::" in captured.out
+    assert "artifact 1 of 2" in captured.out
+    assert "artifact 2 of 2" in captured.out
+    assert "\n  artifact 1 of 2" not in captured.out  # not the plain-text form
+
+
+@pytest.mark.fab_test
+def test_artifact_start_line_still_printed_alongside_progress(tmp_path, monkeypatch, capsys):
+    """The per-artifact '▶ fab-test ... → stem' line still prints as artifacts start."""
+    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+
+    artifact_dir = tmp_path / "artifacts"
+    (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
+    output_dir = tmp_path / "analyzer-results"
+
+    monkeypatch.setattr(fab_test_module, "_is_ci", lambda: False)
+    monkeypatch.setattr(fab_test_module, "_send_telemetry", lambda *a, **k: None)
+    monkeypatch.setattr(fab_test_module.subprocess, "run", _stub_subprocess_run)
+
+    args = _RunAnalyzerArgs(artifact_dir, output_dir)
+    args.verbose = 1
+    code = _run_analyzer("pql_lint", args, output_dir)
+    captured = capsys.readouterr()
+
+    assert code == 0
+    assert "fab-test pql_lint" in captured.out
+    assert "SampleModel" in captured.out
+
+
+# --------------------------------------------------------------------------- #
 # Regression: per-artifact warning handling
 # --------------------------------------------------------------------------- #
 
