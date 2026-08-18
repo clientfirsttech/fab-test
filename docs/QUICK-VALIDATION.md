@@ -8,6 +8,19 @@ Validate the `fab-test` package and its analyzers on your local machine before p
 - A clone of this repository
 - (Optional) External analyzer tools such as Tabular Editor or PBIR Inspector if you plan to run `fab-test` against real artifacts
 
+## Virtual environments used by this project
+
+This repository uses several local virtual environments. They are all ignored by `.gitignore` and can be recreated at any time.
+
+| Environment | Purpose |
+|-------------|---------|
+| `.venv`     | General development environment with the package installed in editable mode (`pip install -e .`). |
+| `.venv-test`| Fresh, throwaway environment used to install and validate the locally built wheel exactly as a consumer would. |
+| `.venv-pkg` | Development/test environment with dev dependencies such as `pytest`, `coverage`, and `playwright`. |
+| `.venv-smoke`| Environment used by the GitHub Actions smoke-test helpers (`smoke-test-orchestrator`, `smoke-test-pql-test`). |
+
+All of these are optional. The only one the walkthrough below depends on is `.venv-test`.
+
 ## Build the wheel locally
 
 The project is packaged with `setuptools` and `pyproject.toml`. Build a wheel into `dist/`:

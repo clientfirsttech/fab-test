@@ -31,6 +31,21 @@ def _repo_root() -> Path:
 REPO_ROOT = _repo_root()
 SCRIPTS_DIR = REPO_ROOT / "scripts"
 
+
+def _script_path(script_name: str) -> str:
+    """Return the path to a sibling analyzer script.
+
+    Works for editable/source installs and wheel installs because the script
+    lives next to this module inside the ``fabric_ci_cd_dataops.scripts``
+    package. Falls back to the repository ``scripts/`` directory only when the
+    package layout is not available (legacy source invocation).
+    """
+    sibling = Path(__file__).with_name(f"{script_name}.py")
+    if sibling.exists():
+        return str(sibling)
+    return str(SCRIPTS_DIR / f"{script_name}.py")
+
+
 # Default tool locations (match analyzers.json registry)
 _DEFAULT_TE_PATH = str(REPO_ROOT / "TabularEditor" / "TabularEditor.exe")
 _DEFAULT_BPA_RULES = str(
@@ -101,7 +116,7 @@ def build_bpa_command(
     output = output_dir / "bpa" / artifact.stem / "envelope.json"
     return [
         sys.executable,
-        str(SCRIPTS_DIR / "invoke_tabular_editor_bpa.py"),
+        _script_path("invoke_tabular_editor_bpa"),
         "--tmdl-path",
         str(artifact),
         "--bpa-rules-path",
@@ -127,7 +142,7 @@ def build_pbir_command(
     output = output_dir / "pbir" / artifact.stem / "envelope.json"
     return [
         sys.executable,
-        str(SCRIPTS_DIR / "invoke_pbir_inspector.py"),
+        _script_path("invoke_pbir_inspector"),
         "--artifact-path",
         str(artifact),
         "--rules-path",
@@ -149,7 +164,7 @@ def build_pql_test_command(
     output = output_dir / "pql_test" / artifact.stem / "envelope.json"
     cmd = [
         sys.executable,
-        str(SCRIPTS_DIR / "invoke_pql_test.py"),
+        _script_path("invoke_pql_test"),
         "--artifact-path",
         str(artifact),
         "--artifact-name",
@@ -175,7 +190,7 @@ def build_pql_lint_command(
     output = output_dir / "pql_lint" / artifact.stem / "envelope.json"
     return [
         sys.executable,
-        str(SCRIPTS_DIR / "invoke_pqlint.py"),
+        _script_path("invoke_pqlint"),
         "--artifact-path",
         str(artifact),
         "--output-path",
@@ -192,7 +207,7 @@ def build_playwright_command(
     output = output_dir / "playwright" / artifact.stem / "envelope.json"
     cmd = [
         sys.executable,
-        str(SCRIPTS_DIR / "invoke_playwright.py"),
+        _script_path("invoke_playwright"),
         "--output-path",
         str(output),
         "--artifact",
@@ -229,7 +244,7 @@ def build_playwright_impact_command(
     changed_artifacts = getattr(args, "changed_artifacts", "changed-artifacts.json")
     cmd = [
         sys.executable,
-        str(SCRIPTS_DIR / "invoke_playwright_impact.py"),
+        _script_path("invoke_playwright_impact"),
         "--changed-artifacts",
         str(changed_artifacts),
     ]
@@ -260,7 +275,7 @@ def build_dependencies_command(
     """Build the semantic-model dependency discovery command."""
     cmd = [
         sys.executable,
-        str(SCRIPTS_DIR / "invoke_playwright_dependencies.py"),
+        _script_path("invoke_playwright_dependencies"),
         "--semantic-model",
         getattr(args, "semantic_model", ""),
     ]
