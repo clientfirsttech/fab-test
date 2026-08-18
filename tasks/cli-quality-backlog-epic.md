@@ -64,7 +64,7 @@ Make the per-artifact timeout user-tunable instead of hard-coded at 120 seconds.
 
 ---
 
-## Parallelize Per-Artifact Runs
+## Parallelize Per-Artifact Runs ✅
 
 Allow independent artifact validations to run concurrently and reduce total wall-clock time.
 
