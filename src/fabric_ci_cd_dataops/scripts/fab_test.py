@@ -526,6 +526,91 @@ def _add_common_flags(parser: argparse.ArgumentParser) -> None:
     )
 
 
+_COMMON_COMPLETION_FLAGS = (
+    "--artifact-dir --output-dir --dry-run --artifact --timeout --jobs "
+    "-v --verbose --telemetry --no-telemetry --format --help"
+)
+
+
+def _completion_subcommands() -> str:
+    return " ".join((*_ANALYZER_REGISTRY.keys(), "all", "clean-tools"))
+
+
+def _generate_completion_script(shell: str) -> str:
+    """Return a shell completion script that also completes artifact stems.
+
+    Artifact stems are looked up from ``.fabric/artifacts`` at *completion
+    time* in the user's shell (not baked in here), so the list always
+    reflects whatever directory they are tab-completing from.
+    """
+    subcommands = _completion_subcommands()
+    if shell == "bash":
+        return f"""\
+_fab_test_completions() {{
+    local cur prev
+    COMPREPLY=()
+    cur="${{COMP_WORDS[COMP_CWORD]}}"
+    prev="${{COMP_WORDS[COMP_CWORD-1]}}"
+
+    if [[ ${{COMP_CWORD}} -eq 1 ]]; then
+        COMPREPLY=( $(compgen -W "{subcommands} --version --print-completion --help" -- "${{cur}}") )
+        return 0
+    fi
+
+    if [[ "${{prev}}" == "--artifact" ]]; then
+        local dir=".fabric/artifacts"
+        if [[ -d "${{dir}}" ]]; then
+            local stems
+            stems=$(for f in "${{dir}}"/*; do basename "$f" | sed 's/\\.[^.]*$//'; done | sort -u)
+            COMPREPLY=( $(compgen -W "${{stems}}" -- "${{cur}}") )
+        fi
+        return 0
+    fi
+
+    if [[ "${{cur}}" == -* ]]; then
+        COMPREPLY=( $(compgen -W "{_COMMON_COMPLETION_FLAGS}" -- "${{cur}}") )
+    fi
+}}
+complete -F _fab_test_completions fab-test
+"""
+    return f"""\
+#compdef fab-test
+
+_fab_test() {{
+    local -a subcommands
+    subcommands=({subcommands})
+
+    if (( CURRENT == 2 )); then
+        compadd -a subcommands
+        compadd -- --version --print-completion --help
+        return
+    fi
+
+    if [[ "${{words[CURRENT-1]}}" == "--artifact" ]]; then
+        local dir=".fabric/artifacts"
+        if [[ -d "${{dir}}" ]]; then
+            local -a stems
+            stems=($(for f in "${{dir}}"/*(N); do basename "$f" | sed 's/\\.[^.]*$//'; done | sort -u))
+            compadd -a stems
+        fi
+        return
+    fi
+
+    compadd -- {_COMMON_COMPLETION_FLAGS}
+}}
+
+_fab_test
+"""
+
+
+class _PrintCompletionAction(argparse.Action):
+    """argparse action that prints a completion script and exits, like --version."""
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        print(_generate_completion_script(values))
+        parser.exit()
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="fab-test",
@@ -552,6 +637,12 @@ def build_parser() -> argparse.ArgumentParser:
         action="version",
         version=f"%(prog)s {_FAB_TEST_VERSION}",
         help="Show fab-test version and exit",
+    )
+    parser.add_argument(
+        "--print-completion",
+        choices=["bash", "zsh"],
+        action=_PrintCompletionAction,
+        help="Print a shell completion script for bash or zsh and exit",
     )
 
     subs = parser.add_subparsers(dest="analyzer", metavar="ANALYZER")

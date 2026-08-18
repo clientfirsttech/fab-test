@@ -2142,6 +2142,103 @@ def test_main_clean_tools_dispatches_correctly(tmp_path, monkeypatch, capsys):
 
 
 # --------------------------------------------------------------------------- #
+# Shell completions
+# --------------------------------------------------------------------------- #
+
+_SUBCOMMAND_NAMES = (
+    "bpa",
+    "pbir",
+    "pql_test",
+    "pql_lint",
+    "playwright",
+    "playwright-impact",
+    "dependencies",
+    "all",
+    "clean-tools",
+)
+
+
+@pytest.mark.fab_test
+def test_print_completion_bash_exits_zero_and_writes_to_stdout():
+    """--print-completion bash writes a bash completion script to stdout."""
+    result = subprocess.run(
+        ["fab-test", "--print-completion", "bash"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "complete -F" in result.stdout
+    assert "fab-test" in result.stdout
+
+
+@pytest.mark.fab_test
+def test_print_completion_zsh_exits_zero_and_writes_to_stdout():
+    """--print-completion zsh writes a zsh completion script to stdout."""
+    result = subprocess.run(
+        ["fab-test", "--print-completion", "zsh"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "#compdef" in result.stdout
+
+
+@pytest.mark.fab_test
+def test_print_completion_invalid_shell_exits_2():
+    """--print-completion only accepts bash or zsh."""
+    result = subprocess.run(
+        ["fab-test", "--print-completion", "fish"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 2, result.stdout
+
+
+@pytest.mark.fab_test
+@pytest.mark.parametrize("shell", ["bash", "zsh"])
+def test_print_completion_lists_all_subcommands(shell):
+    """Both completion scripts enumerate every fab-test subcommand."""
+    result = subprocess.run(
+        ["fab-test", "--print-completion", shell],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    for name in _SUBCOMMAND_NAMES:
+        assert name in result.stdout, f"{name} missing from {shell} completion script"
+
+
+@pytest.mark.fab_test
+@pytest.mark.parametrize("shell", ["bash", "zsh"])
+def test_print_completion_completes_common_flags(shell):
+    """Both completion scripts offer common flags like --artifact-dir."""
+    result = subprocess.run(
+        ["fab-test", "--print-completion", shell],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert "--artifact-dir" in result.stdout
+    assert "--dry-run" in result.stdout
+
+
+@pytest.mark.fab_test
+@pytest.mark.parametrize("shell", ["bash", "zsh"])
+def test_print_completion_completes_artifact_stems_dynamically(shell):
+    """Both scripts look up artifact stems from .fabric/artifacts at completion time."""
+    result = subprocess.run(
+        ["fab-test", "--print-completion", shell],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert ".fabric/artifacts" in result.stdout
+
+
+# --------------------------------------------------------------------------- #
 # Regression: per-artifact warning handling
 # --------------------------------------------------------------------------- #
 
