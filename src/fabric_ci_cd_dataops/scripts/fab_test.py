@@ -328,9 +328,16 @@ def _run_one_artifact(
     in_ci: bool,
     sub_env: dict[str, str],
     timeout: int,
+    index: int,
+    total: int,
 ) -> tuple[str, int]:
     """Run one analyzer against one artifact. Returns (stem, exit_code)."""
     display_name = "." if _is_repository_scoped(name) else artifact.stem
+    if total > 1:
+        if in_ci:
+            print(f"::notice::fab-test {name}: artifact {index} of {total} ({display_name})")
+        else:
+            print(f"  artifact {index} of {total}")
     print(f"\n  ▶ fab-test {name}  →  {display_name}")
     cmd = _build_command(name, artifact, args, output_dir)
     try:
@@ -431,16 +438,20 @@ def _run_analyzer(name: str, args: argparse.Namespace, output_dir: Path) -> int:
     timeout = _resolve_timeout(args)
     jobs = max(1, getattr(args, "jobs", 1) or 1)
 
-    def _run(artifact: Path) -> tuple[str, int]:
+    total = len(artifacts)
+
+    def _run(index_artifact: tuple[int, Path]) -> tuple[str, int]:
+        index, artifact = index_artifact
         return _run_one_artifact(
-            name, artifact, args, output_dir, in_ci, _sub_env, timeout
+            name, artifact, args, output_dir, in_ci, _sub_env, timeout, index, total
         )
 
+    indexed_artifacts = list(enumerate(artifacts, start=1))
     if jobs > 1 and len(artifacts) > 1:
         with ThreadPoolExecutor(max_workers=jobs) as executor:
-            results = list(executor.map(_run, artifacts))
+            results = list(executor.map(_run, indexed_artifacts))
     else:
-        results = [_run(artifact) for artifact in artifacts]
+        results = [_run(pair) for pair in indexed_artifacts]
 
     output_format = getattr(args, "output_format", "text")
     return _print_summary(

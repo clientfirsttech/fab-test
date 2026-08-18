@@ -119,7 +119,7 @@ Accept common hyphenated spellings without breaking existing underscore usage.
 
 ---
 
-## Show Per-Artifact Progress
+## Show Per-Artifact Progress ✅
 
 Improve observability for long analyzer runs without adding noise in CI.
 
