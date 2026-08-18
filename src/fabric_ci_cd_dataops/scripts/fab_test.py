@@ -27,6 +27,7 @@ import os
 import re
 import subprocess
 import sys
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -278,6 +279,73 @@ def _artifact_exit_code(
     return 0
 
 
+def _run_one_artifact(
+    name: str,
+    artifact: Path,
+    args: argparse.Namespace,
+    output_dir: Path,
+    in_ci: bool,
+    sub_env: dict[str, str],
+    timeout: int,
+) -> tuple[str, int]:
+    """Run one analyzer against one artifact. Returns (stem, exit_code)."""
+    display_name = "." if _is_repository_scoped(name) else artifact.stem
+    print(f"\n  ▶ fab-test {name}  →  {display_name}")
+    cmd = _build_command(name, artifact, args, output_dir)
+    try:
+        proc = subprocess.run(
+            cmd,
+            stderr=None if in_ci else subprocess.PIPE,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            env=sub_env,
+            timeout=timeout,
+            check=False,
+        )
+    except subprocess.TimeoutExpired:
+        print(
+            f"  ⏰ fab-test {name}: timed out "
+            f"after {timeout}s for {display_name}"
+        )
+        return (display_name, 1)
+
+    if not in_ci and proc.stderr:
+        for line in proc.stderr.splitlines():
+            clean = _clean_annotation(line)
+            if clean.strip():
+                print(f"  {clean}")
+
+    # Read the envelope and apply the error/warning threshold ourselves so
+    # warnings never fail the build.
+    envelope = _read_artifact_envelope(output_dir, name, artifact.stem)
+    if envelope is None and proc.returncode == 0:
+        envelope = {
+            "status": "passed",
+            "findings": [],
+            "artifact_path": str(artifact),
+            "analyzer": name,
+        }
+    elif envelope is None:
+        envelope = {
+            "status": "failed",
+            "findings": [],
+            "artifact_path": str(artifact),
+            "analyzer": name,
+        }
+
+    artifact_code = _artifact_exit_code(proc.returncode, envelope)
+
+    _errors, warnings = _severity_counts(envelope.get("findings", []))
+    if in_ci:
+        emit_workflow_annotations(envelope, str(artifact))
+    if warnings > 0:
+        emit_pr_review_comments(envelope, str(artifact))
+    _send_telemetry(name, artifact, envelope, args)
+
+    return (artifact.stem, artifact_code)
+
+
 def _run_analyzer(name: str, args: argparse.Namespace, output_dir: Path) -> int:
     """Run one analyzer against all matching artifacts. Returns 0 or 1."""
     glob, description = _ANALYZER_REGISTRY[name]
@@ -314,69 +382,24 @@ def _run_analyzer(name: str, args: argparse.Namespace, output_dir: Path) -> int:
         print(f"\n  ✗ fab-test {name}: missing prerequisite\n  {message}\n")
         return exit_code
 
-    results: list[tuple[str, int]] = []
     in_ci = _is_ci()
     _sub_env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
     verbosity = _verbosity_env(args)
     if verbosity:
         _sub_env["ANALYZER_VERBOSITY"] = verbosity
     timeout = _resolve_timeout(args)
+    jobs = max(1, getattr(args, "jobs", 1) or 1)
 
-    for artifact in artifacts:
-        display_name = "." if _is_repository_scoped(name) else artifact.stem
-        print(f"\n  ▶ fab-test {name}  →  {display_name}")
-        cmd = _build_command(name, artifact, args, output_dir)
-        try:
-            proc = subprocess.run(
-                cmd,
-                stderr=None if in_ci else subprocess.PIPE,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                env=_sub_env,
-                timeout=timeout,
-                check=False,
-            )
-        except subprocess.TimeoutExpired:
-            print(
-                f"  \u23f0 fab-test {name}: timed out "
-                f"after {timeout}s for {display_name}"
-            )
-            results.append((display_name, 1))
-            continue
-        if not in_ci and proc.stderr:
-            for line in proc.stderr.splitlines():
-                clean = _clean_annotation(line)
-                if clean.strip():
-                    print(f"  {clean}")
+    def _run(artifact: Path) -> tuple[str, int]:
+        return _run_one_artifact(
+            name, artifact, args, output_dir, in_ci, _sub_env, timeout
+        )
 
-        # Read the envelope and apply the error/warning threshold ourselves so
-        # warnings never fail the build.
-        envelope = _read_artifact_envelope(output_dir, name, artifact.stem)
-        if envelope is None and proc.returncode == 0:
-            envelope = {
-                "status": "passed",
-                "findings": [],
-                "artifact_path": str(artifact),
-                "analyzer": name,
-            }
-        elif envelope is None:
-            envelope = {
-                "status": "failed",
-                "findings": [],
-                "artifact_path": str(artifact),
-                "analyzer": name,
-            }
-
-        artifact_code = _artifact_exit_code(proc.returncode, envelope)
-        results.append((artifact.stem, artifact_code))
-
-        _errors, warnings = _severity_counts(envelope.get("findings", []))
-        if in_ci:
-            emit_workflow_annotations(envelope, str(artifact))
-        if warnings > 0:
-            emit_pr_review_comments(envelope, str(artifact))
-        _send_telemetry(name, artifact, envelope, args)
+    if jobs > 1 and len(artifacts) > 1:
+        with ThreadPoolExecutor(max_workers=jobs) as executor:
+            results = list(executor.map(_run, artifacts))
+    else:
+        results = [_run(artifact) for artifact in artifacts]
 
     output_format = getattr(args, "output_format", "text")
     return _print_summary(
@@ -421,6 +444,13 @@ def _add_common_flags(parser: argparse.ArgumentParser) -> None:
             "Per-artifact subprocess timeout in seconds "
             f"[env: ANALYZER_TIMEOUT, default: {_DEFAULT_SUBPROCESS_TIMEOUT}]"
         ),
+    )
+    parser.add_argument(
+        "--jobs",
+        type=int,
+        default=1,
+        metavar="N",
+        help="Run up to N artifacts in parallel for the same analyzer (default: 1)",
     )
     parser.add_argument(
         "-v",

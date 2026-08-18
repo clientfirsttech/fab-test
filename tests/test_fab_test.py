@@ -37,6 +37,7 @@ from fabric_ci_cd_dataops.scripts.fab_test import (
     _resolve_timeout,
     _run_analyzer,
     _telemetry_enabled,
+    build_parser,
 )
 from fabric_ci_cd_dataops.scripts.fab_test_registry import (
     build_pql_test_command,
@@ -1797,6 +1798,129 @@ def test_run_analyzer_passes_resolved_timeout_to_subprocess(tmp_path, monkeypatc
 
 
 # --------------------------------------------------------------------------- #
+# Parallelize per-artifact runs
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.fab_test
+def test_jobs_flag_default_is_one():
+    """--jobs defaults to 1 (sequential) when not passed."""
+    parser = build_parser()
+    ns = parser.parse_args(["bpa", "--dry-run"])
+    assert ns.jobs == 1
+
+
+@pytest.mark.fab_test
+def test_jobs_flag_parses_requested_value():
+    """--jobs 4 is parsed as an int."""
+    parser = build_parser()
+    ns = parser.parse_args(["bpa", "--jobs", "4", "--dry-run"])
+    assert ns.jobs == 4
+
+
+@pytest.mark.fab_test
+def test_run_analyzer_default_jobs_runs_artifacts_sequentially(tmp_path, monkeypatch):
+    """With --jobs 1 (default), only one artifact's subprocess runs at a time."""
+    import threading
+    import time
+
+    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+
+    artifact_dir = tmp_path / "artifacts"
+    for i in range(3):
+        (artifact_dir / f"Model{i}.SemanticModel").mkdir(parents=True)
+    output_dir = tmp_path / "analyzer-results"
+
+    monkeypatch.setattr(fab_test_module, "_send_telemetry", lambda *a, **k: None)
+
+    lock = threading.Lock()
+    active = 0
+    max_active = 0
+
+    def _fake_subprocess(*_args, **_kwargs):
+        nonlocal active, max_active
+        with lock:
+            active += 1
+            max_active = max(max_active, active)
+        time.sleep(0.05)
+        with lock:
+            active -= 1
+        return subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(fab_test_module.subprocess, "run", _fake_subprocess)
+
+    args = _RunAnalyzerArgs(artifact_dir, output_dir, jobs=1)
+    code = _run_analyzer("pql_lint", args, output_dir)
+
+    assert code == 0
+    assert max_active == 1
+
+
+@pytest.mark.fab_test
+def test_run_analyzer_jobs_n_runs_artifacts_concurrently(tmp_path, monkeypatch):
+    """--jobs 3 runs up to 3 artifacts of the same analyzer in parallel."""
+    import threading
+
+    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+
+    artifact_dir = tmp_path / "artifacts"
+    for i in range(3):
+        (artifact_dir / f"Model{i}.SemanticModel").mkdir(parents=True)
+    output_dir = tmp_path / "analyzer-results"
+
+    monkeypatch.setattr(fab_test_module, "_send_telemetry", lambda *a, **k: None)
+
+    # A 3-party barrier only completes if all three subprocess calls are
+    # in flight at once; sequential execution would deadlock and time out.
+    barrier = threading.Barrier(3, timeout=2)
+
+    def _fake_subprocess(*_args, **_kwargs):
+        barrier.wait()
+        return subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(fab_test_module.subprocess, "run", _fake_subprocess)
+
+    args = _RunAnalyzerArgs(artifact_dir, output_dir, jobs=3)
+    code = _run_analyzer("pql_lint", args, output_dir)
+
+    assert code == 0
+
+
+@pytest.mark.fab_test
+def test_run_analyzer_parallel_writes_one_envelope_per_artifact(tmp_path, monkeypatch):
+    """Each artifact still writes its own envelope; the summary waits for all."""
+    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+
+    artifact_dir = tmp_path / "artifacts"
+    stems = [f"Model{i}" for i in range(3)]
+    for stem in stems:
+        (artifact_dir / f"{stem}.SemanticModel").mkdir(parents=True)
+    output_dir = tmp_path / "analyzer-results"
+
+    monkeypatch.setattr(fab_test_module, "_send_telemetry", lambda *a, **k: None)
+
+    def _fake_subprocess(cmd, **_kwargs):
+        # Locate the artifact stem this invocation targets and write its
+        # envelope, mirroring what the real analyzer wrapper would do.
+        stem = next(s for s in stems if s in " ".join(cmd))
+        envelope_dir = output_dir / "pql_lint" / stem
+        envelope_dir.mkdir(parents=True, exist_ok=True)
+        (envelope_dir / "envelope.json").write_text(
+            json.dumps({"status": "passed", "findings": []}), encoding="utf-8"
+        )
+        return subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(fab_test_module.subprocess, "run", _fake_subprocess)
+
+    args = _RunAnalyzerArgs(artifact_dir, output_dir, jobs=3)
+    code = _run_analyzer("pql_lint", args, output_dir)
+
+    assert code == 0
+    for stem in stems:
+        assert (output_dir / "pql_lint" / stem / "envelope.json").exists()
+
+
+# --------------------------------------------------------------------------- #
 # Regression: per-artifact warning handling
 # --------------------------------------------------------------------------- #
 
@@ -1813,6 +1937,7 @@ class _RunAnalyzerArgs:
         output_format: str = "json",
         impact_manifest: str | None = None,
         timeout: int | None = None,
+        jobs: int = 1,
     ):
         self.artifact_dir = str(artifact_dir)
         self.output_dir = str(output_dir)
@@ -1825,6 +1950,7 @@ class _RunAnalyzerArgs:
         self.workspace_id = ""
         self.impact_manifest = impact_manifest
         self.timeout = timeout
+        self.jobs = jobs
 
 
 def _make_warning_envelope(output_dir: Path, analyzer: str, stem: str) -> None:
