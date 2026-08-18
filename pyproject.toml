@@ -1,0 +1,115 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fab-test"
+version = "1.0.0"
+requires-python = ">=3.12"
+description = "Metadata-driven CI/CD and validation framework for Microsoft Fabric artifacts"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [
+    { name = "John Kerski" },
+]
+keywords = [
+    "microsoft-fabric",
+    "fabric",
+    "powerbi",
+    "cicd",
+    "dataops",
+    "devops",
+    "tabular-editor",
+    "pbir",
+    "playwright",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Information Technology",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Build Tools",
+    "Topic :: Software Development :: Quality Assurance",
+    "Topic :: Utilities",
+]
+dependencies = [
+    "tabulate",
+    "pql-test==0.1.12",
+    "playwright",
+    "pyyaml",
+    "fabric-cicd",
+    "azure-identity",
+]
+
+[project.urls]
+Repository = "https://github.com/kerski/fabric-ci-cd-dataops"
+Documentation = "https://github.com/kerski/fabric-ci-cd-dataops/blob/main/docs/QUICK-VALIDATION.md"
+Changelog = "https://github.com/kerski/fabric-ci-cd-dataops/blob/main/activity-log.md"
+Issues = "https://github.com/kerski/fabric-ci-cd-dataops/issues"
+
+[project.scripts]
+fab-test = "fabric_ci_cd_dataops.scripts.fab_test:main"
+smoke-test-orchestrator = "fabric_ci_cd_dataops.scripts.smoke_test_orchestrator:main"
+smoke-test-pql-test = "fabric_ci_cd_dataops.scripts.smoke_test_pql_test:main"
+tabular-editor-bpa = "fabric_ci_cd_dataops.scripts.invoke_tabular_editor_bpa:main"
+validate-environments-yaml = "fabric_ci_cd_dataops.scripts.validate_environments_yaml:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["fabric_ci_cd_dataops*"]
+
+[tool.setuptools.package-data]
+"fabric_ci_cd_dataops.scripts" = ["**/*.py"]
+"fabric_ci_cd_dataops" = [
+    "agents/*",
+    "skills/*/*",
+]
+
+[tool.ruff]
+target-version = "py312"
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes (unused imports, undefined names)
+    "I",    # isort
+    "UP",   # pyupgrade (modernise Python 3.12 syntax)
+    "BLE",  # blind exception catches
+    "PLW",  # pylint warnings
+    "S",    # security (bandit-compatible)
+    "SIM",  # simplify
+    "PERF", # performance
+    "RUF",  # ruff-specific rules
+]
+ignore = ["S603", "S607"]  # subprocess call with shell=False is fine here
+
+[tool.ruff.lint.per-file-ignores]
+"src/fabric_ci_cd_dataops/scripts/fab_test.py" = ["BLE001", "S110"]
+"src/fabric_ci_cd_dataops/scripts/scan_credentials.py" = ["BLE001", "S110"]
+"src/fabric_ci_cd_dataops/scripts/scan_entropy.py" = ["BLE001", "S110"]
+"src/fabric_ci_cd_dataops/scripts/invoke_tabular_editor_bpa.py" = ["S314"]
+"tests/test_invoke_tabular_editor_bpa.py" = ["S314", "S101"]
+"tests/test_fab_test.py" = ["S101", "E501"]
+"tests/test_invoke_pbir_inspector.py" = ["S101"]
+"tests/test_smoke_test_orchestrator.py" = ["S101", "E402"]
+"tests/test_smoke_test_pql_test.py" = ["S101", "E402"]
+"tests/test_dynamic_validation_matrix.py" = ["S101"]
+"tests/test_rtk_hook_guard.py" = ["S101"]
+"tests/test_invoke_playwright.py" = ["S101", "S105", "S106"]
+"tests/test_playwright_config.py" = ["S101", "S105", "S106"]
+"tests/test_playwright_embed_config.py" = ["S101", "S105", "S106"]
+"tests/test_playwright_power_bi_api.py" = ["S101", "S105", "S106"]
+"tests/test_fabric_service_client.py" = ["S101", "S105", "S106"]
+"tests/test_playwright_test_cases.py" = ["S101", "S106"]
+"tests/test_playwright_visual.py" = ["S101", "BLE001"]
+"tests/test_security_scans.py" = ["S101"]
+"tests/test_detect_changes.py" = ["S101"]
+"tests/test_compare_baseline.py" = ["S101"]
+"tests/test_environments_config.py" = ["S101"]
+"tests/test_check_promotion_safety.py" = ["S101"]
+"tests/test_deploy.py" = ["S101"]

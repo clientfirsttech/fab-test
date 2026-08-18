@@ -1,0 +1,16 @@
+{
+  "_comment": "TestBed configuration. Branch name does not determine the TestBed workspace; the workspace ID below is the metadata source of truth.",
+  "workspace_id": "",
+  "naming_convention": "{artifact_name}_TEST",
+  "cleanup_policy": "after_validation",
+  "retention_days": 7,
+  "data_strategy": "synthetic_preferred",
+  "baseline_path": ".fabric/testbed/baselines",
+  "fixtures_path": ".fabric/testbed/fixtures",
+  "validators_path": ".fabric/testbed/validators",
+  "comparison_tolerance": {
+    "schema": 0,
+    "row_count_percent": 5,
+    "value_percent": 1
+  }
+}

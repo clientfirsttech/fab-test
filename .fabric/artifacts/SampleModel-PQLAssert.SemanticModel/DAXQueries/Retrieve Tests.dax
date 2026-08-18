@@ -1,0 +1,3 @@
+EVALUATE PQL.Assert.RetrieveTests()
+
+EVALUATE PQL.Assert.RetrieveTestsByEnvironment("DEV")

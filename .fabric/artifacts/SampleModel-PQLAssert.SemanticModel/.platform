@@ -1,0 +1,13 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "SemanticModel",
+    "displayName": "SampleModel-PQLAssert"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "ff782ecf-4858-4e2a-b0dd-d301e814ce39",
+    "_smokeTestTimestamp": "2026-08-14T20:52:59Z"
+  }
+}
+

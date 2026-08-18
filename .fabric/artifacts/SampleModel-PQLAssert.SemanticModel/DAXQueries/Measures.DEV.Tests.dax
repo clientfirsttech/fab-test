@@ -1,0 +1,38 @@
+DEFINE
+	FUNCTION Measures.DEV.Tests = () =>
+		VAR _TotalChars = CALCULATE('MarvelFact'[Number of Characters])
+		VAR _TitleByDate = CALCULATE('MarvelFact'[Number of Characters Title By Date])
+		VAR __GoodFilter = TREATAS({"Good"}, 'AlignmentDim'[Alignment])
+		VAR _GoodChars =
+			SUMMARIZECOLUMNS(
+				__GoodFilter,
+				"Number_of_Characters", IGNORE('MarvelFact'[Number of Characters])
+			)
+		RETURN UNION(
+			PQL.Assert.ShouldBeGreaterThan(
+				"Measures: Total Number of Characters is greater than 0",
+				0,
+				_TotalChars
+			),
+			PQL.Assert.ShouldBeGreaterThan(
+				"Measures: Total Characters exceeds Good-aligned count of 4636",
+				4636,
+				_TotalChars
+			),
+			PQL.Assert.ShouldEqual(
+				"Measures: Number of Good Aligned Characters equals 4636",
+				4636,
+				_GoodChars
+			),
+			PQL.Assert.ShouldBeTrue(
+				"Measures: Current Date Time should not be null",
+				NOT ISBLANK(CALCULATE([Current Date Time]))
+			),
+			PQL.Assert.ShouldStartWith(
+				"Measures: Title By Date starts with 'Number of Characters'",
+				"Number of Characters",
+				_TitleByDate
+			)
+		)
+
+EVALUATE Measures.DEV.Tests()

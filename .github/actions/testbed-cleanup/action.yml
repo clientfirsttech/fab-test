@@ -1,0 +1,29 @@
+name: TestBed Cleanup
+
+description: |
+  Removes the local cloned test artifact directory created by testbed-clone.
+  Logs the cleanup action so workspace-side removal can be tracked separately.
+
+inputs:
+  test_artifact_name:
+    description: Name of the cloned test artifact (original name + _TEST)
+    required: true
+  test_artifact_path:
+    description: Path to the cloned test artifact directory
+    required: true
+
+runs:
+  using: composite
+
+  steps:
+    - name: Cleanup test artifacts
+      shell: bash
+      run: |
+        echo "🧹 Cleaning up TestBed artifacts" >> $GITHUB_STEP_SUMMARY
+
+        echo "Cleaning up: ${{ inputs.test_artifact_name }}"
+
+        if [ -d "${{ inputs.test_artifact_path }}" ]; then
+          rm -rf "${{ inputs.test_artifact_path }}"
+          echo "✅ Cleaned up local test directory" >> $GITHUB_STEP_SUMMARY
+        fi
