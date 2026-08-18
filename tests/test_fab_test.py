@@ -14,6 +14,7 @@ Real artifact execution is done via fab-test directly:
 """
 
 import argparse
+import hashlib
 import json
 import subprocess
 import sys
@@ -25,6 +26,7 @@ import pytest
 from fabric_ci_cd_dataops import __version__ as fab_test_version
 from fabric_ci_cd_dataops.scripts._analyzer_tool_bootstrap import (
     UnsupportedPlatformError,
+    _verify_checksum,
     resolve_executable,
 )
 from fabric_ci_cd_dataops.scripts.fab_test import (
@@ -1559,6 +1561,167 @@ def test_resolve_executable_requires_platform_mismatch_raises(tmp_path, monkeypa
     with unittest.mock.patch("sys.platform", "win32"):
         with pytest.raises(UnsupportedPlatformError, match="not supported on win32"):
             resolve_executable(analyzer_name, metadata, repo_root)
+
+
+# --------------------------------------------------------------------------- #
+# Verify downloaded tool archives (checksum)
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.fab_test
+def test_verify_checksum_mismatch_deletes_file_and_raises(tmp_path):
+    """A checksum mismatch removes the downloaded file and raises clearly."""
+    archive = tmp_path / "tool.zip"
+    archive.write_bytes(b"archive-bytes")
+
+    with pytest.raises(RuntimeError, match="checksum mismatch"):
+        _verify_checksum(archive, "0" * 64, "pbir_inspector")
+
+    assert not archive.exists()
+
+
+@pytest.mark.fab_test
+def test_verify_checksum_match_leaves_file_in_place(tmp_path):
+    """A matching checksum does not delete the file or raise."""
+    archive = tmp_path / "tool.zip"
+    archive.write_bytes(b"archive-bytes")
+    expected = hashlib.sha256(b"archive-bytes").hexdigest()
+
+    _verify_checksum(archive, expected, "pbir_inspector")
+
+    assert archive.exists()
+
+
+def _write_zip_with_executable(zip_path: Path, exe_path: Path, arcname: str) -> None:
+    import zipfile
+
+    exe_path.parent.mkdir(parents=True, exist_ok=True)
+    exe_path.write_text("#!/bin/sh\necho hi", encoding="utf-8")
+    with zipfile.ZipFile(zip_path, "w") as zf:
+        zf.write(exe_path, arcname=arcname)
+
+
+@pytest.mark.fab_test
+def test_resolve_executable_verifies_checksum_before_extraction(tmp_path, monkeypatch):
+    """A correct install_sha256 verifies and resolution proceeds normally."""
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    metadata = repo_root / ".github" / "metadata" / "analyzers.json"
+    metadata.parent.mkdir(parents=True)
+    analyzer_name = "pbir_inspector"
+
+    tool_dir = tmp_path / "tool"
+    exe = tool_dir / "PBIRInspectorCLI"
+    zip_path = tmp_path / "tool.zip"
+    _write_zip_with_executable(zip_path, exe, "PBIRInspectorCLI")
+    digest = hashlib.sha256(zip_path.read_bytes()).hexdigest()
+
+    metadata.write_text(
+        json.dumps(
+            {
+                "analyzer_registry": {
+                    analyzer_name: {
+                        "tool_install": {
+                            "env_var": "PBIR_INSPECTOR_PATH",
+                            "default_path": "./PBIR-Inspector/PBIRInspectorCLI",
+                            "install_url_env_var": "PBIR_INSPECTOR_INSTALL_URL",
+                            "install_sha256": digest,
+                            "archive_type": "zip",
+                            "executable_subpath": "PBIRInspectorCLI",
+                        }
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setenv("PBIR_INSPECTOR_INSTALL_URL", zip_path.as_uri())
+    resolved = resolve_executable(analyzer_name, metadata, repo_root)
+    assert resolved.exists()
+    assert resolved.name == "PBIRInspectorCLI"
+
+
+@pytest.mark.fab_test
+def test_resolve_executable_checksum_mismatch_raises_before_extraction(
+    tmp_path, monkeypatch
+):
+    """A wrong install_sha256 raises and never extracts the archive."""
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    metadata = repo_root / ".github" / "metadata" / "analyzers.json"
+    metadata.parent.mkdir(parents=True)
+    analyzer_name = "pbir_inspector"
+
+    tool_dir = tmp_path / "tool"
+    exe = tool_dir / "PBIRInspectorCLI"
+    zip_path = tmp_path / "tool.zip"
+    _write_zip_with_executable(zip_path, exe, "PBIRInspectorCLI")
+
+    metadata.write_text(
+        json.dumps(
+            {
+                "analyzer_registry": {
+                    analyzer_name: {
+                        "tool_install": {
+                            "env_var": "PBIR_INSPECTOR_PATH",
+                            "default_path": "./PBIR-Inspector/PBIRInspectorCLI",
+                            "install_url_env_var": "PBIR_INSPECTOR_INSTALL_URL",
+                            "install_sha256": "0" * 64,
+                            "archive_type": "zip",
+                            "executable_subpath": "PBIRInspectorCLI",
+                        }
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setenv("PBIR_INSPECTOR_INSTALL_URL", zip_path.as_uri())
+    with pytest.raises(RuntimeError, match="checksum mismatch"):
+        resolve_executable(analyzer_name, metadata, repo_root)
+
+    extracted = repo_root / ".fab-test-tools" / analyzer_name / "extracted"
+    assert not extracted.exists(), "archive must not be extracted on checksum mismatch"
+
+
+@pytest.mark.fab_test
+def test_resolve_executable_no_install_sha256_skips_verification(tmp_path, monkeypatch):
+    """No install_sha256 declared preserves today's download-and-extract behavior."""
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    metadata = repo_root / ".github" / "metadata" / "analyzers.json"
+    metadata.parent.mkdir(parents=True)
+    analyzer_name = "pbir_inspector"
+
+    tool_dir = tmp_path / "tool"
+    exe = tool_dir / "PBIRInspectorCLI"
+    zip_path = tmp_path / "tool.zip"
+    _write_zip_with_executable(zip_path, exe, "PBIRInspectorCLI")
+
+    metadata.write_text(
+        json.dumps(
+            {
+                "analyzer_registry": {
+                    analyzer_name: {
+                        "tool_install": {
+                            "env_var": "PBIR_INSPECTOR_PATH",
+                            "default_path": "./PBIR-Inspector/PBIRInspectorCLI",
+                            "install_url_env_var": "PBIR_INSPECTOR_INSTALL_URL",
+                            "archive_type": "zip",
+                            "executable_subpath": "PBIRInspectorCLI",
+                        }
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setenv("PBIR_INSPECTOR_INSTALL_URL", zip_path.as_uri())
+    resolved = resolve_executable(analyzer_name, metadata, repo_root)
+    assert resolved.exists()
 
 
 # --------------------------------------------------------------------------- #

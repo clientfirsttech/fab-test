@@ -42,7 +42,7 @@ Catch malformed arguments before spawning subprocesses or touching artifacts.
 
 ---
 
-## Verify Downloaded Tool Archives
+## Verify Downloaded Tool Archives ✅
 
 Protect the tool bootstrap flow from corrupted or tampered downloads by validating checksums declared in the registry.
 

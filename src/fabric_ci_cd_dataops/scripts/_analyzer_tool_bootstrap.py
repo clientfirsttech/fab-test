@@ -13,6 +13,7 @@ executable so subsequent runs reuse it.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import sys
@@ -82,6 +83,19 @@ def _download(url: str, dest: Path, timeout: int = 120) -> None:
             if _is_ci() and total_int:
                 pct = downloaded * 100 // total_int
                 print(f"::notice::Downloading tool archive: {pct}%")
+
+
+def _verify_checksum(path: Path, expected_sha256: str, analyzer_name: str) -> None:
+    """Verify ``path``'s SHA-256 digest, deleting it and raising on mismatch."""
+    actual = hashlib.sha256(path.read_bytes()).hexdigest()
+    if actual.lower() != expected_sha256.lower():
+        path.unlink(missing_ok=True)
+        raise RuntimeError(
+            f"{analyzer_name}: downloaded archive checksum mismatch "
+            f"(expected sha256={expected_sha256}, got {actual}). "
+            "The download has been removed; check tool_install.install_sha256 "
+            "in analyzers.json or the install URL."
+        )
 
 
 def _extract_zip(zip_path: Path, extract_dir: Path) -> None:
@@ -253,11 +267,14 @@ def resolve_executable(
             f"::notice::{analyzer_name}: executable not found; downloading from "
             f"{source_name}"
         )
+        expected_sha256 = _platform_specific(tool_install, "install_sha256", platform)
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
             zip_name = _clean_url_filename(install_url)
             zip_path = tmp_path / zip_name
             _download(install_url, zip_path)
+            if expected_sha256:
+                _verify_checksum(zip_path, expected_sha256, analyzer_name)
             extract_dir = cache_dir / "extracted"
             _extract_zip(zip_path, extract_dir)
             executable = _find_executable(extract_dir, executable_subpath or "")
