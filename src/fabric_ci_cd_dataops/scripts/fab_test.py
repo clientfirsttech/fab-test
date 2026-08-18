@@ -25,6 +25,7 @@ Global flags (all subcommands):
 import argparse
 import os
 import re
+import shutil
 import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor
@@ -810,6 +811,17 @@ def build_parser() -> argparse.ArgumentParser:
         help="Path to .env file for Playwright validation",
     )
 
+    # --- clean-tools ---
+    clean_tools_p = subs.add_parser(
+        "clean-tools",
+        help="Remove or inspect the .fab-test-tools downloaded-binary cache",
+    )
+    clean_tools_p.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="List what would be removed without deleting anything",
+    )
+
     return parser
 
 
@@ -819,9 +831,32 @@ def _all_analyzers(args: argparse.Namespace) -> tuple[str, ...]:
     return _load_fab_test_all_analyzers(metadata_path)
 
 
+def _clean_tools(repo_root: Path, dry_run: bool) -> int:
+    """Remove (or preview removing) the .fab-test-tools cache directory."""
+    cache_dir = repo_root / ".fab-test-tools"
+    if not cache_dir.exists():
+        print("  ✓ fab-test clean-tools: nothing to clean (.fab-test-tools does not exist)")
+        return 0
+
+    if dry_run:
+        files = sorted(p for p in cache_dir.rglob("*") if p.is_file())
+        print(f"fab-test clean-tools — dry run, would remove {cache_dir}:")
+        for f in files:
+            print(f"  • {f.relative_to(cache_dir)}")
+        return 0
+
+    shutil.rmtree(cache_dir)
+    print(f"  ✓ fab-test clean-tools: removed {cache_dir}")
+    return 0
+
+
 def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
+
+    if args.analyzer == "clean-tools":
+        return _clean_tools(REPO_ROOT, args.dry_run)
+
     _apply_environment_default(args, _PYPROJECT_CONFIG)
     output_dir = Path(args.output_dir)
 

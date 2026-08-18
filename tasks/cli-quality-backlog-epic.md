@@ -86,7 +86,7 @@ Let teams commit per-project defaults in `pyproject.toml` instead of relying sol
 
 ---
 
-## Add Tool-Cache Management Command
+## Add Tool-Cache Management Command ✅
 
 Give users a first-class way to inspect and clear the `.fab-test-tools` cache.
 
