@@ -53,7 +53,7 @@ Protect the tool bootstrap flow from corrupted or tampered downloads by validati
 
 ---
 
-## Configurable Subprocess Timeout
+## Configurable Subprocess Timeout ✅
 
 Make the per-artifact timeout user-tunable instead of hard-coded at 120 seconds.
 
