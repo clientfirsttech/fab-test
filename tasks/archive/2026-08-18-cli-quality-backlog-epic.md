@@ -1,6 +1,6 @@
 # CLI Quality Backlog Epic
 
-**Status**: 📋 PLANNED
+**Status**: ✅ COMPLETED (2026-08-18)
 **Goal**: Harden `fab-test` into a predictable, fast, and CI-friendly CLI.
 
 ## Overview
