@@ -37,6 +37,6 @@ apm.yml
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
-
+.fab-test-tools/**
 # Local analyzer output
 analyzer-results/
