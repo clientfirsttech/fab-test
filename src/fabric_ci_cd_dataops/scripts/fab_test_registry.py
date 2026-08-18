@@ -15,7 +15,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from ._analyzer_tool_bootstrap import resolve_executable
+from ._analyzer_tool_bootstrap import UnsupportedPlatformError, resolve_executable
 
 # Reuse the same repo-root logic as fab_test.py so paths stay consistent.
 
@@ -348,15 +348,22 @@ def resolve_tool(name: str, args: argparse.Namespace) -> Path | None:
     return resolved
 
 
-def preflight_error(name: str, args: argparse.Namespace) -> str | None:
-    """Return a clean error string if a required tool is missing, else None."""
+def preflight_error(name: str, args: argparse.Namespace) -> tuple[str, int] | None:
+    """Return an (error message, exit code) pair if a required tool is missing.
+
+    Exit code 126 signals the tool exists but is unsupported on this platform
+    ("command found but not executable" — the closest POSIX convention);
+    exit code 1 covers any other resolution failure.
+    """
     if name not in _BOOTSTRAPPED_ANALYZERS:
         return None
     try:
         resolve_tool(name, args)
         return None
+    except UnsupportedPlatformError as exc:
+        return str(exc), 126
     except RuntimeError as exc:
-        return str(exc)
+        return str(exc), 1
 
 
 def build_command(

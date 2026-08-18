@@ -278,8 +278,9 @@ def _run_analyzer(name: str, args: argparse.Namespace, output_dir: Path) -> int:
     # Pre-flight: check required tools exist before invoking subprocesses.
     preflight_err = _preflight_error(name, args)
     if preflight_err:
-        print(f"\n  ✗ fab-test {name}: missing prerequisite\n  {preflight_err}\n")
-        return 1
+        message, exit_code = preflight_err
+        print(f"\n  ✗ fab-test {name}: missing prerequisite\n  {message}\n")
+        return exit_code
 
     results: list[tuple[str, int]] = []
     in_ci = _is_ci()
@@ -421,6 +422,11 @@ def build_parser() -> argparse.ArgumentParser:
             "  fab-test bpa       runs BPA against your actual .fabric artifacts"
         ),
         epilog=(
+            "Exit codes:\n"
+            "  0    All artifacts passed (warnings do not fail the build)\n"
+            "  1    An analyzer found error-level findings, or a tool crashed\n"
+            "  2    Invalid CLI arguments (no analyzer was invoked)\n"
+            "  126  Analyzer unsupported on this platform (see message for the supported OS)\n\n"
             f"Version: {_FAB_TEST_VERSION} | "
             "Docs: https://github.com/kerski/fabric-ci-cd-dataops/blob/main/docs/QUICK-VALIDATION.md"
         ),

@@ -8,7 +8,7 @@ Users rely on `fab-test` inside CI pipelines and local dev loops. As the analyze
 
 ---
 
-## Document Exit-Code Contract
+## Document Exit-Code Contract ✅
 
 Define and surface explicit exit codes so CI pipelines can branch on the failure reason.
 

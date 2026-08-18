@@ -23,7 +23,10 @@ from pathlib import Path
 import pytest
 
 from fabric_ci_cd_dataops import __version__ as fab_test_version
-from fabric_ci_cd_dataops.scripts._analyzer_tool_bootstrap import resolve_executable
+from fabric_ci_cd_dataops.scripts._analyzer_tool_bootstrap import (
+    UnsupportedPlatformError,
+    resolve_executable,
+)
 from fabric_ci_cd_dataops.scripts.fab_test import (
     _artifact_exit_code,
     _load_fab_test_all_analyzers,
@@ -32,7 +35,10 @@ from fabric_ci_cd_dataops.scripts.fab_test import (
     _run_analyzer,
     _telemetry_enabled,
 )
-from fabric_ci_cd_dataops.scripts.fab_test_registry import build_pql_test_command
+from fabric_ci_cd_dataops.scripts.fab_test_registry import (
+    build_pql_test_command,
+    preflight_error,
+)
 from fabric_ci_cd_dataops.scripts.fab_test_summary import (
     _format_findings,
     _is_pql_test_finding,
@@ -1027,6 +1033,72 @@ def test_artifact_exit_code_clean_run_returns_zero():
     assert _artifact_exit_code(0, {"findings": []}) == 0
 
 
+@pytest.mark.fab_test
+def test_cli_help_lists_exit_codes():
+    """--help epilog documents every exit code and its meaning, for CI branching."""
+    result = subprocess.run(
+        ["fab-test", "--help"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "Exit codes:" in result.stdout
+    for code in ("0", "1", "2", "126"):
+        assert code in result.stdout, f"exit code {code} missing from --help epilog"
+
+
+@pytest.mark.fab_test
+def test_cli_invalid_argument_exits_with_code_2():
+    """An unrecognized flag must exit 2 before any analyzer runs."""
+    result = subprocess.run(
+        ["fab-test", "bpa", "--not-a-real-flag"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 2, result.stderr
+
+
+@pytest.mark.fab_test
+def test_preflight_error_platform_mismatch_returns_exit_code_126(monkeypatch):
+    """A platform-only analyzer on an unsupported OS reports exit code 126."""
+    from fabric_ci_cd_dataops.scripts import fab_test_registry as registry
+
+    def _raise_unsupported(*_args, **_kwargs):
+        raise UnsupportedPlatformError(
+            "Analyzer 'bpa' is not supported on linux. Supported platform: win32."
+        )
+
+    monkeypatch.setattr(registry, "resolve_tool", _raise_unsupported)
+    message, code = preflight_error("bpa", argparse.Namespace())
+    assert code == 126
+    assert "not supported on linux" in message
+
+
+@pytest.mark.fab_test
+def test_preflight_error_other_runtime_error_returns_exit_code_1(monkeypatch):
+    """A non-platform tool-resolution failure keeps the existing exit code 1."""
+    from fabric_ci_cd_dataops.scripts import fab_test_registry as registry
+
+    def _raise_generic(*_args, **_kwargs):
+        raise RuntimeError("could not download TabularEditor.exe")
+
+    monkeypatch.setattr(registry, "resolve_tool", _raise_generic)
+    message, code = preflight_error("bpa", argparse.Namespace())
+    assert code == 1
+    assert "could not download" in message
+
+
+@pytest.mark.fab_test
+def test_preflight_error_none_when_tool_resolves(monkeypatch):
+    """No preflight error is returned when the tool resolves successfully."""
+    from fabric_ci_cd_dataops.scripts import fab_test_registry as registry
+
+    monkeypatch.setattr(registry, "resolve_tool", lambda *a, **k: Path("/tmp/te.exe"))
+    assert preflight_error("bpa", argparse.Namespace()) is None
+
+
 # --------------------------------------------------------------------------- #
 # Telemetry gating
 # --------------------------------------------------------------------------- #
@@ -1349,7 +1421,7 @@ def test_resolve_executable_requires_platform_mismatch_raises(tmp_path, monkeypa
     monkeypatch.delenv("PBIR_INSPECTOR_PATH", raising=False)
 
     with unittest.mock.patch("sys.platform", "win32"):
-        with pytest.raises(RuntimeError, match="not supported on win32"):
+        with pytest.raises(UnsupportedPlatformError, match="not supported on win32"):
             resolve_executable(analyzer_name, metadata, repo_root)
 
 
