@@ -30,6 +30,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from fabric_ci_cd_dataops import __version__ as _FAB_TEST_VERSION
+
 from ._analyzer_annotations import (
     emit_pr_review_comments,
     emit_workflow_annotations,
@@ -418,7 +420,18 @@ def build_parser() -> argparse.ArgumentParser:
             "  pytest -m bpa      tests the BPA wrapper (always green)\n"
             "  fab-test bpa       runs BPA against your actual .fabric artifacts"
         ),
+        epilog=(
+            f"Version: {_FAB_TEST_VERSION} | "
+            "Docs: https://github.com/kerski/fabric-ci-cd-dataops/blob/main/docs/QUICK-VALIDATION.md"
+        ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument(
+        "--version",
+        "-V",
+        action="version",
+        version=f"%(prog)s {_FAB_TEST_VERSION}",
+        help="Show fab-test version and exit",
     )
 
     subs = parser.add_subparsers(dest="analyzer", metavar="ANALYZER")
