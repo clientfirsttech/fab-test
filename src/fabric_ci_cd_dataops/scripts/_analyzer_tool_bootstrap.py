@@ -120,6 +120,36 @@ def _clean_url_filename(url: str) -> str:
     return name.split("?")[0].split("#")[0]
 
 
+def _current_platform() -> str:
+    """Return a normalized platform key matching analyzers.json conventions.
+
+    Values: ``linux``, ``win32``, ``darwin``.
+    """
+    plat = sys.platform
+    if plat.startswith("linux"):
+        return "linux"
+    if plat == "darwin":
+        return "darwin"
+    if plat == "win32":
+        return "win32"
+    return plat
+
+
+def _platform_specific(
+    tool_install: dict[str, Any], key: str, platform: str
+) -> str | None:
+    """Return the platform-specific value for ``key`` if it exists.
+
+    Falls back to the legacy single value when no platform-specific map exists.
+    """
+    mapping = tool_install.get(f"{key}s")
+    if isinstance(mapping, dict):
+        value = mapping.get(platform)
+        if value:
+            return str(value)
+    return tool_install.get(key) or None
+
+
 def load_analyzer_config(metadata_path: Path, analyzer_name: str) -> dict[str, Any] | None:
     """Load the analyzer registry entry from ``analyzers.json``."""
     if not metadata_path.exists():
@@ -171,9 +201,23 @@ def resolve_executable(
     env_var = tool_install.get("env_var", "")
     default_path = tool_install.get("default_path", "")
     install_url_env_var = tool_install.get("install_url_env_var", "")
-    committed_install_url = tool_install.get("install_url", "")
     archive_type = tool_install.get("archive_type", "zip")
-    executable_subpath = tool_install.get("executable_subpath", "")
+
+    platform = _current_platform()
+    requires_platform = tool_install.get("requires_platform")
+    if requires_platform and platform != requires_platform:
+        raise RuntimeError(
+            f"Analyzer '{analyzer_name}' is not supported on {platform}. "
+            f"Supported platform: {requires_platform}. "
+            f"Set {env_var}=<path> to use a manually provided executable."
+        )
+
+    committed_install_url = _platform_specific(
+        tool_install, "install_url", platform
+    )
+    executable_subpath = _platform_specific(
+        tool_install, "executable_subpath", platform
+    )
 
     def _usable(path: Path) -> bool:
         return path.exists() and path.is_file()
@@ -191,18 +235,19 @@ def resolve_executable(
         if _usable(path):
             return path.resolve()
 
-    cache_dir = _cache_root(repo_root) / analyzer_name
+    cache_dir = _cache_root(repo_root) / analyzer_name / platform
     cached = _read_marker(cache_dir)
     if cached:
         return cached.resolve()
 
     install_url = _env(install_url_env_var, "") if install_url_env_var else ""
-    if not install_url and committed_install_url:
-        install_url = committed_install_url
+    if not install_url:
+        install_url = committed_install_url or ""
     if install_url and archive_type.lower() == "zip":
+        source_name = install_url_env_var if _env(install_url_env_var, "") else "analyzers.json"
         print(
             f"::notice::{analyzer_name}: executable not found; downloading from "
-            f"{install_url_env_var}"
+            f"{source_name}"
         )
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
@@ -211,7 +256,7 @@ def resolve_executable(
             _download(install_url, zip_path)
             extract_dir = cache_dir / "extracted"
             _extract_zip(zip_path, extract_dir)
-            executable = _find_executable(extract_dir, executable_subpath)
+            executable = _find_executable(extract_dir, executable_subpath or "")
             if executable is None:
                 raise RuntimeError(
                     f"Could not locate executable for {analyzer_name} inside "
