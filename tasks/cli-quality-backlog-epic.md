@@ -108,7 +108,7 @@ Reduce typos and speed up artifact selection with tab completion.
 
 ---
 
-## Normalize Subcommand Aliases
+## Normalize Subcommand Aliases ✅
 
 Accept common hyphenated spellings without breaking existing underscore usage.
 
