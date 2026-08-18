@@ -91,7 +91,7 @@
       "args": ["scripts/invoke_tabular_editor_bpa.py", "--tmdl-path", "{artifact_path}", "--bpa-rules-path", ".github/metadata/rules/BPARules.json", "--tabular-editor-path", "./TabularEditor/TabularEditor.exe", "--output-path", "{output_path}"],
       "description": "Tabular Editor Best Practice Analyzer for semantic models (Windows executable invoked from Python)",
       "exit_code_success": 0,
-      "requires_platform": "windows",
+      "requires_platform": "win32",
       "native_output": {"extension": "xml", "format": "TRX"},
       "reference": "https://www.kerski.tech/making-your-power-bi-teams-more-analytic-with-fabric-5-semantic-model-analysis/",
       "tool_install": {
@@ -100,7 +100,7 @@
         "install_url_env_var": "TABULAR_EDITOR_INSTALL_URL",
         "install_url": "https://cdn.tabulareditor.com/files/TabularEditor.2.28.0.zip",
         "archive_type": "zip",
-        "requires_platform": "windows",
+        "requires_platform": "win32",
         "executable_subpath": "TabularEditor.exe"
       }
     }
