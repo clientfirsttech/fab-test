@@ -1,0 +1,114 @@
+name: Dynamic Visual Validation
+
+on:
+  workflow_run:
+    workflows:
+      - Orchestrator
+    types:
+      - completed
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  PLAYWRIGHT_RESULTS_ROOT: analyzer-results/playwright
+
+jobs:
+  prepare:
+    name: Prepare Visual Validation Matrix
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    outputs:
+      has_targets: ${{ steps.targets.outputs.has_targets }}
+      environment: ${{ steps.environment.outputs.environment }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Determine environment from branch
+        id: environment
+        run: |
+          BRANCH="${{ github.ref_name }}"
+          case "$BRANCH" in
+            develop)
+              ENV_LABEL="DEV"
+              ;;
+            main)
+              ENV_LABEL="PROD"
+              ;;
+            *)
+              ENV_LABEL="ANY"
+              ;;
+          esac
+          echo "environment=$ENV_LABEL" >> $GITHUB_OUTPUT
+          echo "### 🌍 Dynamic Visual Validation Environment" >> $GITHUB_STEP_SUMMARY
+          echo "Branch: $BRANCH → Environment: $ENV_LABEL" >> $GITHUB_STEP_SUMMARY
+
+      - name: Check Playwright target configuration
+        id: targets
+        run: |
+          if [ -f ".env.playwright" ] || [ -f ".env" ]; then
+            echo "has_targets=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_targets=false" >> $GITHUB_OUTPUT
+            echo "::notice::No .env.playwright or .env file found; skipping visual validation."
+          fi
+
+  playwright:
+    name: Playwright Visual Validation
+    needs: [prepare]
+    if: needs.prepare.outputs.has_targets == 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ needs.prepare.outputs.environment }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python virtual environment
+        uses: ./.github/actions/setup-venv
+
+      - name: Install Playwright browsers
+        run: $VENV_PYTHON -m playwright install chromium
+
+      - name: Check Fabric credentials
+        id: credentials
+        run: |
+          if [ -z "${{ secrets.FABRIC_SERVICE_PRINCIPAL_ID }}" ] || [ -z "${{ secrets.FABRIC_SERVICE_PRINCIPAL_SECRET }}" ] || [ -z "${{ secrets.FABRIC_TENANT_ID }}" ]; then
+            echo "has_credentials=false" >> $GITHUB_OUTPUT
+            echo "::warning::Fabric service principal credentials are missing; skipping Playwright visual validation."
+          else
+            echo "has_credentials=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run Playwright validation via fab-test
+        if: steps.credentials.outputs.has_credentials == 'true'
+        env:
+          FABRIC_SERVICE_PRINCIPAL_ID: ${{ secrets.FABRIC_SERVICE_PRINCIPAL_ID }}
+          FABRIC_SERVICE_PRINCIPAL_SECRET: ${{ secrets.FABRIC_SERVICE_PRINCIPAL_SECRET }}
+          FABRIC_TENANT_ID: ${{ secrets.FABRIC_TENANT_ID }}
+          FABRIC_ENVIRONMENT: ${{ needs.prepare.outputs.environment }}
+          ENABLE_EVENTHOUSE_LOGGING: ${{ vars.ENABLE_EVENTHOUSE_LOGGING || 'false' }}
+          EVENTHOUSE_URI: ${{ secrets.EVENTHOUSE_URI }}
+          EVENTHOUSE_DATABASE: ${{ vars.EVENTHOUSE_DATABASE }}
+        run: |
+          echo "### 🎭 Playwright visual validation" >> $GITHUB_STEP_SUMMARY
+          fab-test playwright --format json
+
+      - name: Upload Playwright report and evidence
+        if: always() && steps.credentials.outputs.has_credentials == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-visual-validation-${{ github.run_id }}
+          path: |
+            analyzer-results/playwright/**
+            playwright-report/
+            test-results/
+          retention-days: 7
+
+      - name: Skip Playwright without credentials
+        if: steps.credentials.outputs.has_credentials == 'false'
+        run: |
+          echo "::notice::Skipped Playwright visual validation due to missing credentials."

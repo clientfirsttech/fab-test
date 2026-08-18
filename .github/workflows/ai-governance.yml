@@ -1,0 +1,242 @@
+name: AI Governance Validation
+
+on:
+  workflow_call:
+    inputs:
+      validation_type:
+        required: false
+        type: string
+        default: 'both'
+        description: Type of validation to require (static, dynamic, or both)
+    outputs:
+      validation_passed:
+        description: Whether AI governance validation passed
+        value: ${{ jobs.ai-validation.outputs.validation_passed }}
+      evidence_artifact:
+        description: Name of the validation evidence artifact
+        value: ${{ jobs.ai-validation.outputs.evidence_artifact }}
+
+permissions:
+  contents: read
+
+jobs:
+  ai-validation:
+    name: AI Governance Validation
+    runs-on: ubuntu-latest
+    
+    outputs:
+      validation_passed: ${{ steps.check.outputs.validation_passed }}
+      evidence_artifact: ${{ steps.check.outputs.evidence_artifact }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2  # Need at least 2 commits to compare
+      
+      - name: Set up Python virtual environment
+        uses: ./.github/actions/setup-venv
+      
+      - name: Detect AI-originated changes
+        id: detect_ai
+        run: |
+          echo "### 🤖 AI Governance Validation" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Check commit messages and PR metadata for AI authorship indicators
+          AI_INDICATORS=(
+            "github-copilot"
+            "copilot"
+            "ai-generated"
+            "llm-generated"
+            "automated-agent"
+            "github-agentic"
+          )
+          
+          # Check last commit message
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          COMMIT_AUTHOR=$(git log -1 --pretty=%an)
+          
+          AI_ORIGINATED=false
+          
+          # Check for AI indicators in commit message or author
+          for indicator in "${AI_INDICATORS[@]}"; do
+            if echo "$COMMIT_MSG" | grep -qi "$indicator"; then
+              AI_ORIGINATED=true
+              echo "Detected AI indicator in commit message: $indicator"
+              break
+            fi
+            if echo "$COMMIT_AUTHOR" | grep -qi "$indicator"; then
+              AI_ORIGINATED=true
+              echo "Detected AI indicator in commit author: $indicator"
+              break
+            fi
+          done
+          
+          # Check for GitHub Copilot workspace metadata
+          if [ -f ".github/copilot-metadata.json" ]; then
+            AI_ORIGINATED=true
+            echo "Detected Copilot metadata file"
+          fi
+          
+          # Check for agentic workflow labels
+          if [ -n "${{ github.event.pull_request.number }}" ]; then
+            # This would check PR labels in a real implementation
+            # For now, check PR title
+            PR_TITLE="${{ github.event.pull_request.title }}"
+            for indicator in "${AI_INDICATORS[@]}"; do
+              if echo "$PR_TITLE" | grep -qi "$indicator"; then
+                AI_ORIGINATED=true
+                echo "Detected AI indicator in PR title: $indicator"
+                break
+              fi
+            done
+          fi
+          
+          echo "ai_originated=$AI_ORIGINATED" >> $GITHUB_OUTPUT
+          
+          if [ "$AI_ORIGINATED" == "true" ]; then
+            echo "🤖 **AI-Originated Changes Detected**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Commit: $COMMIT_MSG" >> $GITHUB_STEP_SUMMARY
+            echo "Author: $COMMIT_AUTHOR" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Constraint C7**: AI-generated workflows require validation evidence." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "ℹ️  No AI-originated changes detected" >> $GITHUB_STEP_SUMMARY
+            echo "Skipping AI governance validation" >> $GITHUB_STEP_SUMMARY
+          fi
+      
+      - name: Check for validation evidence
+        id: check
+        if: steps.detect_ai.outputs.ai_originated == 'true'
+        run: |
+          echo "🔍 Checking for validation evidence" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          VALIDATION_TYPE="${{ inputs.validation_type }}"
+          STATIC_EVIDENCE=false
+          DYNAMIC_EVIDENCE=false
+          
+          # Check for static validation evidence artifacts
+          if [ -d "results" ]; then
+            if ls results/*-static-analysis-*.json 1> /dev/null 2>&1; then
+              STATIC_EVIDENCE=true
+              echo "✅ Found static analysis evidence" >> $GITHUB_STEP_SUMMARY
+            fi
+          fi
+          
+          # Check for dynamic validation evidence artifacts
+          if [ -d "results" ]; then
+            if ls results/*-dynamic-validation-*.json 1> /dev/null 2>&1; then
+              DYNAMIC_EVIDENCE=true
+              echo "✅ Found dynamic validation evidence" >> $GITHUB_STEP_SUMMARY
+            fi
+          fi
+          
+          # Check downloaded artifacts from previous jobs
+          if ls static-analysis-* 1> /dev/null 2>&1; then
+            STATIC_EVIDENCE=true
+            echo "✅ Found static analysis artifacts" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if ls dynamic-validation-* 1> /dev/null 2>&1; then
+            DYNAMIC_EVIDENCE=true
+            echo "✅ Found dynamic validation artifacts" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          # Determine if validation passed based on required type
+          VALIDATION_PASSED=false
+          
+          case "$VALIDATION_TYPE" in
+            static)
+              if [ "$STATIC_EVIDENCE" == "true" ]; then
+                VALIDATION_PASSED=true
+              fi
+              ;;
+            dynamic)
+              if [ "$DYNAMIC_EVIDENCE" == "true" ]; then
+                VALIDATION_PASSED=true
+              fi
+              ;;
+            both)
+              if [ "$STATIC_EVIDENCE" == "true" ] && [ "$DYNAMIC_EVIDENCE" == "true" ]; then
+                VALIDATION_PASSED=true
+              fi
+              ;;
+          esac
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "$VALIDATION_PASSED" == "true" ]; then
+            echo "validation_passed=true" >> $GITHUB_OUTPUT
+            echo "✅ **AI Governance Validation**: PASSED" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Required validation type: $VALIDATION_TYPE" >> $GITHUB_STEP_SUMMARY
+            echo "Static evidence: $STATIC_EVIDENCE" >> $GITHUB_STEP_SUMMARY
+            echo "Dynamic evidence: $DYNAMIC_EVIDENCE" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "validation_passed=false" >> $GITHUB_OUTPUT
+            echo "❌ **AI Governance Validation**: FAILED" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Required validation type: $VALIDATION_TYPE" >> $GITHUB_STEP_SUMMARY
+            echo "Static evidence: $STATIC_EVIDENCE" >> $GITHUB_STEP_SUMMARY
+            echo "Dynamic evidence: $DYNAMIC_EVIDENCE" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Action Required**: AI-generated changes must provide validation evidence." >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "evidence_artifact=ai-validation-evidence" >> $GITHUB_OUTPUT
+      
+      - name: Skip validation for non-AI changes
+        id: skip
+        if: steps.detect_ai.outputs.ai_originated != 'true'
+        run: |
+          echo "validation_passed=true" >> $GITHUB_OUTPUT
+          echo "evidence_artifact=none" >> $GITHUB_OUTPUT
+      
+      - name: Create validation evidence artifact
+        if: steps.detect_ai.outputs.ai_originated == 'true'
+        run: |
+          mkdir -p ai-validation-evidence
+
+          # Create evidence manifest
+          jq -n \
+            --arg commit "${{ github.sha }}" \
+            --arg author "$(git log -1 --pretty=%an)" \
+            --arg message "$(git log -1 --pretty=%B | head -1)" \
+            --arg timestamp "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --arg validation_type "${{ inputs.validation_type }}" \
+            --arg validation_passed "${{ steps.check.outputs.validation_passed }}" \
+            '{
+              commit: $commit,
+              author: $author,
+              message: $message,
+              timestamp: $timestamp,
+              validation_type: $validation_type,
+              static_evidence: ($validation_passed == "true"),
+              dynamic_evidence: ($validation_passed == "true"),
+              validation_passed: $validation_passed
+            }' > ai-validation-evidence/manifest.json
+
+          # Copy validation artifacts if they exist
+          if [ -d "results" ]; then
+            cp -r results/* ai-validation-evidence/ 2>/dev/null || true
+          fi
+      
+      - name: Upload validation evidence
+        if: steps.detect_ai.outputs.ai_originated == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-validation-evidence
+          path: ai-validation-evidence/
+          retention-days: 90
+      
+      - name: Block on missing evidence (Constraint C7)
+        if: steps.check.outputs.validation_passed == 'false'
+        run: |
+          echo "::error::AI-originated changes detected without required validation evidence. Deployment blocked per Constraint C7."
+          echo "::error::Required validation type: ${{ inputs.validation_type }}"
+          echo "::error::Please ensure static and/or dynamic validation has run successfully before deploying AI-generated code."
+          exit 1

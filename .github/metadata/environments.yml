@@ -1,0 +1,84 @@
+# Environment configuration - single source of truth
+#
+# This file merges the legacy `environments.json` and `fabric-cicd-config.yml`
+# into one metadata-driven config. Users only need to update this file to map
+# branches to environments and workspaces.
+#
+# Workspace IDs are metadata, not secrets. Keep them empty in this file and
+# supply them at runtime via FABRIC_WORKSPACE_ID or GitHub Secrets.
+
+promotion_chain:
+  - testbed
+  - dev
+  - test
+  - prod
+
+defaults:
+  repository_directory: ".fabric/artifacts"
+  item_type_in_scope:
+    - "*"
+
+environments:
+  testbed:
+    description: "Isolated workspace for artifact validation and behavior testing"
+    workspace_id: "dbd3ca4f-1cad-4037-b78b-4823e9e7d912"
+    allowed_branches:
+      - testbed
+      - "feature/**"
+      - "release/**"
+    promotion_target: dev
+    requires_validation: true
+    requires_security_scan: true
+    requires_ai_validation: true
+    allows_rollback: true
+
+  dev:
+    description: "Development environment"
+    workspace_id: "859d238b-2a35-480a-a3e8-4aea7b281a17"
+    allowed_branches:
+      - develop
+      - "feature/**"
+      - "release/**"
+    promotion_target: test
+    previous_environment: testbed
+    requires_validation: true
+    requires_security_scan: true
+    requires_ai_validation: false
+    allows_rollback: true
+
+  test:
+    description: "Testing environment"
+    workspace_id: ""
+    allowed_branches:
+      - develop
+      - "feature/**"
+      - "release/**"
+    promotion_target: prod
+    previous_environment: dev
+    requires_validation: true
+    requires_security_scan: true
+    requires_ai_validation: false
+    allows_rollback: true
+
+  prod:
+    description: "Production environment"
+    workspace_id: ""
+    allowed_branches:
+      - main
+    promotion_target: null
+    previous_environment: test
+    requires_validation: true
+    requires_security_scan: true
+    requires_ai_validation: false
+    allows_rollback: true
+    deployment_window:
+      enabled: false
+      allowed_days:
+        - Monday
+        - Tuesday
+        - Wednesday
+        - Thursday
+      allowed_hours_utc:
+        start: "09:00"
+        end: "17:00"
+    approval_required: true

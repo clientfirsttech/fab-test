@@ -1,0 +1,32 @@
+/// Table containing timezone information for time calculations
+table Timezone
+	lineageTag: 51ec0b03-633a-4b4c-a99b-a44a795a78d3
+
+	column Timezone
+		lineageTag: 5ff59e6a-9f74-4325-9290-0415426a7c7e
+		sourceColumn: [Value1]
+
+	column UTC_Offset_Hours
+		lineageTag: 89def695-d0b4-42a2-ab7f-719058428b27
+		sourceColumn: [Value2]
+
+	column Display_Name
+		lineageTag: e05115d2-5a75-4e1a-a205-e8a1a99e9fad
+		sourceColumn: [Value3]
+
+	partition Timezone = calculated
+		mode: import
+		source =
+				{
+				    ("UTC", 0, "UTC (Coordinated Universal Time)"),
+				    ("EST", -5, "EST (Eastern Standard Time)"),
+				    ("CST", -6, "CST (Central Standard Time)"),
+				    ("MST", -7, "MST (Mountain Standard Time)"),
+				    ("PST", -8, "PST (Pacific Standard Time)"),
+				    ("GMT", 0, "GMT (Greenwich Mean Time)"),
+				    ("CET", 1, "CET (Central European Time)"),
+				    ("JST", 9, "JST (Japan Standard Time)"),
+				    ("AEST", 10, "AEST (Australian Eastern Standard Time)"),
+				    ("IST", 5.5, "IST (India Standard Time)")
+				}
+

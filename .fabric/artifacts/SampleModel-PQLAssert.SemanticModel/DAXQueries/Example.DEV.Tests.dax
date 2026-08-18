@@ -1,0 +1,28 @@
+DEFINE
+
+	FUNCTION Example.DEV.Tests = () => 
+	
+		VAR __GoodFilter = 
+		TREATAS({"Good"}, 'AlignmentDim'[Alignment])
+
+		VAR __DateFilter = 
+			TREATAS({DATE(1939, 11, 1)}, 'DateDim'[Date])
+
+		VAR _Test1 = 
+			SUMMARIZECOLUMNS(
+				__GoodFilter,
+				__DateFilter,
+				"Number_of_Characters", IGNORE('MarvelFact'[Number of Characters])
+			)
+			
+		VAR _Test2 =
+		SUMMARIZECOLUMNS(
+			__GoodFilter,
+			"Number_of_Characters", IGNORE('MarvelFact'[Number of Characters])
+		)
+			
+		RETURN UNION(
+			PQL.Assert.ShouldNotBeNullOrBlank("Number of Characters should not be blank or null",_Test1),
+			PQL.Assert.ShouldEqual("Number of Good Aligned Characters is 4636",4636,_Test2))
+
+EVALUATE Example.DEV.Tests()

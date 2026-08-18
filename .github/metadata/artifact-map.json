@@ -1,0 +1,11 @@
+{
+  ".SemanticModel": "SemanticModel",
+  ".Report": "Report",
+  ".Agent": "Agent",
+  ".Notebook": "Notebook",
+  ".Dataflow": "Dataflow",
+  ".Eventhouse": "Eventhouse",
+  ".Warehouse": "Warehouse",
+  ".Lakehouse": "Lakehouse",
+  ".Environment": "Environment"
+}

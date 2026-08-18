@@ -1,0 +1,43 @@
+name: Build package
+
+on:
+  pull_request:
+  push:
+    branches: [main, develop]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build tools
+        run: pip install build
+
+      - name: Build wheel and sdist
+        run: python -m build
+
+      - name: Check wheel hygiene
+        run: |
+          set -e
+          pip install unzip
+          unzip -l dist/*.whl | grep -E "(\.github|\.fabric|docs/|tests/|TabularEditor|PBIR-Inspector|analyzer-results|\.venv|\.env|bandit-report|bpa-results|coverage\.json)" && { echo "Excluded path found in wheel"; exit 1; } || true
+
+      - name: Test install in clean venv
+        run: |
+          set -e
+          python -m venv /tmp/venv
+          /tmp/venv/bin/pip install dist/*.whl
+          /tmp/venv/bin/fab-test --help
+          /tmp/venv/bin/smoke-test-orchestrator --help
+          /tmp/venv/bin/smoke-test-pql-test --help
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/*

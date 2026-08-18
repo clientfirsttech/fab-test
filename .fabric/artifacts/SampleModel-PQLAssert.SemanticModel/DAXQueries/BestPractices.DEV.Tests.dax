@@ -1,0 +1,17 @@
+DEFINE
+	FUNCTION BestPractices.DEV.Tests = () =>
+	UNION (
+		// Error Prevention checks
+		PQL.Assert.BP.CheckErrorPrevention(),
+		
+		// Formatting checks
+		PQL.Assert.BP.CheckFormatting(),
+		
+		// DAX Expression checks
+		PQL.Assert.BP.CheckDAXExpressions(),
+		
+		// Performance checks
+		PQL.Assert.BP.CheckPerformance()
+	)
+
+EVALUATE BestPractices.DEV.Tests()

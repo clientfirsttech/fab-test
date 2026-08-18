@@ -1,0 +1,9 @@
+DEFINE
+
+	FUNCTION QuickChecks.PROD.Tests = () =>
+		UNION(
+			PQL.Assert.Tbl.ShouldHaveRows("AlignmentDim Should Have Rows",'AlignmentDim'),
+			PQL.Assert.Col.ShouldBeDistinct("There should be no duplicates in EyeColorDim", EyeColorDim[EyeID])
+		)
+		
+EVALUATE QuickChecks.PROD.Tests()
