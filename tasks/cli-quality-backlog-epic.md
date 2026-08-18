@@ -97,7 +97,7 @@ Give users a first-class way to inspect and clear the `.fab-test-tools` cache.
 
 ---
 
-## Generate Shell Completions
+## Generate Shell Completions ✅
 
 Reduce typos and speed up artifact selection with tab completion.
 
