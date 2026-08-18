@@ -32,6 +32,7 @@ from fabric_ci_cd_dataops.scripts._analyzer_tool_bootstrap import (
 from fabric_ci_cd_dataops.scripts.fab_test import (
     _apply_environment_default,
     _artifact_exit_code,
+    _clean_tools,
     _load_fab_test_all_analyzers,
     _load_pyproject_config,
     _print_all_summary,
@@ -2064,6 +2065,80 @@ def test_main_applies_environment_default_before_dispatch(monkeypatch):
     monkeypatch.setattr(sys, "argv", ["fab-test", "pql_test", "--dry-run"])
     fab_test_module.main()
     assert calls and calls[0][0] == "pql_test"
+
+
+# --------------------------------------------------------------------------- #
+# Tool-cache management command (clean-tools)
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.fab_test
+def test_clean_tools_help_exits_zero():
+    """fab-test clean-tools --help exits 0."""
+    result = subprocess.run(
+        ["fab-test", "clean-tools", "--help"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.fab_test
+def test_clean_tools_removes_existing_cache_dir(tmp_path, capsys):
+    """clean-tools deletes .fab-test-tools and prints a confirmation."""
+    cache_dir = tmp_path / ".fab-test-tools"
+    (cache_dir / "pbir_inspector").mkdir(parents=True)
+    (cache_dir / "pbir_inspector" / "tool.exe").write_text("x", encoding="utf-8")
+
+    code = _clean_tools(tmp_path, dry_run=False)
+    captured = capsys.readouterr()
+
+    assert code == 0
+    assert not cache_dir.exists()
+    assert "removed" in captured.out
+    assert str(cache_dir) in captured.out
+
+
+@pytest.mark.fab_test
+def test_clean_tools_dry_run_lists_without_deleting(tmp_path, capsys):
+    """--dry-run lists what would be removed without deleting anything."""
+    cache_dir = tmp_path / ".fab-test-tools"
+    (cache_dir / "pbir_inspector").mkdir(parents=True)
+    (cache_dir / "pbir_inspector" / "tool.exe").write_text("x", encoding="utf-8")
+
+    code = _clean_tools(tmp_path, dry_run=True)
+    captured = capsys.readouterr()
+
+    assert code == 0
+    assert cache_dir.exists()
+    assert (cache_dir / "pbir_inspector" / "tool.exe").exists()
+    assert "tool.exe" in captured.out
+
+
+@pytest.mark.fab_test
+def test_clean_tools_nothing_to_clean_when_missing(tmp_path, capsys):
+    """A missing .fab-test-tools cache exits cleanly with a clear message."""
+    code = _clean_tools(tmp_path, dry_run=False)
+    captured = capsys.readouterr()
+
+    assert code == 0
+    assert "nothing to clean" in captured.out
+
+
+@pytest.mark.fab_test
+def test_main_clean_tools_dispatches_correctly(tmp_path, monkeypatch, capsys):
+    """main() routes the clean-tools subcommand to _clean_tools."""
+    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+
+    monkeypatch.setattr(fab_test_module, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(sys, "argv", ["fab-test", "clean-tools"])
+
+    code = fab_test_module.main()
+    captured = capsys.readouterr()
+
+    assert code == 0
+    assert "nothing to clean" in captured.out
 
 
 # --------------------------------------------------------------------------- #
