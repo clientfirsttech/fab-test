@@ -30,8 +30,10 @@ from fabric_ci_cd_dataops.scripts._analyzer_tool_bootstrap import (
     resolve_executable,
 )
 from fabric_ci_cd_dataops.scripts.fab_test import (
+    _apply_environment_default,
     _artifact_exit_code,
     _load_fab_test_all_analyzers,
+    _load_pyproject_config,
     _print_all_summary,
     _print_summary,
     _resolve_timeout,
@@ -1918,6 +1920,150 @@ def test_run_analyzer_parallel_writes_one_envelope_per_artifact(tmp_path, monkey
     assert code == 0
     for stem in stems:
         assert (output_dir / "pql_lint" / stem / "envelope.json").exists()
+
+
+# --------------------------------------------------------------------------- #
+# Configuration file support (pyproject.toml [tool.fab-test])
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.fab_test
+def test_load_pyproject_config_reads_tool_fab_test_section(tmp_path):
+    """[tool.fab-test] values are returned as a plain dict."""
+    pyproject = tmp_path / "pyproject.toml"
+    pyproject.write_text(
+        '[tool.fab-test]\njobs = 4\nformat = "json"\n', encoding="utf-8"
+    )
+    config = _load_pyproject_config(pyproject)
+    assert config == {"jobs": 4, "format": "json"}
+
+
+@pytest.mark.fab_test
+def test_load_pyproject_config_missing_file_returns_empty(tmp_path):
+    """A missing pyproject.toml yields an empty config, not an error."""
+    assert _load_pyproject_config(tmp_path / "does-not-exist.toml") == {}
+
+
+@pytest.mark.fab_test
+def test_load_pyproject_config_missing_section_returns_empty(tmp_path):
+    """A pyproject.toml without [tool.fab-test] yields an empty config."""
+    pyproject = tmp_path / "pyproject.toml"
+    pyproject.write_text('[tool.other]\nx = 1\n', encoding="utf-8")
+    assert _load_pyproject_config(pyproject) == {}
+
+
+@pytest.mark.fab_test
+def test_load_pyproject_config_malformed_toml_returns_empty(tmp_path):
+    """Malformed TOML yields an empty config rather than crashing."""
+    pyproject = tmp_path / "pyproject.toml"
+    pyproject.write_text("not [ valid toml", encoding="utf-8")
+    assert _load_pyproject_config(pyproject) == {}
+
+
+@pytest.mark.fab_test
+def test_common_flags_use_pyproject_config_as_default(monkeypatch):
+    """--jobs/--format/--artifact-dir/--output-dir default from [tool.fab-test]."""
+    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+
+    monkeypatch.setattr(
+        fab_test_module,
+        "_PYPROJECT_CONFIG",
+        {
+            "jobs": 4,
+            "format": "json",
+            "artifact_dir": "/configured/artifacts",
+            "output_dir": "/configured/results",
+        },
+    )
+    parser = fab_test_module.build_parser()
+    ns = parser.parse_args(["bpa", "--dry-run"])
+    assert ns.jobs == 4
+    assert ns.output_format == "json"
+    assert ns.artifact_dir == "/configured/artifacts"
+    assert ns.output_dir == "/configured/results"
+
+
+@pytest.mark.fab_test
+def test_common_flags_cli_overrides_pyproject_config(monkeypatch):
+    """An explicit CLI flag still wins over the config file default."""
+    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+
+    monkeypatch.setattr(fab_test_module, "_PYPROJECT_CONFIG", {"jobs": 4})
+    parser = fab_test_module.build_parser()
+    ns = parser.parse_args(["bpa", "--dry-run", "--jobs", "8"])
+    assert ns.jobs == 8
+
+
+@pytest.mark.fab_test
+def test_resolve_timeout_uses_config_when_no_cli_or_env(monkeypatch):
+    """A config-file timeout is used when neither --timeout nor the env is set."""
+    monkeypatch.delenv("ANALYZER_TIMEOUT", raising=False)
+    assert _resolve_timeout(_TimeoutArgs(timeout=None), config={"timeout": 300}) == 300
+
+
+@pytest.mark.fab_test
+def test_resolve_timeout_env_overrides_config(monkeypatch):
+    """ANALYZER_TIMEOUT still overrides a config-file timeout."""
+    monkeypatch.setenv("ANALYZER_TIMEOUT", "60")
+    assert _resolve_timeout(_TimeoutArgs(timeout=None), config={"timeout": 300}) == 60
+
+
+@pytest.mark.fab_test
+def test_resolve_timeout_cli_overrides_config_and_env(monkeypatch):
+    """An explicit --timeout wins over both env var and config file."""
+    monkeypatch.setenv("ANALYZER_TIMEOUT", "60")
+    assert _resolve_timeout(_TimeoutArgs(timeout=999), config={"timeout": 300}) == 999
+
+
+@pytest.mark.fab_test
+def test_apply_environment_default_uses_config_when_no_cli_or_env(monkeypatch):
+    """--env falls back to [tool.fab-test].environment when unset."""
+    monkeypatch.delenv("FABRIC_ENVIRONMENT", raising=False)
+    ns = argparse.Namespace(environment="")
+    _apply_environment_default(ns, {"environment": "DEV"})
+    assert ns.environment == "DEV"
+
+
+@pytest.mark.fab_test
+def test_apply_environment_default_env_overrides_config(monkeypatch):
+    """FABRIC_ENVIRONMENT still overrides a config-file environment default."""
+    monkeypatch.setenv("FABRIC_ENVIRONMENT", "PROD")
+    ns = argparse.Namespace(environment="")
+    _apply_environment_default(ns, {"environment": "DEV"})
+    assert ns.environment == "PROD"
+
+
+@pytest.mark.fab_test
+def test_apply_environment_default_cli_value_not_overwritten(monkeypatch):
+    """An explicit --env value is never replaced by env var or config."""
+    monkeypatch.setenv("FABRIC_ENVIRONMENT", "PROD")
+    ns = argparse.Namespace(environment="STAGE")
+    _apply_environment_default(ns, {"environment": "DEV"})
+    assert ns.environment == "STAGE"
+
+
+@pytest.mark.fab_test
+def test_apply_environment_default_noop_when_no_environment_attr():
+    """Subcommands without an --env flag are left untouched."""
+    ns = argparse.Namespace()
+    _apply_environment_default(ns, {"environment": "DEV"})
+    assert not hasattr(ns, "environment")
+
+
+@pytest.mark.fab_test
+def test_main_applies_environment_default_before_dispatch(monkeypatch):
+    """main() merges the config/env default for --env before running analyzers."""
+    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+
+    calls = []
+    monkeypatch.setattr(
+        fab_test_module,
+        "_apply_environment_default",
+        lambda args, config: calls.append((args.analyzer, config)),
+    )
+    monkeypatch.setattr(sys, "argv", ["fab-test", "pql_test", "--dry-run"])
+    fab_test_module.main()
+    assert calls and calls[0][0] == "pql_test"
 
 
 # --------------------------------------------------------------------------- #
