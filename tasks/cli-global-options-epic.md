@@ -1,6 +1,6 @@
 # CLI Global Options Epic
 
-**Status**: 📋 PLANNED
+**Status**: ✅ COMPLETED
 **Goal**: Add `--help` and `--version` global options to the `fab-test` CLI for a polished, discoverable user experience.
 
 ## Overview

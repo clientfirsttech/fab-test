@@ -2,8 +2,8 @@
 
 ## Active Epics
 
-- [CLI Global Options](tasks/cli-global-options-epic.md) — Add `--help` and `--version` to the `fab-test` CLI.
+_None._
 
 ## Completed Epics
 
-_None yet._
+- [CLI Global Options](tasks/cli-global-options-epic.md) — Added `--help` epilog and `--version`/`-V` to the `fab-test` CLI.

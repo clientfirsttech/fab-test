@@ -21,6 +21,7 @@ from pathlib import Path
 
 import pytest
 
+from fabric_ci_cd_dataops import __version__ as fab_test_version
 from fabric_ci_cd_dataops.scripts._analyzer_tool_bootstrap import resolve_executable
 from fabric_ci_cd_dataops.scripts.fab_test import (
     _artifact_exit_code,
@@ -86,6 +87,53 @@ def test_cli_help_distinguishes_from_pytest():
     assert "pytest" in result.stdout.lower(), (
         "fab-test --help should mention pytest to clarify the separation"
     )
+
+
+@pytest.mark.fab_test
+def test_cli_help_shows_version_and_docs():
+    """--help output should include the current version and documentation link."""
+    result = subprocess.run(
+        ["fab-test", "--help"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert fab_test_version in result.stdout, "--help should show the package version"
+    assert "github.com/kerski/fabric-ci-cd-dataops" in result.stdout, (
+        "--help should link to project documentation"
+    )
+
+
+# --------------------------------------------------------------------------- #
+# Version
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.fab_test
+def test_cli_version_exits_zero():
+    """fab-test --version exits 0 and prints the package version."""
+    result = subprocess.run(
+        ["fab-test", "--version"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert fab_test_version in result.stdout
+    assert "fab-test" in result.stdout.lower()
+
+
+@pytest.mark.fab_test
+def test_cli_version_short_flag():
+    """fab-test -V behaves the same as --version."""
+    result = subprocess.run(
+        ["fab-test", "-V"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert fab_test_version in result.stdout
 
 
 # --------------------------------------------------------------------------- #
