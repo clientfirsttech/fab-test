@@ -27,6 +27,10 @@ _READER_CHUNK_SIZE = 8192
 _USER_AGENT = "fabric-ci-cd-dataops-fab-test/1.0"
 
 
+class UnsupportedPlatformError(RuntimeError):
+    """Raised when an analyzer's tool is not available on the current OS."""
+
+
 def _env(name: str, default: str = "") -> str:
     return os.environ.get(name, default)
 
@@ -206,7 +210,7 @@ def resolve_executable(
     platform = _current_platform()
     requires_platform = tool_install.get("requires_platform")
     if requires_platform and platform != requires_platform:
-        raise RuntimeError(
+        raise UnsupportedPlatformError(
             f"Analyzer '{analyzer_name}' is not supported on {platform}. "
             f"Supported platform: {requires_platform}. "
             f"Set {env_var}=<path> to use a manually provided executable."
