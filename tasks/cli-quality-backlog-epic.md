@@ -20,7 +20,7 @@ Define and surface explicit exit codes so CI pipelines can branch on the failure
 
 ---
 
-## Fail Fast on Unsupported Platforms
+## Fail Fast on Unsupported Platforms ✅
 
 Move platform checks into preflight so Windows-only analyzers stop cleanly before downloading or invoking binaries.
 

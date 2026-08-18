@@ -1100,6 +1100,55 @@ def test_preflight_error_none_when_tool_resolves(monkeypatch):
 
 
 # --------------------------------------------------------------------------- #
+# Fail fast on unsupported platforms
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.fab_test
+def test_run_analyzer_bpa_on_unsupported_platform_fails_fast(tmp_path, monkeypatch):
+    """`fab-test bpa` on Linux/macOS exits 126 before invoking any subprocess.
+
+    Tabular Editor is Windows-only (requires_platform: win32 in analyzers.json).
+    """
+    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+
+    artifact_dir = tmp_path / "artifacts"
+    (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
+    output_dir = tmp_path / "analyzer-results"
+
+    calls = []
+    monkeypatch.setattr(
+        fab_test_module.subprocess, "run", lambda *a, **k: calls.append(a) or None
+    )
+    monkeypatch.setattr(sys, "platform", "linux")
+
+    args = _RunAnalyzerArgs(artifact_dir, output_dir, artifact="SampleModel")
+    code = _run_analyzer("bpa", args, output_dir)
+
+    assert code == 126
+    assert calls == [], "no subprocess should run once the platform check fails"
+
+
+@pytest.mark.fab_test
+def test_run_analyzer_bpa_unsupported_platform_points_to_env_var(
+    tmp_path, monkeypatch, capsys
+):
+    """The fail-fast message tells the user how to override with an env var."""
+    artifact_dir = tmp_path / "artifacts"
+    (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
+    output_dir = tmp_path / "analyzer-results"
+
+    monkeypatch.setattr(sys, "platform", "linux")
+
+    args = _RunAnalyzerArgs(artifact_dir, output_dir, artifact="SampleModel")
+    code = _run_analyzer("bpa", args, output_dir)
+    captured = capsys.readouterr()
+
+    assert code == 126
+    assert "TABULAR_EDITOR_PATH" in captured.out
+
+
+# --------------------------------------------------------------------------- #
 # Telemetry gating
 # --------------------------------------------------------------------------- #
 
