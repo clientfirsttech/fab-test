@@ -34,6 +34,7 @@ from fabric_ci_cd_dataops.scripts.fab_test import (
     _load_fab_test_all_analyzers,
     _print_all_summary,
     _print_summary,
+    _resolve_timeout,
     _run_analyzer,
     _telemetry_enabled,
 )
@@ -1725,6 +1726,77 @@ def test_resolve_executable_no_install_sha256_skips_verification(tmp_path, monke
 
 
 # --------------------------------------------------------------------------- #
+# Configurable subprocess timeout
+# --------------------------------------------------------------------------- #
+
+
+class _TimeoutArgs:
+    def __init__(self, timeout=None):
+        self.timeout = timeout
+
+
+@pytest.mark.fab_test
+def test_resolve_timeout_uses_cli_flag_over_env(monkeypatch):
+    """--timeout takes precedence over ANALYZER_TIMEOUT."""
+    monkeypatch.setenv("ANALYZER_TIMEOUT", "60")
+    assert _resolve_timeout(_TimeoutArgs(timeout=300)) == 300
+
+
+@pytest.mark.fab_test
+def test_resolve_timeout_uses_env_when_no_cli_flag(monkeypatch):
+    """ANALYZER_TIMEOUT overrides the default when --timeout is not passed."""
+    monkeypatch.setenv("ANALYZER_TIMEOUT", "200")
+    assert _resolve_timeout(_TimeoutArgs(timeout=None)) == 200
+
+
+@pytest.mark.fab_test
+def test_resolve_timeout_defaults_to_120(monkeypatch):
+    """With neither --timeout nor ANALYZER_TIMEOUT set, the default is 120."""
+    monkeypatch.delenv("ANALYZER_TIMEOUT", raising=False)
+    assert _resolve_timeout(_TimeoutArgs(timeout=None)) == 120
+
+
+@pytest.mark.fab_test
+def test_bpa_help_shows_timeout_flag():
+    """--timeout must be documented on subcommand help."""
+    result = subprocess.run(
+        ["fab-test", "bpa", "--help"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "--timeout" in result.stdout
+
+
+@pytest.mark.fab_test
+def test_run_analyzer_passes_resolved_timeout_to_subprocess(tmp_path, monkeypatch):
+    """_run_analyzer forwards the resolved timeout to subprocess.run."""
+    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+
+    artifact_dir = tmp_path / "artifacts"
+    (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
+    output_dir = tmp_path / "analyzer-results"
+
+    monkeypatch.delenv("ANALYZER_TIMEOUT", raising=False)
+    monkeypatch.setattr(fab_test_module, "_send_telemetry", lambda *a, **k: None)
+
+    captured_timeouts = []
+
+    def _fake_subprocess(*args, **kwargs):
+        captured_timeouts.append(kwargs.get("timeout"))
+        return subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(fab_test_module.subprocess, "run", _fake_subprocess)
+
+    args = _RunAnalyzerArgs(artifact_dir, output_dir, artifact="SampleModel", timeout=45)
+    code = _run_analyzer("pql_lint", args, output_dir)
+
+    assert code == 0
+    assert captured_timeouts == [45]
+
+
+# --------------------------------------------------------------------------- #
 # Regression: per-artifact warning handling
 # --------------------------------------------------------------------------- #
 
@@ -1740,6 +1812,7 @@ class _RunAnalyzerArgs:
         telemetry: bool | None = False,
         output_format: str = "json",
         impact_manifest: str | None = None,
+        timeout: int | None = None,
     ):
         self.artifact_dir = str(artifact_dir)
         self.output_dir = str(output_dir)
@@ -1751,6 +1824,7 @@ class _RunAnalyzerArgs:
         self.environment = ""
         self.workspace_id = ""
         self.impact_manifest = impact_manifest
+        self.timeout = timeout
 
 
 def _make_warning_envelope(output_dir: Path, analyzer: str, stem: str) -> None:

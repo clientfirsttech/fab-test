@@ -140,8 +140,23 @@ def _verbosity_env(args: argparse.Namespace) -> str:
     return ""
 
 
-# Per-artifact subprocess timeout (seconds). Matches the longest wrapper timeout.
-_SUBPROCESS_TIMEOUT = 120
+# Default per-artifact subprocess timeout (seconds), used when neither
+# --timeout nor ANALYZER_TIMEOUT is set. Matches the longest wrapper timeout.
+_DEFAULT_SUBPROCESS_TIMEOUT = 120
+
+
+def _resolve_timeout(args: argparse.Namespace) -> int:
+    """Resolve the per-artifact subprocess timeout: CLI flag > env var > default."""
+    cli_timeout = getattr(args, "timeout", None)
+    if cli_timeout is not None:
+        return cli_timeout
+    env_timeout = os.environ.get("ANALYZER_TIMEOUT", "")
+    if env_timeout:
+        try:
+            return int(env_timeout)
+        except ValueError:
+            pass
+    return _DEFAULT_SUBPROCESS_TIMEOUT
 
 
 def _telemetry_enabled(args: argparse.Namespace) -> bool:
@@ -305,6 +320,7 @@ def _run_analyzer(name: str, args: argparse.Namespace, output_dir: Path) -> int:
     verbosity = _verbosity_env(args)
     if verbosity:
         _sub_env["ANALYZER_VERBOSITY"] = verbosity
+    timeout = _resolve_timeout(args)
 
     for artifact in artifacts:
         display_name = "." if _is_repository_scoped(name) else artifact.stem
@@ -318,13 +334,13 @@ def _run_analyzer(name: str, args: argparse.Namespace, output_dir: Path) -> int:
                 encoding="utf-8",
                 errors="replace",
                 env=_sub_env,
-                timeout=_SUBPROCESS_TIMEOUT,
+                timeout=timeout,
                 check=False,
             )
         except subprocess.TimeoutExpired:
             print(
                 f"  \u23f0 fab-test {name}: timed out "
-                f"after {_SUBPROCESS_TIMEOUT}s for {display_name}"
+                f"after {timeout}s for {display_name}"
             )
             results.append((display_name, 1))
             continue
@@ -395,6 +411,16 @@ def _add_common_flags(parser: argparse.ArgumentParser) -> None:
         default=None,
         metavar="STEM",
         help="Only analyze the artifact whose stem matches STEM",
+    )
+    parser.add_argument(
+        "--timeout",
+        type=int,
+        default=None,
+        metavar="SECONDS",
+        help=(
+            "Per-artifact subprocess timeout in seconds "
+            f"[env: ANALYZER_TIMEOUT, default: {_DEFAULT_SUBPROCESS_TIMEOUT}]"
+        ),
     )
     parser.add_argument(
         "-v",
