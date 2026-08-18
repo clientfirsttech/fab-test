@@ -1149,6 +1149,93 @@ def test_run_analyzer_bpa_unsupported_platform_points_to_env_var(
 
 
 # --------------------------------------------------------------------------- #
+# Validate CLI inputs up front
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.fab_test
+def test_workspace_id_rejects_non_guid():
+    """--workspace-id abc is rejected before any analyzer runs."""
+    result = subprocess.run(
+        ["fab-test", "pql_test", "--workspace-id", "abc", "--dry-run"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 2, result.stdout
+    assert "GUID" in result.stderr
+
+
+@pytest.mark.fab_test
+def test_workspace_id_accepts_valid_guid():
+    """A well-formed GUID is accepted."""
+    result = subprocess.run(
+        [
+            "fab-test", "pql_test",
+            "--workspace-id", "123e4567-e89b-12d3-a456-426614174000",
+            "--dry-run",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.fab_test
+def test_workspace_id_default_empty_is_accepted():
+    """Omitting --workspace-id (empty default) does not trigger GUID validation."""
+    result = subprocess.run(
+        ["fab-test", "pql_test", "--dry-run"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.fab_test
+def test_artifact_dir_missing_path_exits_early(tmp_path):
+    """A nonexistent --artifact-dir exits before any analyzer runs."""
+    missing = tmp_path / "does-not-exist"
+    result = subprocess.run(
+        ["fab-test", "bpa", "--artifact-dir", str(missing)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 2, result.stdout
+    assert "does not exist" in result.stdout
+    assert str(missing) in result.stdout
+
+
+@pytest.mark.fab_test
+def test_artifact_dir_existing_empty_dir_still_exits_zero(tmp_path):
+    """An existing-but-empty --artifact-dir is a distinct, non-fatal case."""
+    result = subprocess.run(
+        ["fab-test", "bpa", "--dry-run", "--artifact-dir", str(tmp_path)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.fab_test
+def test_format_invalid_choice_lists_allowed_formats():
+    """--format yaml is rejected with the allowed format list."""
+    result = subprocess.run(
+        ["fab-test", "bpa", "--format", "yaml", "--dry-run"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 2, result.stdout
+    assert "text" in result.stderr
+    assert "json" in result.stderr
+
+
+# --------------------------------------------------------------------------- #
 # Telemetry gating
 # --------------------------------------------------------------------------- #
 

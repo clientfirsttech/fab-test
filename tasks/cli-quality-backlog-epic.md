@@ -31,7 +31,7 @@ Move platform checks into preflight so Windows-only analyzers stop cleanly befor
 
 ---
 
-## Validate CLI Inputs Up Front
+## Validate CLI Inputs Up Front ✅
 
 Catch malformed arguments before spawning subprocesses or touching artifacts.
 

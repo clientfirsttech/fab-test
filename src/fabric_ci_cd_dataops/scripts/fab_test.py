@@ -24,6 +24,7 @@ Global flags (all subcommands):
 
 import argparse
 import os
+import re
 import subprocess
 import sys
 from datetime import datetime
@@ -97,6 +98,22 @@ RESULTS_ROOT = REPO_ROOT / "analyzer-results"
 
 def _env(name: str, default: str = "") -> str:
     return os.environ.get(name, default)
+
+
+_GUID_RE = re.compile(
+    r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-"
+    r"[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+)
+
+
+def _guid_type(value: str) -> str:
+    """argparse type= validator for --workspace-id; empty (unset) is allowed."""
+    if value and not _GUID_RE.match(value):
+        raise argparse.ArgumentTypeError(
+            f"'{value}' is not a valid GUID "
+            "(expected format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)"
+        )
+    return value
 
 
 def _is_ci() -> bool:
@@ -502,6 +519,7 @@ def build_parser() -> argparse.ArgumentParser:
         default="",
         dest="workspace_id",
         metavar="ID",
+        type=_guid_type,
         help="Fabric workspace ID [env: FABRIC_WORKSPACE_ID]",
     )
     pql_test_p.add_argument(
@@ -544,6 +562,7 @@ def build_parser() -> argparse.ArgumentParser:
         default="",
         dest="workspace_id",
         metavar="ID",
+        type=_guid_type,
         help="Fabric workspace ID [env: FABRIC_WORKSPACE_ID]",
     )
     playwright_p.add_argument(
@@ -593,6 +612,7 @@ def build_parser() -> argparse.ArgumentParser:
         default="",
         dest="workspace_id",
         metavar="ID",
+        type=_guid_type,
         help="Fabric workspace ID [env: FABRIC_WORKSPACE_ID]",
     )
     impact_p.add_argument(
@@ -635,6 +655,7 @@ def build_parser() -> argparse.ArgumentParser:
         default="",
         dest="workspace_id",
         metavar="ID",
+        type=_guid_type,
         help="Fabric workspace ID [env: FABRIC_WORKSPACE_ID]",
     )
     deps_p.add_argument(
@@ -677,6 +698,7 @@ def build_parser() -> argparse.ArgumentParser:
         default="",
         dest="workspace_id",
         metavar="ID",
+        type=_guid_type,
     )
     all_p.add_argument(
         "--env",
@@ -705,6 +727,11 @@ def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
     output_dir = Path(args.output_dir)
+
+    artifact_dir = Path(args.artifact_dir)
+    if not artifact_dir.exists():
+        print(f"  ✗ fab-test: --artifact-dir does not exist: {artifact_dir}")
+        return 2
 
     if args.analyzer == "all":
         analyzers = _all_analyzers(args)
