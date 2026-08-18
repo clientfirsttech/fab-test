@@ -526,6 +526,13 @@ def _add_common_flags(parser: argparse.ArgumentParser) -> None:
     )
 
 
+_SUBCOMMAND_ALIASES = {
+    "pql-test": "pql_test",
+    "pql-lint": "pql_lint",
+    "playwright_impact": "playwright-impact",
+}
+
+
 _COMMON_COMPLETION_FLAGS = (
     "--artifact-dir --output-dir --dry-run --artifact --timeout --jobs "
     "-v --verbose --telemetry --no-telemetry --format --help"
@@ -699,6 +706,7 @@ def build_parser() -> argparse.ArgumentParser:
     # --- pql_test ---
     pql_test_p = subs.add_parser(
         "pql_test",
+        aliases=["pql-test"],
         help="pql-test DAX/PQL test runner (SemanticModel artifacts)",
     )
     _add_common_flags(pql_test_p)
@@ -721,6 +729,7 @@ def build_parser() -> argparse.ArgumentParser:
     # --- pql_lint ---
     pql_lint_p = subs.add_parser(
         "pql_lint",
+        aliases=["pql-lint"],
         help="pqlint Power Query linter (SemanticModel artifacts)",
     )
     _add_common_flags(pql_lint_p)
@@ -771,6 +780,7 @@ def build_parser() -> argparse.ArgumentParser:
     # --- playwright-impact ---
     impact_p = subs.add_parser(
         "playwright-impact",
+        aliases=["playwright_impact"],
         help="Build impacted-report manifest for Playwright validation",
     )
     _add_common_flags(impact_p)
@@ -944,6 +954,7 @@ def _clean_tools(repo_root: Path, dry_run: bool) -> int:
 def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
+    args.analyzer = _SUBCOMMAND_ALIASES.get(args.analyzer, args.analyzer)
 
     if args.analyzer == "clean-tools":
         return _clean_tools(REPO_ROOT, args.dry_run)

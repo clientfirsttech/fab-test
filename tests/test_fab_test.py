@@ -39,6 +39,7 @@ from fabric_ci_cd_dataops.scripts.fab_test import (
     _print_summary,
     _resolve_timeout,
     _run_analyzer,
+    _SUBCOMMAND_ALIASES,
     _telemetry_enabled,
     build_parser,
 )
@@ -2236,6 +2237,79 @@ def test_print_completion_completes_artifact_stems_dynamically(shell):
         check=False,
     )
     assert ".fabric/artifacts" in result.stdout
+
+
+# --------------------------------------------------------------------------- #
+# Normalize subcommand aliases
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.fab_test
+def test_subcommand_alias_mapping():
+    """Hyphen/underscore aliases resolve to their canonical analyzer name."""
+    assert _SUBCOMMAND_ALIASES["pql-test"] == "pql_test"
+    assert _SUBCOMMAND_ALIASES["pql-lint"] == "pql_lint"
+    assert _SUBCOMMAND_ALIASES["playwright_impact"] == "playwright-impact"
+
+
+@pytest.mark.fab_test
+def test_pql_test_hyphen_alias_behaves_like_underscore():
+    """fab-test pql-test behaves identically to fab-test pql_test."""
+    canonical = subprocess.run(
+        ["fab-test", "pql_test", "--dry-run"],
+        capture_output=True, text=True, check=False,
+    )
+    aliased = subprocess.run(
+        ["fab-test", "pql-test", "--dry-run"],
+        capture_output=True, text=True, check=False,
+    )
+    assert canonical.returncode == aliased.returncode == 0
+    assert canonical.stdout == aliased.stdout
+
+
+@pytest.mark.fab_test
+def test_pql_lint_hyphen_alias_behaves_like_underscore():
+    """fab-test pql-lint behaves identically to fab-test pql_lint."""
+    canonical = subprocess.run(
+        ["fab-test", "pql_lint", "--dry-run"],
+        capture_output=True, text=True, check=False,
+    )
+    aliased = subprocess.run(
+        ["fab-test", "pql-lint", "--dry-run"],
+        capture_output=True, text=True, check=False,
+    )
+    assert canonical.returncode == aliased.returncode == 0
+    assert canonical.stdout == aliased.stdout
+
+
+@pytest.mark.fab_test
+def test_playwright_impact_underscore_alias_accepted():
+    """playwright-impact remains canonical; playwright_impact is also accepted."""
+    canonical = subprocess.run(
+        ["fab-test", "playwright-impact", "--help"],
+        capture_output=True, text=True, check=False,
+    )
+    aliased = subprocess.run(
+        ["fab-test", "playwright_impact", "--help"],
+        capture_output=True, text=True, check=False,
+    )
+    assert canonical.returncode == aliased.returncode == 0
+
+
+@pytest.mark.fab_test
+def test_all_dry_run_output_unaffected_by_aliases():
+    """`fab-test all` still lists the canonical pql_test name, not an alias."""
+    result = subprocess.run(
+        ["fab-test", "all", "--dry-run"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "fab-test pql_test" in result.stdout
+    assert "fab-test pql-test" not in result.stdout
 
 
 # --------------------------------------------------------------------------- #
