@@ -8,7 +8,7 @@ Telemetry payloads today gather git context from `GITHUB_*` environment variable
 
 ---
 
-## Collect Branch and Actor Locally
+## Collect Branch and Actor Locally ✅
 
 Use local git configuration as a fallback when GitHub Actions environment variables are absent.
 
