@@ -45,6 +45,7 @@ from ._analyzer_annotations import (
 )
 from ._analyzer_envelope import _severity_counts
 from ._cli_utils import narrate
+from ._run_manifest import RunManifest
 from .eventhouse_logger import publish_analyzer_telemetry
 from .fab_test_registry import (
     _DEFAULT_BPA_RULES,
@@ -425,6 +426,7 @@ def _run_one_artifact(
     timeout: int,
     index: int,
     total: int,
+    manifest: RunManifest | None = None,
 ) -> tuple[str, int]:
     """Run one analyzer against one artifact. Returns (stem, exit_code)."""
     output_format = getattr(args, "output_format", "text")
@@ -472,6 +474,8 @@ def _run_one_artifact(
         )
         if capture_stdout:
             _reemit(exc.stdout)
+        if manifest is not None:
+            manifest.record_artifact(name, display_name, "timeout", None, 0, 0)
         return (display_name, 1)
 
     if capture_stdout:
@@ -503,17 +507,33 @@ def _run_one_artifact(
 
     artifact_code = _artifact_exit_code(proc.returncode, envelope)
 
-    _errors, warnings = _severity_counts(envelope.get("findings", []))
+    errors, warnings = _severity_counts(envelope.get("findings", []))
     if in_ci:
         emit_workflow_annotations(envelope)
     if warnings > 0:
         emit_pr_review_comments(envelope, str(artifact))
     _send_telemetry(name, artifact, envelope, args)
 
+    if manifest is not None:
+        envelope_path = output_dir / name / artifact.stem / "envelope.json"
+        manifest.record_artifact(
+            name,
+            artifact.stem,
+            envelope.get("status", "unknown"),
+            str(envelope_path) if envelope_path.exists() else None,
+            errors,
+            warnings,
+        )
+
     return (artifact.stem, artifact_code)
 
 
-def _run_analyzer(name: str, args: argparse.Namespace, output_dir: Path) -> int:
+def _run_analyzer(
+    name: str,
+    args: argparse.Namespace,
+    output_dir: Path,
+    manifest: RunManifest | None = None,
+) -> int:
     """Run one analyzer against all matching artifacts. Returns 0 or 1."""
     glob, description = _ANALYZER_REGISTRY[name]
     artifact_dir = Path(args.artifact_dir)
@@ -581,6 +601,8 @@ def _run_analyzer(name: str, args: argparse.Namespace, output_dir: Path) -> int:
             f"\n  ✗ fab-test {name}: missing prerequisite\n  {message}\n",
             output_format=output_format,
         )
+        if manifest is not None:
+            manifest.record_artifact(name, "*", "preflight_failed", None, 0, 0)
         return exit_code
 
     in_ci = _is_ci()
@@ -598,7 +620,7 @@ def _run_analyzer(name: str, args: argparse.Namespace, output_dir: Path) -> int:
     def _run(index_artifact: tuple[int, Path]) -> tuple[str, int]:
         index, artifact = index_artifact
         return _run_one_artifact(
-            name, artifact, args, output_dir, in_ci, _sub_env, timeout, index, total
+            name, artifact, args, output_dir, in_ci, _sub_env, timeout, index, total, manifest
         )
 
     indexed_artifacts = list(enumerate(artifacts, start=1))
@@ -1324,6 +1346,8 @@ def main() -> int:
         )
         return 2
 
+    manifest = RunManifest(_FAB_TEST_VERSION, sys.argv)
+
     if args.analyzer == "all":
         analyzers = _all_analyzers()
         if not analyzers:
@@ -1331,11 +1355,16 @@ def main() -> int:
                 "  ⚠ fab-test all: no analyzers configured in analyzers.json",
                 output_format=args.output_format,
             )
+            manifest.write(output_dir, 0)
             return 0
-        codes = [_run_analyzer(name, args, output_dir) for name in analyzers]
-        return _print_all_summary(output_dir, analyzers, codes, args)
+        codes = [_run_analyzer(name, args, output_dir, manifest) for name in analyzers]
+        exit_code = _print_all_summary(output_dir, analyzers, codes, args)
+        manifest.write(output_dir, exit_code)
+        return exit_code
 
-    return _run_analyzer(args.analyzer, args, output_dir)
+    exit_code = _run_analyzer(args.analyzer, args, output_dir, manifest)
+    manifest.write(output_dir, exit_code)
+    return exit_code
 
 
 if __name__ == "__main__":
