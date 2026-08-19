@@ -942,7 +942,10 @@ def test_bpa_help_shows_telemetry_and_format_flags():
 
 @pytest.mark.fab_test
 def test_all_format_json_dry_run_is_valid_json():
-    """`fab-test all --format json --dry-run` prints parseable JSON summary."""
+    """`fab-test all --format json --dry-run` prints ONLY the JSON summary on
+    stdout — the per-analyzer dry-run banners/listings are narrated to stderr
+    instead (CLI Agent Ergonomics: stdout stays a single parseable document).
+    """
     result = subprocess.run(
         ["fab-test", "all", "--format", "json", "--dry-run"],
         capture_output=True,
@@ -952,13 +955,11 @@ def test_all_format_json_dry_run_is_valid_json():
         check=False,
     )
     assert result.returncode == 0, result.stderr
-    # JSON output appears at the end of stdout after the dry-run listings.
-    first_brace = result.stdout.find("{")
-    assert first_brace >= 0, "No JSON object found in output"
-    summary = json.loads(result.stdout[first_brace:])
+    summary = json.loads(result.stdout)
     assert "artifacts" in summary
     assert "totals" in summary
     assert summary["dry_run"] is True
+    assert "dry run" in result.stderr
 
 
 @pytest.mark.fab_test
@@ -1148,7 +1149,11 @@ def test_run_analyzer_bpa_on_unsupported_platform_fails_fast(tmp_path, monkeypat
 def test_run_analyzer_bpa_unsupported_platform_points_to_env_var(
     tmp_path, monkeypatch, capsys
 ):
-    """The fail-fast message tells the user how to override with an env var."""
+    """The fail-fast message tells the user how to override with an env var.
+
+    Uses the default --format json, so per the CLI Agent Ergonomics contract
+    the preflight message is narrated to stderr, leaving stdout clean.
+    """
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
     output_dir = tmp_path / "analyzer-results"
@@ -1160,7 +1165,8 @@ def test_run_analyzer_bpa_unsupported_platform_points_to_env_var(
     captured = capsys.readouterr()
 
     assert code == 126
-    assert "TABULAR_EDITOR_PATH" in captured.out
+    assert "TABULAR_EDITOR_PATH" in captured.err
+    assert captured.out == ""
 
 
 # --------------------------------------------------------------------------- #
@@ -1735,7 +1741,11 @@ def test_send_telemetry_sends_valid_payload(monkeypatch):
 
 @pytest.mark.fab_test
 def test_dry_run_with_telemetry_prints_payload_preview_not_sent(tmp_path, monkeypatch, capsys):
-    """--telemetry --dry-run prints the payload preview instead of sending it."""
+    """--telemetry --dry-run prints the payload preview instead of sending it.
+
+    Uses the default --format json, so the preview is narrated to stderr,
+    leaving stdout clean per the CLI Agent Ergonomics contract.
+    """
     from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
 
     artifact_dir = tmp_path / "artifacts"
@@ -1755,9 +1765,10 @@ def test_dry_run_with_telemetry_prints_payload_preview_not_sent(tmp_path, monkey
 
     assert code == 0
     assert calls == [], "telemetry must never be transmitted during --dry-run"
-    assert "Telemetry preview" in captured.out
-    assert '"analyzer": "pql_lint"' in captured.out
-    assert '"artifact_name": "SampleModel"' in captured.out
+    assert captured.out == ""
+    assert "Telemetry preview" in captured.err
+    assert '"analyzer": "pql_lint"' in captured.err
+    assert '"artifact_name": "SampleModel"' in captured.err
 
 
 @pytest.mark.fab_test
@@ -1774,6 +1785,7 @@ def test_dry_run_without_telemetry_flag_shows_no_preview(tmp_path, monkeypatch, 
 
     assert code == 0
     assert "Telemetry preview" not in captured.out
+    assert "Telemetry preview" not in captured.err
 
 
 @pytest.mark.fab_test
@@ -1792,6 +1804,7 @@ def test_dry_run_no_telemetry_flag_suppresses_preview_even_with_env(
 
     assert code == 0
     assert "Telemetry preview" not in captured.out
+    assert "Telemetry preview" not in captured.err
 
 
 @pytest.mark.fab_test
@@ -1909,7 +1922,7 @@ def test_telemetry_send_network_failure_does_not_affect_analyzer_exit_code(
     captured = capsys.readouterr()
 
     assert code == 1  # driven by the Error-severity finding, not the telemetry failure
-    assert "Telemetry failed" in captured.out
+    assert "Telemetry failed" in captured.err  # default --format json narrates to stderr
 
 
 # --------------------------------------------------------------------------- #
@@ -2947,6 +2960,92 @@ def test_all_dry_run_output_unaffected_by_aliases():
 
 
 # --------------------------------------------------------------------------- #
+# Route CLI narration through the helper (CLI Agent Ergonomics §2)
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.fab_test
+def test_json_format_real_run_has_no_narration_on_stdout(tmp_path, monkeypatch, capsys):
+    """A real (non-dry-run) analyzer run under --format json narrates only to
+    stderr; stdout carries just the final JSON summary from _print_summary.
+    """
+    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+
+    artifact_dir = tmp_path / "artifacts"
+    for i in range(2):
+        (artifact_dir / f"Model{i}.SemanticModel").mkdir(parents=True)
+    output_dir = tmp_path / "analyzer-results"
+
+    monkeypatch.setattr(fab_test_module, "_is_ci", lambda: False)
+    monkeypatch.setattr(fab_test_module, "_send_telemetry", lambda *a, **k: None)
+    monkeypatch.setattr(fab_test_module.subprocess, "run", _stub_subprocess_run)
+
+    args = _RunAnalyzerArgs(artifact_dir, output_dir, output_format="json")
+    code = _run_analyzer("pql_lint", args, output_dir)
+    captured = capsys.readouterr()
+
+    assert code == 0
+    summary = json.loads(captured.out)
+    assert summary["analyzer"] == "pql_lint"
+    assert "artifact 1 of 2" in captured.err
+    assert "fab-test pql_lint" in captured.err
+
+
+@pytest.mark.fab_test
+def test_text_format_narration_still_on_stdout(tmp_path, monkeypatch, capsys):
+    """--format text keeps narration on stdout exactly as before (regression)."""
+    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+
+    artifact_dir = tmp_path / "artifacts"
+    (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
+    output_dir = tmp_path / "analyzer-results"
+
+    monkeypatch.setattr(fab_test_module, "_is_ci", lambda: False)
+    monkeypatch.setattr(fab_test_module, "_send_telemetry", lambda *a, **k: None)
+    monkeypatch.setattr(fab_test_module.subprocess, "run", _stub_subprocess_run)
+
+    args = _RunAnalyzerArgs(artifact_dir, output_dir, output_format="text")
+    code = _run_analyzer("pql_lint", args, output_dir)
+    captured = capsys.readouterr()
+
+    assert code == 0
+    assert "fab-test pql_lint" in captured.out
+    assert captured.err == ""
+
+
+@pytest.mark.fab_test
+def test_missing_artifacts_warning_narrated_by_format(tmp_path, capsys):
+    """The 'no artifacts found' warning follows the same json/stderr routing."""
+    artifact_dir = tmp_path / "empty"
+    artifact_dir.mkdir()
+    output_dir = tmp_path / "analyzer-results"
+
+    args = _RunAnalyzerArgs(artifact_dir, output_dir, output_format="json")
+    code = _run_analyzer("bpa", args, output_dir)
+    captured = capsys.readouterr()
+
+    assert code == 0
+    assert captured.out == ""
+    assert "no *.SemanticModel artifacts found" in captured.err
+
+
+@pytest.mark.fab_test
+def test_main_artifact_dir_missing_message_narrated_by_format(tmp_path):
+    """main()'s --artifact-dir-missing message follows --format routing too."""
+    missing = tmp_path / "does-not-exist"
+
+    result = subprocess.run(
+        ["fab-test", "bpa", "--artifact-dir", str(missing), "--format", "json"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 2
+    assert result.stdout == ""
+    assert "does not exist" in result.stderr
+
+
+# --------------------------------------------------------------------------- #
 # Show per-artifact progress
 # --------------------------------------------------------------------------- #
 
@@ -2969,7 +3068,7 @@ def test_progress_shown_non_ci_multiple_artifacts(tmp_path, monkeypatch, capsys)
     monkeypatch.setattr(fab_test_module, "_send_telemetry", lambda *a, **k: None)
     monkeypatch.setattr(fab_test_module.subprocess, "run", _stub_subprocess_run)
 
-    args = _RunAnalyzerArgs(artifact_dir, output_dir)
+    args = _RunAnalyzerArgs(artifact_dir, output_dir, output_format="text")
     code = _run_analyzer("pql_lint", args, output_dir)
     captured = capsys.readouterr()
 
@@ -2992,7 +3091,7 @@ def test_progress_not_shown_for_single_artifact(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(fab_test_module, "_send_telemetry", lambda *a, **k: None)
     monkeypatch.setattr(fab_test_module.subprocess, "run", _stub_subprocess_run)
 
-    args = _RunAnalyzerArgs(artifact_dir, output_dir)
+    args = _RunAnalyzerArgs(artifact_dir, output_dir, output_format="text")
     code = _run_analyzer("pql_lint", args, output_dir)
     captured = capsys.readouterr()
 
@@ -3015,7 +3114,7 @@ def test_progress_emitted_as_ci_notice(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(fab_test_module, "emit_workflow_annotations", lambda *a, **k: None)
     monkeypatch.setattr(fab_test_module.subprocess, "run", _stub_subprocess_run)
 
-    args = _RunAnalyzerArgs(artifact_dir, output_dir)
+    args = _RunAnalyzerArgs(artifact_dir, output_dir, output_format="text")
     code = _run_analyzer("pql_lint", args, output_dir)
     captured = capsys.readouterr()
 
@@ -3039,7 +3138,7 @@ def test_artifact_start_line_still_printed_alongside_progress(tmp_path, monkeypa
     monkeypatch.setattr(fab_test_module, "_send_telemetry", lambda *a, **k: None)
     monkeypatch.setattr(fab_test_module.subprocess, "run", _stub_subprocess_run)
 
-    args = _RunAnalyzerArgs(artifact_dir, output_dir)
+    args = _RunAnalyzerArgs(artifact_dir, output_dir, output_format="text")
     args.verbose = 1
     code = _run_analyzer("pql_lint", args, output_dir)
     captured = capsys.readouterr()

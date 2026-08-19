@@ -44,6 +44,7 @@ from ._analyzer_annotations import (
     emit_workflow_annotations,
 )
 from ._analyzer_envelope import _severity_counts
+from ._cli_utils import narrate
 from .eventhouse_logger import publish_analyzer_telemetry
 from .fab_test_registry import (
     _DEFAULT_BPA_RULES,
@@ -328,7 +329,9 @@ def _build_telemetry_payload(
 _REQUIRED_TELEMETRY_FIELDS = ("analyzer", "artifact_name", "status", "timestamp")
 
 
-def _validate_telemetry_payload(payload: dict[str, Any]) -> dict[str, Any] | None:
+def _validate_telemetry_payload(
+    payload: dict[str, Any], output_format: str = "text"
+) -> dict[str, Any] | None:
     """Validate a telemetry payload before sending.
 
     Drops any optional field that isn't JSON-serializable and returns the
@@ -337,9 +340,10 @@ def _validate_telemetry_payload(payload: dict[str, Any]) -> dict[str, Any] | Non
     """
     missing = [f for f in _REQUIRED_TELEMETRY_FIELDS if not payload.get(f)]
     if missing:
-        print(
+        narrate(
             f"::warning::Telemetry payload missing required field(s): "
-            f"{', '.join(missing)}; skipping"
+            f"{', '.join(missing)}; skipping",
+            output_format=output_format,
         )
         return None
 
@@ -363,6 +367,7 @@ def _send_telemetry(
     if not _telemetry_enabled(args):
         return
 
+    output_format = getattr(args, "output_format", "text")
     table = (
         "fabric_dynamic_analysis"
         if analyzer == "pql_test"
@@ -374,13 +379,16 @@ def _send_telemetry(
         envelope,
         getattr(args, "environment", "") or os.getenv("FABRIC_ENVIRONMENT", ""),
     )
-    validated = _validate_telemetry_payload(payload)
+    validated = _validate_telemetry_payload(payload, output_format)
     if validated is None:
         return
     try:
         publish_analyzer_telemetry(table, validated, force=True)
     except Exception as exc:
-        print(f"::warning::Telemetry failed for {artifact.stem}: {exc}")
+        narrate(
+            f"::warning::Telemetry failed for {artifact.stem}: {exc}",
+            output_format=output_format,
+        )
 
 
 def _artifact_exit_code(
@@ -414,13 +422,17 @@ def _run_one_artifact(
     total: int,
 ) -> tuple[str, int]:
     """Run one analyzer against one artifact. Returns (stem, exit_code)."""
+    output_format = getattr(args, "output_format", "text")
     display_name = "." if _is_repository_scoped(name) else artifact.stem
     if total > 1:
         if in_ci:
-            print(f"::notice::fab-test {name}: artifact {index} of {total} ({display_name})")
+            narrate(
+                f"::notice::fab-test {name}: artifact {index} of {total} ({display_name})",
+                output_format=output_format,
+            )
         else:
-            print(f"  artifact {index} of {total}")
-    print(f"\n  ▶ fab-test {name}  →  {display_name}")
+            narrate(f"  artifact {index} of {total}", output_format=output_format)
+    narrate(f"\n  ▶ fab-test {name}  →  {display_name}", output_format=output_format)
     cmd = _build_command(name, artifact, args, output_dir)
     try:
         proc = subprocess.run(
@@ -434,9 +446,9 @@ def _run_one_artifact(
             check=False,
         )
     except subprocess.TimeoutExpired:
-        print(
-            f"  ⏰ fab-test {name}: timed out "
-            f"after {timeout}s for {display_name}"
+        narrate(
+            f"  ⏰ fab-test {name}: timed out after {timeout}s for {display_name}",
+            output_format=output_format,
         )
         return (display_name, 1)
 
@@ -444,7 +456,7 @@ def _run_one_artifact(
         for line in proc.stderr.splitlines():
             clean = _clean_annotation(line)
             if clean.strip():
-                print(f"  {clean}")
+                narrate(f"  {clean}", output_format=output_format)
 
     # Read the envelope and apply the error/warning threshold ourselves so
     # warnings never fail the build.
@@ -480,6 +492,7 @@ def _run_analyzer(name: str, args: argparse.Namespace, output_dir: Path) -> int:
     """Run one analyzer against all matching artifacts. Returns 0 or 1."""
     glob, description = _ANALYZER_REGISTRY[name]
     artifact_dir = Path(args.artifact_dir)
+    output_format = getattr(args, "output_format", "text")
 
     if _is_repository_scoped(name):
         # Repository-scoped analyzers run once against the repo metadata.
@@ -493,16 +506,20 @@ def _run_analyzer(name: str, args: argparse.Namespace, output_dir: Path) -> int:
         artifacts = _discover(artifact_dir, glob, getattr(args, "artifact", None))
 
     if not artifacts:
-        print(f"  ⚠ fab-test {name}: no {glob} artifacts found in {artifact_dir}")
+        narrate(
+            f"  ⚠ fab-test {name}: no {glob} artifacts found in {artifact_dir}",
+            output_format=output_format,
+        )
         return 0
 
     if args.dry_run:
-        print(
+        narrate(
             f"\nfab-test {name} ({description}) — dry run, "
-            f"{len(artifacts)} artifact(s):"
+            f"{len(artifacts)} artifact(s):",
+            output_format=output_format,
         )
         for a in artifacts:
-            print(f"  • {a.name}")
+            narrate(f"  • {a.name}", output_format=output_format)
         if _telemetry_enabled(args):
             environment = getattr(args, "environment", "") or os.getenv(
                 "FABRIC_ENVIRONMENT", ""
@@ -511,15 +528,18 @@ def _run_analyzer(name: str, args: argparse.Namespace, output_dir: Path) -> int:
                 preview = _build_telemetry_payload(
                     name, a, {"status": "dry-run", "findings": []}, environment
                 )
-                print("\n  Telemetry preview (not sent):")
-                print(json.dumps(preview, indent=2))
+                narrate("\n  Telemetry preview (not sent):", output_format=output_format)
+                narrate(json.dumps(preview, indent=2), output_format=output_format)
         return 0
 
     # Pre-flight: check required tools exist before invoking subprocesses.
     preflight_err = _preflight_error(name, args)
     if preflight_err:
         message, exit_code = preflight_err
-        print(f"\n  ✗ fab-test {name}: missing prerequisite\n  {message}\n")
+        narrate(
+            f"\n  ✗ fab-test {name}: missing prerequisite\n  {message}\n",
+            output_format=output_format,
+        )
         return exit_code
 
     in_ci = _is_ci()
@@ -545,7 +565,6 @@ def _run_analyzer(name: str, args: argparse.Namespace, output_dir: Path) -> int:
     else:
         results = [_run(pair) for pair in indexed_artifacts]
 
-    output_format = getattr(args, "output_format", "text")
     return _print_summary(
         name,
         results,
@@ -1067,13 +1086,19 @@ def main() -> int:
 
     artifact_dir = Path(args.artifact_dir)
     if not artifact_dir.exists():
-        print(f"  ✗ fab-test: --artifact-dir does not exist: {artifact_dir}")
+        narrate(
+            f"  ✗ fab-test: --artifact-dir does not exist: {artifact_dir}",
+            output_format=args.output_format,
+        )
         return 2
 
     if args.analyzer == "all":
         analyzers = _all_analyzers()
         if not analyzers:
-            print("  ⚠ fab-test all: no analyzers configured in analyzers.json")
+            narrate(
+                "  ⚠ fab-test all: no analyzers configured in analyzers.json",
+                output_format=args.output_format,
+            )
             return 0
         codes = [_run_analyzer(name, args, output_dir) for name in analyzers]
         return _print_all_summary(output_dir, analyzers, codes, args)
