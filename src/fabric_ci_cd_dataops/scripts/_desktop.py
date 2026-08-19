@@ -31,6 +31,12 @@ class DesktopInstance:
     open_file_path: Path | None
 
 
+class DesktopMatchError(RuntimeError):
+    """Raised when a running Desktop instance can't be unambiguously matched
+    to an artifact: none has the file open, or more than one does.
+    """
+
+
 def _default_workspaces_root() -> Path:
     local_app_data = os.environ.get("LOCALAPPDATA", "")
     return Path(local_app_data) / "Microsoft" / "Power BI Desktop" / "AnalysisServicesWorkspaces"
@@ -103,3 +109,32 @@ def detect_desktop_instances(workspaces_root: Path | None = None) -> list[Deskto
         return []
     file_path = _running_desktop_file_path() if len(ports) == 1 else None
     return [DesktopInstance(port=port, open_file_path=file_path) for port in ports]
+
+
+def match_instance_to_artifact(
+    instances: list[DesktopInstance], target_file: Path
+) -> DesktopInstance:
+    """Return the one running instance with ``target_file`` open.
+
+    Never guesses: raises ``DesktopMatchError`` naming ``target_file`` when no
+    instance has it open, or naming every matching port when more than one
+    does.
+    """
+    target = target_file.resolve()
+    matches = [
+        instance
+        for instance in instances
+        if instance.open_file_path is not None and instance.open_file_path.resolve() == target
+    ]
+    if not matches:
+        raise DesktopMatchError(
+            f"No running Power BI Desktop instance has {target} open. "
+            "Open it in Desktop and try again."
+        )
+    if len(matches) > 1:
+        ports = ", ".join(str(instance.port) for instance in matches)
+        raise DesktopMatchError(
+            f"Multiple running Desktop instances have {target} open (ports: {ports}). "
+            "Close all but one and try again."
+        )
+    return matches[0]

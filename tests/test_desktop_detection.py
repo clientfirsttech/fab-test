@@ -7,14 +7,17 @@ any machine without Power BI Desktop installed or running.
     pytest tests/test_desktop_detection.py
 """
 
+import re
 from pathlib import Path
 
 import pytest
 
 from fabric_ci_cd_dataops.scripts._desktop import (
     DesktopInstance,
+    DesktopMatchError,
     _extract_file_arg,
     detect_desktop_instances,
+    match_instance_to_artifact,
 )
 
 
@@ -139,3 +142,67 @@ def test_extract_file_arg_handles_unquoted_pbip_path():
 def test_extract_file_arg_returns_none_when_no_file_argument():
     """A command line with no recognizable file argument returns None."""
     assert _extract_file_arg("PBIDesktop.exe") is None
+
+
+# --------------------------------------------------------------------------- #
+# Matching a running instance to an artifact (Local Desktop First Run §4)
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.fab_test
+def test_match_selects_the_single_matching_instance(tmp_path):
+    """The one instance whose open file matches the target is selected."""
+    target = tmp_path / "SampleModel.pbip"
+    instances = [DesktopInstance(port=111, open_file_path=target)]
+
+    matched = match_instance_to_artifact(instances, target)
+
+    assert matched.port == 111
+
+
+@pytest.mark.fab_test
+def test_match_raises_naming_the_file_when_no_instance_matches(tmp_path):
+    """No matching instance raises, naming the file the user needs to open."""
+    target = tmp_path / "SampleModel.pbip"
+    instances = [DesktopInstance(port=111, open_file_path=tmp_path / "Other.pbip")]
+
+    with pytest.raises(DesktopMatchError, match=re.escape(str(target))):
+        match_instance_to_artifact(instances, target)
+
+
+@pytest.mark.fab_test
+def test_match_raises_naming_the_file_when_no_instances_running(tmp_path):
+    """An empty instance list raises the same "open the file" error."""
+    target = tmp_path / "SampleModel.pbip"
+
+    with pytest.raises(DesktopMatchError, match=re.escape(str(target))):
+        match_instance_to_artifact([], target)
+
+
+@pytest.mark.fab_test
+def test_match_raises_reporting_every_candidate_when_multiple_match(tmp_path):
+    """Multiple instances with the same open file raise, naming every candidate port."""
+    target = tmp_path / "SampleModel.pbip"
+    instances = [
+        DesktopInstance(port=111, open_file_path=target),
+        DesktopInstance(port=222, open_file_path=target),
+    ]
+
+    with pytest.raises(DesktopMatchError) as exc_info:
+        match_instance_to_artifact(instances, target)
+    assert "111" in str(exc_info.value)
+    assert "222" in str(exc_info.value)
+
+
+@pytest.mark.fab_test
+def test_match_ignores_instances_with_unresolved_file_path(tmp_path):
+    """An instance with no known open file is never treated as a match."""
+    target = tmp_path / "SampleModel.pbip"
+    instances = [
+        DesktopInstance(port=111, open_file_path=None),
+        DesktopInstance(port=222, open_file_path=target),
+    ]
+
+    matched = match_instance_to_artifact(instances, target)
+
+    assert matched.port == 222
