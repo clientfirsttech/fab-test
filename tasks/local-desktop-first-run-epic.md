@@ -206,7 +206,7 @@ Make the first local config something the CLI writes.
 
 ---
 
-## 14. Document for All Three Callers
+## 14. Document for All Three Callers ✅
 
 Cover the agent, the human, and the pipeline together, per the documentation constraint in [vision.md](../vision.md).
 

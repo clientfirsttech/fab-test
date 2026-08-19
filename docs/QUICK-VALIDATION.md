@@ -144,7 +144,27 @@ A copy-pasteable step for a CI job — gate on readiness, run with `--format jso
     path: analyzer-results/run.json
 ```
 
-`run.json` records `schema_version`, `fab_test_version`, the invoked command (credentials redacted), per-artifact status, envelope paths, totals, and the final exit code — see the [Agent Contract](../.github/skills/fab-test/SKILL.md#agent-contract) for the full schema.
+`run.json` records `schema_version`, `fab_test_version`, `origin` (`"local"` locally, the detected CI system in a pipeline), the invoked command (credentials redacted), per-artifact status, envelope paths, totals, and the final exit code — see the [Agent Contract](../.github/skills/fab-test/SKILL.md#agent-contract) for the full schema.
+
+### Running the local-Desktop analyzer set in CI
+
+`fab-test local` (see [QUICKSTART-LOCAL.md](QUICKSTART-LOCAL.md)) isn't only for a laptop — it runs the same in a pipeline, since it never requires a workspace ID or service principal:
+
+```yaml
+- name: Check local-workflow readiness
+  run: fab-test doctor --local --format json
+
+- name: Run the local-Desktop analyzer set
+  run: fab-test local --format json
+
+- name: Upload run manifest
+  uses: actions/upload-artifact@v4
+  with:
+    name: fab-test-run-manifest
+    path: analyzer-results/run.json
+```
+
+The difference from running it on a laptop: no Power BI Desktop instance is open in CI, so `pql-test`'s DAX tests connect to nothing and degrade to a `skipped` status on that artifact (never a failure — see vision.md's "platform gaps degrade to skips") rather than binding to a `desktop` port. `pql-lint`, BPA, and PBIR Inspector are unaffected — they don't depend on Desktop at all.
 
 ## Clean up
 

@@ -61,11 +61,27 @@ fab-test bpa --format json 2>/dev/null | jq .   # safe to pipe straight into jq
 
 ```bash
 fab-test doctor                       # is each analyzer's tool/credential ready?
+fab-test doctor --local               # readiness for the local Desktop workflow specifically
 fab-test list                         # what subcommands exist, and how many artifacts match?
 fab-test explain bpa                  # what command would `fab-test bpa` actually run?
 ```
 
 `doctor` and `list` both support `--format json`. `doctor --analyzer NAME` checks one analyzer; `list`'s matched-artifact counts respect `--artifact-dir`. `explain ANALYZER` never spawns a subprocess — it only shows the resolved command, tool path, rules path, and output path.
+
+`doctor --local` checks Python version, whether a Desktop instance is running, the Desktop Bridge CLI's presence (path only — never invoked), and each of `fab-test local`'s four analyzers, then states exactly which ones would run:
+
+```bash
+fab-test doctor --local --format json
+```
+```json
+{
+  "checks": [
+    {"check": "python", "ready": true, "reason": "3.12.10", "resolved_path": "/usr/bin/python3.12", "remediation": null},
+    {"check": "desktop", "ready": false, "reason": "no running instance detected", "resolved_path": null, "remediation": "Open a .pbip file in Power BI Desktop"}
+  ],
+  "would_run": ["bpa", "pbir", "pql_test"]
+}
+```
 
 ### The run manifest (`analyzer-results/run.json`)
 
@@ -75,6 +91,7 @@ Every analyzer invocation (a single subcommand or `all`) writes one `run.json` u
 {
   "schema_version": 1,
   "fab_test_version": "1.0.0",
+  "origin": "local",
   "command": ["fab-test", "bpa", "--format", "json"],
   "artifacts": [
     {
@@ -92,7 +109,7 @@ Every analyzer invocation (a single subcommand or `all`) writes one `run.json` u
 }
 ```
 
-Per-artifact `status` is one of `passed` / `failed` / `skipped` / `timeout` / `preflight_failed` (the last two cover an aborted run). `detail` is `null` for a normal completion and carries the human-readable failure reason for the two abort statuses — the resolved remediation message for `preflight_failed`, the exceeded duration for `timeout` — so a caller never has to fall back to stderr to learn what to fix. The `command` field is sanitized: known credential flags (`--client-secret`, `--password`, `--token`, `--secret`, `--api-key`) and any `key=value`-shaped token have their value redacted before the file is written — no credential ever appears in the manifest.
+Per-artifact `status` is one of `passed` / `failed` / `skipped` / `timeout` / `preflight_failed` (the last two cover an aborted run). `detail` is `null` for a normal completion and carries the human-readable failure reason for the two abort statuses — the resolved remediation message for `preflight_failed`, the exceeded duration for `timeout` — so a caller never has to fall back to stderr to learn what to fix. `origin` is `"local"` when no CI environment variable is detected, or the detected CI system's name (`"github-actions"`, `"gitlab-ci"`, `"circleci"`, `"azure-devops"`) otherwise — the envelope schema, `status` values, and result layout are identical either way; this is the only field that differs between a local run and a CI run. The `command` field is sanitized: known credential flags (`--client-secret`, `--password`, `--token`, `--secret`, `--api-key`) and any `key=value`-shaped token have their value redacted before the file is written — no credential ever appears in the manifest.
 
 `doctor`, `list`, `explain`, and `clean-tools` never write a manifest — they don't run an analyzer.
 
@@ -107,7 +124,9 @@ Per-artifact `status` is one of `passed` / `failed` / `skipped` / `timeout` / `p
  fab-test playwright-impact — Build impacted-report manifest from changed artifacts [alias: playwright_impact]
  fab-test dependencies     — Discover reports that depend on a deployed semantic model
  fab-test all              — Run the analyzers listed in analyzers.json
+ fab-test local            — Run pql-lint, BPA, PBIR Inspector, and Desktop-bound pql-test — no cloud required
  fab-test doctor           — Check whether each analyzer's tool/credentials are ready
+ fab-test doctor --local   — Check readiness for the local Desktop workflow specifically
  fab-test list             — List subcommands with artifact glob, matched count, and required tool
  fab-test explain ANALYZER — Show the resolved command for one analyzer without running it
  fab-test clean-tools      — Remove or inspect the .fab-test-tools downloaded-binary cache
@@ -122,7 +141,7 @@ use the original underscore names regardless of which spelling you invoke.
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--artifact STEM` | (all) | Only analyze the artifact whose stem matches STEM exactly |
-| `--artifact-dir DIR` | `.fabric/artifacts` | Root directory to discover artifacts |
+| `--artifact-dir DIR` | `.fabric/artifacts` (repository root for `local`) | Root directory to discover artifacts |
 | `--output-dir DIR` | `analyzer-results` | Root directory for result envelopes |
 | `--dry-run` | off | List matching artifacts without running any analyzer |
 | `--telemetry` / `--no-telemetry` | env-driven | Stream/suppress Eventhouse telemetry when configured |
@@ -142,6 +161,25 @@ fab-test all --artifact SampleModel-PQLAssert
 The stem is the artifact folder name without its extension (`.SemanticModel`, `.Report`).
 
 ## Subcommand-Specific Flags
+
+### local
+
+Runs `pql-lint`, BPA, PBIR Inspector, and Desktop-bound `pql-test` against every `.pbip` project discovered under `--artifact-dir` — no `.fabric/artifacts` layout required, no Fabric workspace, no service principal. Its subparser doesn't expose `--workspace-id` or `--env` at all, so the remote XMLA path is unreachable from `local`.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--artifact-dir DIR` | repository root | Root to discover `.pbip` projects — broader default than other subcommands, since local mode's point is "wherever the `.pbip` lives" |
+| `--tabular-editor-path`, `--bpa-rules-path`, `--inspector-path`, `--rules-path` | same as `bpa`/`pbir` | Passed straight through to those two analyzers |
+
+```bash
+fab-test local --dry-run    # see which projects were found and which analyzers would run
+fab-test local              # run it
+fab-test local --format json
+```
+
+A missing prerequisite (`pqlint` not installed, Tabular Editor/PBIR Inspector not resolved) is reported as **skipped** with a remediation hint — it never fails the run. Exit code `1` only means a real finding, never a missing tool. `pql-test` is always ready (it's a pinned `fab-test` dependency); if a Desktop instance has the project's `.pbip` open, `pql-test`'s envelope records a `desktop` field naming the port and model it bound to (see `pql-test` below and the run manifest section for the full shape).
+
+Discovery walks `--artifact-dir` recursively and skips anything inside a separate git checkout (a worktree, a vendored clone) so a broad repo-root walk never double-counts the same fixture living in two checkouts.
 
 ### bpa
 
@@ -178,7 +216,13 @@ fab-test pql-test --env PROD --workspace-id <guid>
 
 `pql-test` is resolved in order: `PATH` → `.venv/Scripts/pql-test.exe` (Windows) / `.venv/bin/pql-test` (Unix) → `python -m pql_test`.
 
-For local runs, Power BI Desktop must be open with the model loaded. `pql-test` connects via XMLA on `localhost`.
+For local runs, `pql-test` connects to a locally-open Power BI Desktop instance automatically when given the artifact's filesystem path — no `--workspace-id` needed. When exactly one Desktop instance has the artifact's `.pbip` open, `fab-test` resolves its local XMLA port and adds it to the envelope as a `desktop` field:
+
+```json
+"desktop": {"port": 51234, "model_name": "SampleModel-PQLAssert"}
+```
+
+`desktop` is absent from the envelope when nothing is bound (no Desktop instance running, or more than one running — `fab-test` never guesses which one). Passing `--workspace-id` skips this Desktop-matching step entirely and uses the remote XMLA path instead.
 
 ### pql-lint
 
