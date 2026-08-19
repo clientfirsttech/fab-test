@@ -2832,8 +2832,8 @@ def test_main_clean_tools_dispatches_correctly(tmp_path, monkeypatch, capsys):
 _SUBCOMMAND_NAMES = (
     "bpa",
     "pbir",
-    "pql_test",
-    "pql_lint",
+    "pql-test",
+    "pql-lint",
     "playwright",
     "playwright-impact",
     "dependencies",
@@ -2993,6 +2993,87 @@ def test_all_dry_run_output_unaffected_by_aliases():
     assert result.returncode == 0, result.stderr
     assert "fab-test pql_test" in result.stdout
     assert "fab-test pql-test" not in result.stdout
+
+
+# --------------------------------------------------------------------------- #
+# Canonicalize subcommand names (CLI Agent Ergonomics §13)
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.fab_test
+def test_help_displays_hyphenated_form_as_canonical():
+    """--help shows the hyphenated spelling as primary, underscore as the alias."""
+    result = subprocess.run(
+        ["fab-test", "--help"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "pql-test (pql_test)" in result.stdout
+    assert "pql-lint (pql_lint)" in result.stdout
+
+
+@pytest.mark.fab_test
+def test_pql_test_underscore_form_still_works_with_no_error():
+    """The underscore spelling is still silently accepted (no warning/deprecation)."""
+    result = subprocess.run(
+        ["fab-test", "pql_test", "--dry-run"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "deprecat" not in result.stdout.lower()
+    assert "deprecat" not in result.stderr.lower()
+
+
+@pytest.mark.fab_test
+def test_list_reports_canonical_name_and_aliases():
+    """`fab-test list --format json` reports the canonical name plus aliases."""
+    result = subprocess.run(
+        ["fab-test", "list", "--format", "json"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    summary = json.loads(result.stdout)
+
+    pql_test_row = next(r for r in summary["analyzers"] if r["analyzer"] == "pql-test")
+    assert pql_test_row["aliases"] == ["pql_test"]
+
+    impact_row = next(
+        r for r in summary["analyzers"] if r["analyzer"] == "playwright-impact"
+    )
+    assert impact_row["aliases"] == ["playwright_impact"]
+
+    bpa_row = next(r for r in summary["analyzers"] if r["analyzer"] == "bpa")
+    assert bpa_row["aliases"] == []
+
+
+@pytest.mark.fab_test
+def test_result_directory_name_unchanged_when_invoked_via_canonical_form(tmp_path):
+    """Invoking via the new canonical 'pql-test' still writes under analyzer-results/pql_test/."""
+    artifact_dir = tmp_path / "artifacts"
+    (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
+    output_dir = tmp_path / "analyzer-results"
+
+    result = subprocess.run(
+        [
+            "fab-test", "pql-test",
+            "--artifact-dir", str(artifact_dir),
+            "--output-dir", str(output_dir),
+            "--dry-run",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    # The dry-run banner uses the internal registry key, unaffected by which
+    # spelling the user typed — proving result-directory naming is unchanged.
+    assert "fab-test pql_test" in result.stdout
 
 
 # --------------------------------------------------------------------------- #

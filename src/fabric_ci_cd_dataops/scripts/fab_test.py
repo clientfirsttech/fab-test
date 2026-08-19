@@ -715,9 +715,36 @@ def _add_common_flags(parser: argparse.ArgumentParser) -> None:
 
 _SUBCOMMAND_ALIASES = {
     "pql-test": "pql_test",
+    "pql_test": "pql_test",
     "pql-lint": "pql_lint",
+    "pql_lint": "pql_lint",
     "playwright_impact": "playwright-impact",
 }
+
+# Canonical (hyphenated, displayed) subcommand name -> internal registry key,
+# for the handful where they diverge. Result directories (analyzer-results/
+# <key>/...) stay on the registry key so historical results remain readable.
+_CANONICAL_TO_REGISTRY_KEY = {
+    "pql-test": "pql_test",
+    "pql-lint": "pql_lint",
+}
+_REGISTRY_KEY_TO_CANONICAL = {v: k for k, v in _CANONICAL_TO_REGISTRY_KEY.items()}
+
+
+def _canonical_name(registry_key: str) -> str:
+    """Return the canonical (hyphenated) display name for a registry key."""
+    return _REGISTRY_KEY_TO_CANONICAL.get(registry_key, registry_key)
+
+
+def _aliases_for(registry_key: str, canonical: str) -> list[str]:
+    """Return every other accepted spelling for ``registry_key``."""
+    return sorted(
+        {
+            alias
+            for alias, key in _SUBCOMMAND_ALIASES.items()
+            if key == registry_key and alias != canonical
+        }
+    )
 
 
 _COMMON_COMPLETION_FLAGS = (
@@ -727,7 +754,13 @@ _COMMON_COMPLETION_FLAGS = (
 
 
 def _completion_subcommands() -> str:
-    return " ".join((*_ANALYZER_REGISTRY.keys(), "all", "clean-tools"))
+    return " ".join(
+        (
+            *(_canonical_name(name) for name in _ANALYZER_REGISTRY),
+            "all",
+            "clean-tools",
+        )
+    )
 
 
 def _generate_completion_script(shell: str) -> str:
@@ -891,10 +924,10 @@ def build_parser() -> argparse.ArgumentParser:
         help=f"PBIR Inspector rules JSON [default: {_DEFAULT_PBIR_RULES}]",
     )
 
-    # --- pql_test ---
+    # --- pql-test ---
     pql_test_p = subs.add_parser(
-        "pql_test",
-        aliases=["pql-test"],
+        "pql-test",
+        aliases=["pql_test"],
         help="pql-test DAX/PQL test runner (SemanticModel artifacts)",
     )
     _add_common_flags(pql_test_p)
@@ -914,10 +947,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="Environment label (e.g. DEV, PROD, ANY) [env: FABRIC_ENVIRONMENT]",
     )
 
-    # --- pql_lint ---
+    # --- pql-lint ---
     pql_lint_p = subs.add_parser(
-        "pql_lint",
-        aliases=["pql-lint"],
+        "pql-lint",
+        aliases=["pql_lint"],
         help="pqlint Power Query linter (SemanticModel artifacts)",
     )
     _add_common_flags(pql_lint_p)
@@ -1248,9 +1281,11 @@ def _list_analyzers(args: argparse.Namespace) -> int:
             count = 1
         else:
             count = len(_discover(artifact_dir, glob, None))
+        canonical = _canonical_name(name)
         rows.append(
             {
-                "analyzer": name,
+                "analyzer": canonical,
+                "aliases": _aliases_for(name, canonical),
                 "description": description,
                 "glob": glob or None,
                 "matched_artifacts": count,
