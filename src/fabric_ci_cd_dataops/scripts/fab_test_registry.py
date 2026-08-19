@@ -20,6 +20,7 @@ from ._analyzer_tool_bootstrap import (
     probe_executable,
     resolve_executable,
 )
+from ._pbip_discovery import discover_pbip_projects
 
 # Reuse the same repo-root logic as fab_test.py so paths stay consistent.
 
@@ -85,15 +86,53 @@ def _env(name: str, default: str = "") -> str:
     return os.environ.get(name, default)
 
 
+# Maps an artifact folder suffix to the analyzers whose glob matches it.
+_SUFFIX_TO_ANALYZERS: dict[str, tuple[str, ...]] = {
+    ".SemanticModel": ("bpa", "pql_test", "pql_lint"),
+    ".Report": ("pbir", "playwright"),
+}
+
+
+def applicable_analyzers(artifact: Path) -> tuple[str, ...]:
+    """Return the analyzer names whose artifact glob matches this path's suffix."""
+    return _SUFFIX_TO_ANALYZERS.get(artifact.suffix, ())
+
+
+def discover_pbip_sources(artifact_dir: Path) -> dict[Path, Path]:
+    """Map each artifact folder paired with a `.pbip` project to that project's path.
+
+    Only folders found via `.pbip` pairing appear here — an artifact folder
+    with no `.pbip` sibling (today's layout) is absent from the mapping.
+    """
+    sources: dict[Path, Path] = {}
+    for project in discover_pbip_projects(artifact_dir):
+        for candidate in (project.report_path, project.semantic_model_path):
+            if candidate is not None:
+                sources[candidate] = project.pbip_path
+    return sources
+
+
 def discover_artifacts(
     artifact_dir: Path,
     glob: str,
     stem_filter: str | None,
 ) -> list[Path]:
-    """Return sorted artifact paths matching ``glob`` and optional stem filter."""
+    """Return sorted artifact paths matching ``glob`` and optional stem filter.
+
+    Includes artifacts found directly under ``artifact_dir`` and any
+    matching folder paired with a `.pbip` project discovered recursively
+    within ``artifact_dir`` — a developer's `.pbip` need not sit at the top
+    level of the directory being scanned. Search never leaves
+    ``artifact_dir``.
+    """
     if not artifact_dir.exists():
         return []
-    artifacts = sorted(artifact_dir.glob(glob))
+    suffix = glob.lstrip("*")
+    matches = {path.resolve() for path in artifact_dir.glob(glob)}
+    matches.update(
+        path for path in discover_pbip_sources(artifact_dir) if path.name.endswith(suffix)
+    )
+    artifacts = sorted(matches)
     if stem_filter:
         # Accept either the artifact stem or the full artifact name
         # (e.g. "SampleModel-PQLAssert" or "SampleModel-PQLAssert.SemanticModel").
