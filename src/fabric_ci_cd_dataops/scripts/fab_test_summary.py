@@ -19,6 +19,31 @@ from ._analyzer_envelope import _severity_counts, _severity_rank
 from .fab_test_registry import ANALYZER_REGISTRY, discover_artifacts
 
 
+def _print_list(rows: list[dict[str, Any]], output_format: str = "text") -> int:
+    """Print the `fab-test list` capability report. Always exits 0."""
+    if output_format == "json":
+        print(json.dumps({"analyzers": rows}, indent=2))
+        return 0
+
+    display_rows = [
+        (
+            r["analyzer"],
+            r["glob"] or "(repository)",
+            str(r["matched_artifacts"]),
+            r["required_tool"] or "(none)",
+        )
+        for r in rows
+    ]
+    table = tabulate(
+        display_rows,
+        headers=("Analyzer", "Glob", "Matched", "Required Tool"),
+        tablefmt="simple",
+        stralign="left",
+    )
+    print(table)
+    return 0
+
+
 def _print_doctor(rows: list[dict[str, Any]], output_format: str = "text") -> int:
     """Print the `fab-test doctor` readiness report.
 

@@ -3292,7 +3292,7 @@ _STDOUT_PURITY_EXTRA_ARGS = {"dependencies": ["--semantic-model", "TestModel"]}
 
 # Admin/reporting subcommands (not part of the analyzer-run pipeline) don't
 # necessarily narrate anything to stderr, and some don't take --dry-run.
-_NO_NARRATION_SUBCOMMANDS = {"doctor"}
+_NO_NARRATION_SUBCOMMANDS = {"doctor", "list"}
 _EXPECTED_EXIT_CODES = {"doctor": (0, 1)}
 
 

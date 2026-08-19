@@ -76,6 +76,7 @@ from .fab_test_registry import (
 from .fab_test_summary import (
     _print_all_summary,
     _print_doctor,
+    _print_list,
     _print_summary,
     _read_artifact_envelope,
 )
@@ -1108,6 +1109,25 @@ def build_parser() -> argparse.ArgumentParser:
         help="Only check this analyzer",
     )
 
+    # --- list ---
+    list_p = subs.add_parser(
+        "list",
+        help="List available analyzers with their artifact glob, matched count, and required tool",
+    )
+    list_p.add_argument(
+        "--artifact-dir",
+        default=str(_PYPROJECT_CONFIG.get("artifact_dir", ARTIFACT_ROOT)),
+        metavar="DIR",
+        help=f"Root for .fabric artifacts (default: {ARTIFACT_ROOT})",
+    )
+    list_p.add_argument(
+        "--format",
+        choices=["text", "json"],
+        default=_PYPROJECT_CONFIG.get("format", "text"),
+        dest="output_format",
+        help="Output format for the capability report (default: text)",
+    )
+
     return parser
 
 
@@ -1153,6 +1173,35 @@ def _doctor(args: argparse.Namespace) -> int:
     return _print_doctor(rows, output_format)
 
 
+_TOOL_DISPLAY_NAMES = {
+    "bpa": "Tabular Editor",
+    "pbir": "PBIR Inspector",
+}
+
+
+def _list_analyzers(args: argparse.Namespace) -> int:
+    """List every subcommand with its artifact glob, matched count, and tool."""
+    artifact_dir = Path(args.artifact_dir)
+    output_format = getattr(args, "output_format", "text")
+
+    rows = []
+    for name, (glob, description) in _ANALYZER_REGISTRY.items():
+        if _is_repository_scoped(name):
+            count = 1
+        else:
+            count = len(_discover(artifact_dir, glob, None))
+        rows.append(
+            {
+                "analyzer": name,
+                "description": description,
+                "glob": glob or None,
+                "matched_artifacts": count,
+                "required_tool": _TOOL_DISPLAY_NAMES.get(name),
+            }
+        )
+    return _print_list(rows, output_format)
+
+
 def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
@@ -1163,6 +1212,9 @@ def main() -> int:
 
     if args.analyzer == "doctor":
         return _doctor(args)
+
+    if args.analyzer == "list":
+        return _list_analyzers(args)
 
     _apply_environment_default(args, _PYPROJECT_CONFIG)
     output_dir = Path(args.output_dir)
