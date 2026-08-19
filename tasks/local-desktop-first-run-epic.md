@@ -70,7 +70,7 @@ Never guess which model is under test.
 
 ---
 
-## 5. Bind DAX Tests to the Detected Instance
+## 5. Bind DAX Tests to the Detected Instance ✅
 
 Make the local `pql-test` path self-configuring instead of tribal knowledge in a docs line.
 

@@ -163,6 +163,8 @@ def write_results(
     native_out: "Path | None" = None,
     duration_ms: int = 0,
     test_summary: "dict[str, int] | None" = None,
+    desktop_port: "int | None" = None,
+    desktop_model_name: str = "",
 ) -> None:
     """Write standardized pql-test envelope JSON."""
     env = build_envelope(
@@ -177,6 +179,8 @@ def write_results(
     env["test_results"] = test_results or []
     if test_summary is not None:
         env["test_summary"] = test_summary
+    if desktop_port is not None:
+        env["desktop"] = {"port": desktop_port, "model_name": desktop_model_name}
     write_envelope(output_path, env)
 
 
@@ -184,6 +188,10 @@ def run_pql_test(args: argparse.Namespace) -> int:
     """Run pql-test and return an exit code."""
     artifact_path = validate_path(args.artifact_path, "Artifact path")
     artifact_name = args.artifact_name or artifact_path.stem
+
+    desktop_port_arg = getattr(args, "desktop_port", "")
+    desktop_port = int(desktop_port_arg) if desktop_port_arg else None
+    desktop_model_name = getattr(args, "desktop_model_name", "")
 
     _env_out = envelope_path("pql_test", artifact_path.stem)
     _nat_out = native_output_path("pql_test", artifact_path.stem, "json")
@@ -250,6 +258,7 @@ def run_pql_test(args: argparse.Namespace) -> int:
             write_results(
                 output_path, "timeout", [], artifact_path,
                 message=message, native_out=nat_out,
+                desktop_port=desktop_port, desktop_model_name=desktop_model_name,
             )
             print(f"::error::{message}", file=sys.stderr)
             return 1
@@ -258,6 +267,7 @@ def run_pql_test(args: argparse.Namespace) -> int:
             write_results(
                 output_path, "error", [], artifact_path,
                 message=message, native_out=nat_out,
+                desktop_port=desktop_port, desktop_model_name=desktop_model_name,
             )
             print(f"::error::{message}", file=sys.stderr)
             return 1
@@ -266,6 +276,7 @@ def run_pql_test(args: argparse.Namespace) -> int:
             write_results(
                 output_path, "error", [], artifact_path,
                 message=message, native_out=nat_out,
+                desktop_port=desktop_port, desktop_model_name=desktop_model_name,
             )
             print(f"::error::{message}", file=sys.stderr)
             return 1
@@ -344,6 +355,8 @@ def run_pql_test(args: argparse.Namespace) -> int:
             message=message,
             native_out=nat_out,
             duration_ms=timer.elapsed_ms,
+            desktop_port=desktop_port,
+            desktop_model_name=desktop_model_name,
         )
         if level >= _VERBOSITY_LEVELS["default"]:
             icon = "✅" if status == "passed" else "⏭️"
@@ -362,6 +375,8 @@ def run_pql_test(args: argparse.Namespace) -> int:
         message=message,
         native_out=nat_out,
         duration_ms=timer.elapsed_ms,
+        desktop_port=desktop_port,
+        desktop_model_name=desktop_model_name,
     )
     if level >= _VERBOSITY_LEVELS["default"]:
         log(f"📁 Envelope: {output_path}")
@@ -397,6 +412,14 @@ def main() -> int:
     )
     parser.add_argument(
         "--env", default="", help="Environment label (e.g. DEV, PROD, ANY)",
+    )
+    parser.add_argument(
+        "--desktop-port", default="",
+        help="Port of the Power BI Desktop instance this run is bound to (envelope-only)",
+    )
+    parser.add_argument(
+        "--desktop-model-name", default="",
+        help="Model name of the bound Desktop instance (envelope-only)",
     )
     args = parser.parse_args()
     raise SystemExit(run_pql_test(args))

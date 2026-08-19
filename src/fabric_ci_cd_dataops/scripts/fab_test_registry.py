@@ -20,6 +20,7 @@ from ._analyzer_tool_bootstrap import (
     probe_executable,
     resolve_executable,
 )
+from ._desktop import DesktopMatchError, detect_desktop_instances, match_instance_to_artifact
 from ._pbip_discovery import discover_pbip_projects
 
 # Reuse the same repo-root logic as fab_test.py so paths stay consistent.
@@ -197,12 +198,36 @@ def build_pbir_command(
     ]
 
 
+def _bound_desktop_instance(artifact: Path):
+    """Return the (port, model_name) of a Desktop instance with this artifact's
+    .pbip open, or None when there's no pairing or no unambiguous match.
+    """
+    pbip_path = discover_pbip_sources(artifact.parent).get(artifact.resolve())
+    if pbip_path is None:
+        return None
+    instances = detect_desktop_instances()
+    if not instances:
+        return None
+    try:
+        instance = match_instance_to_artifact(instances, pbip_path)
+    except DesktopMatchError:
+        return None
+    return instance.port, pbip_path.stem
+
+
 def build_pql_test_command(
     artifact: Path,
     args: argparse.Namespace,
     output_dir: Path,
 ) -> list[str]:
-    """Build the pql-test command for ``artifact``."""
+    """Build the pql-test command for ``artifact``.
+
+    When no workspace is supplied, invoked against the artifact's own paired
+    .pbip: if exactly one running Power BI Desktop instance has that file
+    open, its port and model name are added so the envelope can record what
+    it bound to. Desktop detection is skipped entirely once a workspace ID
+    is supplied -- that's the remote XMLA path.
+    """
     output = output_dir / "pql_test" / artifact.stem / "envelope.json"
     cmd = [
         sys.executable,
@@ -221,6 +246,11 @@ def build_pql_test_command(
         cmd += ["--workspace-id", workspace_id]
     if environment:
         cmd += ["--env", environment]
+    if not workspace_id:
+        bound = _bound_desktop_instance(artifact)
+        if bound is not None:
+            port, model_name = bound
+            cmd += ["--desktop-port", str(port), "--desktop-model-name", model_name]
     return cmd
 
 
