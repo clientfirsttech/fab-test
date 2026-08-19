@@ -87,7 +87,7 @@ fab-test bpa --tabular-editor-path "/path/to/TabularEditor.exe"
 fab-test pbir --inspector-path "/path/to/PBIRInspectorCLI"
 
 # Run pql-test DAX tests
-fab-test pql_test --env DEV
+fab-test pql-test --env DEV
 
 # Run Playwright visual validation (requires service-principal credentials)
 fab-test playwright --artifact "Not Working Visuals" --env dev --env-file .env
@@ -95,6 +95,19 @@ fab-test playwright --artifact "Not Working Visuals" --env dev --env-file .env
 # Discover reports that depend on a deployed semantic model
 fab-test dependencies --semantic-model SalesModel --env dev --env-file .env
 ```
+
+### The machine-readable workflow (agents and pipelines)
+
+`fab-test` is designed to be called the same way by a human, a CI pipeline, or an AI agent. The four-command loop:
+
+```bash
+fab-test doctor --format json          # 1. is each analyzer's tool/credential ready?
+fab-test list --format json            # 2. what subcommands exist, and how many artifacts match?
+fab-test bpa --format json             # 3. run it — stdout is exactly one JSON document
+cat analyzer-results/run.json          # 4. read the manifest instead of globbing result dirs
+```
+
+`--format json` guarantees stdout carries nothing but the payload — narration goes to stderr. See the [Agent Contract](.github/skills/fab-test/SKILL.md#agent-contract) for exit codes, the JSON stdout guarantee, and the `run.json` schema.
 
 Full CLI reference: [`.github/skills/fab-test/SKILL.md`](.github/skills/fab-test/SKILL.md).
 

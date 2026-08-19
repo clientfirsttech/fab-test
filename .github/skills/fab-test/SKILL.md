@@ -19,9 +19,9 @@ Entry point: `scripts/fab_test.py` (installed as `fab-test` console script via `
 | `pytest -m pbir` | Is the PBIR wrapper code correct? (always green, no binary needed) |
 | `fab-test pbir` | Do my reports pass PBIR Inspector rules? (requires PBIR Inspector binary) |
 | `pytest -m pql_test` | Is the pql-test wrapper code correct? (mocked, always green) |
-| `fab-test pql_test` | Do my semantic model DAX tests pass? (requires Power BI Desktop open) |
+| `fab-test pql-test` | Do my semantic model DAX tests pass? (requires Power BI Desktop open) |
 | `pytest -m pql_lint` | Is the pqlint wrapper code correct? (always green, no tools needed) |
-| `fab-test pql_lint` | Do my semantic models pass Power Query lint rules? |
+| `fab-test pql-lint` | Do my semantic models pass Power Query lint rules? |
 | `pytest -m playwright` | Is the Playwright wrapper code correct? (mocked contract tests) |
 | `fab-test playwright` | Do my Power BI reports render without visual-load errors? (requires service-principal credentials) |
 
@@ -33,17 +33,88 @@ pip install -e .
 
 This registers the `fab-test` console script. The `.venv` is searched automatically for tool binaries (e.g. `pql-test`) even when not on `PATH`.
 
+## Agent Contract
+
+`fab-test` is built to be called identically by a human, a CI pipeline, and an AI agent.
+
+### Exit codes
+
+| Code | Meaning |
+|------|---------|
+| `0` | All artifacts passed (warnings do not fail the build) |
+| `1` | An analyzer found error-level findings, or the analyzer process crashed |
+| `2` | Invalid CLI arguments (no analyzer was invoked) |
+| `126` | Analyzer unsupported on this platform (message names the supported OS) |
+| `127` | Required external tool could not be resolved (message names the flag, env var, and config key that would fix it) |
+
+### JSON stdout guarantee
+
+Every subcommand that accepts `--format json` writes **exactly one JSON document to stdout** — nothing else. Progress, banners, warnings, and any analyzer subprocess's own output are narrated to **stderr**. This holds even for `--dry-run`: a single analyzer's dry run emits a small `{"analyzer": ..., "dry_run": true, "artifacts": [...]}` summary rather than leaving stdout empty.
+
+```bash
+fab-test bpa --format json 2>/dev/null | jq .   # safe to pipe straight into jq
+```
+
+`--format text` (the default) is unaffected — output is unchanged from before this contract existed.
+
+### Discoverability: doctor → list → explain
+
+```bash
+fab-test doctor                       # is each analyzer's tool/credential ready?
+fab-test list                         # what subcommands exist, and how many artifacts match?
+fab-test explain bpa                  # what command would `fab-test bpa` actually run?
+```
+
+`doctor` and `list` both support `--format json`. `doctor --analyzer NAME` checks one analyzer; `list`'s matched-artifact counts respect `--artifact-dir`. `explain ANALYZER` never spawns a subprocess — it only shows the resolved command, tool path, rules path, and output path.
+
+### The run manifest (`analyzer-results/run.json`)
+
+Every analyzer invocation (a single subcommand or `all`) writes one `run.json` under `--output-dir` (default `analyzer-results/`), so a caller reads one file instead of globbing result directories:
+
+```json
+{
+  "schema_version": 1,
+  "fab_test_version": "1.0.0",
+  "command": ["fab-test", "bpa", "--format", "json"],
+  "artifacts": [
+    {
+      "analyzer": "bpa",
+      "artifact": "SampleModel-PQLAssert",
+      "status": "passed",
+      "envelope_path": "analyzer-results/bpa/SampleModel-PQLAssert/envelope.json",
+      "errors": 0,
+      "warnings": 21
+    }
+  ],
+  "totals": {"errors": 0, "warnings": 21},
+  "exit_code": 0
+}
+```
+
+Per-artifact `status` is one of `passed` / `failed` / `skipped` / `timeout` / `preflight_failed` (the last two cover an aborted run). The `command` field is sanitized: known credential flags (`--client-secret`, `--password`, `--token`, `--secret`, `--api-key`) and any `key=value`-shaped token have their value redacted before the file is written — no credential ever appears in the manifest.
+
+`doctor`, `list`, `explain`, and `clean-tools` never write a manifest — they don't run an analyzer.
+
 ## Subcommands
 
 ```
  fab-test bpa              — Tabular Editor Best Practice Analyzer (SemanticModel artifacts)
  fab-test pbir             — PBIR Inspector static report analysis (Report artifacts)
- fab-test pql_test         — pql-test DAX/PQL test runner (SemanticModel artifacts)
- fab-test pql_lint         — pqlint Power Query linter (SemanticModel artifacts)
+ fab-test pql-test         — pql-test DAX/PQL test runner (SemanticModel artifacts) [alias: pql_test]
+ fab-test pql-lint         — pqlint Power Query linter (SemanticModel artifacts) [alias: pql_lint]
  fab-test playwright       — Playwright visual/error validation (Report artifacts)
- fab-test playwright-impact — Build impacted-report manifest from changed artifacts
+ fab-test playwright-impact — Build impacted-report manifest from changed artifacts [alias: playwright_impact]
  fab-test dependencies     — Discover reports that depend on a deployed semantic model
  fab-test all              — Run the analyzers listed in analyzers.json
+ fab-test doctor           — Check whether each analyzer's tool/credentials are ready
+ fab-test list             — List subcommands with artifact glob, matched count, and required tool
+ fab-test explain ANALYZER — Show the resolved command for one analyzer without running it
+ fab-test clean-tools      — Remove or inspect the .fab-test-tools downloaded-binary cache
+```
+
+Underscore spellings (`pql_test`, `pql_lint`, `playwright_impact`) still work silently as aliases —
+existing scripts and muscle memory keep working. Result directories under `analyzer-results/`
+use the original underscore names regardless of which spelling you invoke.
 
 ## Global Flags (all subcommands)
 
@@ -54,13 +125,15 @@ This registers the `fab-test` console script. The `.venv` is searched automatica
 | `--output-dir DIR` | `analyzer-results` | Root directory for result envelopes |
 | `--dry-run` | off | List matching artifacts without running any analyzer |
 | `--telemetry` / `--no-telemetry` | env-driven | Stream/suppress Eventhouse telemetry when configured |
-| `--format {text,json}` | `text` | Aggregate summary output format |
+| `--format {text,json}` | `text` | Aggregate summary output format (see Agent Contract above for the stdout guarantee) |
 | `-v`, `--verbose` | off | Increase output verbosity (one `-v` = per-finding detail, two `-v` = command + stdout/stderr) |
+| `--timeout SECONDS` | `120` | Per-artifact subprocess timeout [env: `ANALYZER_TIMEOUT`] |
+| `--jobs N` | `1` | Run up to N artifacts in parallel for the same analyzer |
 
 ### Isolating a single artifact
 
 ```bash
-fab-test pql_test --artifact SampleModel-PQLAssert
+fab-test pql-test --artifact SampleModel-PQLAssert
 fab-test bpa --artifact SampleModel-PQLAssert
 fab-test all --artifact SampleModel-PQLAssert
 ```
@@ -90,7 +163,7 @@ fab-test bpa
 | `--inspector-path PATH` | `PBIR_INSPECTOR_PATH` | `PBIR-Inspector/PBIRInspectorCLI` |
 | `--rules-path PATH` | — | `.github/metadata/rules/pbi-inspector-custom-rules.json` |
 
-### pql_test
+### pql-test
 
 | Flag | Env var | Description |
 |------|---------|-------------|
@@ -98,15 +171,15 @@ fab-test bpa
 | `--workspace-id ID` | `FABRIC_WORKSPACE_ID` | Fabric workspace GUID for remote XMLA |
 
 ```bash
-fab-test pql_test --env DEV
-fab-test pql_test --env PROD --workspace-id <guid>
+fab-test pql-test --env DEV
+fab-test pql-test --env PROD --workspace-id <guid>
 ```
 
 `pql-test` is resolved in order: `PATH` → `.venv/Scripts/pql-test.exe` (Windows) / `.venv/bin/pql-test` (Unix) → `python -m pql_test`.
 
 For local runs, Power BI Desktop must be open with the model loaded. `pql-test` connects via XMLA on `localhost`.
 
-### pql_lint
+### pql-lint
 
 No additional flags beyond the global ones.
 
@@ -196,9 +269,9 @@ Current default list:
 }
 ```
 
-`pql_lint` and `playwright` are excluded from `fab-test all` by default but remain available as direct subcommands.
+`pql-lint` and `playwright` are excluded from `fab-test all` by default but remain available as direct subcommands.
 
-Accepts the union of flags from `bpa`, `pbir`, `pql_test`, and `pql_lint`, plus `--playwright-env-file` for Playwright support.
+Accepts the union of flags from `bpa`, `pbir`, `pql-test`, and `pql-lint`, plus `--playwright-env-file` for Playwright support.
 
 ```bash
 fab-test all \
@@ -213,7 +286,7 @@ After all analyzers finish, `fab-test all` prints an aggregate summary table sho
 
 ```bash
 fab-test bpa --dry-run
-fab-test pql_test --dry-run
+fab-test pql-test --dry-run
 fab-test all --dry-run --artifact SampleModel-PQLAssert
 ```
 

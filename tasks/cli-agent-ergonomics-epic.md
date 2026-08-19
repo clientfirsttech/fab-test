@@ -199,7 +199,7 @@ Remove the underscore/hyphen coin flip (`pql_test`, `pql_lint` vs `playwright-im
 
 ---
 
-## 14. Document for All Three Callers
+## 14. Document for All Three Callers ✅
 
 Publish the contract for the agent, the human, and the pipeline together, per the documentation constraint in [vision.md](../vision.md).
 
