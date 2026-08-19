@@ -9,12 +9,26 @@ through one precedence resolver.
 
 from __future__ import annotations
 
+import difflib
 from pathlib import Path
 from typing import Any
 
 import yaml
 
 CONFIG_FILENAME = "fab-test.yml"
+
+# Every setting fab-test currently reads from a config file, and its
+# expected Python type. Keep in sync with the argparse defaults and
+# _resolve_timeout/_apply_environment_default in fab_test.py -- task 11
+# formalizes this as a JSON schema and asserts the two can't drift.
+_VALID_KEYS: dict[str, type] = {
+    "artifact_dir": str,
+    "output_dir": str,
+    "jobs": int,
+    "format": str,
+    "timeout": int,
+    "environment": str,
+}
 
 
 class ConfigError(Exception):
@@ -68,6 +82,27 @@ def merged_file_config(
             f"present; {CONFIG_FILENAME} wins for any overlapping key"
         )
     return {**pyproject_config, **yaml_config}, warnings
+
+
+def validate_config(config: dict[str, Any]) -> None:
+    """Validate a merged config dict's keys and value types.
+
+    Raises ConfigError naming the offending key -- with the closest valid
+    key when one is close enough, or the expected type for a type
+    mismatch. A single pass over a handful of keys; adds no measurable
+    startup cost for a valid config.
+    """
+    for key, value in config.items():
+        if key not in _VALID_KEYS:
+            suggestion = difflib.get_close_matches(key, _VALID_KEYS, n=1)
+            hint = f" (did you mean '{suggestion[0]}'?)" if suggestion else ""
+            raise ConfigError(f"unknown config key '{key}'{hint}")
+        expected_type = _VALID_KEYS[key]
+        if not isinstance(value, expected_type):
+            raise ConfigError(
+                f"config key '{key}' must be of type {expected_type.__name__}, "
+                f"got {type(value).__name__}"
+            )
 
 
 def load_config(repo_root: Path, explicit_path: str | None = None) -> dict[str, Any]:
