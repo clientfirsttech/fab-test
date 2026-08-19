@@ -54,7 +54,7 @@ Analyzer subprocesses currently inherit stdout, so their banners land in the mid
 
 ---
 
-## 4. Propagate Output Mode to Wrapper Scripts
+## 4. Propagate Output Mode to Wrapper Scripts ✅
 
 The wrappers print their own emoji banners. Give them the same discipline through the existing environment-variable channel.
 

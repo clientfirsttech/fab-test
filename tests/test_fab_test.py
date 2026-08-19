@@ -3188,6 +3188,61 @@ def test_json_format_timeout_reemits_captured_stdout_before_timeout(
 
 
 # --------------------------------------------------------------------------- #
+# Propagate output mode to wrapper scripts (CLI Agent Ergonomics §4)
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.fab_test
+def test_json_format_sets_analyzer_output_mode_env_for_subprocess(tmp_path, monkeypatch):
+    """--format json sets ANALYZER_OUTPUT_MODE=json in the subprocess environment."""
+    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+
+    artifact_dir = tmp_path / "artifacts"
+    (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
+    output_dir = tmp_path / "analyzer-results"
+
+    monkeypatch.setattr(fab_test_module, "_send_telemetry", lambda *a, **k: None)
+
+    captured_kwargs = {}
+
+    def _fake_subprocess(cmd, **kwargs):
+        captured_kwargs.update(kwargs)
+        return subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(fab_test_module.subprocess, "run", _fake_subprocess)
+
+    args = _RunAnalyzerArgs(artifact_dir, output_dir, output_format="json")
+    _run_analyzer("pql_lint", args, output_dir)
+
+    assert captured_kwargs["env"]["ANALYZER_OUTPUT_MODE"] == "json"
+
+
+@pytest.mark.fab_test
+def test_text_format_leaves_analyzer_output_mode_env_unset(tmp_path, monkeypatch):
+    """--format text does not set ANALYZER_OUTPUT_MODE, matching direct invocation."""
+    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+
+    artifact_dir = tmp_path / "artifacts"
+    (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
+    output_dir = tmp_path / "analyzer-results"
+
+    monkeypatch.setattr(fab_test_module, "_send_telemetry", lambda *a, **k: None)
+
+    captured_kwargs = {}
+
+    def _fake_subprocess(cmd, **kwargs):
+        captured_kwargs.update(kwargs)
+        return subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(fab_test_module.subprocess, "run", _fake_subprocess)
+
+    args = _RunAnalyzerArgs(artifact_dir, output_dir, output_format="text")
+    _run_analyzer("pql_lint", args, output_dir)
+
+    assert "ANALYZER_OUTPUT_MODE" not in captured_kwargs["env"]
+
+
+# --------------------------------------------------------------------------- #
 # Show per-artifact progress
 # --------------------------------------------------------------------------- #
 

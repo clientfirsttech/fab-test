@@ -567,6 +567,8 @@ def _run_analyzer(name: str, args: argparse.Namespace, output_dir: Path) -> int:
     verbosity = _verbosity_env(args)
     if verbosity:
         _sub_env["ANALYZER_VERBOSITY"] = verbosity
+    if output_format == "json":
+        _sub_env["ANALYZER_OUTPUT_MODE"] = "json"
     timeout = _resolve_timeout(args)
     jobs = max(1, getattr(args, "jobs", 1) or 1)
 

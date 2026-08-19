@@ -14,11 +14,32 @@ from fabric_ci_cd_dataops.scripts.invoke_tabular_editor_bpa import (
     _format_bpa_message,
     _parse_vstest_counters,
     build_bpa_command,
+    log,
     main,
     run_bpa,
     validate_path,
     write_results,
 )
+
+
+class TestLog:
+    """Tests for log(), the wrapper's human-banner choke point."""
+
+    def test_log_routes_to_stdout_when_output_mode_absent(self, monkeypatch, capsys):
+        """Direct invocation (no ANALYZER_OUTPUT_MODE) is unchanged: stdout."""
+        monkeypatch.delenv("ANALYZER_OUTPUT_MODE", raising=False)
+        log("hello")
+        captured = capsys.readouterr()
+        assert captured.out == "hello\n"
+        assert captured.err == ""
+
+    def test_log_routes_to_stderr_when_output_mode_json(self, monkeypatch, capsys):
+        """fab-test sets ANALYZER_OUTPUT_MODE=json under --format json."""
+        monkeypatch.setenv("ANALYZER_OUTPUT_MODE", "json")
+        log("hello")
+        captured = capsys.readouterr()
+        assert captured.out == ""
+        assert captured.err == "hello\n"
 
 
 class TestValidatePath:
