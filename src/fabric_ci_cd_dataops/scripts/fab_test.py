@@ -23,7 +23,9 @@ Global flags (all subcommands):
 """
 
 import argparse
+import hashlib
 import os
+import platform
 import re
 import shutil
 import subprocess
@@ -261,6 +263,40 @@ def _detect_origin() -> str:
     return "local"
 
 
+def _current_os_platform() -> str:
+    return sys.platform
+
+
+def _machine_context() -> dict[str, str]:
+    """Return non-sensitive machine context: platform, python, fab-test version.
+
+    A field is simply omitted (rather than failing the whole payload) if it
+    cannot be determined.
+    """
+    context: dict[str, str] = {"fab_test_version": _FAB_TEST_VERSION}
+    try:
+        context["platform"] = _current_os_platform()
+    except Exception:
+        pass
+    try:
+        context["python_version"] = platform.python_version()
+    except Exception:
+        pass
+    return context
+
+
+def _redact_pii(value: str) -> str:
+    """Redact a value that looks like PII (e.g. an email address).
+
+    Hashes rather than drops the value so it stays usable for correlating
+    runs by the same actor without exposing the raw email in telemetry.
+    """
+    if "@" in value:
+        digest = hashlib.sha256(value.encode("utf-8")).hexdigest()[:16]
+        return f"sha256:{digest}"
+    return value
+
+
 def _build_telemetry_payload(
     analyzer: str,
     artifact: Path,
@@ -277,7 +313,7 @@ def _build_telemetry_payload(
         "commit_sha": ctx.get("commit", ""),
         "workflow_run_id": ctx.get("workflow_run_id", ""),
         "repository": ctx.get("repository", ""),
-        "actor": ctx.get("actor", ""),
+        "actor": _redact_pii(ctx.get("actor", "")),
         "branch": ctx.get("branch", ""),
         "origin": _detect_origin(),
         "environment": environment,
@@ -287,6 +323,7 @@ def _build_telemetry_payload(
         "warning_count": warnings,
         "findings_count": len(envelope.get("findings", [])),
         "results": envelope,
+        **_machine_context(),
     }
 
 

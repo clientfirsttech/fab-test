@@ -38,8 +38,10 @@ from fabric_ci_cd_dataops.scripts.fab_test import (
     _git_context,
     _load_fab_test_all_analyzers,
     _load_pyproject_config,
+    _machine_context,
     _print_all_summary,
     _print_summary,
+    _redact_pii,
     _resolve_timeout,
     _run_analyzer,
     _SUBCOMMAND_ALIASES,
@@ -1510,6 +1512,99 @@ def test_build_telemetry_payload_includes_origin(monkeypatch):
         "DEV",
     )
     assert payload["origin"] == "circleci"
+
+
+# --------------------------------------------------------------------------- #
+# Capture machine context
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.fab_test
+def test_machine_context_includes_platform_python_and_fab_test_version():
+    """Machine context carries platform, python_version, and fab_test_version."""
+    context = _machine_context()
+    assert context["platform"] == sys.platform
+    assert context["python_version"]
+    assert context["fab_test_version"] == fab_test_version
+
+
+@pytest.mark.fab_test
+def test_machine_context_omits_platform_when_undetectable(monkeypatch):
+    """If the OS platform can't be read, the field is omitted, not a crash."""
+    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+
+    monkeypatch.setattr(
+        fab_test_module,
+        "_current_os_platform",
+        lambda: (_ for _ in ()).throw(RuntimeError("no platform")),
+    )
+
+    context = _machine_context()
+    assert "platform" not in context
+    assert context["python_version"]
+    assert context["fab_test_version"] == fab_test_version
+
+
+@pytest.mark.fab_test
+def test_redact_pii_hashes_email_like_values():
+    """An email-shaped value is redacted to a stable, non-reversible hash."""
+    redacted = _redact_pii("dev@example.com")
+    assert "@" not in redacted
+    assert redacted.startswith("sha256:")
+    assert redacted == _redact_pii("dev@example.com")  # stable/deterministic
+
+
+@pytest.mark.fab_test
+def test_redact_pii_leaves_non_email_values_unchanged():
+    """A non-email value (e.g. a CI bot username) passes through unchanged."""
+    assert _redact_pii("ci-bot") == "ci-bot"
+    assert _redact_pii("") == ""
+
+
+@pytest.mark.fab_test
+def test_build_telemetry_payload_includes_machine_context():
+    """The telemetry payload carries platform/python_version/fab_test_version."""
+    payload = _build_telemetry_payload(
+        "bpa",
+        Path("SampleModel.SemanticModel"),
+        {"status": "passed", "findings": []},
+        "DEV",
+    )
+    assert payload["platform"] == sys.platform
+    assert payload["fab_test_version"] == fab_test_version
+
+
+@pytest.mark.fab_test
+def test_build_telemetry_payload_redacts_email_actor(monkeypatch):
+    """An actor that looks like an email address is redacted in the payload."""
+    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+
+    monkeypatch.setattr(
+        fab_test_module, "_git_context", lambda: {"actor": "dev@example.com"}
+    )
+    payload = _build_telemetry_payload(
+        "bpa",
+        Path("SampleModel.SemanticModel"),
+        {"status": "passed", "findings": []},
+        "DEV",
+    )
+    assert "@" not in payload["actor"]
+    assert payload["actor"].startswith("sha256:")
+
+
+@pytest.mark.fab_test
+def test_build_telemetry_payload_actor_unchanged_when_not_email(monkeypatch):
+    """A non-email actor (e.g. GITHUB_ACTOR) passes through unredacted."""
+    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+
+    monkeypatch.setattr(fab_test_module, "_git_context", lambda: {"actor": "ci-bot"})
+    payload = _build_telemetry_payload(
+        "bpa",
+        Path("SampleModel.SemanticModel"),
+        {"status": "passed", "findings": []},
+        "DEV",
+    )
+    assert payload["actor"] == "ci-bot"
 
 
 # --------------------------------------------------------------------------- #
