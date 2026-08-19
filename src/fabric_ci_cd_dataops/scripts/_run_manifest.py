@@ -58,8 +58,14 @@ class RunManifest:
         envelope_path: str | None,
         errors: int,
         warnings: int,
+        detail: str | None = None,
     ) -> None:
-        """Record one artifact's outcome for the manifest."""
+        """Record one artifact's outcome for the manifest.
+
+        ``detail`` carries the human-readable failure reason for abort
+        statuses (``preflight_failed``, ``timeout``); it is ``None`` when
+        the artifact completed normally.
+        """
         self.artifacts.append(
             {
                 "analyzer": analyzer,
@@ -68,6 +74,7 @@ class RunManifest:
                 "envelope_path": envelope_path,
                 "errors": errors,
                 "warnings": warnings,
+                "detail": detail,
             }
         )
 

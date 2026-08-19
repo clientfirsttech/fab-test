@@ -475,7 +475,10 @@ def _run_one_artifact(
         if capture_stdout:
             _reemit(exc.stdout)
         if manifest is not None:
-            manifest.record_artifact(name, display_name, "timeout", None, 0, 0)
+            manifest.record_artifact(
+                name, display_name, "timeout", None, 0, 0,
+                detail=f"exceeded {timeout}s timeout",
+            )
         return (display_name, 1)
 
     if capture_stdout:
@@ -602,7 +605,9 @@ def _run_analyzer(
             output_format=output_format,
         )
         if manifest is not None:
-            manifest.record_artifact(name, "*", "preflight_failed", None, 0, 0)
+            manifest.record_artifact(
+                name, "*", "preflight_failed", None, 0, 0, detail=message
+            )
         return exit_code
 
     in_ci = _is_ci()

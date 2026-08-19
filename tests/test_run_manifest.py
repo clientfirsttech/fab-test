@@ -45,6 +45,26 @@ def test_manifest_dict_has_required_keys():
 
 
 @pytest.mark.fab_test
+def test_record_artifact_defaults_detail_to_none():
+    """detail is null when the artifact completed normally."""
+    manifest = RunManifest("1.0.0", ["fab-test", "bpa"])
+    manifest.record_artifact("bpa", "SampleModel", "passed", "e.json", 0, 0)
+
+    assert manifest.to_dict(exit_code=0)["artifacts"][0]["detail"] is None
+
+
+@pytest.mark.fab_test
+def test_record_artifact_stores_detail_when_provided():
+    """detail carries the failure message through to the manifest."""
+    manifest = RunManifest("1.0.0", ["fab-test", "bpa"])
+    manifest.record_artifact(
+        "bpa", "*", "preflight_failed", None, 0, 0, detail="tool not found"
+    )
+
+    assert manifest.to_dict(exit_code=127)["artifacts"][0]["detail"] == "tool not found"
+
+
+@pytest.mark.fab_test
 def test_manifest_totals_sum_across_artifacts():
     """totals.errors/warnings sum every recorded artifact."""
     manifest = RunManifest("1.0.0", ["fab-test", "all"])
@@ -239,6 +259,7 @@ def test_manifest_records_preflight_failure_with_exit_code(tmp_path, monkeypatch
     manifest = json.loads((output_dir / "run.json").read_text(encoding="utf-8"))
     assert manifest["exit_code"] == 127
     assert manifest["artifacts"][0]["status"] == "preflight_failed"
+    assert manifest["artifacts"][0]["detail"] == "tool not found"
 
 
 @pytest.mark.fab_test
@@ -269,6 +290,7 @@ def test_manifest_records_timeout_status_for_artifact(tmp_path, monkeypatch):
 
     manifest = json.loads((output_dir / "run.json").read_text(encoding="utf-8"))
     assert manifest["artifacts"][0]["status"] == "timeout"
+    assert "1" in manifest["artifacts"][0]["detail"]
 
 
 @pytest.mark.fab_test
