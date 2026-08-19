@@ -48,7 +48,7 @@ from ._analyzer_annotations import (
 )
 from ._analyzer_envelope import _severity_counts
 from ._cli_utils import narrate
-from ._config import CONFIG_FILENAME, ConfigError, merged_file_config
+from ._config import CONFIG_FILENAME, ConfigError, merged_file_config, validate_config
 from ._desktop import bridge_cli_path, detect_desktop_instances
 from ._pbip_discovery import discover_pbip_projects as _discover_pbip_projects
 from ._run_manifest import RunManifest
@@ -1640,6 +1640,7 @@ def main() -> int:
         args.file_config, file_config_warnings = merged_file_config(
             REPO_ROOT, REPO_ROOT / "pyproject.toml", args.config
         )
+        validate_config(args.file_config)
     except ConfigError as exc:
         print(f"  ✗ fab-test: {exc}", file=sys.stderr)
         return 2

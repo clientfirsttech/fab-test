@@ -21,6 +21,7 @@ from fabric_ci_cd_dataops.scripts._config import (
     load_config,
     load_pyproject_config,
     merged_file_config,
+    validate_config,
 )
 
 
@@ -255,3 +256,78 @@ def test_main_narrates_duplicate_config_source_warning(tmp_path):
     combined = result.stdout + result.stderr
     assert combined.count("pyproject.toml") == 1
     assert CONFIG_FILENAME in combined
+
+
+# --------------------------------------------------------------------------- #
+# Validating config keys and types (Config Consolidation §3)
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.fab_test
+def test_validate_config_passes_for_empty_config():
+    """An empty config is trivially valid."""
+    validate_config({})  # must not raise
+
+
+@pytest.mark.fab_test
+def test_validate_config_passes_for_valid_config():
+    """A config with only known keys and correct types is valid."""
+    validate_config({"jobs": 4, "format": "json", "artifact_dir": "/tmp/x"})  # must not raise
+
+
+@pytest.mark.fab_test
+def test_validate_config_raises_naming_unknown_key_and_suggestion():
+    """A typo'd key exits naming the key and the closest valid key."""
+    with pytest.raises(ConfigError, match="artifact_dir"):
+        validate_config({"artifac_dir": "/tmp/x"})
+
+
+@pytest.mark.fab_test
+def test_validate_config_raises_naming_unknown_key_with_no_close_match():
+    """A key with no close match still names the offending key."""
+    with pytest.raises(ConfigError, match="totally_bogus_setting"):
+        validate_config({"totally_bogus_setting": 1})
+
+
+@pytest.mark.fab_test
+def test_validate_config_raises_naming_expected_type():
+    """A key with the wrong type exits naming the expected type."""
+    with pytest.raises(ConfigError, match="int"):
+        validate_config({"jobs": "four"})
+
+
+@pytest.mark.fab_test
+def test_main_exits_2_on_unknown_config_key(tmp_path):
+    """A real invocation with a typo'd config key exits 2 with a suggestion."""
+    (tmp_path / CONFIG_FILENAME).write_text("artifac_dir: /tmp/x\n", encoding="utf-8")
+
+    result = subprocess.run(
+        ["fab-test", "bpa", "--dry-run"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        cwd=tmp_path,
+        check=False,
+    )
+
+    assert result.returncode == 2
+    assert "artifac_dir" in result.stderr
+    assert "artifact_dir" in result.stderr
+
+
+@pytest.mark.fab_test
+def test_main_exits_2_on_wrong_type_config_value(tmp_path):
+    """A real invocation with a wrong-typed config value exits 2 naming the type."""
+    (tmp_path / CONFIG_FILENAME).write_text("jobs: four\n", encoding="utf-8")
+
+    result = subprocess.run(
+        ["fab-test", "bpa", "--dry-run"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        cwd=tmp_path,
+        check=False,
+    )
+
+    assert result.returncode == 2
+    assert "jobs" in result.stderr

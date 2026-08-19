@@ -39,7 +39,7 @@ Fold the existing `pyproject.toml` table into the new loader so there is one in-
 
 ---
 
-## 3. Validate Keys With Suggestions
+## 3. Validate Keys With Suggestions ✅
 
 Catch typos at the config layer instead of silently ignoring them.
 
