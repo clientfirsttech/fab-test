@@ -48,6 +48,7 @@ from ._analyzer_annotations import (
 )
 from ._analyzer_envelope import _severity_counts
 from ._cli_utils import narrate
+from ._config import CONFIG_FILENAME, ConfigError, load_config
 from ._desktop import bridge_cli_path, detect_desktop_instances
 from ._pbip_discovery import discover_pbip_projects as _discover_pbip_projects
 from ._run_manifest import RunManifest
@@ -908,6 +909,12 @@ def build_parser() -> argparse.ArgumentParser:
         action=_PrintCompletionAction,
         help="Print a shell completion script for bash or zsh and exit",
     )
+    parser.add_argument(
+        "--config",
+        default=None,
+        metavar="PATH",
+        help=f"Path to a config file (default: discover {CONFIG_FILENAME} at the repository root)",
+    )
 
     subs = parser.add_subparsers(dest="analyzer", metavar="ANALYZER")
     subs.required = True
@@ -1640,6 +1647,14 @@ def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
     args.analyzer = _SUBCOMMAND_ALIASES.get(args.analyzer, args.analyzer)
+
+    try:
+        # Nothing consumes this yet -- later Config Consolidation tasks merge
+        # it with [tool.fab-test] and route every setting through it.
+        args.file_config = load_config(REPO_ROOT, args.config)
+    except ConfigError as exc:
+        print(f"  ✗ fab-test: {exc}", file=sys.stderr)
+        return 2
 
     admin_exit_code = _dispatch_admin_command(args)
     if admin_exit_code is not None:
