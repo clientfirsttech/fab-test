@@ -45,9 +45,15 @@ def _sanitize_command(command: list[str]) -> list[str]:
 class RunManifest:
     """Accumulates per-artifact results across one fab-test invocation."""
 
-    def __init__(self, fab_test_version: str, invoked_command: list[str]):
+    def __init__(
+        self,
+        fab_test_version: str,
+        invoked_command: list[str],
+        origin: str = "unknown",
+    ):
         self.fab_test_version = fab_test_version
         self.invoked_command = _sanitize_command(invoked_command)
+        self.origin = origin
         self.artifacts: list[dict[str, Any]] = []
 
     def record_artifact(
@@ -85,6 +91,7 @@ class RunManifest:
         return {
             "schema_version": RUN_MANIFEST_SCHEMA_VERSION,
             "fab_test_version": self.fab_test_version,
+            "origin": self.origin,
             "command": self.invoked_command,
             "artifacts": self.artifacts,
             "totals": {"errors": total_errors, "warnings": total_warnings},

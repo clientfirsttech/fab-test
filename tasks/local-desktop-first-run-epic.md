@@ -176,7 +176,7 @@ Tell a new user exactly what is missing before they run anything.
 
 ---
 
-## 12. Keep the Contract Identical Local and in CI
+## 12. Keep the Contract Identical Local and in CI ✅
 
 Guarantee that graduating from a laptop to a pipeline requires no rework.
 
