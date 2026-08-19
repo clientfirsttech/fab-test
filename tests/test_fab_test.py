@@ -32,7 +32,9 @@ from fabric_ci_cd_dataops.scripts._analyzer_tool_bootstrap import (
 from fabric_ci_cd_dataops.scripts.fab_test import (
     _apply_environment_default,
     _artifact_exit_code,
+    _build_telemetry_payload,
     _clean_tools,
+    _detect_origin,
     _git_context,
     _load_fab_test_all_analyzers,
     _load_pyproject_config,
@@ -1435,6 +1437,79 @@ def test_git_context_actor_not_overridden_by_git_when_github_actor_set(monkeypat
 
     ctx = _git_context()
     assert ctx["actor"] == "ci-bot"
+
+
+# --------------------------------------------------------------------------- #
+# Distinguish local vs pipeline origin
+# --------------------------------------------------------------------------- #
+
+
+def _clear_ci_env(monkeypatch):
+    for name in ("GITHUB_ACTIONS", "CI", "GITLAB_CI", "CIRCLECI", "AZURE_DEVOPS"):
+        monkeypatch.delenv(name, raising=False)
+
+
+@pytest.mark.fab_test
+def test_detect_origin_github_actions(monkeypatch):
+    """GITHUB_ACTIONS maps origin to 'github-actions'."""
+    _clear_ci_env(monkeypatch)
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")
+    assert _detect_origin() == "github-actions"
+
+
+@pytest.mark.fab_test
+def test_detect_origin_gitlab_ci(monkeypatch):
+    """GITLAB_CI maps origin to 'gitlab-ci'."""
+    _clear_ci_env(monkeypatch)
+    monkeypatch.setenv("GITLAB_CI", "true")
+    assert _detect_origin() == "gitlab-ci"
+
+
+@pytest.mark.fab_test
+def test_detect_origin_circleci(monkeypatch):
+    """CIRCLECI maps origin to 'circleci'."""
+    _clear_ci_env(monkeypatch)
+    monkeypatch.setenv("CIRCLECI", "true")
+    assert _detect_origin() == "circleci"
+
+
+@pytest.mark.fab_test
+def test_detect_origin_azure_devops(monkeypatch):
+    """AZURE_DEVOPS maps origin to 'azure-devops'."""
+    _clear_ci_env(monkeypatch)
+    monkeypatch.setenv("AZURE_DEVOPS", "true")
+    assert _detect_origin() == "azure-devops"
+
+
+@pytest.mark.fab_test
+def test_detect_origin_local_when_no_ci_env_present(monkeypatch):
+    """With no known CI env vars, origin is 'local'."""
+    _clear_ci_env(monkeypatch)
+    assert _detect_origin() == "local"
+
+
+@pytest.mark.fab_test
+def test_detect_origin_github_actions_takes_precedence(monkeypatch):
+    """If multiple CI env vars are somehow set, GITHUB_ACTIONS wins."""
+    _clear_ci_env(monkeypatch)
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")
+    monkeypatch.setenv("GITLAB_CI", "true")
+    assert _detect_origin() == "github-actions"
+
+
+@pytest.mark.fab_test
+def test_build_telemetry_payload_includes_origin(monkeypatch):
+    """The telemetry payload carries the detected origin field."""
+    _clear_ci_env(monkeypatch)
+    monkeypatch.setenv("CIRCLECI", "true")
+
+    payload = _build_telemetry_payload(
+        "bpa",
+        Path("SampleModel.SemanticModel"),
+        {"status": "passed", "findings": []},
+        "DEV",
+    )
+    assert payload["origin"] == "circleci"
 
 
 # --------------------------------------------------------------------------- #

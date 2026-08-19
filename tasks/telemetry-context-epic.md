@@ -19,7 +19,7 @@ Use local git configuration as a fallback when GitHub Actions environment variab
 
 ---
 
-## Distinguish Local vs Pipeline Origin
+## Distinguish Local vs Pipeline Origin ✅
 
 Add an explicit `origin` field to telemetry so dashboards can filter by run environment.
 

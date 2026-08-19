@@ -244,6 +244,23 @@ def _git_context() -> dict[str, str]:
     return ctx
 
 
+def _detect_origin() -> str:
+    """Return which CI system (if any) this run is executing under.
+
+    Checked in a fixed order so a run with multiple CI env vars set (e.g. a
+    CI system that shells out to another) resolves deterministically.
+    """
+    if os.environ.get("GITHUB_ACTIONS"):
+        return "github-actions"
+    if os.environ.get("GITLAB_CI"):
+        return "gitlab-ci"
+    if os.environ.get("CIRCLECI"):
+        return "circleci"
+    if os.environ.get("AZURE_DEVOPS"):
+        return "azure-devops"
+    return "local"
+
+
 def _build_telemetry_payload(
     analyzer: str,
     artifact: Path,
@@ -262,6 +279,7 @@ def _build_telemetry_payload(
         "repository": ctx.get("repository", ""),
         "actor": ctx.get("actor", ""),
         "branch": ctx.get("branch", ""),
+        "origin": _detect_origin(),
         "environment": environment,
         "analyzer": analyzer,
         "status": envelope.get("status", "unknown"),
