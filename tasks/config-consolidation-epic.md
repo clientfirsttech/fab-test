@@ -25,7 +25,7 @@ Introduce the config file itself, with nothing depending on it yet.
 
 ---
 
-## 2. Merge With `[tool.fab-test]`
+## 2. Merge With `[tool.fab-test]` ✅
 
 Fold the existing `pyproject.toml` table into the new loader so there is one in-memory configuration.
 

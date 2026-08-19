@@ -36,6 +36,40 @@ def discover_config_path(repo_root: Path, explicit_path: str | None = None) -> P
     return candidate if candidate.exists() else None
 
 
+def load_pyproject_config(path: Path) -> dict[str, Any]:
+    """Load the ``[tool.fab-test]`` table from ``pyproject.toml``, if present."""
+    if not path.exists():
+        return {}
+    import tomllib
+
+    try:
+        data = tomllib.loads(path.read_text(encoding="utf-8"))
+    except (OSError, tomllib.TOMLDecodeError):
+        return {}
+    config = data.get("tool", {}).get("fab-test", {})
+    return config if isinstance(config, dict) else {}
+
+
+def merged_file_config(
+    repo_root: Path, pyproject_path: Path, explicit_path: str | None = None
+) -> tuple[dict[str, Any], list[str]]:
+    """Merge fab-test.yml over ``[tool.fab-test]``, fab-test.yml winning per key.
+
+    Returns ``(merged_config, warnings)``. A warning names both sources
+    exactly once when both are present, since the caller (not this module)
+    decides how to narrate it.
+    """
+    pyproject_config = load_pyproject_config(pyproject_path)
+    yaml_config = load_config(repo_root, explicit_path)
+    warnings = []
+    if pyproject_config and yaml_config:
+        warnings.append(
+            f"both {pyproject_path.name}'s [tool.fab-test] and {CONFIG_FILENAME} are "
+            f"present; {CONFIG_FILENAME} wins for any overlapping key"
+        )
+    return {**pyproject_config, **yaml_config}, warnings
+
+
 def load_config(repo_root: Path, explicit_path: str | None = None) -> dict[str, Any]:
     """Load and parse the config file into a plain dict.
 

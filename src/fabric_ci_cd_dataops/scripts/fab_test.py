@@ -48,7 +48,7 @@ from ._analyzer_annotations import (
 )
 from ._analyzer_envelope import _severity_counts
 from ._cli_utils import narrate
-from ._config import CONFIG_FILENAME, ConfigError, load_config
+from ._config import CONFIG_FILENAME, ConfigError, merged_file_config
 from ._desktop import bridge_cli_path, detect_desktop_instances
 from ._pbip_discovery import discover_pbip_projects as _discover_pbip_projects
 from ._run_manifest import RunManifest
@@ -122,21 +122,7 @@ ARTIFACT_ROOT = REPO_ROOT / ".fabric" / "artifacts"
 RESULTS_ROOT = REPO_ROOT / "analyzer-results"
 
 
-def _load_pyproject_config(path: Path) -> dict[str, Any]:
-    """Load the ``[tool.fab-test]`` table from ``pyproject.toml``, if present."""
-    if not path.exists():
-        return {}
-    try:
-        import tomllib
-
-        data = tomllib.loads(path.read_text(encoding="utf-8"))
-    except Exception:
-        return {}
-    config = data.get("tool", {}).get("fab-test", {})
-    return config if isinstance(config, dict) else {}
-
-
-_PYPROJECT_CONFIG = _load_pyproject_config(REPO_ROOT / "pyproject.toml")
+_PYPROJECT_CONFIG, _FILE_CONFIG_WARNINGS = merged_file_config(REPO_ROOT, REPO_ROOT / "pyproject.toml")
 
 
 def _env(name: str, default: str = "") -> str:
@@ -1649,12 +1635,16 @@ def main() -> int:
     args.analyzer = _SUBCOMMAND_ALIASES.get(args.analyzer, args.analyzer)
 
     try:
-        # Nothing consumes this yet -- later Config Consolidation tasks merge
-        # it with [tool.fab-test] and route every setting through it.
-        args.file_config = load_config(REPO_ROOT, args.config)
+        # Nothing consumes this yet -- a later Config Consolidation task
+        # routes every setting through one precedence resolver.
+        args.file_config, file_config_warnings = merged_file_config(
+            REPO_ROOT, REPO_ROOT / "pyproject.toml", args.config
+        )
     except ConfigError as exc:
         print(f"  ✗ fab-test: {exc}", file=sys.stderr)
         return 2
+    for warning in file_config_warnings:
+        narrate(f"  ⚠ fab-test: {warning}", output_format=getattr(args, "output_format", "text"))
 
     admin_exit_code = _dispatch_admin_command(args)
     if admin_exit_code is not None:
