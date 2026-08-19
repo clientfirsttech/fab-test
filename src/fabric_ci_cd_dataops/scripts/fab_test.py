@@ -513,6 +513,9 @@ def _run_analyzer(name: str, args: argparse.Namespace, output_dir: Path) -> int:
     glob, description = _ANALYZER_REGISTRY[name]
     artifact_dir = Path(args.artifact_dir)
     output_format = getattr(args, "output_format", "text")
+    # `all` emits its own aggregate JSON via _print_all_summary; a standalone
+    # analyzer must emit its own so stdout is never empty under --format json.
+    emit_own_json = output_format == "json" and getattr(args, "analyzer", None) != "all"
 
     if _is_repository_scoped(name):
         # Repository-scoped analyzers run once against the repo metadata.
@@ -530,6 +533,8 @@ def _run_analyzer(name: str, args: argparse.Namespace, output_dir: Path) -> int:
             f"  ⚠ fab-test {name}: no {glob} artifacts found in {artifact_dir}",
             output_format=output_format,
         )
+        if emit_own_json:
+            print(json.dumps({"analyzer": name, "artifacts": []}, indent=2))
         return 0
 
     if args.dry_run:
@@ -550,6 +555,17 @@ def _run_analyzer(name: str, args: argparse.Namespace, output_dir: Path) -> int:
                 )
                 narrate("\n  Telemetry preview (not sent):", output_format=output_format)
                 narrate(json.dumps(preview, indent=2), output_format=output_format)
+        if emit_own_json:
+            print(
+                json.dumps(
+                    {
+                        "analyzer": name,
+                        "dry_run": True,
+                        "artifacts": [a.name for a in artifacts],
+                    },
+                    indent=2,
+                )
+            )
         return 0
 
     # Pre-flight: check required tools exist before invoking subprocesses.

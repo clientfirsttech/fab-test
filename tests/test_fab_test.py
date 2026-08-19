@@ -1744,7 +1744,7 @@ def test_dry_run_with_telemetry_prints_payload_preview_not_sent(tmp_path, monkey
     """--telemetry --dry-run prints the payload preview instead of sending it.
 
     Uses the default --format json, so the preview is narrated to stderr,
-    leaving stdout clean per the CLI Agent Ergonomics contract.
+    while stdout carries only the dry-run JSON summary (CLI Agent Ergonomics).
     """
     from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
 
@@ -1765,7 +1765,9 @@ def test_dry_run_with_telemetry_prints_payload_preview_not_sent(tmp_path, monkey
 
     assert code == 0
     assert calls == [], "telemetry must never be transmitted during --dry-run"
-    assert captured.out == ""
+    summary = json.loads(captured.out)
+    assert summary["analyzer"] == "pql_lint"
+    assert summary["dry_run"] is True
     assert "Telemetry preview" in captured.err
     assert '"analyzer": "pql_lint"' in captured.err
     assert '"artifact_name": "SampleModel"' in captured.err
@@ -3015,7 +3017,9 @@ def test_text_format_narration_still_on_stdout(tmp_path, monkeypatch, capsys):
 
 @pytest.mark.fab_test
 def test_missing_artifacts_warning_narrated_by_format(tmp_path, capsys):
-    """The 'no artifacts found' warning follows the same json/stderr routing."""
+    """The 'no artifacts found' warning follows the same json/stderr routing,
+    while stdout still carries a valid (empty-artifacts) JSON summary.
+    """
     artifact_dir = tmp_path / "empty"
     artifact_dir.mkdir()
     output_dir = tmp_path / "analyzer-results"
@@ -3025,7 +3029,8 @@ def test_missing_artifacts_warning_narrated_by_format(tmp_path, capsys):
     captured = capsys.readouterr()
 
     assert code == 0
-    assert captured.out == ""
+    summary = json.loads(captured.out)
+    assert summary == {"analyzer": "bpa", "artifacts": []}
     assert "no *.SemanticModel artifacts found" in captured.err
 
 
@@ -3240,6 +3245,58 @@ def test_text_format_leaves_analyzer_output_mode_env_unset(tmp_path, monkeypatch
     _run_analyzer("pql_lint", args, output_dir)
 
     assert "ANALYZER_OUTPUT_MODE" not in captured_kwargs["env"]
+
+
+# --------------------------------------------------------------------------- #
+# Prove stdout purity for every subcommand (CLI Agent Ergonomics §5)
+# --------------------------------------------------------------------------- #
+
+# dependencies is the only subcommand with a required flag beyond the common
+# ones; every other --format-capable subcommand runs with just --dry-run.
+_STDOUT_PURITY_EXTRA_ARGS = {"dependencies": ["--semantic-model", "TestModel"]}
+
+
+def _subcommands_with_format_flag() -> list[str]:
+    """Enumerate canonical (non-alias) subcommand names that support --format.
+
+    Driven by the live parser, not a hardcoded list, so a new --format
+    subcommand is automatically swept into the stdout-purity test below.
+    """
+    parser = build_parser()
+    subparsers_action = next(
+        action
+        for action in parser._actions
+        if isinstance(action, argparse._SubParsersAction)
+    )
+    seen_subparsers = set()
+    names = []
+    for subcommand_name, subparser in subparsers_action.choices.items():
+        if id(subparser) in seen_subparsers:
+            continue  # an alias of an already-seen canonical name
+        seen_subparsers.add(id(subparser))
+        if any("--format" in action.option_strings for action in subparser._actions):
+            names.append(subcommand_name)
+    return names
+
+
+@pytest.mark.fab_test
+@pytest.mark.parametrize("subcommand", _subcommands_with_format_flag())
+def test_stdout_is_pure_json_for_every_subcommand(subcommand):
+    """Every --format json subcommand emits stdout that parses in one json.loads()
+    call, and narrates something to stderr (so silence wouldn't hide a dropped run).
+    """
+    extra = _STDOUT_PURITY_EXTRA_ARGS.get(subcommand, [])
+    result = subprocess.run(
+        ["fab-test", subcommand, "--format", "json", "--dry-run", *extra],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    json.loads(result.stdout)  # must be a single, complete JSON document
+    assert result.stderr.strip() != "", "narration should not be silently dropped"
 
 
 # --------------------------------------------------------------------------- #
