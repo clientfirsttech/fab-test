@@ -45,6 +45,12 @@ dependencies = [
     "azure-identity",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.15",
+    "pytest",
+]
+
 [project.urls]
 Repository = "https://github.com/kerski/fabric-ci-cd-dataops"
 Documentation = "https://github.com/kerski/fabric-ci-cd-dataops/blob/main/docs/QUICK-VALIDATION.md"
@@ -71,6 +77,9 @@ include = ["fabric_ci_cd_dataops*"]
 
 [tool.ruff]
 target-version = "py312"
+line-length = 120
+# Vendored reference code shipped inside skills is not ours to restyle.
+extend-exclude = [".github/skills"]
 
 [tool.ruff.lint]
 select = [
@@ -85,31 +94,51 @@ select = [
     "SIM",  # simplify
     "PERF", # performance
     "RUF",  # ruff-specific rules
+    "ARG",  # unused arguments — parameters no caller needs
+    "RET",  # needless returns and intermediate assignments
+    "C4",   # comprehension rewrites
+    "PIE",  # miscellaneous unnecessary code
+    "ISC",  # implicit string concatenation
+    "ERA",  # commented-out code
+    "DTZ",  # timezone-naive datetimes
+    "LOG",  # logging misuse
+    "G",    # logging format strings
+    "TRY",  # exception antipatterns
 ]
-ignore = ["S603", "S607"]  # subprocess call with shell=False is fine here
+ignore = [
+    "S603",   # subprocess without shell=True is the safe form, which is what we use
+    "S607",   # partial executable paths resolve from PATH on purpose (fab, pbi-tools)
+    "TRY003", # a message at the raise site beats an exception subclass per failure mode
+]
+
+# The info glyph is deliberate in CLI output, not a typo for the letter i.
+allowed-confusables = ["ℹ"]
+
+# Thresholds for the non-gating complexity report (see the lint workflow).
+# Raising either of these is a decision, not a formality — say why in the commit.
+[tool.ruff.lint.mccabe]
+max-complexity = 15
+
+[tool.ruff.lint.pylint]
+max-args = 8
 
 [tool.ruff.lint.per-file-ignores]
+# Scanners deliberately swallow per-file errors so one bad file cannot abort a scan.
 "src/fabric_ci_cd_dataops/scripts/fab_test.py" = ["BLE001", "S110"]
 "src/fabric_ci_cd_dataops/scripts/scan_credentials.py" = ["BLE001", "S110"]
 "src/fabric_ci_cd_dataops/scripts/scan_entropy.py" = ["BLE001", "S110"]
 "src/fabric_ci_cd_dataops/scripts/invoke_tabular_editor_bpa.py" = ["S314"]
-"tests/test_invoke_tabular_editor_bpa.py" = ["S314", "S101"]
-"tests/test_fab_test.py" = ["S101", "E501"]
-"tests/test_invoke_pbir_inspector.py" = ["S101"]
-"tests/test_smoke_test_orchestrator.py" = ["S101", "E402"]
-"tests/test_smoke_test_pql_test.py" = ["S101", "E402"]
-"tests/test_dynamic_validation_matrix.py" = ["S101"]
-"tests/test_rtk_hook_guard.py" = ["S101"]
-"tests/test_invoke_playwright.py" = ["S101", "S105", "S106"]
-"tests/test_playwright_config.py" = ["S101", "S105", "S106"]
-"tests/test_playwright_embed_config.py" = ["S101", "S105", "S106"]
-"tests/test_playwright_power_bi_api.py" = ["S101", "S105", "S106"]
-"tests/test_fabric_service_client.py" = ["S101", "S105", "S106"]
-"tests/test_playwright_test_cases.py" = ["S101", "S106"]
-"tests/test_playwright_visual.py" = ["S101", "BLE001"]
-"tests/test_security_scans.py" = ["S101"]
-"tests/test_detect_changes.py" = ["S101"]
-"tests/test_compare_baseline.py" = ["S101"]
-"tests/test_environments_config.py" = ["S101"]
-"tests/test_check_promotion_safety.py" = ["S101"]
-"tests/test_deploy.py" = ["S101"]
+# Tests: asserts are the point, stub callables ignore their arguments, fake
+# credentials are not secrets, and sys.path setup runs before imports.
+"tests/**" = [
+    "S101",   # assert
+    "S105",   # hardcoded password string
+    "S106",   # hardcoded password argument
+    "S314",   # xml parsing of fixture data
+    "ARG001", # stub function arguments
+    "ARG002", # stub method arguments
+    "ARG005", # stub lambda arguments
+    "BLE001", # broad except in failure-path tests
+    "E402",   # imports after sys.path setup
+    "S108",   # fake /tmp paths in fixtures
+]

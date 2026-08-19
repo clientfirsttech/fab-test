@@ -7,7 +7,6 @@ from pathlib import Path
 
 import pytest
 
-
 from fabric_ci_cd_dataops.scripts._analyzer_report import AnalyzerReporter, _resolve_verbosity
 
 # pytest markers that belong to the analyzer contract tier.

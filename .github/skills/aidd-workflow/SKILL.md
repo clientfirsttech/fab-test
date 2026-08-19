@@ -13,6 +13,7 @@ Constraints {
   Always read vision.md before executing any task or plan command
   (vision conflict detected) => stop, explain the conflict, ask user to resolve before proceeding
   (project language is Python) => skip JS/TS skills: aidd-javascript, aidd-lit, aidd-react, aidd-autodux, aidd-ecs
+  (task writes or reviews Python) => load aidd-python — it is the language skill the JS/TS skills would otherwise have supplied
   (task involves Fabric deployment) => load fabric-cicd-deployment first
   (task involves code changes) => use aidd-tdd — write tests before implementation
   All skills resolve to: .github/skills/<skill-name>/SKILL.md
@@ -26,11 +27,11 @@ Constraints {
 | help, list commands | `aidd-please` | List commands without modifying files |
 | plan, what's next, priorities | `aidd-please` | Review plan.md, suggest next steps |
 | discover, user journey, user story, feature | `aidd-product-manager`, `aidd-please` | Interactive product discovery |
-| task, create epic, plan task | `aidd-task-creator`, `aidd-please`, `aidd-tdd` | Plan + TDD execution |
+| task, create epic, plan task | `aidd-task-creator`, `aidd-please`, `aidd-tdd`, `aidd-python` | Plan + TDD execution |
 | execute epic, run epic | `aidd-task-creator`, `aidd-please` | Execute a previously planned epic |
-| review, code review | `aidd-review`, `aidd-please` | Quality + security review |
+| review, code review | `aidd-review`, `aidd-python`, `aidd-please` | Quality + security review |
 | churn, hotspots, refactoring candidates | `aidd-churn`, `aidd-please` | Hotspot ranking by LoC × churn × complexity |
-| fix bug, fix, aidd-fix | `aidd-fix`, `aidd-please` | Structured bug-fix workflow |
+| fix bug, fix, aidd-fix | `aidd-fix`, `aidd-python`, `aidd-please` | Structured bug-fix workflow |
 | user test, test script | `aidd-user-testing`, `aidd-please` | Generate human/AI test scripts |
 | run test, execute test | `aidd-user-testing`, `aidd-please` | Execute AI agent test |
 | log, log changes, changelog | `aidd-log`, `aidd-please` | Document completed work |
@@ -49,6 +50,7 @@ Constraints {
 | Skill | Purpose |
 |-------|------|
 | `aidd-workflow` | This file — project command resolver |
+| `aidd-python` | Python best practices, simplicity budgets, over-engineering review lens |
 | `fabric-cicd-deployment` | Metadata-driven Fabric deployment via environments.yml |
 | `document` | Sync docs: README, QUICK-VALIDATION, fab-test skill |
 | `fab-test` | fab-test CLI reference — subcommands, flags, result locations |

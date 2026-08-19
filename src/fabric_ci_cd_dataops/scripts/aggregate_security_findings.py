@@ -10,7 +10,7 @@ def load_findings(path: str, finding_type: str) -> list:
     try:
         with open(path) as f:
             data = json.load(f)
-    except Exception:
+    except (OSError, json.JSONDecodeError):
         return []
 
     if finding_type == 'secret':

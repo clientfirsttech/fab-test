@@ -20,6 +20,7 @@ Verbosity never changes the files written to disk.
 """
 
 import os
+import sys
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -107,11 +108,17 @@ class AnalyzerReporter:
 
     @staticmethod
     def _print_table_to(out, results: list[AnalyzerResult]) -> None:
-        rows = []
-        for r in results:
-            rows.append(
-                (r.analyzer, r.artifact, r.status, str(r.findings_count), f"{r.duration_ms}ms", r.envelope_path or r.native_path)
+        rows = [
+            (
+                r.analyzer,
+                r.artifact,
+                r.status,
+                str(r.findings_count),
+                f"{r.duration_ms}ms",
+                r.envelope_path or r.native_path,
             )
+            for r in results
+        ]
         if not rows:
             print("No analyzer results recorded.", file=out)
             return

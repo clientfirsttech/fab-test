@@ -72,11 +72,11 @@ def get_changed_files(repo_root: Path) -> list[str]:
                 except subprocess.CalledProcessError:
                     continue
 
-        return changed_files
-
     except subprocess.CalledProcessError as e:
         print(f"Error running git diff: {e}", file=sys.stderr)
         return []
+    else:
+        return changed_files
 
 
 def detect_artifact_type(artifact_path: str, artifact_map: dict[str, str]) -> str:
@@ -87,7 +87,7 @@ def detect_artifact_type(artifact_path: str, artifact_map: dict[str, str]) -> st
     return "Unknown"
 
 
-def group_changes_by_artifact(changed_files: list[str], repo_root: Path, artifact_map: dict[str, str]) -> dict:
+def group_changes_by_artifact(changed_files: list[str], artifact_map: dict[str, str]) -> dict:
     """Group changed files by their parent artifact."""
     artifacts_dir = Path(".fabric/artifacts")
     changed_artifacts = {}
@@ -154,7 +154,7 @@ def main():
 
     if not terse:
         print("Grouping changes by artifact...")
-    changed_artifacts = group_changes_by_artifact(changed_files, repo_root, artifact_map)
+    changed_artifacts = group_changes_by_artifact(changed_files, artifact_map)
 
     # Build output structure
     output = {

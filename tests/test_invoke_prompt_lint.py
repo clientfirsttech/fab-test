@@ -55,7 +55,10 @@ class TestMain:
         artifact = tmp_path / "prompt.txt"
         artifact.write_text("Simple prompt", encoding="utf-8")
         output = tmp_path / "out.json"
-        monkeypatch.setattr(sys, "argv", ["invoke_prompt_lint.py", "--artifact-path", str(artifact), "--output-path", str(output)])
+        monkeypatch.setattr(
+            sys, "argv",
+            ["invoke_prompt_lint.py", "--artifact-path", str(artifact), "--output-path", str(output)],
+        )
         with pytest.raises(SystemExit) as exc_info:
             main()
         assert exc_info.value.code == 0

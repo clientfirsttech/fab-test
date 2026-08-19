@@ -30,6 +30,7 @@ from fabric_ci_cd_dataops.scripts._analyzer_tool_bootstrap import (
     resolve_executable,
 )
 from fabric_ci_cd_dataops.scripts.fab_test import (
+    _SUBCOMMAND_ALIASES,
     _apply_environment_default,
     _artifact_exit_code,
     _build_telemetry_payload,
@@ -45,7 +46,6 @@ from fabric_ci_cd_dataops.scripts.fab_test import (
     _resolve_timeout,
     _run_analyzer,
     _send_telemetry,
-    _SUBCOMMAND_ALIASES,
     _telemetry_enabled,
     _validate_telemetry_payload,
     build_parser,
@@ -2196,9 +2196,11 @@ def test_resolve_executable_requires_platform_mismatch_raises(tmp_path, monkeypa
 
     monkeypatch.delenv("PBIR_INSPECTOR_PATH", raising=False)
 
-    with unittest.mock.patch("sys.platform", "win32"):
-        with pytest.raises(UnsupportedPlatformError, match="not supported on win32"):
-            resolve_executable(analyzer_name, metadata, repo_root)
+    with (
+        unittest.mock.patch("sys.platform", "win32"),
+        pytest.raises(UnsupportedPlatformError, match="not supported on win32"),
+    ):
+        resolve_executable(analyzer_name, metadata, repo_root)
 
 
 # --------------------------------------------------------------------------- #

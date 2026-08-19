@@ -6,6 +6,51 @@ on:
     branches: [main, develop]
 
 jobs:
+  lint:
+    name: Lint (ruff)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install lint tools
+        run: pip install -e ".[dev]"
+
+      # The gate. Config lives in pyproject.toml; a finding here fails the build.
+      - name: Ruff
+        run: ruff check .
+
+      # Not a gate. Complexity and argument-count rules report the code that has
+      # outgrown its shape, so the trend is visible without blocking a PR on it.
+      # See the "Reduce analyzer complexity" task in plan.md.
+      - name: Complexity report
+        if: always()
+        run: |
+          echo "### Complexity signals (non-gating)" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          ruff check src --select C901,PLR0911,PLR0912,PLR0913,PLR0915 --statistics \
+            >> "$GITHUB_STEP_SUMMARY" || true
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install package and test tools
+        run: pip install -e ".[dev]"
+
+      - name: Pytest
+        run: pytest -q
+
   build:
     runs-on: ubuntu-latest
     steps:

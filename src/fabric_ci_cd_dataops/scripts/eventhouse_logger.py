@@ -74,7 +74,10 @@ def validate_feature_flag(terse: bool = False) -> bool:
     enabled = os.getenv("ENABLE_EVENTHOUSE_LOGGING", "false").lower() == "true"
 
     if not enabled:
-        terse_print(terse, "SKIP", "eventhouse_logger", "ENABLE_EVENTHOUSE_LOGGING=false; telemetry is optional per Constraint C9")
+        terse_print(
+            terse, "SKIP", "eventhouse_logger",
+            "ENABLE_EVENTHOUSE_LOGGING=false; telemetry is optional per Constraint C9",
+        )
         if not terse:
             print("ℹ️  Eventhouse logging is disabled (ENABLE_EVENTHOUSE_LOGGING=false)")
             print("   Per Constraint C9, telemetry is optional and never mandatory.")
@@ -86,7 +89,10 @@ def validate_feature_flag(terse: bool = False) -> bool:
 def validate_table_name(table_name: str, terse: bool = False) -> bool:
     """Validate table name is one of the allowed Eventhouse tables."""
     if table_name not in VALID_TABLES:
-        terse_print(terse, "ERROR", "eventhouse_table", f"invalid table '{table_name}'; valid: {', '.join(VALID_TABLES)}")
+        terse_print(
+            terse, "ERROR", "eventhouse_table",
+            f"invalid table '{table_name}'; valid: {', '.join(VALID_TABLES)}",
+        )
         if not terse:
             print(f"Error: Invalid table name '{table_name}'", file=sys.stderr)
             print(f"Valid tables: {', '.join(VALID_TABLES)}", file=sys.stderr)
@@ -105,8 +111,7 @@ def load_payload(payload_path: Path, terse: bool = False) -> dict:
 
     try:
         with open(payload_path) as f:
-            payload = json.load(f)
-        return payload
+            return json.load(f)
     except json.JSONDecodeError as e:
         terse_print(terse, "ERROR", "eventhouse_payload", f"invalid JSON: {e}")
         if not terse:
@@ -117,10 +122,10 @@ def load_payload(payload_path: Path, terse: bool = False) -> dict:
 def validate_payload_schema(payload: dict, table_name: str, terse: bool = False) -> bool:
     """
     Validate payload matches expected schema for target table.
-    
+
     Schema reference: Eventhouse branch template
     Source: https://github.com/kerski/pbi-teams-more-analytic-support
-    
+
     Common fields across all tables:
     - timestamp
     - artifact_name
@@ -158,7 +163,10 @@ def validate_payload_schema(payload: dict, table_name: str, terse: bool = False)
 
     elif table_name == "fabric_dynamic_analysis":
         if "results" not in payload or "environment" not in payload:
-            terse_print(terse, "ERROR", "eventhouse_schema", "'results' and 'environment' fields required for fabric_dynamic_analysis")
+            terse_print(
+                terse, "ERROR", "eventhouse_schema",
+                "'results' and 'environment' fields required for fabric_dynamic_analysis",
+            )
             if not terse:
                 print("Error: 'results' and 'environment' fields required for fabric_dynamic_analysis", file=sys.stderr)
             return False
@@ -170,12 +178,11 @@ def validate_payload_schema(payload: dict, table_name: str, terse: bool = False)
                 print("Error: 'environment' field required for fabric_deployments", file=sys.stderr)
             return False
 
-    elif table_name == "fabric_testbed_runs":
-        if "results" not in payload:
-            terse_print(terse, "ERROR", "eventhouse_schema", "'results' field required for fabric_testbed_runs")
-            if not terse:
-                print("Error: 'results' field required for fabric_testbed_runs", file=sys.stderr)
-            return False
+    elif table_name == "fabric_testbed_runs" and "results" not in payload:
+        terse_print(terse, "ERROR", "eventhouse_schema", "'results' field required for fabric_testbed_runs")
+        if not terse:
+            print("Error: 'results' field required for fabric_testbed_runs", file=sys.stderr)
+        return False
 
     return True
 
@@ -183,33 +190,33 @@ def validate_payload_schema(payload: dict, table_name: str, terse: bool = False)
 def publish_to_eventhouse(table_name: str, payload: dict, terse: bool = False) -> bool:
     """
     Publish telemetry payload to Eventhouse table.
-    
+
     This is a placeholder implementation. The actual implementation will use:
     - Kusto Python SDK (azure-kusto-data, azure-kusto-ingest)
     - Azure Identity for authentication
     - Eventhouse connection string from secrets
-    
+
     Example implementation:
-    
+
         from azure.kusto.data import KustoClient, KustoConnectionStringBuilder
         from azure.kusto.ingest import QueuedIngestClient, IngestionProperties
         from azure.identity import DefaultAzureCredential
-        
+
         # Build connection
         kcsb = KustoConnectionStringBuilder.with_aad_managed_service_identity_authentication(
             eventhouse_uri
         )
-        
+
         # Create ingest client
         ingest_client = QueuedIngestClient(kcsb)
-        
+
         # Ingest data
         ingestion_props = IngestionProperties(
             database=database_name,
             table=table_name,
             data_format="json"
         )
-        
+
         ingest_client.ingest_from_dict([payload], ingestion_properties=ingestion_props)
     """
     if not terse:
@@ -232,12 +239,12 @@ def publish_to_eventhouse(table_name: str, payload: dict, terse: bool = False) -
         print("""
     Required Dependencies:
         pip install azure-kusto-data azure-kusto-ingest azure-identity
-    
+
     Expected Configuration:
         EVENTHOUSE_URI: from GitHub Secrets or Environment Variables
         DATABASE_NAME: from metadata configuration
         TABLE_NAME: derived from analysis type
-    
+
     Schema Source:
         https://github.com/kerski/pbi-teams-more-analytic-support (Eventhouse branch)
         Eventhouse schema is the system of record per Constraint C9
@@ -317,13 +324,19 @@ def main():
     success = publish_to_eventhouse(args.table, payload, terse)
 
     if success:
-        terse_print(terse, "OK", "eventhouse_logger", f"telemetry published to {args.table} for {payload.get('artifact_name', 'N/A')}")
+        terse_print(
+            terse, "OK", "eventhouse_logger",
+            f"telemetry published to {args.table} for {payload.get('artifact_name', 'N/A')}",
+        )
         if not terse:
             print("\n✅ Telemetry published successfully")
         sys.exit(0)
     else:
         # Per Constraint C9, telemetry failures should not block workflows
-        terse_print(terse, "WARN", "eventhouse_logger", f"telemetry publishing failed for {args.table}; continuing per Constraint C9")
+        terse_print(
+            terse, "WARN", "eventhouse_logger",
+            f"telemetry publishing failed for {args.table}; continuing per Constraint C9",
+        )
         if not terse:
             print("\n⚠️  Telemetry publishing failed, but continuing gracefully", file=sys.stderr)
             print("   Per Constraint C9: Telemetry is optional and never mandatory")

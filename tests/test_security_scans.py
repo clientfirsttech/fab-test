@@ -6,11 +6,9 @@ exclusion logic, and output schemas.
 """
 
 import json
-import sys
 from pathlib import Path
 
 import pytest
-
 
 from fabric_ci_cd_dataops.scripts.aggregate_security_findings import load_findings
 from fabric_ci_cd_dataops.scripts.aggregate_security_findings import main as aggregate_main

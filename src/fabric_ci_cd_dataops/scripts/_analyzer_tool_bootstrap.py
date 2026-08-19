@@ -61,6 +61,9 @@ def _read_marker(cache_dir: Path) -> Path | None:
     return None
 
 
+_ALLOWED_INSTALL_SCHEMES = frozenset({"https", "file"})
+
+
 def _write_marker(cache_dir: Path, executable: Path) -> None:
     cache_dir.mkdir(parents=True, exist_ok=True)
     _marker_path(cache_dir).write_text(str(executable), encoding="utf-8")
@@ -68,9 +71,16 @@ def _write_marker(cache_dir: Path, executable: Path) -> None:
 
 def _download(url: str, dest: Path, timeout: int = 120) -> None:
     """Download ``url`` to ``dest`` with a simple progress indicator in CI."""
-    request = Request(url, headers={"User-Agent": _USER_AGENT})
+    # https for real releases, file:// for the local-first and offline install paths.
+    # Anything else (plain http, custom schemes) is refused rather than fetched.
+    scheme = urlparse(url).scheme
+    if scheme not in _ALLOWED_INSTALL_SCHEMES:
+        raise RuntimeError(
+            f"Refusing to download an analyzer from a {scheme or 'scheme-less'} URL: {url}"
+        )
+    request = Request(url, headers={"User-Agent": _USER_AGENT})  # noqa: S310 - scheme checked above
     dest.parent.mkdir(parents=True, exist_ok=True)
-    with urlopen(request, timeout=timeout) as response, open(dest, "wb") as fh:
+    with urlopen(request, timeout=timeout) as response, open(dest, "wb") as fh:  # noqa: S310 - scheme checked above
         total = response.headers.get("Content-Length")
         total_int = int(total) if total else None
         downloaded = 0

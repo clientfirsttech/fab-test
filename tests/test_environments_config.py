@@ -6,7 +6,6 @@ from unittest import mock
 
 import pytest
 
-
 from fabric_ci_cd_dataops.scripts.generate_fabric_cicd_config import build_environment_config, load_config
 from fabric_ci_cd_dataops.scripts.generate_fabric_cicd_config import main as generate_main
 from fabric_ci_cd_dataops.scripts.validate_environments_yaml import validate_environments_yaml

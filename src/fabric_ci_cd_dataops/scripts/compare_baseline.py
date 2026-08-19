@@ -50,12 +50,12 @@ class BaselineComparator:
     ) -> dict[str, Any]:
         """
         Compare current artifact against baseline.
-        
+
         Args:
             artifact_name: Name of the artifact in the TestBed workspace
             workspace_id: TestBed workspace ID
             terse: If True, emit machine-readable output only
-            
+
         Returns:
             Dict with comparison results
         """
@@ -152,13 +152,16 @@ def main():
                 print("✅ Baseline comparison: PASSED")
             sys.exit(0)
         else:
-            terse_print(args.terse, "FAIL", "baseline_comparison", f"{args.artifact_name} has {len(result['differences'])} differences")
+            terse_print(
+                args.terse, "FAIL", "baseline_comparison",
+                f"{args.artifact_name} has {len(result['differences'])} differences",
+            )
             if not args.terse:
                 print("❌ Baseline comparison: FAILED")
                 print(f"Found {len(result['differences'])} differences")
             sys.exit(1)
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - CLI boundary: every failure becomes exit 1
         terse_print(args.terse, "ERROR", "baseline_comparison", str(e))
         if not args.terse:
             print(f"❌ Error: {e}", file=sys.stderr)

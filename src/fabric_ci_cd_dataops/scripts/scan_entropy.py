@@ -9,7 +9,8 @@ import sys
 from pathlib import Path
 
 EXCLUDE_DIRS = {'.git', 'node_modules', '__pycache__', '.venv', 'venv'}
-EXCLUDE_EXTENSIONS = {'.pyc', '.so', '.dll', '.exe', '.lock', '.tmdl', '.pbix', '.pbit'}  # .tmdl/.pbix contain Base64-encoded data
+# .tmdl/.pbix contain Base64-encoded data
+EXCLUDE_EXTENSIONS = {'.pyc', '.so', '.dll', '.exe', '.lock', '.tmdl', '.pbix', '.pbit'}
 THRESHOLD = 4.5
 
 

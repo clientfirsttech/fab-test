@@ -77,7 +77,10 @@ class TestWriteResults:
     def test_envelope_shape(self, tmp_path: Path):
         """Envelope contains every required key from the shared schema."""
         output_path = tmp_path / "envelope.json"
-        write_results(output_path=output_path, status="passed", findings=[], artifact_path=tmp_path / "model", message="OK")
+        write_results(
+            output_path=output_path, status="passed", findings=[],
+            artifact_path=tmp_path / "model", message="OK",
+        )
         data = json.loads(output_path.read_text(encoding="utf-8"))
         missing = ENVELOPE_REQUIRED_KEYS - data.keys()
         assert not missing, f"Envelope missing keys: {missing}"
@@ -176,7 +179,10 @@ class TestMain:
         artifact = tmp_path / "SalesModel.SemanticModel"
         artifact.mkdir()
         output = tmp_path / "out.json"
-        monkeypatch.setattr(sys, "argv", ["invoke_pqlint.py", "--artifact-path", str(artifact), "--output-path", str(output)])
+        monkeypatch.setattr(
+            sys, "argv",
+            ["invoke_pqlint.py", "--artifact-path", str(artifact), "--output-path", str(output)],
+        )
         with mock.patch("fabric_ci_cd_dataops.scripts.invoke_pqlint.subprocess.run") as mock_run:
             mock_run.return_value = mock.Mock(returncode=0, stdout='{"findings": []}', stderr="")
             with pytest.raises(SystemExit) as exc_info:

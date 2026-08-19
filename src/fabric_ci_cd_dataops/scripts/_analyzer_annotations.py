@@ -12,6 +12,7 @@ import json
 import os
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
 
 from ._analyzer_envelope import _is_error_severity, _is_warning_severity
@@ -66,10 +67,7 @@ def _format_finding_message(finding: dict[str, Any], analyzer: str) -> str:
     return f"[{analyzer}] {rule}: {msg}".strip()
 
 
-def emit_workflow_annotations(
-    envelope: dict[str, Any],
-    artifact_path: str = "",
-) -> None:
+def emit_workflow_annotations(envelope: dict[str, Any]) -> None:
     """Emit ::error:: and ::warning:: annotations for findings.
 
     In GitHub Actions each finding becomes a workflow annotation. Outside CI
@@ -95,8 +93,11 @@ def _post_pr_review_comment(context: dict[str, str], body: str) -> bool:
         f"{context['api_url']}/repos/{context['repo']}/"
         f"issues/{context['pr_number']}/comments"
     )
+    if urlsplit(url).scheme != "https":
+        print(f"::warning::Refusing to post to a non-HTTPS API URL: {url}")
+        return False
     payload = json.dumps({"body": body}).encode("utf-8")
-    request = Request(
+    request = Request(  # noqa: S310 - scheme checked above
         url,
         data=payload,
         headers={
@@ -108,9 +109,9 @@ def _post_pr_review_comment(context: dict[str, str], body: str) -> bool:
         method="POST",
     )
     try:
-        with urlopen(request, timeout=30) as response:
+        with urlopen(request, timeout=30) as response:  # noqa: S310 - scheme checked above
             return response.status == 201
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - PR commenting is best-effort, never fatal
         print(f"::warning::Could not post PR review comment: {exc}")
         return False
 
@@ -141,8 +142,7 @@ def emit_pr_review_comments(
         f"### ⚠️ {analyzer} warnings for `{artifact}`",
         "",
     ]
-    for finding in warnings:
-        lines.append(f"- {_format_finding_message(finding, analyzer)}")
+    lines.extend(f"- {_format_finding_message(finding, analyzer)}" for finding in warnings)
     lines.append("")
     lines.append(
         "See uploaded workflow artifacts for the full envelope and native output."

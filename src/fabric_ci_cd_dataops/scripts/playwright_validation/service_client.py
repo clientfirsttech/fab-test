@@ -40,7 +40,7 @@ class FabricToken:
 def _api_headers(token: FabricToken) -> dict[str, str]:
     """Return standard Fabric REST API headers."""
     return {
-        "Authorization": "******",
+        "Authorization": f"Bearer {token.access_token}",
         "Content-Type": "application/json",
     }
 

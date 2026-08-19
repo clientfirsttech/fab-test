@@ -40,3 +40,6 @@ apm.yml
 .fab-test-tools/**
 # Local analyzer output
 analyzer-results/
+
+# Claude Code worktrees
+.claude/worktrees/

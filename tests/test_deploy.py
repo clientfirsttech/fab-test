@@ -7,7 +7,6 @@ from unittest import mock
 
 import pytest
 
-
 from fabric_ci_cd_dataops.scripts.deploy import (
     build_dependency_graph,
     build_environment_config,
@@ -82,7 +81,7 @@ class TestBuildEnvironmentConfig:
         artifact = self._artifact(repo_with_config)
         full_config = load_environments_config(repo_with_config, terse=True)
         env_config = build_environment_config(
-            full_config, "dev", "", artifact, repo_with_config, terse=True
+            full_config, "dev", "", artifact, terse=True
         )
         assert env_config["core"]["workspace_id"] == "ws-dev"
         assert env_config["core"]["repository_directory"] == str(artifact.parent)
@@ -98,7 +97,7 @@ class TestBuildEnvironmentConfig:
         artifact = self._artifact(repo_with_config)
         full_config = load_environments_config(repo_with_config, terse=True)
         env_config = build_environment_config(
-            full_config, "dev", "override-ws", artifact, repo_with_config, terse=True
+            full_config, "dev", "override-ws", artifact, terse=True
         )
         assert env_config["core"]["workspace_id"] == "override-ws"
 
@@ -110,7 +109,7 @@ class TestBuildEnvironmentConfig:
         full_config["environments"]["dev"]["workspace_id"] = ""
         with pytest.raises(SystemExit) as exc_info:
             build_environment_config(
-                full_config, "dev", "", artifact, repo_with_config, terse=True
+                full_config, "dev", "", artifact, terse=True
             )
         assert exc_info.value.code == 1
 
@@ -134,7 +133,7 @@ class TestBuildEnvironmentConfig:
 
         full_config = load_environments_config(repo_with_config, terse=True)
         env_config = build_environment_config(
-            full_config, "dev", "", report, repo_with_config, terse=True
+            full_config, "dev", "", report, terse=True
         )
 
         assert env_config["core"]["item_types_in_scope"] == ["Report"]
@@ -145,7 +144,7 @@ class TestBuildEnvironmentConfig:
         artifact = self._artifact(repo_with_config)
         full_config = load_environments_config(repo_with_config, terse=True)
         env_config = build_environment_config(
-            full_config, "dev", "", artifact, repo_with_config, terse=True
+            full_config, "dev", "", artifact, terse=True
         )
 
         assert env_config["core"]["item_types_in_scope"] == ["SemanticModel"]

@@ -1,10 +1,8 @@
 """Unit tests for the shared analyzer pytest reporter (vision §2.8 F2 + R3)."""
 
 import io
-import sys
 from pathlib import Path
 from typing import Any
-
 
 from fabric_ci_cd_dataops.scripts._analyzer_report import (
     AnalyzerReporter,

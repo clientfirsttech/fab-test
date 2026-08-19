@@ -29,7 +29,7 @@ import argparse
 import json
 import os
 import sys
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -124,7 +124,12 @@ class PromotionSafetyChecker:
             if not terse:
                 print(f"❌ Invalid promotion path: {source_env} → {target_env}")
                 print(f"   Required chain: {' → '.join(promotion_chain)}")
-                print(f"   From {source_env}, you can only promote to: {promotion_chain[source_idx + 1] if source_idx + 1 < len(promotion_chain) else 'nowhere (final env)'}")
+                next_env = (
+                    promotion_chain[source_idx + 1]
+                    if source_idx + 1 < len(promotion_chain)
+                    else "nowhere (final env)"
+                )
+                print(f"   From {source_env}, you can only promote to: {next_env}")
             return False
 
         if not terse:
@@ -141,7 +146,7 @@ class PromotionSafetyChecker:
                 print(f"✅ Deployment window: Not enforced for {environment}")
             return True
 
-        now_utc = datetime.utcnow()
+        now_utc = datetime.now(UTC)
         current_day = now_utc.strftime('%A')
         current_time = now_utc.strftime('%H:%M')
 
@@ -204,7 +209,11 @@ class PromotionSafetyChecker:
         # Check branch/environment guard (production protection)
         results['branch_guard_valid'] = self.validate_branch_for_target(target_env, branch, event_name, terse)
         if not results['branch_guard_valid']:
-            terse_print(terse, "FAIL", "branch_guard", f"branch '{branch or os.getenv('GITHUB_REF_NAME', '')}' not allowed for {target_env}")
+            actual_branch = branch or os.getenv('GITHUB_REF_NAME', '')
+            terse_print(
+                terse, "FAIL", "branch_guard",
+                f"branch '{actual_branch}' not allowed for {target_env}",
+            )
 
         # Check deployment window
         results['deployment_window_valid'] = self.check_deployment_window(target_env, terse)
@@ -215,31 +224,27 @@ class PromotionSafetyChecker:
         target_config = self.config.get('environments', {}).get(target_env, {})
 
         # Check validation requirement
-        if target_config.get('requires_validation', False):
-            if not terse:
-                print("⚠️  Validation required: Checking for evidence...")
-                print("   (Validation evidence check would be implemented here)")
+        if target_config.get('requires_validation', False) and not terse:
+            print("⚠️  Validation required: Checking for evidence...")
+            print("   (Validation evidence check would be implemented here)")
             # In a real implementation, this would check for validation artifacts
 
         # Check security scan requirement
-        if target_config.get('requires_security_scan', False):
-            if not terse:
-                print("⚠️  Security scan required: Checking for evidence...")
-                print("   (Security scan evidence check would be implemented here)")
+        if target_config.get('requires_security_scan', False) and not terse:
+            print("⚠️  Security scan required: Checking for evidence...")
+            print("   (Security scan evidence check would be implemented here)")
             # In a real implementation, this would check for security scan results
 
         # Check AI validation requirement
-        if target_config.get('requires_ai_validation', False):
-            if not terse:
-                print("⚠️  AI validation required: Checking for evidence...")
-                print("   (AI validation evidence check would be implemented here)")
+        if target_config.get('requires_ai_validation', False) and not terse:
+            print("⚠️  AI validation required: Checking for evidence...")
+            print("   (AI validation evidence check would be implemented here)")
             # In a real implementation, this would check for AI governance validation
 
         # Check approval requirement
-        if target_config.get('approval_required', False):
-            if not terse:
-                print(f"⚠️  Manual approval required for {target_env}")
-                print("   (Approval check would be implemented here)")
+        if target_config.get('approval_required', False) and not terse:
+            print(f"⚠️  Manual approval required for {target_env}")
+            print("   (Approval check would be implemented here)")
             # In a real implementation, this would check for manual approval
 
         if not terse:
@@ -337,7 +342,7 @@ def main():
         # Exit based on results
         sys.exit(0 if results['all_passed'] else 1)
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - CLI boundary: every failure becomes exit 1
         terse_print(args.terse, "ERROR", "promotion_safety", str(e))
         if not args.terse:
             print(f"❌ Error: {e}", file=sys.stderr)

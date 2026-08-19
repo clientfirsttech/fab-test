@@ -71,13 +71,18 @@ class AnalyzerRunner:
         command = [analyzer_config['command']]
 
         # Substitute placeholders in arguments
+        substitutions = {
+            '{artifact_name}': artifact_name,
+            '{artifact_path}': artifact_path,
+            '{workspace_id}': workspace_id,
+            '{environment}': environment,
+            '{output_path}': output_path,
+        }
         for arg in analyzer_config.get('args', []):
-            arg = arg.replace('{artifact_name}', artifact_name)
-            arg = arg.replace('{artifact_path}', artifact_path)
-            arg = arg.replace('{workspace_id}', workspace_id)
-            arg = arg.replace('{environment}', environment)
-            arg = arg.replace('{output_path}', output_path)
-            command.append(arg)
+            substituted = arg
+            for placeholder, value in substitutions.items():
+                substituted = substituted.replace(placeholder, value)
+            command.append(substituted)
 
         return command
 
@@ -94,7 +99,7 @@ class AnalyzerRunner:
     ) -> dict[str, Any]:
         """
         Execute an analyzer and return results.
-        
+
         Returns:
             Dict with keys: success, exit_code, stdout, stderr, analyzer, artifact
         """
@@ -143,7 +148,8 @@ class AnalyzerRunner:
                 command,
                 capture_output=True,
                 text=True,
-                timeout=300  # 5 minute timeout
+                timeout=300,  # 5 minute timeout
+                check=False,
             )
 
             expected_exit_code = analyzer_config.get('exit_code_success', 0)
@@ -163,7 +169,10 @@ class AnalyzerRunner:
                     if proc.stdout:
                         print(f"Output:\n{proc.stdout}")
             else:
-                terse_print(terse, "FAIL", f"analyzer.{analyzer_name}", f"{artifact_name} failed (exit {proc.returncode})")
+                terse_print(
+                    terse, "FAIL", f"analyzer.{analyzer_name}",
+                    f"{artifact_name} failed (exit {proc.returncode})",
+                )
                 if not terse:
                     print(f"❌ {analyzer_name}: FAILED (exit code {proc.returncode})")
                     if proc.stderr:
@@ -186,14 +195,17 @@ class AnalyzerRunner:
                 'success': False,
                 'exit_code': -1,
                 'stdout': '',
-                'stderr': f'Analyzer command not found: {analyzer_config["command"]}. Please ensure the tool is installed and available in PATH.'
+                'stderr': (
+                    f'Analyzer command not found: {analyzer_config["command"]}. '
+                    'Please ensure the tool is installed and available in PATH.'
+                ),
             })
             terse_print(terse, "ERROR", f"analyzer.{analyzer_name}", f"command not found: {analyzer_config['command']}")
             if not terse:
                 print(f"❌ {analyzer_name}: COMMAND NOT FOUND")
                 print(f"Please install {analyzer_config['command']} before running this analyzer")
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - one analyzer must not abort the run
             result.update({
                 'success': False,
                 'exit_code': -1,
@@ -288,7 +300,7 @@ def main():
         # Exit with appropriate code
         sys.exit(0 if result['success'] else 1)
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - CLI boundary: every failure becomes exit 1
         terse_print(args.terse, "ERROR", "analyzer_runner", str(e))
         if not args.terse:
             print(f"❌ Error: {e}", file=sys.stderr)
