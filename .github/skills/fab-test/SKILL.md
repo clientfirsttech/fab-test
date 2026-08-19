@@ -83,7 +83,8 @@ Every analyzer invocation (a single subcommand or `all`) writes one `run.json` u
       "status": "passed",
       "envelope_path": "analyzer-results/bpa/SampleModel-PQLAssert/envelope.json",
       "errors": 0,
-      "warnings": 21
+      "warnings": 21,
+      "detail": null
     }
   ],
   "totals": {"errors": 0, "warnings": 21},
@@ -91,7 +92,7 @@ Every analyzer invocation (a single subcommand or `all`) writes one `run.json` u
 }
 ```
 
-Per-artifact `status` is one of `passed` / `failed` / `skipped` / `timeout` / `preflight_failed` (the last two cover an aborted run). The `command` field is sanitized: known credential flags (`--client-secret`, `--password`, `--token`, `--secret`, `--api-key`) and any `key=value`-shaped token have their value redacted before the file is written — no credential ever appears in the manifest.
+Per-artifact `status` is one of `passed` / `failed` / `skipped` / `timeout` / `preflight_failed` (the last two cover an aborted run). `detail` is `null` for a normal completion and carries the human-readable failure reason for the two abort statuses — the resolved remediation message for `preflight_failed`, the exceeded duration for `timeout` — so a caller never has to fall back to stderr to learn what to fix. The `command` field is sanitized: known credential flags (`--client-secret`, `--password`, `--token`, `--secret`, `--api-key`) and any `key=value`-shaped token have their value redacted before the file is written — no credential ever appears in the manifest.
 
 `doctor`, `list`, `explain`, and `clean-tools` never write a manifest — they don't run an analyzer.
 
