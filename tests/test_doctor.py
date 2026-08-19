@@ -101,7 +101,13 @@ def test_print_doctor_returns_zero_when_any_ready():
     """_print_doctor returns 0 as long as at least one row is ready."""
     rows = [
         {"analyzer": "bpa", "ready": False, "reason": "x", "resolved_path": None, "remediation": "y"},
-        {"analyzer": "pql_lint", "ready": True, "reason": "no external tool required", "resolved_path": None, "remediation": None},
+        {
+            "analyzer": "pql_lint",
+            "ready": True,
+            "reason": "no external tool required",
+            "resolved_path": None,
+            "remediation": None,
+        },
     ]
     assert _print_doctor(rows, output_format="json") == 0
 
