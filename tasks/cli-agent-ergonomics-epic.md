@@ -170,7 +170,7 @@ Emit one file per invocation so callers read a single path instead of globbing r
 
 ---
 
-## 12. Cover `all` and Abort Paths in the Manifest
+## 12. Cover `all` and Abort Paths in the Manifest ✅
 
 A manifest that only appears on the happy path is a manifest an agent cannot rely on.
 
