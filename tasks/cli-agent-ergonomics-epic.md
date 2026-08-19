@@ -156,7 +156,7 @@ Show the resolved command without running it, so a failing run can be diagnosed 
 
 ---
 
-## 11. Write the Run Manifest
+## 11. Write the Run Manifest ✅
 
 Emit one file per invocation so callers read a single path instead of globbing result directories.
 
