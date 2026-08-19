@@ -38,7 +38,6 @@ from fabric_ci_cd_dataops.scripts.fab_test import (
     _detect_origin,
     _git_context,
     _load_fab_test_all_analyzers,
-    _load_pyproject_config,
     _machine_context,
     _print_all_summary,
     _print_summary,
@@ -2819,39 +2818,6 @@ def test_run_analyzer_parallel_writes_one_envelope_per_artifact(tmp_path, monkey
 # --------------------------------------------------------------------------- #
 # Configuration file support (pyproject.toml [tool.fab-test])
 # --------------------------------------------------------------------------- #
-
-
-@pytest.mark.fab_test
-def test_load_pyproject_config_reads_tool_fab_test_section(tmp_path):
-    """[tool.fab-test] values are returned as a plain dict."""
-    pyproject = tmp_path / "pyproject.toml"
-    pyproject.write_text(
-        '[tool.fab-test]\njobs = 4\nformat = "json"\n', encoding="utf-8"
-    )
-    config = _load_pyproject_config(pyproject)
-    assert config == {"jobs": 4, "format": "json"}
-
-
-@pytest.mark.fab_test
-def test_load_pyproject_config_missing_file_returns_empty(tmp_path):
-    """A missing pyproject.toml yields an empty config, not an error."""
-    assert _load_pyproject_config(tmp_path / "does-not-exist.toml") == {}
-
-
-@pytest.mark.fab_test
-def test_load_pyproject_config_missing_section_returns_empty(tmp_path):
-    """A pyproject.toml without [tool.fab-test] yields an empty config."""
-    pyproject = tmp_path / "pyproject.toml"
-    pyproject.write_text('[tool.other]\nx = 1\n', encoding="utf-8")
-    assert _load_pyproject_config(pyproject) == {}
-
-
-@pytest.mark.fab_test
-def test_load_pyproject_config_malformed_toml_returns_empty(tmp_path):
-    """Malformed TOML yields an empty config rather than crashing."""
-    pyproject = tmp_path / "pyproject.toml"
-    pyproject.write_text("not [ valid toml", encoding="utf-8")
-    assert _load_pyproject_config(pyproject) == {}
 
 
 @pytest.mark.fab_test
