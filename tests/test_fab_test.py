@@ -1822,6 +1822,97 @@ def test_telemetry_sent_normally_when_not_dry_run(tmp_path, monkeypatch):
 
 
 # --------------------------------------------------------------------------- #
+# Regression tests for telemetry context
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.fab_test
+def test_git_context_mocked_local_git_returns_branch_and_actor(monkeypatch):
+    """A mocked local git environment yields both branch and actor via git."""
+    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+
+    _clear_github_env(monkeypatch)
+    monkeypatch.setattr(
+        fab_test_module.subprocess,
+        "run",
+        _fake_git_run(
+            {
+                "rev-parse HEAD": "deadbeef\n",
+                "rev-parse --abbrev-ref HEAD": "feature/x\n",
+                "config user.email": "dev@example.com\n",
+            }
+        ),
+    )
+    ctx = _git_context()
+    assert ctx["branch"] == "feature/x"
+    assert ctx["actor"] == "dev@example.com"
+
+
+@pytest.mark.fab_test
+def test_git_context_github_actions_env_preferred_over_local_git(monkeypatch):
+    """GitHub Actions env vars win over local git output when both are present."""
+    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+
+    _clear_github_env(monkeypatch)
+    monkeypatch.setenv("GITHUB_REF_NAME", "main")
+    monkeypatch.setenv("GITHUB_ACTOR", "ci-bot")
+    monkeypatch.setattr(
+        fab_test_module.subprocess,
+        "run",
+        _fake_git_run(
+            {
+                "rev-parse --abbrev-ref HEAD": "local-branch\n",
+                "config user.email": "dev@example.com\n",
+            }
+        ),
+    )
+    ctx = _git_context()
+    assert ctx["branch"] == "main"
+    assert ctx["actor"] == "ci-bot"
+
+
+@pytest.mark.fab_test
+def test_telemetry_send_network_failure_does_not_affect_analyzer_exit_code(
+    tmp_path, monkeypatch, capsys
+):
+    """A telemetry network failure is swallowed; the analyzer's own exit code stands."""
+    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+
+    artifact_dir = tmp_path / "artifacts"
+    (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
+    output_dir = tmp_path / "analyzer-results"
+    envelope_dir = output_dir / "pql_lint" / "SampleModel"
+    envelope_dir.mkdir(parents=True)
+    envelope_dir_json = envelope_dir / "envelope.json"
+    envelope_dir_json.write_text(
+        json.dumps(
+            {
+                "status": "failed",
+                "findings": [
+                    {"rule": "R1", "severity": "Error", "object": "T", "message": "m"}
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setenv("ENABLE_EVENTHOUSE_LOGGING", "true")
+    monkeypatch.setattr(fab_test_module.subprocess, "run", _stub_subprocess_run)
+    monkeypatch.setattr(
+        fab_test_module,
+        "publish_analyzer_telemetry",
+        lambda *a, **k: (_ for _ in ()).throw(ConnectionError("network unreachable")),
+    )
+
+    args = _RunAnalyzerArgs(artifact_dir, output_dir, telemetry=None, dry_run=False)
+    code = _run_analyzer("pql_lint", args, output_dir)
+    captured = capsys.readouterr()
+
+    assert code == 1  # driven by the Error-severity finding, not the telemetry failure
+    assert "Telemetry failed" in captured.out
+
+
+# --------------------------------------------------------------------------- #
 # Tool bootstrap with zip archives
 # --------------------------------------------------------------------------- #
 

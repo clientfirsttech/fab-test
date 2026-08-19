@@ -63,7 +63,7 @@ Let users preview what telemetry would send without actually transmitting it.
 
 ---
 
-## Regression Tests for Telemetry Context
+## Regression Tests for Telemetry Context ✅
 
 Cover local, CI, and missing-git scenarios with unit tests that do not require a real Eventhouse endpoint.
 
