@@ -1,6 +1,6 @@
 # Local Desktop First Run Epic
 
-**Status**: 📋 PLANNED
+**Status**: 🚧 IN-PROGRESS
 **Goal**: A Power BI developer with a `.pbip` open in Desktop gets real analyzer results in one command, with no workspace, service principal, or CI.
 
 ## Overview
@@ -10,7 +10,7 @@ Depends on the run manifest and `doctor` from the CLI Agent Ergonomics epic. Tas
 
 ---
 
-## 1. Discover `.pbip` Projects
+## 1. Discover `.pbip` Projects ✅
 
 Find Power BI projects wherever they live instead of requiring the `.fabric/artifacts` layout.
 
