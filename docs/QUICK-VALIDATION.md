@@ -90,7 +90,7 @@ pytest -m pql_lint      # Power Query lint wrapper only
 ```bash
 fab-test bpa --dry-run
 fab-test pbir --dry-run
-fab-test pql_test --dry-run
+fab-test pql-test --dry-run
 ```
 
 ### Run a single analyzer
@@ -98,15 +98,15 @@ fab-test pql_test --dry-run
 ```bash
 fab-test bpa --tabular-editor-path "/path/to/TabularEditor.exe"
 fab-test pbir --inspector-path "/path/to/PBIRInspectorCLI"
-fab-test pql_test --env DEV
-fab-test pql_lint
+fab-test pql-test --env DEV
+fab-test pql-lint
 ```
 
 ### Isolate one artifact
 
 ```bash
 fab-test bpa --artifact SampleModel-PQLAssert
-fab-test pql_test --artifact SampleModel-PQLAssert --env DEV
+fab-test pql-test --artifact SampleModel-PQLAssert --env DEV
 ```
 
 ### Run the default analyzer set
@@ -116,6 +116,35 @@ fab-test all
 ```
 
 The default set is configured in `.github/metadata/analyzers.json`.
+
+### Check readiness before running (doctor)
+
+Before running any analyzer, ask whether its tool or credentials are actually in place:
+
+```bash
+fab-test doctor
+fab-test doctor --analyzer bpa --format json
+```
+
+### Pipeline snippet: doctor as a gate, run.json as the artifact
+
+A copy-pasteable step for a CI job — gate on readiness, run with `--format json`, upload the manifest instead of globbing result directories:
+
+```yaml
+- name: Check fab-test readiness
+  run: fab-test doctor --format json
+
+- name: Run bpa
+  run: fab-test bpa --format json --artifact-dir .fabric/artifacts
+
+- name: Upload run manifest
+  uses: actions/upload-artifact@v4
+  with:
+    name: fab-test-run-manifest
+    path: analyzer-results/run.json
+```
+
+`run.json` records `schema_version`, `fab_test_version`, the invoked command (credentials redacted), per-artifact status, envelope paths, totals, and the final exit code — see the [Agent Contract](../.github/skills/fab-test/SKILL.md#agent-contract) for the full schema.
 
 ## Clean up
 
