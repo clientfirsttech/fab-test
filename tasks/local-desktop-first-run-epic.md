@@ -190,9 +190,11 @@ Guarantee that graduating from a laptop to a pipeline requires no rework.
 
 ---
 
-## 13. Scaffold the Local Config
+## 13. Scaffold the Local Config ⏸️ DEFERRED
 
 Make the first local config something the CLI writes.
+
+**Deferral reason (2026-08-19)**: this task wants `fab-test init --local` to scaffold "a minimal config," but the actual config-file format (`fab-test.yml`) doesn't exist until Config Consolidation (the second epic) builds it -- and that epic's own overview says it depends on `fab-test local` existing first, not the reverse. Per user direction, deferring rather than writing something to `[tool.fab-test]` now that would likely need rework once `fab-test.yml` lands. Revisit once Config Consolidation's task 1 (`_config.py`) exists.
 
 **Requirements**:
 - Given `fab-test init --local`, then a minimal config targeting the discovered `.pbip` projects is scaffolded.
