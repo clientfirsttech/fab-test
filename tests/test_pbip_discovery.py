@@ -128,3 +128,31 @@ def test_discover_finds_multiple_projects_in_nested_directories(tmp_path):
 
     assert len(projects) == 1
     assert projects[0].name == "Nested"
+
+
+@pytest.mark.fab_test
+def test_discover_skips_projects_inside_a_nested_git_checkout(tmp_path):
+    """A .pbip inside a separate git checkout (e.g. a worktree under
+    .claude/worktrees/<branch>) is not discovered -- a broad repo-root walk
+    shouldn't double-count the same fixture living in two checkouts. A
+    dot-prefixed directory that ISN'T a separate checkout (like .fabric,
+    this project's own artifacts root) is still searched.
+    """
+    nested_checkout = tmp_path / ".claude" / "worktrees" / "some-branch"
+    nested_checkout.mkdir(parents=True)
+    (nested_checkout / ".git").write_text("gitdir: ../../../.git/worktrees/some-branch\n", encoding="utf-8")
+    inside_checkout = nested_checkout / ".fabric" / "artifacts"
+    inside_checkout.mkdir(parents=True)
+    _write_pbip(inside_checkout, "Hidden", "Hidden.Report")
+    _write_report(inside_checkout, "Hidden", "../Hidden.SemanticModel")
+    _write_semantic_model(inside_checkout, "Hidden")
+
+    visible = tmp_path / ".fabric" / "artifacts"
+    visible.mkdir(parents=True)
+    _write_pbip(visible, "Visible", "Visible.Report")
+    _write_report(visible, "Visible", "../Visible.SemanticModel")
+    _write_semantic_model(visible, "Visible")
+
+    projects = discover_pbip_projects(tmp_path)
+
+    assert [p.name for p in projects] == ["Visible"]
