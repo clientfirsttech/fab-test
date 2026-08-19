@@ -1613,7 +1613,7 @@ def _run_local(args: argparse.Namespace) -> int:
             print(json.dumps(plan, indent=2))
         return 0
 
-    manifest = RunManifest(_FAB_TEST_VERSION, sys.argv)
+    manifest = RunManifest(_FAB_TEST_VERSION, sys.argv, origin=_detect_origin())
 
     results: list[dict[str, Any]] = []
     for name in _LOCAL_ANALYZERS:
@@ -1659,7 +1659,7 @@ def main() -> int:
     if args.analyzer == "local":
         return _run_local(args)
 
-    manifest = RunManifest(_FAB_TEST_VERSION, sys.argv)
+    manifest = RunManifest(_FAB_TEST_VERSION, sys.argv, origin=_detect_origin())
 
     if args.analyzer == "all":
         analyzers = _all_analyzers()

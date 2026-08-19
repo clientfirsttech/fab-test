@@ -21,6 +21,7 @@ from fabric_ci_cd_dataops.scripts._run_manifest import RunManifest, _sanitize_co
 _REQUIRED_KEYS = {
     "schema_version",
     "fab_test_version",
+    "origin",
     "command",
     "artifacts",
     "totals",
@@ -306,3 +307,114 @@ def test_main_does_not_construct_manifest_for_admin_subcommands(monkeypatch, arg
     monkeypatch.setattr(sys, "argv", ["fab-test", *argv_tail])
 
     fab_test_module.main()  # must not raise
+
+
+# --------------------------------------------------------------------------- #
+# origin: local vs CI (Local Desktop First Run §12)
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.fab_test
+def test_manifest_origin_defaults_to_unknown_when_not_specified():
+    """origin defaults to 'unknown' for callers that don't specify it."""
+    manifest = RunManifest("1.0.0", ["fab-test", "bpa"])
+
+    assert manifest.to_dict(exit_code=0)["origin"] == "unknown"
+
+
+@pytest.mark.fab_test
+def test_manifest_records_specified_origin():
+    """origin carries through to the manifest exactly as given."""
+    manifest = RunManifest("1.0.0", ["fab-test", "bpa"], origin="local")
+
+    assert manifest.to_dict(exit_code=0)["origin"] == "local"
+
+
+@pytest.mark.fab_test
+def test_main_writes_local_origin_outside_ci(tmp_path, monkeypatch):
+    """A run with no CI env vars set records origin: local."""
+    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+
+    for var in ("GITHUB_ACTIONS", "GITLAB_CI", "CIRCLECI", "AZURE_DEVOPS", "CI"):
+        monkeypatch.delenv(var, raising=False)
+
+    artifact_dir = tmp_path / "artifacts"
+    (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
+    output_dir = tmp_path / "analyzer-results"
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "fab-test", "pql_lint",
+            "--artifact-dir", str(artifact_dir),
+            "--output-dir", str(output_dir),
+            "--dry-run",
+        ],
+    )
+
+    fab_test_module.main()
+
+    manifest = json.loads((output_dir / "run.json").read_text(encoding="utf-8"))
+    assert manifest["origin"] == "local"
+
+
+@pytest.mark.fab_test
+def test_main_writes_ci_origin_under_github_actions(tmp_path, monkeypatch):
+    """A run with GITHUB_ACTIONS set records origin: github-actions."""
+    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")
+
+    artifact_dir = tmp_path / "artifacts"
+    (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
+    output_dir = tmp_path / "analyzer-results"
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "fab-test", "pql_lint",
+            "--artifact-dir", str(artifact_dir),
+            "--output-dir", str(output_dir),
+            "--dry-run",
+        ],
+    )
+
+    fab_test_module.main()
+
+    manifest = json.loads((output_dir / "run.json").read_text(encoding="utf-8"))
+    assert manifest["origin"] == "github-actions"
+
+
+@pytest.mark.fab_test
+def test_local_missing_prerequisite_skips_without_failing_under_ci(tmp_path, monkeypatch):
+    """A missing local prerequisite still degrades to a skip -- not a pipeline
+    failure -- even when CI env vars are set.
+    """
+    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")
+    monkeypatch.setattr(
+        fab_test_module,
+        "_local_readiness",
+        lambda name, args: {"ready": False, "reason": "not installed", "remediation": None},
+    )
+
+    import argparse
+
+    args = argparse.Namespace(
+        analyzer="local",
+        artifact_dir=str(tmp_path),
+        output_dir=str(tmp_path / "results"),
+        dry_run=False,
+        artifact=None,
+        timeout=None,
+        jobs=1,
+        output_format="text",
+        telemetry=False,
+        no_telemetry=True,
+        verbose=0,
+    )
+
+    exit_code = fab_test_module._run_local(args)
+
+    assert exit_code == 0
