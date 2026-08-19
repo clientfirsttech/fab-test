@@ -1,6 +1,6 @@
 # Telemetry Context Epic
 
-**Status**: 📋 PLANNED
+**Status**: ✅ COMPLETED (2026-08-18)
 **Goal**: Ensure analyzer telemetry always carries repository, branch, actor, and run context.
 
 ## Overview
