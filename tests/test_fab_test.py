@@ -44,8 +44,10 @@ from fabric_ci_cd_dataops.scripts.fab_test import (
     _redact_pii,
     _resolve_timeout,
     _run_analyzer,
+    _send_telemetry,
     _SUBCOMMAND_ALIASES,
     _telemetry_enabled,
+    _validate_telemetry_payload,
     build_parser,
 )
 from fabric_ci_cd_dataops.scripts.fab_test_registry import (
@@ -1605,6 +1607,125 @@ def test_build_telemetry_payload_actor_unchanged_when_not_email(monkeypatch):
         "DEV",
     )
     assert payload["actor"] == "ci-bot"
+
+
+# --------------------------------------------------------------------------- #
+# Validate telemetry payload schema
+# --------------------------------------------------------------------------- #
+
+
+def _valid_telemetry_payload(**overrides):
+    payload = {
+        "timestamp": "2026-08-18T12:00:00",
+        "artifact_name": "SampleModel",
+        "artifact_type": "SemanticModel",
+        "analyzer": "bpa",
+        "status": "passed",
+        "commit_sha": "abc123",
+        "workflow_run_id": "",
+        "repository": "",
+        "actor": "",
+        "branch": "",
+        "origin": "local",
+    }
+    payload.update(overrides)
+    return payload
+
+
+@pytest.mark.fab_test
+def test_validate_telemetry_payload_passes_through_valid_payload():
+    """A fully-formed payload is returned unchanged (aside from key order)."""
+    payload = _valid_telemetry_payload()
+    assert _validate_telemetry_payload(payload) == payload
+
+
+@pytest.mark.fab_test
+def test_validate_telemetry_payload_returns_none_when_required_field_missing(capsys):
+    """A payload missing a required field is skipped, with a warning logged."""
+    payload = _valid_telemetry_payload()
+    del payload["status"]
+
+    result = _validate_telemetry_payload(payload)
+    captured = capsys.readouterr()
+
+    assert result is None
+    assert "status" in captured.out
+
+
+@pytest.mark.fab_test
+def test_validate_telemetry_payload_reports_all_missing_required_fields(capsys):
+    """The warning lists every missing required field, not just the first."""
+    payload = _valid_telemetry_payload()
+    del payload["analyzer"]
+    del payload["timestamp"]
+
+    result = _validate_telemetry_payload(payload)
+    captured = capsys.readouterr()
+
+    assert result is None
+    assert "analyzer" in captured.out
+    assert "timestamp" in captured.out
+
+
+@pytest.mark.fab_test
+def test_validate_telemetry_payload_drops_malformed_optional_field():
+    """A malformed (non-JSON-serializable) optional field is dropped, not fatal."""
+    payload = _valid_telemetry_payload(weird_field={1, 2, 3})
+
+    result = _validate_telemetry_payload(payload)
+
+    assert result is not None
+    assert "weird_field" not in result
+    assert result["status"] == "passed"
+    assert result["analyzer"] == "bpa"
+
+
+@pytest.mark.fab_test
+def test_send_telemetry_skips_and_warns_on_invalid_payload(monkeypatch, capsys):
+    """_send_telemetry skips sending and warns, without raising, on invalid payload."""
+    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+
+    monkeypatch.setattr(fab_test_module, "_telemetry_enabled", lambda args: True)
+    monkeypatch.setattr(
+        fab_test_module,
+        "_build_telemetry_payload",
+        lambda *a, **k: _valid_telemetry_payload(status=""),  # falsy -> "missing"
+    )
+    calls = []
+    monkeypatch.setattr(
+        fab_test_module,
+        "publish_analyzer_telemetry",
+        lambda *a, **k: calls.append(a),
+    )
+
+    _send_telemetry("bpa", Path("SampleModel.SemanticModel"), {"findings": []}, _TelemetryArgs())
+    captured = capsys.readouterr()
+
+    assert calls == []
+    assert "status" in captured.out
+
+
+@pytest.mark.fab_test
+def test_send_telemetry_sends_valid_payload(monkeypatch):
+    """A valid payload still reaches publish_analyzer_telemetry as before."""
+    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+
+    monkeypatch.setattr(fab_test_module, "_telemetry_enabled", lambda args: True)
+    monkeypatch.setattr(
+        fab_test_module,
+        "_build_telemetry_payload",
+        lambda *a, **k: _valid_telemetry_payload(),
+    )
+    calls = []
+    monkeypatch.setattr(
+        fab_test_module,
+        "publish_analyzer_telemetry",
+        lambda *a, **k: calls.append(a),
+    )
+
+    _send_telemetry("bpa", Path("SampleModel.SemanticModel"), {"findings": []}, _TelemetryArgs())
+
+    assert len(calls) == 1
 
 
 # --------------------------------------------------------------------------- #
