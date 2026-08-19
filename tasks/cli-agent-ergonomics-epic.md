@@ -25,7 +25,7 @@ Introduce one helper that decides where a line goes — stdout for machine paylo
 
 ---
 
-## 2. Route CLI Narration Through the Helper
+## 2. Route CLI Narration Through the Helper ✅
 
 Replace direct `print` calls in the CLI with the helper so banners, per-artifact progress, and warnings stop polluting stdout.
 
