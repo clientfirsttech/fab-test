@@ -506,6 +506,16 @@ def _run_analyzer(name: str, args: argparse.Namespace, output_dir: Path) -> int:
         )
         for a in artifacts:
             print(f"  • {a.name}")
+        if _telemetry_enabled(args):
+            environment = getattr(args, "environment", "") or os.getenv(
+                "FABRIC_ENVIRONMENT", ""
+            )
+            for a in artifacts:
+                preview = _build_telemetry_payload(
+                    name, a, {"status": "dry-run", "findings": []}, environment
+                )
+                print("\n  Telemetry preview (not sent):")
+                print(json.dumps(preview, indent=2))
         return 0
 
     # Pre-flight: check required tools exist before invoking subprocesses.
