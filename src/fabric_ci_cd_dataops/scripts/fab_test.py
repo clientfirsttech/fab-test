@@ -48,6 +48,7 @@ from ._analyzer_annotations import (
 )
 from ._analyzer_envelope import _severity_counts
 from ._cli_utils import narrate
+from ._pbip_discovery import discover_pbip_projects as _discover_pbip_projects
 from ._run_manifest import RunManifest
 from .eventhouse_logger import publish_analyzer_telemetry
 from .fab_test_registry import (
@@ -1453,6 +1454,69 @@ def _local_readiness(name: str, args: argparse.Namespace) -> dict[str, Any]:
     return _check_readiness(name, args)
 
 
+def _project_matches_glob(project: Any, glob: str) -> bool:
+    """Whether a discovered PbipProject has the folder `glob` matches."""
+    suffix = glob.lstrip("*")
+    if suffix == ".SemanticModel":
+        return project.semantic_model_path is not None
+    if suffix == ".Report":
+        return project.report_path is not None
+    return False
+
+
+def _build_local_plan(args: argparse.Namespace) -> dict[str, Any]:
+    """Build the `fab-test local --dry-run` plan.
+
+    Never spawns a subprocess or touches Desktop detection: it only
+    discovers projects on disk and checks each analyzer's readiness, the
+    same primitives `doctor`/`list` already use.
+    """
+    artifact_dir = Path(args.artifact_dir)
+    projects = _discover_pbip_projects(artifact_dir)
+
+    plan_analyzers = []
+    for name in _LOCAL_ANALYZERS:
+        readiness = _local_readiness(name, args)
+        if not readiness["ready"]:
+            plan_analyzers.append({
+                "analyzer": name,
+                "status": "skipped",
+                "reason": readiness["reason"],
+                "remediation": readiness["remediation"],
+            })
+            continue
+        glob, _description = _ANALYZER_REGISTRY[name]
+        matching = [p.name for p in projects if _project_matches_glob(p, glob)]
+        plan_analyzers.append({"analyzer": name, "status": "would_run", "projects": matching})
+
+    return {
+        "analyzer": "local",
+        "dry_run": True,
+        "projects": [p.name for p in projects],
+        "analyzers": plan_analyzers,
+    }
+
+
+def _narrate_local_plan(plan: dict[str, Any], output_format: str) -> None:
+    """Print the fab-test local --dry-run plan as human-readable narration."""
+    projects = plan["projects"]
+    narrate(
+        f"\nfab-test local — dry run, {len(projects)} project(s): "
+        f"{', '.join(projects) if projects else '(none)'}",
+        output_format=output_format,
+    )
+    for entry in plan["analyzers"]:
+        if entry["status"] == "skipped":
+            hint = f" ({entry['remediation']})" if entry["remediation"] else ""
+            narrate(
+                f"  ⏭ {entry['analyzer']}: skipped -- {entry['reason']}{hint}",
+                output_format=output_format,
+            )
+        else:
+            names = ", ".join(entry["projects"]) if entry["projects"] else "(no matching project)"
+            narrate(f"  ▶ {entry['analyzer']}: would run against {names}", output_format=output_format)
+
+
 def _run_local(args: argparse.Namespace) -> int:
     """Run every analyzer in `_LOCAL_ANALYZERS` against every discovered project.
 
@@ -1464,6 +1528,14 @@ def _run_local(args: argparse.Namespace) -> int:
     """
     output_format = getattr(args, "output_format", "text")
     output_dir = Path(args.output_dir)
+
+    if getattr(args, "dry_run", False):
+        plan = _build_local_plan(args)
+        _narrate_local_plan(plan, output_format)
+        if output_format == "json":
+            print(json.dumps(plan, indent=2))
+        return 0
+
     manifest = RunManifest(_FAB_TEST_VERSION, sys.argv)
 
     results: list[dict[str, Any]] = []

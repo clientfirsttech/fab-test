@@ -147,7 +147,7 @@ One bundled command that runs every check possible without cloud access.
 
 ---
 
-## 10. Add `fab-test local --dry-run`
+## 10. Add `fab-test local --dry-run` ✅
 
 Let a user see the plan before spending time on it.
 
