@@ -48,6 +48,7 @@ from ._analyzer_annotations import (
 )
 from ._analyzer_envelope import _severity_counts
 from ._cli_utils import narrate
+from ._desktop import bridge_cli_path, detect_desktop_instances
 from ._pbip_discovery import discover_pbip_projects as _discover_pbip_projects
 from ._run_manifest import RunManifest
 from .eventhouse_logger import publish_analyzer_telemetry
@@ -88,6 +89,7 @@ from .fab_test_summary import (
     _print_all_summary,
     _print_doctor,
     _print_list,
+    _print_local_doctor,
     _print_summary,
     _read_artifact_envelope,
 )
@@ -1219,6 +1221,11 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="NAME",
         help="Only check this analyzer",
     )
+    doctor_p.add_argument(
+        "--local",
+        action="store_true",
+        help="Check prerequisites for the local Desktop workflow (fab-test local)",
+    )
 
     # --- list ---
     list_p = subs.add_parser(
@@ -1303,8 +1310,64 @@ def _clean_tools(repo_root: Path, dry_run: bool) -> int:
     return 0
 
 
+def _doctor_local(args: argparse.Namespace) -> int:
+    """Check prerequisites for the local Desktop workflow (`fab-test local`).
+
+    Python version and the Desktop-instance count are read directly, never
+    downloaded; the Bridge CLI check is presence-only (see `bridge_cli_path`
+    for why). Each `_LOCAL_ANALYZERS` entry reuses `_local_readiness`, the
+    same check `fab-test local` itself runs before starting.
+    """
+    output_format = getattr(args, "output_format", "text")
+    rows: list[dict[str, Any]] = []
+
+    py_ok = sys.version_info >= (3, 12)
+    rows.append({
+        "check": "python",
+        "ready": py_ok,
+        "reason": platform.python_version(),
+        "resolved_path": sys.executable,
+        "remediation": None if py_ok else "Install Python 3.12 or later",
+    })
+
+    instances = detect_desktop_instances()
+    rows.append({
+        "check": "desktop",
+        "ready": bool(instances),
+        "reason": (
+            f"{len(instances)} instance(s) running" if instances else "no running instance detected"
+        ),
+        "resolved_path": None,
+        "remediation": None if instances else "Open a .pbip file in Power BI Desktop",
+    })
+
+    bridge_path = bridge_cli_path()
+    rows.append({
+        "check": "desktop-bridge",
+        "ready": bridge_path is not None,
+        "reason": "found on PATH" if bridge_path else "not found on PATH",
+        "resolved_path": bridge_path,
+        "remediation": (
+            None if bridge_path
+            else "npm install -g @microsoft/powerbi-desktop-bridge-cli (preview; report-render checks only)"
+        ),
+    })
+
+    would_run = []
+    for name in _LOCAL_ANALYZERS:
+        readiness = _local_readiness(name, args)
+        rows.append({"check": name, **readiness})
+        if readiness["ready"]:
+            would_run.append(name)
+
+    return _print_local_doctor(rows, would_run, output_format)
+
+
 def _doctor(args: argparse.Namespace) -> int:
     """Check whether each analyzer's prerequisites are ready to run."""
+    if getattr(args, "local", False):
+        return _doctor_local(args)
+
     output_format = getattr(args, "output_format", "text")
     only = getattr(args, "analyzer_filter", None)
     if only and only not in _ANALYZER_REGISTRY:
@@ -1424,33 +1487,47 @@ def _dispatch_admin_command(args: argparse.Namespace) -> int | None:
 _LOCAL_ANALYZERS = ("pql_lint", "bpa", "pbir", "pql_test")
 
 
-def _pql_lint_ready() -> bool:
-    """Whether the ``pqlint`` package is usable, on PATH or importable.
+def _pql_lint_path() -> str | None:
+    """Resolved location of the ``pqlint`` package if usable, else ``None``.
 
     Unlike pql-test, pqlint is not a pinned fab-test dependency, so a
     fresh install genuinely may not have it -- the case this check exists
     to catch (mirrors invoke_pqlint.py's own resolution fallback).
     """
-    return shutil.which("pqlint") is not None or importlib.util.find_spec("pqlint") is not None
+    on_path = shutil.which("pqlint")
+    if on_path:
+        return on_path
+    spec = importlib.util.find_spec("pqlint")
+    return spec.origin if spec else None
 
 
 def _local_readiness(name: str, args: argparse.Namespace) -> dict[str, Any]:
     """Return a readiness dict for one of the `_LOCAL_ANALYZERS`.
 
-    pql_test is always ready (a pinned fab-test dependency); pql_lint needs
-    its own presence check since pqlint is not bundled; bpa/pbir reuse the
-    existing bootstrapped-tool readiness probe.
+    Always has the same four keys as `check_readiness` (ready, reason,
+    resolved_path, remediation) so a JSON consumer never has to branch on
+    which analyzer it's reading. pql_test is always ready (a pinned
+    fab-test dependency); pql_lint needs its own presence check since
+    pqlint is not bundled; bpa/pbir reuse the existing bootstrapped-tool
+    readiness probe.
     """
     if name == "pql_lint":
-        if _pql_lint_ready():
-            return {"ready": True, "reason": "pqlint available", "remediation": None}
+        path = _pql_lint_path()
+        if path:
+            return {"ready": True, "reason": "pqlint available", "resolved_path": path, "remediation": None}
         return {
             "ready": False,
             "reason": "pqlint not found on PATH or importable",
+            "resolved_path": None,
             "remediation": "pip install pqlint",
         }
     if name == "pql_test":
-        return {"ready": True, "reason": "pql-test is a fab-test dependency", "remediation": None}
+        return {
+            "ready": True,
+            "reason": "pql-test is a fab-test dependency",
+            "resolved_path": None,
+            "remediation": None,
+        }
     return _check_readiness(name, args)
 
 

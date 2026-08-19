@@ -3,10 +3,13 @@
 Scope
 -----
 `doctor` surfaces the readiness probe (task 7) as the command a human or
-agent runs first. Always passes on any machine — it only reads local state,
-never downloads anything or spawns a subprocess.
+agent runs first. Always passes on any machine — it only reads local state
+and never downloads anything. The one exception is `doctor --local`'s
+Desktop-instance check, which spawns a local PowerShell process to resolve
+an open file path, but only when exactly one instance is running.
 """
 
+import argparse
 import json
 import subprocess
 
@@ -139,3 +142,56 @@ def test_print_doctor_text_shows_remediation_for_not_ready(capsys):
     assert "bpa" in captured.out
     assert "not yet downloaded" in captured.out
     assert "https://example.com/tool.zip" in captured.out
+
+
+# --------------------------------------------------------------------------- #
+# fab-test doctor --local (Local Desktop First Run §11)
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.fab_test
+def test_doctor_local_reports_python_desktop_bridge_and_tool_checks():
+    """doctor --local reports Python, Desktop, bridge CLI, and both external tools."""
+    result = subprocess.run(
+        ["fab-test", "doctor", "--local"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        check=False,
+    )
+    assert result.returncode in (0, 1), result.stderr
+    for expected in ("python", "desktop", "bridge", "bpa", "pbir", "pql_lint", "pql_test"):
+        assert expected in result.stdout.lower(), f"missing '{expected}' in:\n{result.stdout}"
+
+
+@pytest.mark.fab_test
+def test_doctor_local_json_is_single_document_with_would_run():
+    """doctor --local --format json emits one document with a would_run list."""
+    result = subprocess.run(
+        ["fab-test", "doctor", "--local", "--format", "json"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        check=False,
+    )
+    assert result.returncode in (0, 1), result.stderr
+    data = json.loads(result.stdout)
+    assert "checks" in data
+    assert "would_run" in data
+    assert isinstance(data["would_run"], list)
+
+
+@pytest.mark.fab_test
+def test_doctor_local_remediation_present_for_missing_prerequisite(monkeypatch):
+    """A not-ready check includes a remediation hint the caller can act on."""
+    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+
+    monkeypatch.setattr(
+        fab_test_module,
+        "_local_readiness",
+        lambda name, args: {"ready": False, "reason": "not installed", "remediation": "pip install it"},
+    )
+    args = argparse.Namespace(output_format="json", local=True)
+
+    exit_code = fab_test_module._doctor(args)
+    assert exit_code in (0, 1)

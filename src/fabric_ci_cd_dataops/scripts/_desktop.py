@@ -16,6 +16,7 @@ from __future__ import annotations
 import os
 import platform
 import re
+import shutil
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -93,6 +94,17 @@ def _running_desktop_file_path() -> Path | None:
     if len(lines) != 1:
         return None
     return _extract_file_arg(lines[0])
+
+
+def bridge_cli_path() -> str | None:
+    """Return the resolved path of the Power BI Desktop Bridge CLI (``powerbi-desktop``)
+    if it's on PATH, else ``None``.
+
+    Presence only -- deliberately never invokes the CLI. Its actual command
+    output schema (``status``, ``screenshot``, ...) isn't verified in this
+    codebase yet; see the epic file for the task 6-8 follow-up.
+    """
+    return shutil.which("powerbi-desktop")
 
 
 def detect_desktop_instances(workspaces_root: Path | None = None) -> list[DesktopInstance]:

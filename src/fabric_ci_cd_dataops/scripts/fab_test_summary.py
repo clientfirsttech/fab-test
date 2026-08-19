@@ -65,6 +65,30 @@ def _print_doctor(rows: list[dict[str, Any]], output_format: str = "text") -> in
     return 0 if any_ready else 1
 
 
+def _print_local_doctor(
+    rows: list[dict[str, Any]], would_run: list[str], output_format: str = "text"
+) -> int:
+    """Print the `fab-test doctor --local` readiness report.
+
+    Returns 0 if at least one local analyzer would run, else 1.
+    """
+    if output_format == "json":
+        print(json.dumps({"checks": rows, "would_run": would_run}, indent=2))
+        return 0 if would_run else 1
+
+    for r in rows:
+        icon = "✅" if r["ready"] else "❌"
+        location = f" — {r['resolved_path']}" if r.get("resolved_path") else ""
+        print(f"{icon} {r['check']}: {r['reason']}{location}")
+        if not r["ready"] and r.get("remediation"):
+            print(f"   → {r['remediation']}")
+    if would_run:
+        print(f"\nfab-test local would run: {', '.join(would_run)}")
+    else:
+        print("\nfab-test local: nothing would run -- resolve at least one prerequisite above")
+    return 0 if would_run else 1
+
+
 def _terminal_width() -> int:
     try:
         return max(shutil.get_terminal_size().columns, 80)
