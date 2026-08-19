@@ -3290,6 +3290,22 @@ def test_text_format_leaves_analyzer_output_mode_env_unset(tmp_path, monkeypatch
 _STDOUT_PURITY_EXTRA_ARGS = {"dependencies": ["--semantic-model", "TestModel"]}
 
 
+# Admin/reporting subcommands (not part of the analyzer-run pipeline) don't
+# necessarily narrate anything to stderr, and some don't take --dry-run.
+_NO_NARRATION_SUBCOMMANDS = {"doctor"}
+_EXPECTED_EXIT_CODES = {"doctor": (0, 1)}
+
+
+def _subparser_for(subcommand: str):
+    parser = build_parser()
+    subparsers_action = next(
+        action
+        for action in parser._actions
+        if isinstance(action, argparse._SubParsersAction)
+    )
+    return subparsers_action.choices[subcommand]
+
+
 def _subcommands_with_format_flag() -> list[str]:
     """Enumerate canonical (non-alias) subcommand names that support --format.
 
@@ -3317,20 +3333,30 @@ def _subcommands_with_format_flag() -> list[str]:
 @pytest.mark.parametrize("subcommand", _subcommands_with_format_flag())
 def test_stdout_is_pure_json_for_every_subcommand(subcommand):
     """Every --format json subcommand emits stdout that parses in one json.loads()
-    call, and narrates something to stderr (so silence wouldn't hide a dropped run).
+    call. Analyzer-run subcommands also narrate something to stderr (so silence
+    wouldn't hide a dropped run); admin/reporting subcommands need not.
     """
-    extra = _STDOUT_PURITY_EXTRA_ARGS.get(subcommand, [])
+    extra = list(_STDOUT_PURITY_EXTRA_ARGS.get(subcommand, []))
+    args = ["fab-test", subcommand, "--format", "json"]
+    if any(
+        "--dry-run" in action.option_strings
+        for action in _subparser_for(subcommand)._actions
+    ):
+        args.append("--dry-run")
+    args.extend(extra)
+
     result = subprocess.run(
-        ["fab-test", subcommand, "--format", "json", "--dry-run", *extra],
+        args,
         capture_output=True,
         text=True,
         encoding="utf-8",
         errors="replace",
         check=False,
     )
-    assert result.returncode == 0, result.stderr
+    assert result.returncode in _EXPECTED_EXIT_CODES.get(subcommand, (0,)), result.stderr
     json.loads(result.stdout)  # must be a single, complete JSON document
-    assert result.stderr.strip() != "", "narration should not be silently dropped"
+    if subcommand not in _NO_NARRATION_SUBCOMMANDS:
+        assert result.stderr.strip() != "", "narration should not be silently dropped"
 
 
 # --------------------------------------------------------------------------- #

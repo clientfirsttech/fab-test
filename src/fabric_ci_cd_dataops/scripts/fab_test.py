@@ -68,10 +68,14 @@ from .fab_test_registry import (
     load_fab_test_all_analyzers as _load_fab_test_all_analyzers,
 )
 from .fab_test_registry import (
+    check_readiness as _check_readiness,
+)
+from .fab_test_registry import (
     preflight_error as _preflight_error,
 )
 from .fab_test_summary import (
     _print_all_summary,
+    _print_doctor,
     _print_summary,
     _read_artifact_envelope,
 )
@@ -1084,6 +1088,26 @@ def build_parser() -> argparse.ArgumentParser:
         help="List what would be removed without deleting anything",
     )
 
+    # --- doctor ---
+    doctor_p = subs.add_parser(
+        "doctor",
+        help="Check whether each analyzer's prerequisites are ready to run",
+    )
+    doctor_p.add_argument(
+        "--format",
+        choices=["text", "json"],
+        default=_PYPROJECT_CONFIG.get("format", "text"),
+        dest="output_format",
+        help="Output format for the readiness report (default: text)",
+    )
+    doctor_p.add_argument(
+        "--analyzer",
+        dest="analyzer_filter",
+        default=None,
+        metavar="NAME",
+        help="Only check this analyzer",
+    )
+
     return parser
 
 
@@ -1112,6 +1136,23 @@ def _clean_tools(repo_root: Path, dry_run: bool) -> int:
     return 0
 
 
+def _doctor(args: argparse.Namespace) -> int:
+    """Check whether each analyzer's prerequisites are ready to run."""
+    output_format = getattr(args, "output_format", "text")
+    only = getattr(args, "analyzer_filter", None)
+    if only and only not in _ANALYZER_REGISTRY:
+        print(
+            f"  ✗ fab-test doctor: unknown analyzer '{only}'. "
+            f"Valid names: {', '.join(_ANALYZER_REGISTRY)}",
+            file=sys.stderr,
+        )
+        return 2
+
+    names = [only] if only else list(_ANALYZER_REGISTRY.keys())
+    rows = [{"analyzer": name, **_check_readiness(name, args)} for name in names]
+    return _print_doctor(rows, output_format)
+
+
 def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
@@ -1119,6 +1160,9 @@ def main() -> int:
 
     if args.analyzer == "clean-tools":
         return _clean_tools(REPO_ROOT, args.dry_run)
+
+    if args.analyzer == "doctor":
+        return _doctor(args)
 
     _apply_environment_default(args, _PYPROJECT_CONFIG)
     output_dir = Path(args.output_dir)

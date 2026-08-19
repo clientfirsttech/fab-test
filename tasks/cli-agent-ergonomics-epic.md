@@ -112,7 +112,7 @@ Extract a check that answers "could this analyzer run?" without downloading anyt
 
 ---
 
-## 8. Add `fab-test doctor`
+## 8. Add `fab-test doctor` ✅
 
 Surface the probe as the command a human or agent runs first.
 
