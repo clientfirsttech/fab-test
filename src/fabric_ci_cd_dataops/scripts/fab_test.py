@@ -34,6 +34,7 @@ import subprocess
 import sys
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -417,23 +418,30 @@ def _artifact_exit_code(
     return 0
 
 
+@dataclass
+class _RunContext:
+    """Per-run state shared across every artifact in one analyzer invocation."""
+
+    in_ci: bool
+    sub_env: dict[str, str]
+    timeout: int
+    manifest: RunManifest | None = None
+
+
 def _run_one_artifact(
     name: str,
     artifact: Path,
     args: argparse.Namespace,
     output_dir: Path,
-    in_ci: bool,
-    sub_env: dict[str, str],
-    timeout: int,
+    ctx: _RunContext,
     index: int,
     total: int,
-    manifest: RunManifest | None = None,
 ) -> tuple[str, int]:
     """Run one analyzer against one artifact. Returns (stem, exit_code)."""
     output_format = getattr(args, "output_format", "text")
     display_name = "." if _is_repository_scoped(name) else artifact.stem
     if total > 1:
-        if in_ci:
+        if ctx.in_ci:
             narrate(
                 f"::notice::fab-test {name}: artifact {index} of {total} ({display_name})",
                 output_format=output_format,
@@ -460,32 +468,32 @@ def _run_one_artifact(
         proc = subprocess.run(
             cmd,
             stdout=subprocess.PIPE if capture_stdout else None,
-            stderr=None if in_ci else subprocess.PIPE,
+            stderr=None if ctx.in_ci else subprocess.PIPE,
             text=True,
             encoding="utf-8",
             errors="replace",
-            env=sub_env,
-            timeout=timeout,
+            env=ctx.sub_env,
+            timeout=ctx.timeout,
             check=False,
         )
     except subprocess.TimeoutExpired as exc:
         narrate(
-            f"  ⏰ fab-test {name}: timed out after {timeout}s for {display_name}",
+            f"  ⏰ fab-test {name}: timed out after {ctx.timeout}s for {display_name}",
             output_format=output_format,
         )
         if capture_stdout:
             _reemit(exc.stdout)
-        if manifest is not None:
-            manifest.record_artifact(
+        if ctx.manifest is not None:
+            ctx.manifest.record_artifact(
                 name, display_name, "timeout", None, 0, 0,
-                detail=f"exceeded {timeout}s timeout",
+                detail=f"exceeded {ctx.timeout}s timeout",
             )
         return (display_name, 1)
 
     if capture_stdout:
         _reemit(proc.stdout)
 
-    if not in_ci and proc.stderr:
+    if not ctx.in_ci and proc.stderr:
         for line in proc.stderr.splitlines():
             clean = _clean_annotation(line)
             if clean.strip():
@@ -512,15 +520,15 @@ def _run_one_artifact(
     artifact_code = _artifact_exit_code(proc.returncode, envelope)
 
     errors, warnings = _severity_counts(envelope.get("findings", []))
-    if in_ci:
+    if ctx.in_ci:
         emit_workflow_annotations(envelope)
     if warnings > 0:
         emit_pr_review_comments(envelope, str(artifact))
     _send_telemetry(name, artifact, envelope, args)
 
-    if manifest is not None:
+    if ctx.manifest is not None:
         envelope_path = output_dir / name / artifact.stem / "envelope.json"
-        manifest.record_artifact(
+        ctx.manifest.record_artifact(
             name,
             artifact.stem,
             envelope.get("status", "unknown"),
@@ -622,12 +630,11 @@ def _run_analyzer(
     jobs = max(1, getattr(args, "jobs", 1) or 1)
 
     total = len(artifacts)
+    ctx = _RunContext(in_ci=in_ci, sub_env=_sub_env, timeout=timeout, manifest=manifest)
 
     def _run(index_artifact: tuple[int, Path]) -> tuple[str, int]:
         index, artifact = index_artifact
-        return _run_one_artifact(
-            name, artifact, args, output_dir, in_ci, _sub_env, timeout, index, total, manifest
-        )
+        return _run_one_artifact(name, artifact, args, output_dir, ctx, index, total)
 
     indexed_artifacts = list(enumerate(artifacts, start=1))
     if jobs > 1 and len(artifacts) > 1:
