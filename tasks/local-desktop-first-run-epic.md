@@ -24,7 +24,7 @@ Find Power BI projects wherever they live instead of requiring the `.fabric/arti
 
 ---
 
-## 2. Wire Discovery Into Artifact Resolution
+## 2. Wire Discovery Into Artifact Resolution ✅
 
 Make the CLI use the new discovery without breaking the existing layout.
 

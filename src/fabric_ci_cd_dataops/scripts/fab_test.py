@@ -59,6 +59,9 @@ from .fab_test_registry import (
     ANALYZER_REGISTRY as _ANALYZER_REGISTRY,
 )
 from .fab_test_registry import (
+    applicable_analyzers as _applicable_analyzers,
+)
+from .fab_test_registry import (
     build_command as _build_command,
 )
 from .fab_test_registry import (
@@ -66,6 +69,9 @@ from .fab_test_registry import (
 )
 from .fab_test_registry import (
     discover_artifacts as _discover,
+)
+from .fab_test_registry import (
+    discover_pbip_sources as _discover_pbip_sources,
 )
 from .fab_test_registry import (
     is_repository_scoped as _is_repository_scoped,
@@ -567,7 +573,8 @@ def _run_analyzer(
 
     if not artifacts:
         narrate(
-            f"  ⚠ fab-test {name}: no {glob} artifacts found in {artifact_dir}",
+            f"  ⚠ fab-test {name}: no {glob} artifacts or .pbip projects found under "
+            f"{artifact_dir}",
             output_format=output_format,
         )
         if emit_own_json:
@@ -580,8 +587,15 @@ def _run_analyzer(
             f"{len(artifacts)} artifact(s):",
             output_format=output_format,
         )
+        pbip_sources = _discover_pbip_sources(artifact_dir)
         for a in artifacts:
-            narrate(f"  • {a.name}", output_format=output_format)
+            analyzers = ", ".join(_applicable_analyzers(a)) or "none"
+            source = pbip_sources.get(a)
+            source_note = f"  [from {source.name}]" if source else ""
+            narrate(
+                f"  • {a.name}  (analyzers: {analyzers}){source_note}",
+                output_format=output_format,
+            )
         if _telemetry_enabled(args):
             environment = getattr(args, "environment", "") or os.getenv(
                 "FABRIC_ENVIRONMENT", ""
