@@ -3287,12 +3287,15 @@ def test_text_format_leaves_analyzer_output_mode_env_unset(tmp_path, monkeypatch
 
 # dependencies is the only subcommand with a required flag beyond the common
 # ones; every other --format-capable subcommand runs with just --dry-run.
-_STDOUT_PURITY_EXTRA_ARGS = {"dependencies": ["--semantic-model", "TestModel"]}
+_STDOUT_PURITY_EXTRA_ARGS = {
+    "dependencies": ["--semantic-model", "TestModel"],
+    "explain": ["bpa"],
+}
 
 
 # Admin/reporting subcommands (not part of the analyzer-run pipeline) don't
 # necessarily narrate anything to stderr, and some don't take --dry-run.
-_NO_NARRATION_SUBCOMMANDS = {"doctor", "list"}
+_NO_NARRATION_SUBCOMMANDS = {"doctor", "list", "explain"}
 _EXPECTED_EXIT_CODES = {"doctor": (0, 1)}
 
 
