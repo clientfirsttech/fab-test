@@ -98,7 +98,7 @@ Let a caller distinguish a machine that is not set up from an artifact that fail
 
 ---
 
-## 7. Add a Readiness Probe
+## 7. Add a Readiness Probe ✅
 
 Extract a check that answers "could this analyzer run?" without downloading anything or touching artifacts — the engine behind `doctor`.
 
