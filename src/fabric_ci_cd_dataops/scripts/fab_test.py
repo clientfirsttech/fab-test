@@ -790,9 +790,10 @@ def build_parser() -> argparse.ArgumentParser:
         epilog=(
             "Exit codes:\n"
             "  0    All artifacts passed (warnings do not fail the build)\n"
-            "  1    An analyzer found error-level findings, or a tool crashed\n"
+            "  1    An analyzer found error-level findings, or the analyzer process crashed\n"
             "  2    Invalid CLI arguments (no analyzer was invoked)\n"
-            "  126  Analyzer unsupported on this platform (see message for the supported OS)\n\n"
+            "  126  Analyzer unsupported on this platform (see message for the supported OS)\n"
+            "  127  Required external tool could not be resolved (see message for the fix)\n\n"
             f"Version: {_FAB_TEST_VERSION} | "
             "Docs: https://github.com/kerski/fabric-ci-cd-dataops/blob/main/docs/QUICK-VALIDATION.md"
         ),

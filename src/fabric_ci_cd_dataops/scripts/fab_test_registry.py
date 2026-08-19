@@ -348,12 +348,19 @@ def resolve_tool(name: str, args: argparse.Namespace) -> Path | None:
     return resolved
 
 
+_TOOL_FLAG_HINTS = {
+    "bpa": "--tabular-editor-path",
+    "pbir": "--inspector-path",
+}
+
+
 def preflight_error(name: str, args: argparse.Namespace) -> tuple[str, int] | None:
     """Return an (error message, exit code) pair if a required tool is missing.
 
     Exit code 126 signals the tool exists but is unsupported on this platform
     ("command found but not executable" — the closest POSIX convention);
-    exit code 1 covers any other resolution failure.
+    exit code 127 ("command not found") covers any other resolution failure,
+    distinguishing an unconfigured machine from a real rule violation (1).
     """
     if name not in _BOOTSTRAPPED_ANALYZERS:
         return None
@@ -362,7 +369,11 @@ def preflight_error(name: str, args: argparse.Namespace) -> tuple[str, int] | No
     except UnsupportedPlatformError as exc:
         return str(exc), 126
     except RuntimeError as exc:
-        return str(exc), 1
+        message = str(exc)
+        flag = _TOOL_FLAG_HINTS.get(name)
+        if flag:
+            message = f"{message}\n  Or pass {flag} <path> on the command line."
+        return message, 127
     else:
         return None
 

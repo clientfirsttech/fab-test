@@ -82,7 +82,7 @@ Lock the guarantee with a test that would have caught today's behavior.
 
 ---
 
-## 6. Exit `127` for Missing Prerequisites
+## 6. Exit `127` for Missing Prerequisites ✅
 
 Let a caller distinguish a machine that is not set up from an artifact that failed.
 
