@@ -1729,6 +1729,99 @@ def test_send_telemetry_sends_valid_payload(monkeypatch):
 
 
 # --------------------------------------------------------------------------- #
+# Telemetry dry-run inspection
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.fab_test
+def test_dry_run_with_telemetry_prints_payload_preview_not_sent(tmp_path, monkeypatch, capsys):
+    """--telemetry --dry-run prints the payload preview instead of sending it."""
+    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+
+    artifact_dir = tmp_path / "artifacts"
+    (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
+    output_dir = tmp_path / "analyzer-results"
+
+    calls = []
+    monkeypatch.setattr(
+        fab_test_module,
+        "publish_analyzer_telemetry",
+        lambda *a, **k: calls.append(a),
+    )
+
+    args = _RunAnalyzerArgs(artifact_dir, output_dir, telemetry=True, dry_run=True)
+    code = _run_analyzer("pql_lint", args, output_dir)
+    captured = capsys.readouterr()
+
+    assert code == 0
+    assert calls == [], "telemetry must never be transmitted during --dry-run"
+    assert "Telemetry preview" in captured.out
+    assert '"analyzer": "pql_lint"' in captured.out
+    assert '"artifact_name": "SampleModel"' in captured.out
+
+
+@pytest.mark.fab_test
+def test_dry_run_without_telemetry_flag_shows_no_preview(tmp_path, monkeypatch, capsys):
+    """Plain --dry-run (no --telemetry) prints no telemetry preview."""
+    artifact_dir = tmp_path / "artifacts"
+    (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
+    output_dir = tmp_path / "analyzer-results"
+
+    monkeypatch.delenv("ENABLE_EVENTHOUSE_LOGGING", raising=False)
+    args = _RunAnalyzerArgs(artifact_dir, output_dir, telemetry=None, dry_run=True)
+    code = _run_analyzer("pql_lint", args, output_dir)
+    captured = capsys.readouterr()
+
+    assert code == 0
+    assert "Telemetry preview" not in captured.out
+
+
+@pytest.mark.fab_test
+def test_dry_run_no_telemetry_flag_suppresses_preview_even_with_env(
+    tmp_path, monkeypatch, capsys
+):
+    """--no-telemetry suppresses the dry-run preview even if the env flag is on."""
+    artifact_dir = tmp_path / "artifacts"
+    (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
+    output_dir = tmp_path / "analyzer-results"
+
+    monkeypatch.setenv("ENABLE_EVENTHOUSE_LOGGING", "true")
+    args = _RunAnalyzerArgs(artifact_dir, output_dir, telemetry=False, dry_run=True)
+    code = _run_analyzer("pql_lint", args, output_dir)
+    captured = capsys.readouterr()
+
+    assert code == 0
+    assert "Telemetry preview" not in captured.out
+
+
+@pytest.mark.fab_test
+def test_telemetry_sent_normally_when_not_dry_run(tmp_path, monkeypatch):
+    """--telemetry with ENABLE_EVENTHOUSE_LOGGING=true still sends for real runs."""
+    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+
+    artifact_dir = tmp_path / "artifacts"
+    (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
+    output_dir = tmp_path / "analyzer-results"
+
+    monkeypatch.setenv("ENABLE_EVENTHOUSE_LOGGING", "true")
+    monkeypatch.setattr(
+        fab_test_module.subprocess, "run", _stub_subprocess_run
+    )
+    calls = []
+    monkeypatch.setattr(
+        fab_test_module,
+        "publish_analyzer_telemetry",
+        lambda *a, **k: calls.append(a),
+    )
+
+    args = _RunAnalyzerArgs(artifact_dir, output_dir, telemetry=None, dry_run=False)
+    code = _run_analyzer("pql_lint", args, output_dir)
+
+    assert code == 0
+    assert len(calls) == 1
+
+
+# --------------------------------------------------------------------------- #
 # Tool bootstrap with zip archives
 # --------------------------------------------------------------------------- #
 
@@ -2881,11 +2974,12 @@ class _RunAnalyzerArgs:
         impact_manifest: str | None = None,
         timeout: int | None = None,
         jobs: int = 1,
+        dry_run: bool = False,
     ):
         self.artifact_dir = str(artifact_dir)
         self.output_dir = str(output_dir)
         self.artifact = artifact
-        self.dry_run = False
+        self.dry_run = dry_run
         self.verbose = 0
         self.telemetry = telemetry
         self.output_format = output_format

@@ -52,7 +52,7 @@ Reject malformed payloads before transmission so incomplete records don't corrup
 
 ---
 
-## Add Telemetry Dry-Run Inspection
+## Add Telemetry Dry-Run Inspection ✅
 
 Let users preview what telemetry would send without actually transmitting it.
 
