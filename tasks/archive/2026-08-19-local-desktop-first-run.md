@@ -1,6 +1,6 @@
 # Local Desktop First Run Epic
 
-**Status**: 🚧 IN-PROGRESS
+**Status**: ✅ COMPLETED (2026-08-19) — 10/14 tasks; 4 deferred (see tasks 6-8, 13 below)
 **Goal**: A Power BI developer with a `.pbip` open in Desktop gets real analyzer results in one command, with no workspace, service principal, or CI.
 
 ## Overview
