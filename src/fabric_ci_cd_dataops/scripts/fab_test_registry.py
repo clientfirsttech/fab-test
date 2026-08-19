@@ -15,7 +15,11 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from ._analyzer_tool_bootstrap import UnsupportedPlatformError, resolve_executable
+from ._analyzer_tool_bootstrap import (
+    UnsupportedPlatformError,
+    probe_executable,
+    resolve_executable,
+)
 
 # Reuse the same repo-root logic as fab_test.py so paths stay consistent.
 
@@ -376,6 +380,36 @@ def preflight_error(name: str, args: argparse.Namespace) -> tuple[str, int] | No
         return message, 127
     else:
         return None
+
+
+def check_readiness(name: str, args: argparse.Namespace | None) -> dict[str, Any]:
+    """Return a readiness dict for analyzer ``name`` (the engine behind `doctor`).
+
+    Never reads an artifact or spawns a subprocess. Analyzers without an
+    external tool to resolve (pql_test, pql_lint, playwright, ...) are always
+    ready. See ``probe_executable`` for the bootstrapped-analyzer shape.
+    """
+    if name not in _BOOTSTRAPPED_ANALYZERS:
+        return {
+            "ready": True,
+            "resolved_path": None,
+            "reason": "no external tool required",
+            "remediation": None,
+        }
+
+    explicit = None
+    if args is not None:
+        if name == "bpa":
+            explicit = getattr(args, "tabular_editor_path", None)
+        elif name == "pbir":
+            explicit = getattr(args, "inspector_path", None)
+
+    return probe_executable(
+        _BOOTSTRAP_REGISTRY_NAME.get(name, name),
+        ANALYZERS_JSON,
+        REPO_ROOT,
+        explicit_path=explicit,
+    )
 
 
 def build_command(

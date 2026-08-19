@@ -193,6 +193,99 @@ def load_analyzer_config(metadata_path: Path, analyzer_name: str) -> dict[str, A
     return config
 
 
+def probe_executable(
+    analyzer_name: str,
+    metadata_path: Path,
+    repo_root: Path,
+    explicit_path: str | None = None,
+) -> dict[str, Any]:
+    """Check whether ``analyzer_name``'s tool is (or would be) resolvable.
+
+    Mirrors ``resolve_executable``'s resolution order but never downloads,
+    extracts, or spawns a subprocess — it is the engine behind
+    ``fab-test doctor``. When a download would be needed, the install URL
+    that *would* be used is reported instead of being fetched.
+
+    Returns a dict with:
+      ready: bool
+      resolved_path: str | None -- an already-usable path, if one exists
+      reason: str               -- human explanation of the ready/not-ready state
+      remediation: str | None   -- what to do (or what would happen) when not ready
+    """
+    config = load_analyzer_config(metadata_path, analyzer_name) or {}
+    tool_install = config.get("tool_install") or {}
+    env_var = tool_install.get("env_var", "")
+    default_path = tool_install.get("default_path", "")
+    install_url_env_var = tool_install.get("install_url_env_var", "")
+
+    platform = _current_platform()
+    requires_platform = tool_install.get("requires_platform")
+    if requires_platform and platform != requires_platform:
+        return {
+            "ready": False,
+            "resolved_path": None,
+            "reason": f"not supported on {platform}",
+            "remediation": (
+                f"Supported platform: {requires_platform}. "
+                f"Set {env_var}=<path> to use a manually provided executable."
+            ),
+        }
+
+    committed_install_url = _platform_specific(tool_install, "install_url", platform)
+
+    def _usable(path: Path) -> bool:
+        return path.exists() and path.is_file()
+
+    candidates: list[tuple[str, Path]] = []
+    if explicit_path:
+        candidates.append(("CLI argument", Path(explicit_path)))
+    if env_var and _env(env_var).strip():
+        candidates.append((f"env var {env_var}", Path(_env(env_var).strip())))
+    if default_path and default_path.strip():
+        candidates.append(("default path", repo_root / default_path.strip()))
+
+    for source, path in candidates:
+        if _usable(path):
+            return {
+                "ready": True,
+                "resolved_path": str(path.resolve()),
+                "reason": f"resolved via {source}",
+                "remediation": None,
+            }
+
+    cache_dir = _cache_root(repo_root) / analyzer_name / platform
+    cached = _read_marker(cache_dir)
+    if cached:
+        return {
+            "ready": True,
+            "resolved_path": str(cached.resolve()),
+            "reason": "resolved via cached download",
+            "remediation": None,
+        }
+
+    install_url = _env(install_url_env_var, "") if install_url_env_var else ""
+    if not install_url:
+        install_url = committed_install_url or ""
+    if install_url:
+        return {
+            "ready": False,
+            "resolved_path": None,
+            "reason": "not yet downloaded",
+            "remediation": f"Would download from {install_url} on first run.",
+        }
+
+    return {
+        "ready": False,
+        "resolved_path": None,
+        "reason": "no executable found and no install URL configured",
+        "remediation": (
+            f"Set {env_var}=<path> to a manually provided executable."
+            if env_var
+            else "No automatic resolution is configured for this analyzer."
+        ),
+    }
+
+
 def resolve_executable(
     analyzer_name: str,
     metadata_path: Path,
