@@ -56,7 +56,7 @@ Find Power BI Desktop and its local XMLA endpoint so the user does not have to.
 
 ---
 
-## 4. Match an Instance to an Artifact
+## 4. Match an Instance to an Artifact ✅
 
 Never guess which model is under test.
 
