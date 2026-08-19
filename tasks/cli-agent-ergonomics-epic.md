@@ -39,7 +39,7 @@ Replace direct `print` calls in the CLI with the helper so banners, per-artifact
 
 ---
 
-## 3. Capture Subprocess Output Under JSON
+## 3. Capture Subprocess Output Under JSON ✅
 
 Analyzer subprocesses currently inherit stdout, so their banners land in the middle of the JSON document. Capture and re-emit them.
 

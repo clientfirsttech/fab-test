@@ -3046,6 +3046,148 @@ def test_main_artifact_dir_missing_message_narrated_by_format(tmp_path):
 
 
 # --------------------------------------------------------------------------- #
+# Capture subprocess output under JSON (CLI Agent Ergonomics §3)
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.fab_test
+def test_json_format_passes_stdout_pipe_to_subprocess(tmp_path, monkeypatch):
+    """--format json captures the analyzer subprocess's stdout via PIPE."""
+    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+
+    artifact_dir = tmp_path / "artifacts"
+    (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
+    output_dir = tmp_path / "analyzer-results"
+
+    monkeypatch.setattr(fab_test_module, "_send_telemetry", lambda *a, **k: None)
+
+    captured_kwargs = {}
+
+    def _fake_subprocess(cmd, **kwargs):
+        captured_kwargs.update(kwargs)
+        return subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(fab_test_module.subprocess, "run", _fake_subprocess)
+
+    args = _RunAnalyzerArgs(artifact_dir, output_dir, output_format="json")
+    _run_analyzer("pql_lint", args, output_dir)
+
+    assert captured_kwargs.get("stdout") == subprocess.PIPE
+
+
+@pytest.mark.fab_test
+def test_text_format_does_not_capture_subprocess_stdout(tmp_path, monkeypatch):
+    """--format text leaves subprocess stdout inherited: no capture, no added latency."""
+    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+
+    artifact_dir = tmp_path / "artifacts"
+    (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
+    output_dir = tmp_path / "analyzer-results"
+
+    monkeypatch.setattr(fab_test_module, "_send_telemetry", lambda *a, **k: None)
+
+    captured_kwargs = {}
+
+    def _fake_subprocess(cmd, **kwargs):
+        captured_kwargs.update(kwargs)
+        return subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(fab_test_module.subprocess, "run", _fake_subprocess)
+
+    args = _RunAnalyzerArgs(artifact_dir, output_dir, output_format="text")
+    _run_analyzer("pql_lint", args, output_dir)
+
+    assert captured_kwargs.get("stdout") is None
+
+
+@pytest.mark.fab_test
+def test_json_format_reemits_captured_subprocess_stdout_to_stderr(tmp_path, monkeypatch, capsys):
+    """The analyzer's own stdout banner is re-emitted on stderr under --format json,
+    leaving stdout as a single parseable JSON document.
+    """
+    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+
+    artifact_dir = tmp_path / "artifacts"
+    (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
+    output_dir = tmp_path / "analyzer-results"
+
+    monkeypatch.setattr(fab_test_module, "_send_telemetry", lambda *a, **k: None)
+    monkeypatch.setattr(
+        fab_test_module.subprocess,
+        "run",
+        lambda cmd, **k: subprocess.CompletedProcess(
+            args=[], returncode=0, stdout="Tabular Editor BPA banner\n", stderr=""
+        ),
+    )
+
+    args = _RunAnalyzerArgs(artifact_dir, output_dir, output_format="json")
+    code = _run_analyzer("pql_lint", args, output_dir)
+    captured = capsys.readouterr()
+
+    assert code == 0
+    assert "Tabular Editor BPA banner" in captured.err
+    summary = json.loads(captured.out)
+    assert summary["analyzer"] == "pql_lint"
+
+
+@pytest.mark.fab_test
+def test_json_format_verbose_still_narrates_and_stdout_stays_valid(tmp_path, monkeypatch, capsys):
+    """--format json -v still narrates captured output to stderr; stdout still parses."""
+    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+
+    artifact_dir = tmp_path / "artifacts"
+    (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
+    output_dir = tmp_path / "analyzer-results"
+
+    monkeypatch.setattr(fab_test_module, "_send_telemetry", lambda *a, **k: None)
+    monkeypatch.setattr(
+        fab_test_module.subprocess,
+        "run",
+        lambda cmd, **k: subprocess.CompletedProcess(
+            args=[], returncode=0, stdout="debug banner\n", stderr=""
+        ),
+    )
+
+    args = _RunAnalyzerArgs(artifact_dir, output_dir, output_format="json")
+    args.verbose = 2
+    code = _run_analyzer("pql_lint", args, output_dir)
+    captured = capsys.readouterr()
+
+    assert code == 0
+    assert "debug banner" in captured.err
+    summary = json.loads(captured.out)
+    assert summary["analyzer"] == "pql_lint"
+
+
+@pytest.mark.fab_test
+def test_json_format_timeout_reemits_captured_stdout_before_timeout(
+    tmp_path, monkeypatch, capsys
+):
+    """A subprocess timeout still re-emits whatever stdout was captured before it fired."""
+    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+
+    artifact_dir = tmp_path / "artifacts"
+    (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
+    output_dir = tmp_path / "analyzer-results"
+
+    monkeypatch.setattr(fab_test_module, "_send_telemetry", lambda *a, **k: None)
+
+    def _fake_subprocess(cmd, **kwargs):
+        raise subprocess.TimeoutExpired(cmd=cmd, timeout=1, output="partial banner\n")
+
+    monkeypatch.setattr(fab_test_module.subprocess, "run", _fake_subprocess)
+
+    args = _RunAnalyzerArgs(
+        artifact_dir, output_dir, output_format="json", timeout=1
+    )
+    code = _run_analyzer("pql_lint", args, output_dir)
+    captured = capsys.readouterr()
+
+    assert code == 1
+    assert "partial banner" in captured.err
+
+
+# --------------------------------------------------------------------------- #
 # Show per-artifact progress
 # --------------------------------------------------------------------------- #
 
