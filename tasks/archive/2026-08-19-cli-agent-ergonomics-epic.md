@@ -1,6 +1,6 @@
 # CLI Agent Ergonomics Epic
 
-**Status**: 📋 PLANNED
+**Status**: ✅ COMPLETED (2026-08-19)
 **Goal**: Make `fab-test` equally callable by a human at a prompt and by an AI agent parsing stdout.
 
 ## Overview
