@@ -39,13 +39,15 @@ Make the CLI use the new discovery without breaking the existing layout.
 
 ---
 
-## 3. Detect Running Desktop Instances
+## 3. Detect Running Desktop Instances ✅
 
 Find Power BI Desktop and its local XMLA endpoint so the user does not have to.
 
+**Scope decision (2026-08-19)**: implemented via `msmdsrv.port.txt` (confirmed, stable mechanism) with no Desktop Bridge CLI integration — single-instance only for now. Correlating a specific port to a specific open file when several Desktop windows are open needs a reliable per-window signal the raw port file doesn't provide; the Bridge CLI (`@microsoft/powerbi-desktop-bridge-cli`, preview) likely provides it via `status`, but its exact output schema couldn't be verified without a live Desktop session, so it's deferred rather than guessed. This also means task 6 (bridge detection) and task 7 (render capture, which needs the bridge's `screenshot`/`screenshot-all`) need to be revisited once the schema is confirmed or a live session is available to verify against.
+
 **Requirements**:
-- Given Power BI Desktop is running, then detection returns each instance with its local XMLA port and open file path.
-- Given the Desktop bridge CLI is installed, then it is used as the detection source; given it is not, then local port discovery is used as a fallback.
+- Given Power BI Desktop is running, then detection returns each instance with its local XMLA port; the open file path is resolved when exactly one instance is running.
+- Given more than one instance is running, then every port is still reported but no open file path is guessed.
 - Given no instance is running, then detection returns an empty list without raising.
 - Given detection runs on a non-Windows platform, then it returns empty rather than failing.
 
