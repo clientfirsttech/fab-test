@@ -23,7 +23,6 @@ Guiding vision and constraints: [vision.md](vision.md)
   | `main` | 16 | [deploy.py](src/fabric_ci_cd_dataops/scripts/deploy.py) |
 
   Budgets and the review lens are in [aidd-python](.github/skills/aidd-python/SKILL.md). Raise a threshold only with a reason in the commit message.
-- **Simplify `fab-test`'s admin dispatch** — surfaced in code review: `main()` in [fab_test.py](src/fabric_ci_cd_dataops/scripts/fab_test.py) has grown to 8 `return` statements (budget 6) from a sequential `if args.analyzer == "X": return _handler(args)` chain for `clean-tools`/`doctor`/`list`/`explain`. Extract an `_dispatch_admin_command(args) -> int | None` helper (returns `None` when the subcommand isn't an admin one) so a future admin subcommand doesn't add another branch to `main()` itself.
 - **Bundle `_run_one_artifact`'s run-context params** — surfaced in code review: `_run_one_artifact` in [fab_test.py](src/fabric_ci_cd_dataops/scripts/fab_test.py) takes 10 positional parameters (budget 8); `in_ci`, `sub_env`, `timeout`, and `manifest` are all derived once per run in `_run_analyzer` and threaded through unchanged. Bundle them into a small `_RunContext` dataclass.
 
 ## Suggested Order

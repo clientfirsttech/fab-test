@@ -32,6 +32,7 @@ import re
 import shutil
 import subprocess
 import sys
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from pathlib import Path
@@ -1352,22 +1353,32 @@ def _explain_analyzer(args: argparse.Namespace) -> int:
     return 0
 
 
+_ADMIN_COMMAND_HANDLERS: dict[str, Callable[[argparse.Namespace], int]] = {
+    "clean-tools": lambda args: _clean_tools(REPO_ROOT, args.dry_run),
+    "doctor": _doctor,
+    "list": _list_analyzers,
+    "explain": _explain_analyzer,
+}
+
+
+def _dispatch_admin_command(args: argparse.Namespace) -> int | None:
+    """Run the admin/reporting subcommand named by ``args.analyzer``.
+
+    Returns ``None`` when ``args.analyzer`` isn't one of these, so the
+    caller knows to fall through to the analyzer-running path instead.
+    """
+    handler = _ADMIN_COMMAND_HANDLERS.get(args.analyzer)
+    return handler(args) if handler else None
+
+
 def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
     args.analyzer = _SUBCOMMAND_ALIASES.get(args.analyzer, args.analyzer)
 
-    if args.analyzer == "clean-tools":
-        return _clean_tools(REPO_ROOT, args.dry_run)
-
-    if args.analyzer == "doctor":
-        return _doctor(args)
-
-    if args.analyzer == "list":
-        return _list_analyzers(args)
-
-    if args.analyzer == "explain":
-        return _explain_analyzer(args)
+    admin_exit_code = _dispatch_admin_command(args)
+    if admin_exit_code is not None:
+        return admin_exit_code
 
     _apply_environment_default(args, _PYPROJECT_CONFIG)
     output_dir = Path(args.output_dir)
