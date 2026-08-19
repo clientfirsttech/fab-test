@@ -1060,7 +1060,7 @@ def test_cli_help_lists_exit_codes():
     )
     assert result.returncode == 0, result.stderr
     assert "Exit codes:" in result.stdout
-    for code in ("0", "1", "2", "126"):
+    for code in ("0", "1", "2", "126", "127"):
         assert code in result.stdout, f"exit code {code} missing from --help epilog"
 
 
@@ -1093,8 +1093,8 @@ def test_preflight_error_platform_mismatch_returns_exit_code_126(monkeypatch):
 
 
 @pytest.mark.fab_test
-def test_preflight_error_other_runtime_error_returns_exit_code_1(monkeypatch):
-    """A non-platform tool-resolution failure keeps the existing exit code 1."""
+def test_preflight_error_other_runtime_error_returns_exit_code_127(monkeypatch):
+    """A non-platform tool-resolution failure exits 127 (tool not found)."""
     from fabric_ci_cd_dataops.scripts import fab_test_registry as registry
 
     def _raise_generic(*_args, **_kwargs):
@@ -1102,8 +1102,42 @@ def test_preflight_error_other_runtime_error_returns_exit_code_1(monkeypatch):
 
     monkeypatch.setattr(registry, "resolve_tool", _raise_generic)
     message, code = preflight_error("bpa", argparse.Namespace())
-    assert code == 1
+    assert code == 127
     assert "could not download" in message
+
+
+@pytest.mark.fab_test
+def test_preflight_error_names_cli_flag_env_var_and_config_key(monkeypatch):
+    """The missing-tool message names the CLI flag alongside env var/config key."""
+    from fabric_ci_cd_dataops.scripts import fab_test_registry as registry
+
+    def _raise_generic(*_args, **_kwargs):
+        raise RuntimeError(
+            "Could not resolve executable for analyzer 'tabular_editor_bpa'.\n"
+            "  Set TABULAR_EDITOR_PATH=<path>\n"
+            "  Or set tool_install.install_url in analyzers.json to a zip URL."
+        )
+
+    monkeypatch.setattr(registry, "resolve_tool", _raise_generic)
+    message, code = preflight_error("bpa", argparse.Namespace())
+    assert code == 127
+    assert "--tabular-editor-path" in message
+    assert "TABULAR_EDITOR_PATH" in message
+    assert "tool_install.install_url" in message
+
+
+@pytest.mark.fab_test
+def test_preflight_error_pbir_names_inspector_path_flag(monkeypatch):
+    """The pbir missing-tool message names --inspector-path."""
+    from fabric_ci_cd_dataops.scripts import fab_test_registry as registry
+
+    def _raise_generic(*_args, **_kwargs):
+        raise RuntimeError("Could not resolve executable for analyzer 'pbir_inspector'.")
+
+    monkeypatch.setattr(registry, "resolve_tool", _raise_generic)
+    message, code = preflight_error("pbir", argparse.Namespace())
+    assert code == 127
+    assert "--inspector-path" in message
 
 
 @pytest.mark.fab_test
