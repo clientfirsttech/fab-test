@@ -1,6 +1,6 @@
 # Config Consolidation Epic
 
-**Status**: 📋 PLANNED
+**Status**: 🚧 IN-PROGRESS
 **Goal**: One front door for configuration and rule tuning, with a single precedence rule and no forked rule files.
 
 ## Overview
@@ -10,7 +10,7 @@ Runs last of the three epics: the surfaces worth consolidating are only fully kn
 
 ---
 
-## 1. Load and Discover `fab-test.yml`
+## 1. Load and Discover `fab-test.yml` ✅
 
 Introduce the config file itself, with nothing depending on it yet.
 
