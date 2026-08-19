@@ -25,6 +25,7 @@ Global flags (all subcommands):
 import argparse
 import contextlib
 import hashlib
+import importlib.util
 import json
 import os
 import platform
@@ -558,7 +559,10 @@ def _run_analyzer(
     output_format = getattr(args, "output_format", "text")
     # `all` emits its own aggregate JSON via _print_all_summary; a standalone
     # analyzer must emit its own so stdout is never empty under --format json.
-    emit_own_json = output_format == "json" and getattr(args, "analyzer", None) != "all"
+    emit_own_json = output_format == "json" and getattr(args, "analyzer", None) not in (
+        "all",
+        "local",
+    )
 
     if _is_repository_scoped(name):
         # Repository-scoped analyzers run once against the repo metadata.
@@ -666,12 +670,14 @@ def _run_analyzer(
     )
 
 
-def _add_common_flags(parser: argparse.ArgumentParser) -> None:
+def _add_common_flags(
+    parser: argparse.ArgumentParser, *, artifact_dir_default: Path = ARTIFACT_ROOT
+) -> None:
     parser.add_argument(
         "--artifact-dir",
-        default=str(_PYPROJECT_CONFIG.get("artifact_dir", ARTIFACT_ROOT)),
+        default=str(_PYPROJECT_CONFIG.get("artifact_dir", artifact_dir_default)),
         metavar="DIR",
-        help=f"Root for .fabric artifacts (default: {ARTIFACT_ROOT})",
+        help=f"Root for .fabric artifacts (default: {artifact_dir_default})",
     )
     parser.add_argument(
         "--output-dir",
@@ -1160,6 +1166,28 @@ def build_parser() -> argparse.ArgumentParser:
         help="Path to .env file for Playwright validation",
     )
 
+    # --- local ---
+    local_p = subs.add_parser(
+        "local",
+        help=(
+            "Run pql-lint, BPA, PBIR Inspector, and Desktop-bound pql-test "
+            "against every discovered .pbip project -- no cloud required"
+        ),
+    )
+    _add_common_flags(local_p, artifact_dir_default=REPO_ROOT)
+    local_p.add_argument(
+        "--tabular-editor-path", default=None, dest="tabular_editor_path", metavar="PATH",
+    )
+    local_p.add_argument(
+        "--bpa-rules-path", default=_DEFAULT_BPA_RULES, dest="bpa_rules_path", metavar="PATH",
+    )
+    local_p.add_argument(
+        "--inspector-path", default=None, dest="inspector_path", metavar="PATH",
+    )
+    local_p.add_argument(
+        "--rules-path", default=_DEFAULT_PBIR_RULES, dest="rules_path", metavar="PATH",
+    )
+
     # --- clean-tools ---
     clean_tools_p = subs.add_parser(
         "clean-tools",
@@ -1392,6 +1420,73 @@ def _dispatch_admin_command(args: argparse.Namespace) -> int | None:
     return handler(args) if handler else None
 
 
+_LOCAL_ANALYZERS = ("pql_lint", "bpa", "pbir", "pql_test")
+
+
+def _pql_lint_ready() -> bool:
+    """Whether the ``pqlint`` package is usable, on PATH or importable.
+
+    Unlike pql-test, pqlint is not a pinned fab-test dependency, so a
+    fresh install genuinely may not have it -- the case this check exists
+    to catch (mirrors invoke_pqlint.py's own resolution fallback).
+    """
+    return shutil.which("pqlint") is not None or importlib.util.find_spec("pqlint") is not None
+
+
+def _local_readiness(name: str, args: argparse.Namespace) -> dict[str, Any]:
+    """Return a readiness dict for one of the `_LOCAL_ANALYZERS`.
+
+    pql_test is always ready (a pinned fab-test dependency); pql_lint needs
+    its own presence check since pqlint is not bundled; bpa/pbir reuse the
+    existing bootstrapped-tool readiness probe.
+    """
+    if name == "pql_lint":
+        if _pql_lint_ready():
+            return {"ready": True, "reason": "pqlint available", "remediation": None}
+        return {
+            "ready": False,
+            "reason": "pqlint not found on PATH or importable",
+            "remediation": "pip install pqlint",
+        }
+    if name == "pql_test":
+        return {"ready": True, "reason": "pql-test is a fab-test dependency", "remediation": None}
+    return _check_readiness(name, args)
+
+
+def _run_local(args: argparse.Namespace) -> int:
+    """Run every analyzer in `_LOCAL_ANALYZERS` against every discovered project.
+
+    An analyzer whose prerequisite is absent is skipped with a remediation
+    hint rather than failing the run (vision §2.7: platform gaps degrade to
+    skips). Never requires a workspace ID, service-principal credential, or
+    Fabric network call -- the `local` subparser doesn't even expose those
+    flags.
+    """
+    output_format = getattr(args, "output_format", "text")
+    output_dir = Path(args.output_dir)
+    manifest = RunManifest(_FAB_TEST_VERSION, sys.argv)
+
+    results: list[dict[str, Any]] = []
+    for name in _LOCAL_ANALYZERS:
+        readiness = _local_readiness(name, args)
+        if not readiness["ready"]:
+            hint = f" ({readiness['remediation']})" if readiness["remediation"] else ""
+            narrate(
+                f"  ⏭ fab-test local: {name} skipped -- {readiness['reason']}{hint}",
+                output_format=output_format,
+            )
+            results.append({"analyzer": name, "status": "skipped", "reason": readiness["reason"]})
+            continue
+        code = _run_analyzer(name, args, output_dir, manifest)
+        results.append({"analyzer": name, "status": "ran", "exit_code": code})
+
+    exit_code = 1 if any(r.get("exit_code", 0) != 0 for r in results) else 0
+    manifest.write(output_dir, exit_code)
+    if output_format == "json":
+        print(json.dumps({"analyzer": "local", "results": results, "exit_code": exit_code}, indent=2))
+    return exit_code
+
+
 def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
@@ -1411,6 +1506,9 @@ def main() -> int:
             output_format=args.output_format,
         )
         return 2
+
+    if args.analyzer == "local":
+        return _run_local(args)
 
     manifest = RunManifest(_FAB_TEST_VERSION, sys.argv)
 

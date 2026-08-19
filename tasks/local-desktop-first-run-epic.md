@@ -132,7 +132,7 @@ Make the visual evidence findable from the envelope alone.
 
 ---
 
-## 9. Add `fab-test local`
+## 9. Add `fab-test local` ✅
 
 One bundled command that runs every check possible without cloud access.
 
