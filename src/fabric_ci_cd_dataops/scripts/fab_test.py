@@ -1669,19 +1669,18 @@ def main() -> int:
 
     if args.analyzer == "all":
         analyzers = _all_analyzers()
-        if not analyzers:
+        if analyzers:
+            codes = [_run_analyzer(name, args, output_dir, manifest) for name in analyzers]
+            exit_code = _print_all_summary(output_dir, analyzers, codes, args)
+        else:
             narrate(
                 "  ⚠ fab-test all: no analyzers configured in analyzers.json",
                 output_format=args.output_format,
             )
-            manifest.write(output_dir, 0)
-            return 0
-        codes = [_run_analyzer(name, args, output_dir, manifest) for name in analyzers]
-        exit_code = _print_all_summary(output_dir, analyzers, codes, args)
-        manifest.write(output_dir, exit_code)
-        return exit_code
+            exit_code = 0
+    else:
+        exit_code = _run_analyzer(args.analyzer, args, output_dir, manifest)
 
-    exit_code = _run_analyzer(args.analyzer, args, output_dir, manifest)
     manifest.write(output_dir, exit_code)
     return exit_code
 
