@@ -68,7 +68,7 @@ The wrappers print their own emoji banners. Give them the same discipline throug
 
 ---
 
-## 5. Prove stdout Purity for Every Subcommand
+## 5. Prove stdout Purity for Every Subcommand ✅
 
 Lock the guarantee with a test that would have caught today's behavior.
 
