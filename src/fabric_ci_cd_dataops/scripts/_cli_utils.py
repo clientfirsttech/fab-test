@@ -31,3 +31,24 @@ def terse_print(terse: bool, status: str, scope: str, message: str) -> None:
         print(line, file=sys.stderr)
     else:
         print(line)
+
+
+def narrate(message: str, *, output_format: str = "text", quiet: bool = False) -> None:
+    """Print a human-facing narration line, routed by output format.
+
+    Callers use this instead of a bare ``print`` for banners, per-artifact
+    progress, and warnings, so stdout stays reserved for the machine-readable
+    payload under ``--format json``.
+
+    Args:
+        message: The line to narrate.
+        output_format: ``"json"`` routes to stderr; anything else (default
+            ``"text"``) routes to stdout, exactly like ``print`` does today.
+        quiet: When True, the line is suppressed entirely in both formats.
+    """
+    if quiet:
+        return
+    if output_format == "json":
+        print(message, file=sys.stderr)
+    else:
+        print(message)

@@ -10,7 +10,7 @@ Tasks are ordered so each builds on the previous. Every task carries the narrow 
 
 ---
 
-## 1. Add an Output Channel Helper
+## 1. Add an Output Channel Helper ✅
 
 Introduce one helper that decides where a line goes — stdout for machine payloads, stderr for everything a human reads — so no other task has to reason about it.
 
