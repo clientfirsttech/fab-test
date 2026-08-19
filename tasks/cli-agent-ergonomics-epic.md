@@ -128,7 +128,7 @@ Surface the probe as the command a human or agent runs first.
 
 ---
 
-## 9. Add `fab-test list`
+## 9. Add `fab-test list` ✅
 
 Let a caller discover capability from the tool instead of the documentation.
 
