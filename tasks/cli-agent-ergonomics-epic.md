@@ -184,7 +184,7 @@ A manifest that only appears on the happy path is a manifest an agent cannot rel
 
 ---
 
-## 13. Canonicalize Subcommand Names
+## 13. Canonicalize Subcommand Names ✅
 
 Remove the underscore/hyphen coin flip (`pql_test`, `pql_lint` vs `playwright-impact`).
 

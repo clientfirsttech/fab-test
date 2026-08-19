@@ -28,6 +28,7 @@ def _print_list(rows: list[dict[str, Any]], output_format: str = "text") -> int:
     display_rows = [
         (
             r["analyzer"],
+            ", ".join(r.get("aliases", ())) or "-",
             r["glob"] or "(repository)",
             str(r["matched_artifacts"]),
             r["required_tool"] or "(none)",
@@ -36,7 +37,7 @@ def _print_list(rows: list[dict[str, Any]], output_format: str = "text") -> int:
     ]
     table = tabulate(
         display_rows,
-        headers=("Analyzer", "Glob", "Matched", "Required Tool"),
+        headers=("Analyzer", "Aliases", "Glob", "Matched", "Required Tool"),
         tablefmt="simple",
         stralign="left",
     )
