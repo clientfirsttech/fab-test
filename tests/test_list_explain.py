@@ -106,3 +106,119 @@ def test_list_repository_scoped_analyzers_have_no_glob():
     deps_row = next(r for r in summary["analyzers"] if r["analyzer"] == "dependencies")
     assert deps_row["glob"] is None
     assert deps_row["matched_artifacts"] == 1
+
+
+# --------------------------------------------------------------------------- #
+# fab-test explain
+# --------------------------------------------------------------------------- #
+
+
+class _ExplainArgs:
+    def __init__(self, analyzer_name, artifact_dir, output_dir, output_format="json"):
+        self.analyzer_name = analyzer_name
+        self.artifact_dir = str(artifact_dir)
+        self.output_dir = str(output_dir)
+        self.artifact = None
+        self.output_format = output_format
+
+
+@pytest.mark.fab_test
+def test_explain_bpa_never_spawns_a_subprocess(tmp_path, monkeypatch):
+    """explain builds the resolved command but never executes it."""
+    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+
+    artifact_dir = tmp_path / "artifacts"
+    (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
+
+    def _fail_if_called(*_a, **_k):
+        raise AssertionError("explain must never spawn a subprocess")
+
+    monkeypatch.setattr(fab_test_module.subprocess, "run", _fail_if_called)
+
+    args = _ExplainArgs("bpa", artifact_dir, tmp_path / "results")
+    code = fab_test_module._explain_analyzer(args)
+
+    assert code == 0
+
+
+@pytest.mark.fab_test
+def test_explain_json_payload_shape(tmp_path, capsys):
+    """The JSON payload has the documented keys and a real command list."""
+    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+
+    artifact_dir = tmp_path / "artifacts"
+    (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
+
+    args = _ExplainArgs("bpa", artifact_dir, tmp_path / "results")
+    code = fab_test_module._explain_analyzer(args)
+    captured = capsys.readouterr()
+
+    assert code == 0
+    payload = json.loads(captured.out)
+    for key in ("analyzer", "artifact", "command", "tool_path", "rules_path", "output_path"):
+        assert key in payload, f"{key} missing from explain payload"
+    assert payload["analyzer"] == "bpa"
+    assert isinstance(payload["command"], list)
+    assert any("invoke_tabular_editor_bpa" in part for part in payload["command"])
+
+
+@pytest.mark.fab_test
+def test_explain_text_format_shows_command(tmp_path, capsys):
+    """--format text (default) prints a human-readable command breakdown."""
+    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+
+    artifact_dir = tmp_path / "artifacts"
+    (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
+
+    args = _ExplainArgs("bpa", artifact_dir, tmp_path / "results", output_format="text")
+    code = fab_test_module._explain_analyzer(args)
+    captured = capsys.readouterr()
+
+    assert code == 0
+    assert "bpa" in captured.out
+    assert "invoke_tabular_editor_bpa" in captured.out
+
+
+@pytest.mark.fab_test
+def test_explain_unknown_analyzer_exits_2_and_lists_valid_names():
+    """An unrecognized analyzer name exits 2 and lists the valid choices."""
+    result = subprocess.run(
+        ["fab-test", "explain", "not-a-real-analyzer"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 2
+    assert "not-a-real-analyzer" in result.stderr
+    assert "bpa" in result.stderr
+
+
+@pytest.mark.fab_test
+def test_explain_rules_path_falls_back_to_default_when_not_overridden(tmp_path, capsys):
+    """rules_path reports the real default the command uses, not null."""
+    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+
+    artifact_dir = tmp_path / "artifacts"
+    (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
+
+    args = _ExplainArgs("bpa", artifact_dir, tmp_path / "results")
+    fab_test_module._explain_analyzer(args)
+    captured = capsys.readouterr()
+
+    payload = json.loads(captured.out)
+    assert payload["rules_path"] == fab_test_module._DEFAULT_BPA_RULES
+    assert payload["rules_path"] in payload["command"]
+
+
+@pytest.mark.fab_test
+def test_explain_falls_back_to_placeholder_when_no_artifact_matches(tmp_path):
+    """With no matching artifact, explain still shows an illustrative command."""
+    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+
+    artifact_dir = tmp_path / "empty"
+    artifact_dir.mkdir()
+
+    args = _ExplainArgs("bpa", artifact_dir, tmp_path / "results")
+    code = fab_test_module._explain_analyzer(args)
+
+    assert code == 0

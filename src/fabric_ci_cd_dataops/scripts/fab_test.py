@@ -1128,6 +1128,42 @@ def build_parser() -> argparse.ArgumentParser:
         help="Output format for the capability report (default: text)",
     )
 
+    # --- explain ---
+    explain_p = subs.add_parser(
+        "explain",
+        help="Show the resolved command for one analyzer without running it",
+    )
+    explain_p.add_argument(
+        "analyzer_name",
+        metavar="ANALYZER",
+        help="Analyzer to explain (e.g. bpa, pbir, pql_test)",
+    )
+    explain_p.add_argument(
+        "--artifact-dir",
+        default=str(_PYPROJECT_CONFIG.get("artifact_dir", ARTIFACT_ROOT)),
+        metavar="DIR",
+        help=f"Root for .fabric artifacts (default: {ARTIFACT_ROOT})",
+    )
+    explain_p.add_argument(
+        "--output-dir",
+        default=str(_PYPROJECT_CONFIG.get("output_dir", RESULTS_ROOT)),
+        metavar="DIR",
+        help=f"Root for result envelopes (default: {RESULTS_ROOT})",
+    )
+    explain_p.add_argument(
+        "--artifact",
+        default=None,
+        metavar="STEM",
+        help="Explain the command for the artifact whose stem matches STEM",
+    )
+    explain_p.add_argument(
+        "--format",
+        choices=["text", "json"],
+        default=_PYPROJECT_CONFIG.get("format", "text"),
+        dest="output_format",
+        help="Output format for the explanation (default: text)",
+    )
+
     return parser
 
 
@@ -1202,6 +1238,64 @@ def _list_analyzers(args: argparse.Namespace) -> int:
     return _print_list(rows, output_format)
 
 
+def _explain_analyzer(args: argparse.Namespace) -> int:
+    """Show the resolved command for one analyzer without running it."""
+    name = args.analyzer_name
+    if name not in _ANALYZER_REGISTRY:
+        print(
+            f"  ✗ fab-test explain: unknown analyzer '{name}'. "
+            f"Valid names: {', '.join(_ANALYZER_REGISTRY)}",
+            file=sys.stderr,
+        )
+        return 2
+
+    output_format = getattr(args, "output_format", "text")
+    output_dir = Path(getattr(args, "output_dir", str(RESULTS_ROOT)))
+    artifact_dir = Path(getattr(args, "artifact_dir", str(ARTIFACT_ROOT)))
+    glob, _description = _ANALYZER_REGISTRY[name]
+
+    if _is_repository_scoped(name):
+        artifact = Path(".")
+    else:
+        matches = _discover(artifact_dir, glob, getattr(args, "artifact", None))
+        if matches:
+            artifact = matches[0]
+        else:
+            # No real artifact to point at; show an illustrative command shape.
+            artifact = artifact_dir / f"<artifact>{glob.lstrip('*')}"
+
+    command = _build_command(name, artifact, args, output_dir)
+    readiness = _check_readiness(name, args)
+    default_rules_path = {"bpa": _DEFAULT_BPA_RULES, "pbir": _DEFAULT_PBIR_RULES}.get(name)
+    rules_path = (
+        getattr(args, "bpa_rules_path", None)
+        or getattr(args, "rules_path", None)
+        or default_rules_path
+    )
+    payload = {
+        "analyzer": name,
+        "artifact": str(artifact),
+        "command": command,
+        "tool_path": readiness.get("resolved_path"),
+        "rules_path": rules_path,
+        "output_path": str(output_dir / name / artifact.stem / "envelope.json"),
+    }
+
+    if output_format == "json":
+        print(json.dumps(payload, indent=2))
+        return 0
+
+    print(f"fab-test explain {name}")
+    print(f"  Artifact: {payload['artifact']}")
+    if payload["tool_path"]:
+        print(f"  Tool:     {payload['tool_path']}")
+    if payload["rules_path"]:
+        print(f"  Rules:    {payload['rules_path']}")
+    print(f"  Output:   {payload['output_path']}")
+    print(f"  Command:  {' '.join(command)}")
+    return 0
+
+
 def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
@@ -1215,6 +1309,9 @@ def main() -> int:
 
     if args.analyzer == "list":
         return _list_analyzers(args)
+
+    if args.analyzer == "explain":
+        return _explain_analyzer(args)
 
     _apply_environment_default(args, _PYPROJECT_CONFIG)
     output_dir = Path(args.output_dir)

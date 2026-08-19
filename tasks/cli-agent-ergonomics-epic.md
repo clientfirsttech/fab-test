@@ -142,7 +142,7 @@ Let a caller discover capability from the tool instead of the documentation.
 
 ---
 
-## 10. Add `fab-test explain`
+## 10. Add `fab-test explain` ✅
 
 Show the resolved command without running it, so a failing run can be diagnosed without a second execution.
 
