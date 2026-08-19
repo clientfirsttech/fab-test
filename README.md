@@ -49,6 +49,18 @@ fab-test --help
 
 ## Run manual tests locally
 
+### Local Desktop workflow (no cloud required)
+
+The fastest path to real findings: a `.pbip` open in Power BI Desktop, no `.fabric/artifacts` layout, no Fabric workspace, no service principal.
+
+```bash
+fab-test doctor --local     # what's ready, and what fab-test local will run
+fab-test local --dry-run    # see the plan first
+fab-test local              # pql-lint, BPA, PBIR Inspector, and Desktop-bound pql-test
+```
+
+A missing prerequisite (e.g. `pqlint` not installed) is reported as skipped with a remediation hint, not a failure. See [`docs/QUICKSTART-LOCAL.md`](docs/QUICKSTART-LOCAL.md) for the full walkthrough.
+
 ### Wrapper contract tests with pytest
 
 `pytest` exercises the analyzer wrappers without requiring external tools such as Tabular Editor or Power BI Desktop. To run the contract tests against the installed wheel, stay in the repository root and run the following inside the same virtual environment:
