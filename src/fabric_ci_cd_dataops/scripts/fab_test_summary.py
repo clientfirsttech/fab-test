@@ -19,6 +19,26 @@ from ._analyzer_envelope import _severity_counts, _severity_rank
 from .fab_test_registry import ANALYZER_REGISTRY, discover_artifacts
 
 
+def _print_doctor(rows: list[dict[str, Any]], output_format: str = "text") -> int:
+    """Print the `fab-test doctor` readiness report.
+
+    Returns 0 if at least one analyzer is ready, else 1.
+    """
+    any_ready = any(r["ready"] for r in rows)
+
+    if output_format == "json":
+        print(json.dumps({"analyzers": rows}, indent=2))
+        return 0 if any_ready else 1
+
+    for r in rows:
+        icon = "✅" if r["ready"] else "❌"
+        location = f" — {r['resolved_path']}" if r["resolved_path"] else ""
+        print(f"{icon} {r['analyzer']}: {r['reason']}{location}")
+        if not r["ready"] and r["remediation"]:
+            print(f"   → {r['remediation']}")
+    return 0 if any_ready else 1
+
+
 def _terminal_width() -> int:
     try:
         return max(shutil.get_terminal_size().columns, 80)
