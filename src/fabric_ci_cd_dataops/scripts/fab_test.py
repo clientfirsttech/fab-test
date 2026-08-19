@@ -60,6 +60,9 @@ from .fab_test_registry import (
     build_command as _build_command,
 )
 from .fab_test_registry import (
+    check_readiness as _check_readiness,
+)
+from .fab_test_registry import (
     discover_artifacts as _discover,
 )
 from .fab_test_registry import (
@@ -67,9 +70,6 @@ from .fab_test_registry import (
 )
 from .fab_test_registry import (
     load_fab_test_all_analyzers as _load_fab_test_all_analyzers,
-)
-from .fab_test_registry import (
-    check_readiness as _check_readiness,
 )
 from .fab_test_registry import (
     preflight_error as _preflight_error,
@@ -1277,10 +1277,7 @@ def _list_analyzers(args: argparse.Namespace) -> int:
 
     rows = []
     for name, (glob, description) in _ANALYZER_REGISTRY.items():
-        if _is_repository_scoped(name):
-            count = 1
-        else:
-            count = len(_discover(artifact_dir, glob, None))
+        count = 1 if _is_repository_scoped(name) else len(_discover(artifact_dir, glob, None))
         canonical = _canonical_name(name)
         rows.append(
             {
@@ -1315,11 +1312,8 @@ def _explain_analyzer(args: argparse.Namespace) -> int:
         artifact = Path(".")
     else:
         matches = _discover(artifact_dir, glob, getattr(args, "artifact", None))
-        if matches:
-            artifact = matches[0]
-        else:
-            # No real artifact to point at; show an illustrative command shape.
-            artifact = artifact_dir / f"<artifact>{glob.lstrip('*')}"
+        # No real artifact to point at; show an illustrative command shape.
+        artifact = matches[0] if matches else artifact_dir / f"<artifact>{glob.lstrip('*')}"
 
     command = _build_command(name, artifact, args, output_dir)
     readiness = _check_readiness(name, args)
