@@ -48,8 +48,16 @@ def _verbosity() -> int:
 
 
 def log(message: str) -> None:
-    """Print a GitHub Actions-friendly message."""
-    print(message)
+    """Print a GitHub Actions-friendly message.
+
+    Routes to stderr when ANALYZER_OUTPUT_MODE=json (set by fab-test under
+    --format json) so only the envelope write touches stdout/disk. Direct
+    invocation without the env var is unchanged (stdout).
+    """
+    if os.environ.get("ANALYZER_OUTPUT_MODE", "").lower() == "json":
+        print(message, file=sys.stderr)
+    else:
+        print(message)
 
 
 def validate_path(path_str: str, description: str, must_exist: bool = True) -> Path:
