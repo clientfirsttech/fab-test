@@ -171,6 +171,107 @@ def test_main_writes_run_manifest_under_custom_output_dir(tmp_path):
 
 
 @pytest.mark.fab_test
+def test_manifest_covers_every_analyzer_in_all_run(tmp_path, monkeypatch):
+    """`fab-test all` accumulates manifest entries from every analyzer run,
+    not just the last one in the loop.
+    """
+    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+
+    artifact_dir = tmp_path / "artifacts"
+    (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
+    (artifact_dir / "SampleModel.Report").mkdir(parents=True)
+    output_dir = tmp_path / "analyzer-results"
+
+    monkeypatch.setattr(fab_test_module, "_all_analyzers", lambda: ("bpa", "pbir"))
+    monkeypatch.setattr(fab_test_module, "_send_telemetry", lambda *a, **k: None)
+    monkeypatch.setattr(fab_test_module, "_preflight_error", lambda *a, **k: None)
+    monkeypatch.setattr(
+        fab_test_module.subprocess,
+        "run",
+        lambda *a, **k: subprocess.CompletedProcess(
+            args=[], returncode=0, stdout="", stderr=""
+        ),
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "fab-test", "all",
+            "--artifact-dir", str(artifact_dir),
+            "--output-dir", str(output_dir),
+        ],
+    )
+
+    fab_test_module.main()
+
+    manifest = json.loads((output_dir / "run.json").read_text(encoding="utf-8"))
+    analyzers_seen = {a["analyzer"] for a in manifest["artifacts"]}
+    assert analyzers_seen == {"bpa", "pbir"}
+
+
+@pytest.mark.fab_test
+def test_manifest_records_preflight_failure_with_exit_code(tmp_path, monkeypatch):
+    """A preflight tool-resolution abort still writes a manifest with the
+    failure reason and the exit code preflight_error returned.
+    """
+    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+
+    artifact_dir = tmp_path / "artifacts"
+    (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
+    output_dir = tmp_path / "analyzer-results"
+
+    monkeypatch.setattr(
+        fab_test_module, "_preflight_error", lambda name, args: ("tool not found", 127)
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "fab-test", "bpa",
+            "--artifact-dir", str(artifact_dir),
+            "--output-dir", str(output_dir),
+        ],
+    )
+
+    exit_code = fab_test_module.main()
+
+    assert exit_code == 127
+    manifest = json.loads((output_dir / "run.json").read_text(encoding="utf-8"))
+    assert manifest["exit_code"] == 127
+    assert manifest["artifacts"][0]["status"] == "preflight_failed"
+
+
+@pytest.mark.fab_test
+def test_manifest_records_timeout_status_for_artifact(tmp_path, monkeypatch):
+    """A subprocess timeout is recorded with status 'timeout' for that artifact."""
+    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+
+    artifact_dir = tmp_path / "artifacts"
+    (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
+    output_dir = tmp_path / "analyzer-results"
+
+    def _raise_timeout(cmd, **_kwargs):
+        raise subprocess.TimeoutExpired(cmd=cmd, timeout=1)
+
+    monkeypatch.setattr(fab_test_module.subprocess, "run", _raise_timeout)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "fab-test", "pql_lint",
+            "--artifact-dir", str(artifact_dir),
+            "--output-dir", str(output_dir),
+            "--timeout", "1",
+        ],
+    )
+
+    fab_test_module.main()
+
+    manifest = json.loads((output_dir / "run.json").read_text(encoding="utf-8"))
+    assert manifest["artifacts"][0]["status"] == "timeout"
+
+
+@pytest.mark.fab_test
 @pytest.mark.parametrize("argv_tail", [["doctor"], ["list"], ["explain", "bpa"]])
 def test_main_does_not_construct_manifest_for_admin_subcommands(monkeypatch, argv_tail):
     """Admin/reporting subcommands (doctor, list, explain) never build a RunManifest."""
