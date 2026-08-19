@@ -78,6 +78,17 @@ class TestBuildCommand:
         assert "--client-id" not in command
         assert "--client-secret" not in command
 
+    def test_command_never_forwards_desktop_flags_to_pql_test_cli(self, tmp_path: Path):
+        """--desktop-port/--desktop-model-name are fab-test bookkeeping only --
+        pql-test's own CLI has no such flags, so build_command must never emit them.
+        """
+        artifact = tmp_path / "SalesModel.SemanticModel"
+        artifact.mkdir()
+        output = tmp_path / "out.json"
+        command = build_command(artifact, output_path=output)
+        assert "--desktop-port" not in command
+        assert "--desktop-model-name" not in command
+
 
 class TestPqlEnv:
     """Tests for mapping Fabric credentials to pql-test env vars."""
@@ -252,6 +263,34 @@ class TestWriteResults:
             "skipped": 1,
         }
 
+    def test_envelope_includes_desktop_info_when_provided(self, tmp_path: Path):
+        """A bound Desktop instance's port and model name land in the envelope."""
+        output_path = tmp_path / "envelope.json"
+        write_results(
+            output_path=output_path,
+            status="passed",
+            findings=[],
+            artifact_path=tmp_path / "model",
+            message="OK",
+            desktop_port=51234,
+            desktop_model_name="SampleModel",
+        )
+        data = json.loads(output_path.read_text(encoding="utf-8"))
+        assert data["desktop"] == {"port": 51234, "model_name": "SampleModel"}
+
+    def test_envelope_omits_desktop_key_when_not_bound(self, tmp_path: Path):
+        """No Desktop binding means no 'desktop' key at all -- not a null placeholder."""
+        output_path = tmp_path / "envelope.json"
+        write_results(
+            output_path=output_path,
+            status="passed",
+            findings=[],
+            artifact_path=tmp_path / "model",
+            message="OK",
+        )
+        data = json.loads(output_path.read_text(encoding="utf-8"))
+        assert "desktop" not in data
+
 
 class TestVerbosity:
     """Tests for ANALYZER_VERBOSITY handling in run_pql_test."""
@@ -335,6 +374,30 @@ class TestRunPqlTest:
         data = json.loads(output.read_text(encoding="utf-8"))
         assert data["status"] == "passed"
         assert data["test_results"] == []
+
+    @mock.patch("fabric_ci_cd_dataops.scripts.invoke_pql_test.subprocess.run")
+    def test_run_writes_desktop_binding_to_envelope(self, mock_run, tmp_path: Path):
+        """desktop_port/desktop_model_name args land in the written envelope."""
+        artifact = tmp_path / "SalesModel.SemanticModel"
+        artifact.mkdir()
+        output = tmp_path / "out.json"
+        mock_run.return_value = mock.Mock(
+            returncode=0, stdout='{"test_results": []}', stderr=""
+        )
+
+        class Args:
+            artifact_path = str(artifact)
+            artifact_name = "SalesModel"
+            output_path = str(output)
+            workspace_id = ""
+            env = ""
+            desktop_port = "51234"
+            desktop_model_name = "SalesModel"
+
+        exit_code = run_pql_test(Args())
+        assert exit_code == 0
+        data = json.loads(output.read_text(encoding="utf-8"))
+        assert data["desktop"] == {"port": 51234, "model_name": "SalesModel"}
 
     @mock.patch("fabric_ci_cd_dataops.scripts.invoke_pql_test.subprocess.run")
     def test_run_fails_with_findings(self, mock_run, tmp_path: Path):

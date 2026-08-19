@@ -316,6 +316,104 @@ def test_build_pql_test_command_uses_fabric_workspace_id_env(monkeypatch):
     assert cmd[env_idx + 1] == "TEST"
 
 
+# --------------------------------------------------------------------------- #
+# Binding pql_test to a detected Desktop instance (Local Desktop First Run §5)
+# --------------------------------------------------------------------------- #
+
+
+def _pbip_project_dir(tmp_path, name):
+    (tmp_path / f"{name}.pbip").write_text(
+        json.dumps({"artifacts": [{"report": {"path": f"{name}.Report"}}]}),
+        encoding="utf-8",
+    )
+    report_dir = tmp_path / f"{name}.Report"
+    report_dir.mkdir(parents=True)
+    (report_dir / "definition.pbir").write_text(
+        json.dumps({"datasetReference": {"byPath": {"path": f"../{name}.SemanticModel"}}}),
+        encoding="utf-8",
+    )
+    model_dir = tmp_path / f"{name}.SemanticModel"
+    model_dir.mkdir(parents=True)
+    return model_dir
+
+
+@pytest.mark.fab_test
+def test_build_pql_test_command_adds_desktop_flags_when_instance_matches(tmp_path, monkeypatch):
+    """A matched Desktop instance's port and model name are added to the command."""
+    from fabric_ci_cd_dataops.scripts import fab_test_registry
+    from fabric_ci_cd_dataops.scripts._desktop import DesktopInstance
+
+    model_dir = _pbip_project_dir(tmp_path, "SampleModel")
+    pbip_path = (tmp_path / "SampleModel.pbip").resolve()
+    monkeypatch.setattr(
+        fab_test_registry,
+        "detect_desktop_instances",
+        lambda: [DesktopInstance(port=51234, open_file_path=pbip_path)],
+    )
+
+    args = argparse.Namespace(workspace_id="", environment="")
+    cmd = build_pql_test_command(model_dir, args, REPO_ROOT / "analyzer-results")
+
+    assert "--desktop-port" in cmd
+    assert cmd[cmd.index("--desktop-port") + 1] == "51234"
+    assert "--desktop-model-name" in cmd
+    assert cmd[cmd.index("--desktop-model-name") + 1] == "SampleModel"
+
+
+@pytest.mark.fab_test
+def test_build_pql_test_command_skips_detection_when_workspace_id_given(tmp_path, monkeypatch):
+    """--workspace-id skips Desktop detection entirely, even if a match exists."""
+    from fabric_ci_cd_dataops.scripts import fab_test_registry
+
+    model_dir = _pbip_project_dir(tmp_path, "SampleModel")
+
+    def _fail_if_called():
+        raise AssertionError("detect_desktop_instances must not be called with --workspace-id")
+
+    monkeypatch.setattr(fab_test_registry, "detect_desktop_instances", _fail_if_called)
+
+    args = argparse.Namespace(workspace_id="workspace-123", environment="")
+    cmd = build_pql_test_command(model_dir, args, REPO_ROOT / "analyzer-results")
+
+    assert "--desktop-port" not in cmd
+    assert "--desktop-model-name" not in cmd
+
+
+@pytest.mark.fab_test
+def test_build_pql_test_command_omits_desktop_flags_when_no_instance_running(tmp_path, monkeypatch):
+    """No running Desktop instance leaves the command unchanged from today."""
+    from fabric_ci_cd_dataops.scripts import fab_test_registry
+
+    model_dir = _pbip_project_dir(tmp_path, "SampleModel")
+    monkeypatch.setattr(fab_test_registry, "detect_desktop_instances", list)
+
+    args = argparse.Namespace(workspace_id="", environment="")
+    cmd = build_pql_test_command(model_dir, args, REPO_ROOT / "analyzer-results")
+
+    assert "--desktop-port" not in cmd
+    assert "--desktop-model-name" not in cmd
+
+
+@pytest.mark.fab_test
+def test_build_pql_test_command_omits_desktop_flags_when_artifact_has_no_pbip(tmp_path, monkeypatch):
+    """An artifact with no paired .pbip never attempts Desktop matching."""
+    from fabric_ci_cd_dataops.scripts import fab_test_registry
+    from fabric_ci_cd_dataops.scripts._desktop import DesktopInstance
+
+    model_dir = tmp_path / "Orphan.SemanticModel"
+    model_dir.mkdir(parents=True)
+    monkeypatch.setattr(
+        fab_test_registry,
+        "detect_desktop_instances",
+        lambda: [DesktopInstance(port=1, open_file_path=tmp_path / "Orphan.pbip")],
+    )
+
+    args = argparse.Namespace(workspace_id="", environment="")
+    cmd = build_pql_test_command(model_dir, args, REPO_ROOT / "analyzer-results")
+
+    assert "--desktop-port" not in cmd
+
+
 @pytest.mark.fab_test
 def test_all_help_exits_zero():
     """fab-test all --help exits 0."""
