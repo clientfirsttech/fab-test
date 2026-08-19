@@ -84,9 +84,11 @@ Make the local `pql-test` path self-configuring instead of tribal knowledge in a
 
 ---
 
-## 6. Detect the Desktop Bridge CLI
+## 6. Detect the Desktop Bridge CLI ⏸️ DEFERRED
 
 Report render-check availability as a first-class readiness fact.
+
+**Deferral reason (2026-08-19)**: this and tasks 7-8 depend on `@microsoft/powerbi-desktop-bridge-cli` (the "Desktop bridge CLI"), a Microsoft preview tool (docs dated July 2026) whose `status`/`screenshot`/`screenshot-all` commands are exactly what these three tasks need. Its `--version`/presence check alone would be low-risk to build, but tasks 7-8 need its actual output schema (how a screenshot's bytes/path are returned), which couldn't be confirmed from the npm README (blocked) or any example output found during research, and there's no live Desktop session in this environment to verify against. Per user direction, all three are deferred as a block rather than guessing the schema. Revisit by either confirming the schema from a real installation, or from Microsoft's own docs if the preview stabilizes.
 
 **Requirements**:
 - Given the bridge CLI is on `PATH`, then its version is resolved and reported as available.
@@ -98,9 +100,11 @@ Report render-check availability as a first-class readiness fact.
 
 ---
 
-## 7. Capture Report Renders as Findings
+## 7. Capture Report Renders as Findings ⏸️ DEFERRED
 
 Give report authors value on day one without a service principal.
+
+**Deferral reason**: depends on task 6 — see above.
 
 **Requirements**:
 - Given a report open in Desktop, then each page is captured and any page that fails to render becomes an error-level finding.
@@ -112,9 +116,11 @@ Give report authors value on day one without a service principal.
 
 ---
 
-## 8. Store Screenshots With Results
+## 8. Store Screenshots With Results ⏸️ DEFERRED
 
 Make the visual evidence findable from the envelope alone.
+
+**Deferral reason**: depends on task 6 — see above.
 
 **Requirements**:
 - Given captured renders, then screenshots are written under the analyzer result directory for that artifact.
