@@ -210,8 +210,24 @@ def _telemetry_enabled(args: argparse.Namespace) -> bool:
     return os.getenv("ENABLE_EVENTHOUSE_LOGGING", "").lower() == "true"
 
 
+def _git_command_output(cmd: list[str]) -> str:
+    """Run a local git command and return trimmed stdout, or "" on any failure."""
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
+        if proc.returncode == 0:
+            return proc.stdout.strip()
+    except Exception:
+        pass
+    return ""
+
+
 def _git_context() -> dict[str, str]:
-    """Return repository/branch/commit context from GitHub Actions or git CLI."""
+    """Return repository/branch/commit/actor context from GitHub Actions or git CLI.
+
+    Falls back to local git for branch, commit, and actor (via
+    ``git config user.email``) so telemetry still carries useful context on
+    local runs and self-hosted runners where ``GITHUB_*`` vars are empty.
+    """
     ctx = {
         "repository": os.getenv("GITHUB_REPOSITORY", ""),
         "branch": os.getenv("GITHUB_REF_NAME", ""),
@@ -220,29 +236,11 @@ def _git_context() -> dict[str, str]:
         "workflow_run_id": os.getenv("GITHUB_RUN_ID", ""),
     }
     if not ctx["commit"]:
-        try:
-            proc = subprocess.run(
-                ["git", "rev-parse", "HEAD"],
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-            if proc.returncode == 0:
-                ctx["commit"] = proc.stdout.strip()
-        except Exception:
-            pass
+        ctx["commit"] = _git_command_output(["git", "rev-parse", "HEAD"])
     if not ctx["branch"]:
-        try:
-            proc = subprocess.run(
-                ["git", "rev-parse", "--abbrev-ref", "HEAD"],
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-            if proc.returncode == 0:
-                ctx["branch"] = proc.stdout.strip()
-        except Exception:
-            pass
+        ctx["branch"] = _git_command_output(["git", "rev-parse", "--abbrev-ref", "HEAD"])
+    if not ctx["actor"]:
+        ctx["actor"] = _git_command_output(["git", "config", "user.email"])
     return ctx
 
 

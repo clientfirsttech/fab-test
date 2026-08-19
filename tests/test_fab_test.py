@@ -33,6 +33,7 @@ from fabric_ci_cd_dataops.scripts.fab_test import (
     _apply_environment_default,
     _artifact_exit_code,
     _clean_tools,
+    _git_context,
     _load_fab_test_all_analyzers,
     _load_pyproject_config,
     _print_all_summary,
@@ -1278,6 +1279,162 @@ def test_telemetry_enabled_defaults_to_env(monkeypatch):
 
     monkeypatch.setenv("ENABLE_EVENTHOUSE_LOGGING", "false")
     assert _telemetry_enabled(args) is False
+
+
+# --------------------------------------------------------------------------- #
+# Git context (telemetry): branch, commit, actor
+# --------------------------------------------------------------------------- #
+
+
+def _clear_github_env(monkeypatch):
+    for name in (
+        "GITHUB_REPOSITORY",
+        "GITHUB_REF_NAME",
+        "GITHUB_SHA",
+        "GITHUB_ACTOR",
+        "GITHUB_RUN_ID",
+    ):
+        monkeypatch.delenv(name, raising=False)
+
+
+def _fake_git_run(responses: dict[str, str]):
+    """Build a subprocess.run stand-in keyed by the git subcommand args."""
+
+    def _run(cmd, **_kwargs):
+        key = " ".join(cmd[1:])  # drop the leading "git"
+        if key in responses:
+            return subprocess.CompletedProcess(
+                args=cmd, returncode=0, stdout=responses[key], stderr=""
+            )
+        return subprocess.CompletedProcess(args=cmd, returncode=1, stdout="", stderr="")
+
+    return _run
+
+
+@pytest.mark.fab_test
+def test_git_context_prefers_github_env_vars(monkeypatch):
+    """GitHub Actions env vars are used as-is when present."""
+    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+
+    monkeypatch.setenv("GITHUB_REPOSITORY", "kerski/fab-test")
+    monkeypatch.setenv("GITHUB_REF_NAME", "main")
+    monkeypatch.setenv("GITHUB_SHA", "abc123")
+    monkeypatch.setenv("GITHUB_ACTOR", "ci-bot")
+    monkeypatch.setenv("GITHUB_RUN_ID", "42")
+    monkeypatch.setattr(
+        fab_test_module.subprocess,
+        "run",
+        lambda *a, **k: (_ for _ in ()).throw(AssertionError("git should not run")),
+    )
+
+    ctx = _git_context()
+    assert ctx == {
+        "repository": "kerski/fab-test",
+        "branch": "main",
+        "commit": "abc123",
+        "actor": "ci-bot",
+        "workflow_run_id": "42",
+    }
+
+
+@pytest.mark.fab_test
+def test_git_context_falls_back_to_local_git_branch_and_commit(monkeypatch):
+    """Outside GitHub Actions, branch and commit come from local git."""
+    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+
+    _clear_github_env(monkeypatch)
+    monkeypatch.setattr(
+        fab_test_module.subprocess,
+        "run",
+        _fake_git_run(
+            {
+                "rev-parse HEAD": "deadbeef\n",
+                "rev-parse --abbrev-ref HEAD": "feature/x\n",
+                "config user.email": "dev@example.com\n",
+            }
+        ),
+    )
+
+    ctx = _git_context()
+    assert ctx["commit"] == "deadbeef"
+    assert ctx["branch"] == "feature/x"
+
+
+@pytest.mark.fab_test
+def test_git_context_falls_back_to_local_git_user_email_for_actor(monkeypatch):
+    """When GITHUB_ACTOR is unset, the actor falls back to git config user.email."""
+    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+
+    _clear_github_env(monkeypatch)
+    monkeypatch.setattr(
+        fab_test_module.subprocess,
+        "run",
+        _fake_git_run(
+            {
+                "rev-parse HEAD": "deadbeef\n",
+                "rev-parse --abbrev-ref HEAD": "main\n",
+                "config user.email": "dev@example.com\n",
+            }
+        ),
+    )
+
+    ctx = _git_context()
+    assert ctx["actor"] == "dev@example.com"
+
+
+@pytest.mark.fab_test
+def test_git_context_actor_empty_when_git_config_has_no_email(monkeypatch):
+    """A git config with no user.email set leaves actor empty, not crashing."""
+    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+
+    _clear_github_env(monkeypatch)
+    monkeypatch.setattr(
+        fab_test_module.subprocess, "run", _fake_git_run({})  # every command "fails"
+    )
+
+    ctx = _git_context()
+    assert ctx["actor"] == ""
+    assert ctx["branch"] == ""
+    assert ctx["commit"] == ""
+
+
+@pytest.mark.fab_test
+def test_git_context_returns_empty_strings_when_git_is_unavailable(monkeypatch):
+    """If git itself is missing, _git_context degrades to empty fields, no crash."""
+    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+
+    _clear_github_env(monkeypatch)
+    monkeypatch.setattr(
+        fab_test_module.subprocess,
+        "run",
+        lambda *a, **k: (_ for _ in ()).throw(FileNotFoundError("git not found")),
+    )
+
+    ctx = _git_context()
+    assert ctx == {
+        "repository": "",
+        "branch": "",
+        "commit": "",
+        "actor": "",
+        "workflow_run_id": "",
+    }
+
+
+@pytest.mark.fab_test
+def test_git_context_actor_not_overridden_by_git_when_github_actor_set(monkeypatch):
+    """GITHUB_ACTOR wins over the local git user.email even if both are set."""
+    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+
+    _clear_github_env(monkeypatch)
+    monkeypatch.setenv("GITHUB_ACTOR", "ci-bot")
+    monkeypatch.setattr(
+        fab_test_module.subprocess,
+        "run",
+        _fake_git_run({"config user.email": "dev@example.com\n"}),
+    )
+
+    ctx = _git_context()
+    assert ctx["actor"] == "ci-bot"
 
 
 # --------------------------------------------------------------------------- #
