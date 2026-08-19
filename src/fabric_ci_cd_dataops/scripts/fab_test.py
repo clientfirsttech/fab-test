@@ -24,6 +24,7 @@ Global flags (all subcommands):
 
 import argparse
 import hashlib
+import json
 import os
 import platform
 import re
@@ -327,6 +328,34 @@ def _build_telemetry_payload(
     }
 
 
+_REQUIRED_TELEMETRY_FIELDS = ("analyzer", "artifact_name", "status", "timestamp")
+
+
+def _validate_telemetry_payload(payload: dict[str, Any]) -> dict[str, Any] | None:
+    """Validate a telemetry payload before sending.
+
+    Drops any optional field that isn't JSON-serializable and returns the
+    cleaned payload. Returns None (and logs a warning) if a required field
+    is missing, so the caller can skip the record without failing the run.
+    """
+    missing = [f for f in _REQUIRED_TELEMETRY_FIELDS if not payload.get(f)]
+    if missing:
+        print(
+            f"::warning::Telemetry payload missing required field(s): "
+            f"{', '.join(missing)}; skipping"
+        )
+        return None
+
+    cleaned = {}
+    for key, value in payload.items():
+        try:
+            json.dumps(value)
+        except (TypeError, ValueError):
+            continue
+        cleaned[key] = value
+    return cleaned
+
+
 def _send_telemetry(
     analyzer: str,
     artifact: Path,
@@ -348,8 +377,11 @@ def _send_telemetry(
         envelope,
         getattr(args, "environment", "") or os.getenv("FABRIC_ENVIRONMENT", ""),
     )
+    validated = _validate_telemetry_payload(payload)
+    if validated is None:
+        return
     try:
-        publish_analyzer_telemetry(table, payload, force=True)
+        publish_analyzer_telemetry(table, validated, force=True)
     except Exception as exc:
         print(f"::warning::Telemetry failed for {artifact.stem}: {exc}")
 

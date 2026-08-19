@@ -41,7 +41,7 @@ Include enough non-sensitive machine context to diagnose environment-specific fa
 
 ---
 
-## Validate Telemetry Payload Schema
+## Validate Telemetry Payload Schema ✅
 
 Reject malformed payloads before transmission so incomplete records don't corrupt downstream analytics.
 
