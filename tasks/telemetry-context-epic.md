@@ -30,7 +30,7 @@ Add an explicit `origin` field to telemetry so dashboards can filter by run envi
 
 ---
 
-## Capture Machine Context
+## Capture Machine Context ✅
 
 Include enough non-sensitive machine context to diagnose environment-specific failures.
 
