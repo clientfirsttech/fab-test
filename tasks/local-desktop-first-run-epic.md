@@ -161,7 +161,7 @@ Let a user see the plan before spending time on it.
 
 ---
 
-## 11. Add `fab-test doctor --local`
+## 11. Add `fab-test doctor --local` ✅
 
 Tell a new user exactly what is missing before they run anything.
 

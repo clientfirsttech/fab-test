@@ -16,6 +16,7 @@ from fabric_ci_cd_dataops.scripts._desktop import (
     DesktopInstance,
     DesktopMatchError,
     _extract_file_arg,
+    bridge_cli_path,
     detect_desktop_instances,
     match_instance_to_artifact,
 )
@@ -206,3 +207,35 @@ def test_match_ignores_instances_with_unresolved_file_path(tmp_path):
     matched = match_instance_to_artifact(instances, target)
 
     assert matched.port == 222
+
+
+# --------------------------------------------------------------------------- #
+# Desktop Bridge CLI presence (Local Desktop First Run §11 -- doctor --local)
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.fab_test
+def test_bridge_cli_path_returns_none_when_absent(monkeypatch):
+    """No powerbi-desktop on PATH returns None, never raises."""
+    from fabric_ci_cd_dataops.scripts import _desktop
+
+    monkeypatch.setattr(_desktop.shutil, "which", lambda _name: None)
+
+    assert bridge_cli_path() is None
+
+
+@pytest.mark.fab_test
+def test_bridge_cli_path_returns_resolved_path_when_present(monkeypatch):
+    """powerbi-desktop on PATH returns its resolved path -- never invoked."""
+    from fabric_ci_cd_dataops.scripts import _desktop
+
+    monkeypatch.setattr(
+        _desktop.shutil, "which", lambda name: "/usr/local/bin/powerbi-desktop" if name == "powerbi-desktop" else None
+    )
+    monkeypatch.setattr(
+        _desktop.subprocess,
+        "run",
+        lambda *a, **k: (_ for _ in ()).throw(AssertionError("bridge_cli_path must never invoke the CLI")),
+    )
+
+    assert bridge_cli_path() == "/usr/local/bin/powerbi-desktop"
