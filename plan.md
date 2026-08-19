@@ -10,7 +10,20 @@ Guiding vision and constraints: [vision.md](vision.md)
 
 ## Standalone Tasks
 
-- **Wire coverage enforcement** — add `pytest-cov` to the `dev` optional-dependency group, scope `[tool.coverage.run]` to `src/`, and put `--cov-fail-under=80` in the CI invocation only (never `pytest.ini`, which would fail every granular marker run). Makes the `vision.md` coverage constraint enforceable rather than aspirational.
+- **Wire coverage enforcement** — add `pytest-cov` to the `dev` optional-dependency group, scope `[tool.coverage.run]` to `src/`, and put `--cov-fail-under=80` in the CI invocation only (never `pytest.ini`, which would fail every granular marker run). Makes the `vision.md` coverage constraint enforceable rather than aspirational. The `dev` group now exists, so this is the only missing piece.
+- **Reduce analyzer complexity** — the lint gate is clean, but the non-gating complexity report in `build.yml` still shows 36 findings across `src/`, concentrated in seven functions. Each is a wrapper that grew argument parsing, tool resolution, execution, and envelope writing into one body; the split is the same every time. Ranked worst first:
+
+  | Function | Complexity | File |
+  |----------|-----------|------|
+  | `run_bpa` | 30 | [invoke_tabular_editor_bpa.py](src/fabric_ci_cd_dataops/scripts/invoke_tabular_editor_bpa.py) |
+  | `run_inspector` | 24 | [invoke_pbir_inspector.py](src/fabric_ci_cd_dataops/scripts/invoke_pbir_inspector.py) |
+  | `run_pql_test` | 23 | [invoke_pql_test.py](src/fabric_ci_cd_dataops/scripts/invoke_pql_test.py) |
+  | `validate_environments_yaml` | 22 | [validate_environments_yaml.py](src/fabric_ci_cd_dataops/scripts/validate_environments_yaml.py) |
+  | `_print_all_summary` | 18 | [fab_test_summary.py](src/fabric_ci_cd_dataops/scripts/fab_test_summary.py) |
+  | `resolve_executable` | 17 | [_analyzer_tool_bootstrap.py](src/fabric_ci_cd_dataops/scripts/_analyzer_tool_bootstrap.py) |
+  | `main` | 16 | [deploy.py](src/fabric_ci_cd_dataops/scripts/deploy.py) |
+
+  Budgets and the review lens are in [aidd-python](.github/skills/aidd-python/SKILL.md). Raise a threshold only with a reason in the commit message.
 
 ## Suggested Order
 

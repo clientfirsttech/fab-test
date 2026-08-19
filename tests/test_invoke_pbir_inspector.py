@@ -732,33 +732,6 @@ class TestRunInspector:
         assert "Invalid binding" in captured.out
         assert "Missing alt text" in captured.out
 
-    def test_print_findings_table_uses_normalized_schema(
-        self, capsys
-    ):
-        """Verbose table prints normalized rule/severity/object/message fields."""
-        findings = [
-            {
-                "rule": "ERR_01",
-                "severity": "error",
-                "object": "Chart",
-                "message": "Invalid binding",
-            },
-            {
-                "rule": "WARN_01",
-                "severity": "warning",
-                "object": "Table",
-                "message": "Missing alt text",
-            },
-        ]
-        invoke_pbir_inspector._print_findings_table(findings)
-        captured = capsys.readouterr()
-        assert "ERR_01" in captured.out
-        assert "WARN_01" in captured.out
-        assert "Error" in captured.out
-        assert "Warning" in captured.out
-        assert "Invalid binding" in captured.out
-        assert "Missing alt text" in captured.out
-
     @mock.patch("fabric_ci_cd_dataops.scripts.invoke_pbir_inspector.subprocess.run")
     def test_run_timeout(self, mock_run, tmp_path: Path):
         """Timeout is handled gracefully."""

@@ -36,6 +36,7 @@ def test_zero_semantic_model_artifacts_fails_bpa(tmp_path: Path, monkeypatch):
             cwd=REPO_ROOT,
             capture_output=True,
             text=True,
+            check=False,
         )
         # The session must fail even though the contract tests themselves pass.
         assert result.returncode != 0, (

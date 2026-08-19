@@ -5,7 +5,6 @@ from pathlib import Path
 
 import pytest
 
-
 from fabric_ci_cd_dataops.scripts.check_promotion_safety import PromotionSafetyChecker, main
 
 

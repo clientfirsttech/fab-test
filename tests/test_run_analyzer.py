@@ -7,7 +7,6 @@ from unittest import mock
 
 import pytest
 
-
 from fabric_ci_cd_dataops.scripts.run_analyzer import AnalyzerRunner, main
 
 
@@ -115,9 +114,8 @@ class TestAnalyzerRunner:
             "--output-json",
             str(output_file),
         ]
-        with mock.patch.object(sys, "argv", argv):
-            with pytest.raises(SystemExit) as exc_info:
-                main()
+        with mock.patch.object(sys, "argv", argv), pytest.raises(SystemExit) as exc_info:
+            main()
         assert exc_info.value.code == 0
         assert output_file.exists()
         saved = json.loads(output_file.read_text(encoding="utf-8"))

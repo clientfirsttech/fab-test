@@ -183,7 +183,7 @@ def build_pql_test_command(
 
 def build_pql_lint_command(
     artifact: Path,
-    args: argparse.Namespace,
+    args: argparse.Namespace,  # noqa: ARG001 - uniform builder signature
     output_dir: Path,
 ) -> list[str]:
     """Build the pqlint command for ``artifact``."""
@@ -238,9 +238,9 @@ def build_playwright_command(
 
 
 def build_playwright_impact_command(
-    artifact: Path,
+    artifact: Path,  # noqa: ARG001 - uniform builder signature
     args: argparse.Namespace,
-    output_dir: Path,
+    output_dir: Path,  # noqa: ARG001 - uniform builder signature
 ) -> list[str]:
     """Build the Playwright impact manifest command for ``artifact``."""
     changed_artifacts = getattr(args, "changed_artifacts", "changed-artifacts.json")
@@ -359,11 +359,12 @@ def preflight_error(name: str, args: argparse.Namespace) -> tuple[str, int] | No
         return None
     try:
         resolve_tool(name, args)
-        return None
     except UnsupportedPlatformError as exc:
         return str(exc), 126
     except RuntimeError as exc:
         return str(exc), 1
+    else:
+        return None
 
 
 def build_command(

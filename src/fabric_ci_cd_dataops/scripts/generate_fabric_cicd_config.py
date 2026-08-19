@@ -101,7 +101,10 @@ def main():
     with open(args.output, "w") as f:
         yaml.safe_dump(env_config, f, default_flow_style=False, sort_keys=False)
 
-    terse_print(terse, "OK", "generate_config", f"{args.output} generated for {args.environment} (workspace={env_config['workspace_id']})")
+    terse_print(
+        terse, "OK", "generate_config",
+        f"{args.output} generated for {args.environment} (workspace={env_config['workspace_id']})",
+    )
     if not terse:
         print(f"Generated fabric-cicd config: {args.output}")
         print(f"Environment: {args.environment}")

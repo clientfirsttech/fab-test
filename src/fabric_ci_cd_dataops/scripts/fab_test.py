@@ -23,6 +23,7 @@ Global flags (all subcommands):
 """
 
 import argparse
+import contextlib
 import hashlib
 import json
 import os
@@ -32,7 +33,7 @@ import shutil
 import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -275,14 +276,10 @@ def _machine_context() -> dict[str, str]:
     cannot be determined.
     """
     context: dict[str, str] = {"fab_test_version": _FAB_TEST_VERSION}
-    try:
+    with contextlib.suppress(Exception):
         context["platform"] = _current_os_platform()
-    except Exception:
-        pass
-    try:
+    with contextlib.suppress(Exception):
         context["python_version"] = platform.python_version()
-    except Exception:
-        pass
     return context
 
 
@@ -308,7 +305,7 @@ def _build_telemetry_payload(
     errors, warnings = _severity_counts(envelope.get("findings", []))
     ctx = _git_context()
     return {
-        "timestamp": datetime.now().isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "artifact_name": artifact.stem,
         "artifact_type": artifact.suffix.lstrip("."),
         "commit_sha": ctx.get("commit", ""),
@@ -471,7 +468,7 @@ def _run_one_artifact(
 
     _errors, warnings = _severity_counts(envelope.get("findings", []))
     if in_ci:
-        emit_workflow_annotations(envelope, str(artifact))
+        emit_workflow_annotations(envelope)
     if warnings > 0:
         emit_pr_review_comments(envelope, str(artifact))
     _send_telemetry(name, artifact, envelope, args)
@@ -719,7 +716,7 @@ _fab_test
 class _PrintCompletionAction(argparse.Action):
     """argparse action that prints a completion script and exits, like --version."""
 
-    def __call__(self, parser, namespace, values, option_string=None):
+    def __call__(self, parser, namespace, values, option_string=None):  # noqa: ARG002 - argparse Action API
         print(_generate_completion_script(values))
         parser.exit()
 
@@ -1032,7 +1029,7 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _all_analyzers(args: argparse.Namespace) -> tuple[str, ...]:
+def _all_analyzers() -> tuple[str, ...]:
     """Resolve which analyzers `fab-test all` should run."""
     metadata_path = REPO_ROOT / ".github" / "metadata" / "analyzers.json"
     return _load_fab_test_all_analyzers(metadata_path)
@@ -1074,7 +1071,7 @@ def main() -> int:
         return 2
 
     if args.analyzer == "all":
-        analyzers = _all_analyzers(args)
+        analyzers = _all_analyzers()
         if not analyzers:
             print("  ⚠ fab-test all: no analyzers configured in analyzers.json")
             return 0

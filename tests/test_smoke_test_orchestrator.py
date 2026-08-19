@@ -1,7 +1,6 @@
 """Unit tests for scripts/smoke_test_orchestrator.py."""
 
 import json
-import sys
 from pathlib import Path
 
 import pytest

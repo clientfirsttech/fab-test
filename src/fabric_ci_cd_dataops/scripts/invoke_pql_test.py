@@ -235,6 +235,7 @@ def run_pql_test(args: argparse.Namespace) -> int:
                 errors="replace",
                 timeout=300,
                 env=pql_env,
+                check=False,
             )
         except subprocess.TimeoutExpired:
             message = "pql-test timed out after 5 minutes"
@@ -252,7 +253,7 @@ def run_pql_test(args: argparse.Namespace) -> int:
             )
             print(f"::error::{message}", file=sys.stderr)
             return 1
-        except Exception as exc:  # pragma: no cover
+        except Exception as exc:  # noqa: BLE001 - wrapper boundary: failures become an error envelope
             message = f"Unexpected error running pql-test: {exc}"
             write_results(
                 output_path, "error", [], artifact_path,

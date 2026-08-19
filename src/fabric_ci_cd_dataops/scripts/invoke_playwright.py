@@ -285,10 +285,7 @@ def _run_single_report(
     write_test_cases(cases, test_cases_dir)
 
     report_name = report_name_override or config.report_name
-    if args.output_path:
-        output_path = Path(args.output_path).resolve()
-    else:
-        output_path = envelope_path("playwright", report_name)
+    output_path = Path(args.output_path).resolve() if args.output_path else envelope_path("playwright", report_name)
 
     level = args.verbose
     if level >= 1:

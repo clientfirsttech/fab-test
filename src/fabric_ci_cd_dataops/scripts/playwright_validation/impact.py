@@ -109,7 +109,7 @@ def load_changed_artifacts(path: Path) -> list[dict[str, Any]]:
         data = json.load(fh)
     artifacts = data.get("changed_artifacts", data if isinstance(data, list) else [])
     if not isinstance(artifacts, list):
-        raise ValueError("changed-artifacts data must contain a list of artifacts")
+        raise TypeError("changed-artifacts data must contain a list of artifacts")
     return artifacts
 
 

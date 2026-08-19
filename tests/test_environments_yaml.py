@@ -3,11 +3,11 @@ from __future__ import annotations
 
 import os
 import subprocess
-import sys
 from pathlib import Path
 from typing import Any
 
 import pytest
+
 from fabric_ci_cd_dataops.scripts.validate_environments_yaml import validate_environments_yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -177,6 +177,7 @@ class TestValidateEnvironmentsYamlCli:
             encoding="utf-8",
             errors="replace",
             env={**os.environ, "PYTHONIOENCODING": "utf-8"},
+            check=False,
         )
         assert result.returncode == 0, result.stderr
 
@@ -190,6 +191,7 @@ class TestValidateEnvironmentsYamlCli:
             encoding="utf-8",
             errors="replace",
             env={**os.environ, "PYTHONIOENCODING": "utf-8"},
+            check=False,
         )
         assert result.returncode == 1
         assert result.stderr is not None

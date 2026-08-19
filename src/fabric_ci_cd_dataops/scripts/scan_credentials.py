@@ -65,7 +65,7 @@ def scan_file_for_credentials(file_path: Path) -> list:
 
                 # Skip if this appears to be in documentation/examples
                 is_documentation = False
-                for doc_pattern_name, doc_pattern in DOCUMENTATION_PATTERNS.items():
+                for doc_pattern in DOCUMENTATION_PATTERNS.values():
                     if re.search(doc_pattern, context, re.IGNORECASE):
                         is_documentation = True
                         break

@@ -6,7 +6,6 @@ from pathlib import Path
 
 import pytest
 
-
 from fabric_ci_cd_dataops.scripts.compare_baseline import BaselineComparator, main
 
 

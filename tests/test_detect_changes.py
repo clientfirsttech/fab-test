@@ -8,7 +8,6 @@ from unittest import mock
 
 import pytest
 
-
 from fabric_ci_cd_dataops.scripts.detect_changes import (
     detect_artifact_type,
     group_changes_by_artifact,
@@ -64,7 +63,7 @@ class TestGroupChangesByArtifact:
             ".SemanticModel": "SemanticModel",
             ".Report": "Report",
         }
-        result = group_changes_by_artifact(changed, Path("."), artifact_map)
+        result = group_changes_by_artifact(changed, artifact_map)
 
         assert len(result) == 2
         assert result[".fabric/artifacts/SalesModel.SemanticModel"]["type"] == "SemanticModel"
@@ -74,7 +73,7 @@ class TestGroupChangesByArtifact:
     def test_ignores_files_outside_artifacts(self):
         """Files outside .fabric/artifacts are ignored."""
         changed = ["scripts/deploy.py", ".github/workflows/ci.yml"]
-        assert group_changes_by_artifact(changed, Path("."), {}) == {}
+        assert group_changes_by_artifact(changed, {}) == {}
 
 
 class TestMain:
@@ -95,10 +94,12 @@ class TestMain:
             ".fabric/artifacts/SalesModel.SemanticModel/definition/model.tmdl"
         ]
         argv = ["detect_changes.py"]
-        with mock.patch("fabric_ci_cd_dataops.scripts.detect_changes.get_changed_files", return_value=changed):
-            with mock.patch.object(sys, "argv", argv):
-                with mock.patch.dict(os.environ, {"GITHUB_WORKSPACE": str(tmp_path)}, clear=False):
-                    main()
+        with (
+            mock.patch("fabric_ci_cd_dataops.scripts.detect_changes.get_changed_files", return_value=changed),
+            mock.patch.object(sys, "argv", argv),
+            mock.patch.dict(os.environ, {"GITHUB_WORKSPACE": str(tmp_path)}, clear=False),
+        ):
+            main()
 
         output = tmp_path / "changed-artifacts.json"
         assert output.exists()

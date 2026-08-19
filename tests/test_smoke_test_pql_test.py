@@ -1,8 +1,6 @@
 """Unit tests for scripts/smoke_test_pql_test.py."""
 
 import json
-import sys
-from pathlib import Path
 
 import pytest
 

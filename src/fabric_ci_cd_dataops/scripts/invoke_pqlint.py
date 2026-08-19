@@ -125,7 +125,7 @@ def run_pqlint(args: argparse.Namespace) -> int:
 
     with Timer() as timer:
         try:
-            proc = subprocess.run(command, capture_output=True, text=True, timeout=300)
+            proc = subprocess.run(command, capture_output=True, text=True, timeout=300, check=False)
         except subprocess.TimeoutExpired:
             message = "pqlint timed out after 5 minutes"
             write_results(output_path, "timeout", [], artifact_path, message=message, native_out=nat_out)
@@ -136,7 +136,7 @@ def run_pqlint(args: argparse.Namespace) -> int:
             write_results(output_path, "error", [], artifact_path, message=message, native_out=nat_out)
             print(f"::error::{message}", file=sys.stderr)
             return 1
-        except Exception as exc:  # pragma: no cover
+        except Exception as exc:  # noqa: BLE001 - wrapper boundary: failures become an error envelope
             message = f"Unexpected error running pqlint: {exc}"
             write_results(output_path, "error", [], artifact_path, message=message, native_out=nat_out)
             print(f"::error::{message}", file=sys.stderr)
@@ -154,14 +154,20 @@ def run_pqlint(args: argparse.Namespace) -> int:
 
     if success:
         message = "pqlint passed with no findings"
-        write_results(output_path, "passed", [], artifact_path, message=message, native_out=nat_out, duration_ms=timer.elapsed_ms)
+        write_results(
+            output_path, "passed", [], artifact_path,
+            message=message, native_out=nat_out, duration_ms=timer.elapsed_ms,
+        )
         if level >= _VERBOSITY_LEVELS["default"]:
             log(f"✅ {message}")
             log(f"📁 Envelope: {output_path}")
         return 0
 
     message = f"pqlint found {len(findings)} finding(s)"
-    write_results(output_path, "failed", findings, artifact_path, message=message, native_out=nat_out, duration_ms=timer.elapsed_ms)
+    write_results(
+        output_path, "failed", findings, artifact_path,
+        message=message, native_out=nat_out, duration_ms=timer.elapsed_ms,
+    )
     if level >= _VERBOSITY_LEVELS["default"]:
         log(f"📁 Envelope: {output_path}")
     if level >= _VERBOSITY_LEVELS["verbose"]:

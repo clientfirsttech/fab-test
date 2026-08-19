@@ -89,7 +89,7 @@ def _artifact_item_name(artifact_path: Path) -> str:
     """Return the fabric-cicd item name from an artifact directory path."""
     name = artifact_path.name
     # fabric-cicd expects names like "SalesModel.SemanticModel".
-    if name.endswith(".SemanticModel") or name.endswith(".Report"):
+    if name.endswith((".SemanticModel", ".Report")):
         return name
     return f"{name}.Item"
 
@@ -279,7 +279,6 @@ def build_environment_config(
     environment: str,
     workspace_id: str,
     artifact_path: Path,
-    repo_root: Path,
     terse: bool = False,
 ) -> dict[str, Any]:
     """Build a fabric-cicd YAML config for the target artifact and environment.
@@ -416,7 +415,6 @@ def deploy_artifact(
             token_credential=credential,
             environment=environment,
         )
-        return 0 if result.status.value == "completed" else 1
     except InputError as exc:
         msg = f"Deployment configuration error: {exc}"
         terse_print(terse, "ERROR", "deploy_config", msg)
@@ -433,6 +431,8 @@ def deploy_artifact(
         if not terse:
             print(f"Error: {msg}", file=sys.stderr)
         return 1
+    else:
+        return 0 if result.status.value == "completed" else 1
     finally:
         tmp_config_path.unlink(missing_ok=True)
 
@@ -587,7 +587,7 @@ def main():
 
     config = load_environments_config(repo_root, terse)
     env_config = build_environment_config(
-        config, args.environment, workspace_id, artifact_path, repo_root, terse
+        config, args.environment, workspace_id, artifact_path, terse
     )
 
     exit_code = deploy_artifact(

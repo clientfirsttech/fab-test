@@ -13,9 +13,10 @@ import shutil
 from pathlib import Path
 from typing import Any
 
+from tabulate import tabulate
+
 from ._analyzer_envelope import _severity_counts, _severity_rank
 from .fab_test_registry import ANALYZER_REGISTRY, discover_artifacts
-from tabulate import tabulate
 
 
 def _terminal_width() -> int:

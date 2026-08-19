@@ -8,7 +8,6 @@ from unittest import mock
 
 import pytest
 
-
 import fabric_ci_cd_dataops.scripts.invoke_tabular_editor_bpa as invoke_tabular_editor_bpa
 from fabric_ci_cd_dataops.scripts._analyzer_envelope import ENVELOPE_REQUIRED_KEYS
 from fabric_ci_cd_dataops.scripts.invoke_tabular_editor_bpa import (
@@ -400,7 +399,7 @@ class TestRunBpa:
             '    </UnitTest>\n'
             '  </TestDefinitions>\n'
             '  <Results>\n'
-            '    <UnitTestResult testId="2" testName="Avoid bi-directional relationships"'  # noqa: E501
+            '    <UnitTestResult testId="2" testName="Avoid bi-directional relationships"'
             ' outcome="Passed"><Output /></UnitTestResult>\n'
             '    <UnitTestResult testId="4" testName="Add descriptions to measures"'
             ' outcome="Failed">\n'

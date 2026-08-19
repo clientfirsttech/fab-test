@@ -72,6 +72,7 @@ def test_cli_help_lists_all_arguments():
         [BPA_WRAPPER, "--help"],
         capture_output=True,
         text=True,
+        check=False,
     )
     assert result.returncode == 0, result.stderr
     for argument in CLI_ARGUMENTS:
@@ -85,6 +86,7 @@ def test_cli_requires_mandatory_arguments():
         [BPA_WRAPPER],
         capture_output=True,
         text=True,
+        check=False,
     )
     assert result.returncode != 0
     assert "--tmdl-path" in result.stderr

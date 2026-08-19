@@ -54,12 +54,23 @@ def validate_prompt_file(path: Path) -> list[dict[str, Any]]:
         findings.append({"rule": "empty_prompt", "message": "Prompt file is empty"})
 
     if "{{" in text and "}}" in text:
-        findings.append({"rule": "template_placeholders", "message": "Prompt contains unresolved template placeholders"})
+        findings.append({
+            "rule": "template_placeholders",
+            "message": "Prompt contains unresolved template placeholders",
+        })
 
     return findings
 
 
-def write_results(output_path: Path, status: str, findings: list[dict[str, Any]], artifact_path: Path, message: str = "", native_out: "Path | None" = None, duration_ms: int = 0) -> None:
+def write_results(
+    output_path: Path,
+    status: str,
+    findings: list[dict[str, Any]],
+    artifact_path: Path,
+    message: str = "",
+    native_out: "Path | None" = None,
+    duration_ms: int = 0,
+) -> None:
     """Write standardized prompt-lint envelope JSON."""
     env = build_envelope(
         analyzer="prompt_lint",
@@ -92,13 +103,19 @@ def run_prompt_lint(args: argparse.Namespace) -> int:
 
     if success:
         message = "Prompt lint passed"
-        write_results(output_path, "passed", [], artifact_path, message=message, native_out=nat_out, duration_ms=timer.elapsed_ms)
+        write_results(
+            output_path, "passed", [], artifact_path,
+            message=message, native_out=nat_out, duration_ms=timer.elapsed_ms,
+        )
         log(f"✅ {message}")
         log(f"📁 Envelope: {output_path}")
         return 0
 
     message = f"Prompt lint found {len(findings)} finding(s)"
-    write_results(output_path, "failed", findings, artifact_path, message=message, native_out=nat_out, duration_ms=timer.elapsed_ms)
+    write_results(
+        output_path, "failed", findings, artifact_path,
+        message=message, native_out=nat_out, duration_ms=timer.elapsed_ms,
+    )
     if level >= _VERBOSITY_LEVELS["verbose"]:
         for f in findings:
             log(f"  • {f.get('rule', '?')}: {f.get('message', '')}")
