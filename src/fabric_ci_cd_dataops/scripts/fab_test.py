@@ -434,9 +434,24 @@ def _run_one_artifact(
             narrate(f"  artifact {index} of {total}", output_format=output_format)
     narrate(f"\n  ▶ fab-test {name}  →  {display_name}", output_format=output_format)
     cmd = _build_command(name, artifact, args, output_dir)
+    # Under --format json, capture the child's stdout instead of inheriting it
+    # (it would otherwise land in the middle of the JSON document) and
+    # re-emit it as narration. --format text keeps today's direct inheritance
+    # so there is no added buffering latency.
+    capture_stdout = output_format == "json"
+
+    def _reemit(text: str | None) -> None:
+        if not text:
+            return
+        for line in text.splitlines():
+            clean = _clean_annotation(line)
+            if clean.strip():
+                narrate(f"  {clean}", output_format=output_format)
+
     try:
         proc = subprocess.run(
             cmd,
+            stdout=subprocess.PIPE if capture_stdout else None,
             stderr=None if in_ci else subprocess.PIPE,
             text=True,
             encoding="utf-8",
@@ -445,12 +460,17 @@ def _run_one_artifact(
             timeout=timeout,
             check=False,
         )
-    except subprocess.TimeoutExpired:
+    except subprocess.TimeoutExpired as exc:
         narrate(
             f"  ⏰ fab-test {name}: timed out after {timeout}s for {display_name}",
             output_format=output_format,
         )
+        if capture_stdout:
+            _reemit(exc.stdout)
         return (display_name, 1)
+
+    if capture_stdout:
+        _reemit(proc.stdout)
 
     if not in_ci and proc.stderr:
         for line in proc.stderr.splitlines():
