@@ -55,6 +55,7 @@ from ._config import (
     resolve_setting,
     validate_config,
 )
+from ._credentials import probe_credentials
 from ._desktop import bridge_cli_path, detect_desktop_instances
 from ._pbip_discovery import discover_pbip_projects as _discover_pbip_projects
 from ._run_manifest import RunManifest
@@ -104,6 +105,7 @@ from .fab_test_registry import (
 )
 from .fab_test_summary import (
     _print_all_summary,
+    _print_auth_status,
     _print_config_show,
     _print_doctor,
     _print_list,
@@ -1296,6 +1298,59 @@ def build_parser() -> argparse.ArgumentParser:
         help="Path to .env file for Playwright validation",
     )
 
+    # --- auth ---
+    auth_p = subs.add_parser(
+        "auth",
+        help="Report or acquire Fabric credentials (fab-test stores none of its own)",
+    )
+    auth_subs = auth_p.add_subparsers(dest="auth_command", metavar="COMMAND")
+    auth_subs.required = True
+    auth_status_p = auth_subs.add_parser(
+        "status",
+        help="Show which identity fab-test would use, verifying it for real",
+    )
+    auth_status_p.add_argument(
+        "--workspace-id",
+        default="",
+        dest="workspace_id",
+        metavar="ID",
+        help="Check whether this workspace is reachable [env: FABRIC_WORKSPACE_ID]",
+    )
+    auth_status_p.add_argument(
+        "--env-file",
+        default=None,
+        dest="playwright_env_file",
+        metavar="PATH",
+        help="Path to a .env file holding credentials",
+    )
+    auth_status_p.add_argument(
+        "--format",
+        choices=["text", "json"],
+        default="text",
+        dest="output_format",
+        help="Output format (default: text)",
+    )
+    auth_login_p = auth_subs.add_parser(
+        "login",
+        help="Delegate sign-in to the tool that owns the credential",
+    )
+    auth_login_p.add_argument(
+        # Deliberately NOT --environment: in fab-test, --env is the test
+        # environment label (DEV/PROD). pql-test spells the Azure cloud
+        # --environment, and merging the two names would be a trap.
+        "--cloud",
+        default="public",
+        choices=["public", "USGov", "USGovHigh", "USGovDoD", "Germany", "China"],
+        help="Azure cloud to sign in to (default: public)",
+    )
+    auth_login_p.add_argument(
+        "--format",
+        choices=["text", "json"],
+        default="text",
+        dest="output_format",
+        help="Output format (default: text)",
+    )
+
     # --- local ---
     local_p = subs.add_parser(
         "local",
@@ -1810,7 +1865,147 @@ def _explain_analyzer(args: argparse.Namespace) -> int:
     return 0
 
 
+def _verify_ambient_credential() -> None:
+    """Acquire a token from the ambient Azure credential, or raise.
+
+    Split out so `auth status` has one seam to stub in tests and one place
+    where a network call is deliberately allowed. `check_readiness` may
+    never call this -- that asymmetry is the whole reason the §7 probe
+    reports ambient credentials as unverified.
+    """
+    from .playwright_validation.fabric_service_client import _authenticate_ambient
+
+    _authenticate_ambient()
+
+
+def _check_workspace_reachable(workspace_id: str, args: argparse.Namespace) -> bool:
+    """Whether the resolved identity can actually read ``workspace_id``.
+
+    Moved here from the §7 probe, which must make no network call. Lists
+    items rather than fetching the workspace so a permission that is
+    scoped to reading contents still reports reachable.
+    """
+    from .playwright_validation.fabric_service_client import (
+        FabricServiceClientError,
+        build_fabric_service_client,
+    )
+
+    try:
+        client = build_fabric_service_client(
+            env_file=getattr(args, "playwright_env_file", None)
+        )
+        client.list_items(workspace_id, "SemanticModel")
+    except (FabricServiceClientError, OSError):
+        return False
+    return True
+
+
+def _auth_status(args: argparse.Namespace) -> int:
+    """Report the identity fab-test would use, verifying it for real."""
+    output_format = getattr(args, "output_format", "text")
+    status = probe_credentials(env_file=getattr(args, "playwright_env_file", None))
+
+    if not status.resolved:
+        return _print_auth_status(
+            {
+                "identity": {"source": None, "tenant_id": None, "verified": False},
+                "workspace": None,
+                "detail": status.detail,
+                "remediation": status.remediation,
+            },
+            output_format,
+            exit_code=127,
+        )
+
+    verified, detail = status.verified, status.detail
+    if not verified:
+        try:
+            _verify_ambient_credential()
+        except Exception as exc:  # any auth failure is reported, never re-raised
+            return _print_auth_status(
+                {
+                    "identity": {
+                        "source": status.source,
+                        "tenant_id": status.tenant_id,
+                        "verified": False,
+                    },
+                    "workspace": None,
+                    "detail": str(exc),
+                    "remediation": "Sign in with `az login`, or set a service principal",
+                },
+                output_format,
+                exit_code=127,
+            )
+        verified, detail = True, f"{status.source} verified"
+
+    workspace_id = getattr(args, "workspace_id", "") or (
+        getattr(args, "file_config", None) or {}
+    ).get("workspace", "")
+    workspace = None
+    exit_code = 0
+    if workspace_id:
+        reachable = _check_workspace_reachable(workspace_id, args)
+        workspace = {"id": workspace_id, "reachable": reachable}
+        if not reachable:
+            exit_code = 1
+
+    return _print_auth_status(
+        {
+            "identity": {
+                "source": status.source,
+                "tenant_id": status.tenant_id,
+                "verified": verified,
+            },
+            "workspace": workspace,
+            "detail": detail,
+            "remediation": None,
+        },
+        output_format,
+        exit_code=exit_code,
+    )
+
+
+_AUTH_LOGIN_FALLBACK = (
+    "No delegable login tool found on PATH.\n"
+    "  Sign in with `az login`, or set FABRIC_TENANT_ID, "
+    "FABRIC_SERVICE_PRINCIPAL_ID, and FABRIC_SERVICE_PRINCIPAL_SECRET."
+)
+
+
+def _auth_login(args: argparse.Namespace) -> int:
+    """Delegate the login to the tool that owns the credential.
+
+    Mints and stores nothing. `fab-test` is a facade: `pql-test` already
+    maintains a login with browser, certificate, federated-token, and
+    managed-identity support, and a fourth token cache on a machine that
+    already has three would be a security surface with no new capability
+    behind it. When there is nothing to delegate to, name the command that
+    works instead of failing quietly.
+    """
+    tool = shutil.which("pql-test")
+    if tool is None:
+        print(f"  ✗ fab-test auth login: {_AUTH_LOGIN_FALLBACK}")
+        return 127
+
+    command = [tool, "auth", "login"]
+    cloud = getattr(args, "cloud", "") or ""
+    if cloud and cloud != "public":
+        command += ["--environment", cloud]
+
+    # Printed before running so the caller can reproduce it without fab-test.
+    print(f"  → delegating to: {' '.join(command)}")
+    return subprocess.run(command, check=False).returncode
+
+
+def _auth(args: argparse.Namespace) -> int:
+    """Dispatch `fab-test auth <status|login>`."""
+    if getattr(args, "auth_command", None) == "login":
+        return _auth_login(args)
+    return _auth_status(args)
+
+
 _ADMIN_COMMAND_HANDLERS: dict[str, Callable[[argparse.Namespace], int]] = {
+    "auth": _auth,
     "clean-tools": lambda args: _clean_tools(REPO_ROOT, args.dry_run),
     "doctor": _doctor,
     "list": _list_analyzers,

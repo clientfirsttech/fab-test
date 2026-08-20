@@ -171,7 +171,14 @@ Built as its own module rather than inside `fab_test_registry.py` as first plann
 
 ---
 
-## 8. Add `fab-test auth status`
+## 8. Add `fab-test auth status` ✅
+
+**Done (2026-08-20)**: `fab-test auth <status|login>` as a nested subcommand. `auth status` reuses the §7 probe and is the one place allowed to make a network call, which is exactly what lets the probe report an ambient credential as unverified and point here. Exit codes: `0` verified, `127` nothing resolvable or an ambient credential that fails to acquire a token, `1` credentials fine but the named workspace unreachable.
+
+Both requirements moved from §7 are met: workspace reachability is checked with `list_items` rather than a workspace fetch, so a permission scoped to reading contents still reports reachable; and an unverified ambient credential is resolved for real, reporting verified or naming why it failed.
+
+**Hardening beyond the requirement**: `redact_secrets` scrubs any live client-secret value from `detail` and `remediation` on the way out. The probe is tested never to put one there, but this output is the one place a credential could reach a terminal or CI log. Only the secret is redacted — a tenant ID is reported on purpose, and blanking it would remove the answer the caller came for.
+
 
 Promote the credential probe to a first-class noun, so "which identity am I using?" has an obvious command.
 
@@ -189,7 +196,12 @@ Promote the credential probe to a first-class noun, so "which identity am I usin
 
 ---
 
-## 9. Add a Delegating `fab-test auth login`
+## 9. Add a Delegating `fab-test auth login` ✅
+
+**Done (2026-08-20)**: resolves `pql-test` on PATH, prints the exact command before running it so the caller can reproduce the login without `fab-test`, and propagates its exit code. With nothing to delegate to it exits `127` naming `az login` and the service-principal variables. A test asserts the working directory is untouched — `fab-test` writes no token, cache, or credential file of its own, which is the entire justification for delegating.
+
+The `--env` / `--cloud` collision is settled and guarded by tests in both directions: `--cloud` exists on `auth login` and nowhere else, and `pql-test --help` still documents `--env` as the test environment label with no `--cloud` in sight.
+
 
 Give the human a next step without `fab-test` becoming a credential store.
 

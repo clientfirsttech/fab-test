@@ -46,6 +46,45 @@ def _print_list(rows: list[dict[str, Any]], output_format: str = "text") -> int:
     return 0
 
 
+def _print_auth_status(
+    payload: dict[str, Any], output_format: str = "text", *, exit_code: int = 0
+) -> int:
+    """Print the `fab-test auth status` report and return ``exit_code``.
+
+    Never prints a secret: the payload carries a source name, a tenant,
+    and a workspace ID, none of which grant access to anything.
+    """
+    from ._credentials import redact_secrets
+
+    # Defense in depth: the probe is tested never to put a secret in these
+    # fields, but this output is the one place a live credential value
+    # could reach a terminal or a CI log, so scrub it on the way out.
+    for key in ("detail", "remediation"):
+        if payload.get(key):
+            payload[key] = redact_secrets(payload[key])
+
+    if output_format == "json":
+        print(json.dumps(payload, indent=2))
+        return exit_code
+
+    identity = payload["identity"]
+    rows = [
+        ("identity", identity["source"] or "(none resolved)"),
+        ("tenant", identity["tenant_id"] or "-"),
+        ("verified", "yes" if identity["verified"] else "no"),
+    ]
+    workspace = payload.get("workspace")
+    if workspace:
+        rows.append(("workspace", workspace["id"]))
+        rows.append(("reachable", "yes" if workspace["reachable"] else "no"))
+    print(tabulate(rows, headers=("Check", "Value"), tablefmt="simple", stralign="left"))
+    if payload.get("detail"):
+        print(f"\n  {payload['detail']}")
+    if payload.get("remediation"):
+        print(f"  → {payload['remediation']}")
+    return exit_code
+
+
 def _print_doctor(rows: list[dict[str, Any]], output_format: str = "text") -> int:
     """Print the `fab-test doctor` readiness report.
 
