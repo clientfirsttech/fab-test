@@ -35,6 +35,7 @@ from ._analyzer_envelope import (
     native_output_path,
     write_envelope,
 )
+from ._report_html import attach_report
 
 _VERBOSITY_LEVELS = {"summary": 0, "default": 1, "verbose": 2, "debug": 3}
 
@@ -274,6 +275,10 @@ def write_results(
     env["rules_file"] = str(rules_path)
     if test_summary is not None:
         env["test_summary"] = test_summary
+    # Tabular Editor emits TRX, which is not something a person wants to
+    # read, so the report is rendered from the envelope. No-op unless
+    # --report was passed.
+    attach_report(env, output_path)
     write_envelope(output_path, env)
 
 

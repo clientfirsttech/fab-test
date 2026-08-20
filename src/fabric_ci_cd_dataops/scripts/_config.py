@@ -33,6 +33,9 @@ _VALID_KEYS: dict[str, type] = {
     # workspace (Artifact Targeting and Auth §3). A display name or a GUID;
     # a positional WORKSPACE.Workspace/... target overrides it.
     "workspace": str,
+    # Generate a readable HTML report beside each envelope (Human-Readable
+    # Reports §5). Opt-in: false unless asked for.
+    "report": bool,
     # Rule overlays (Config Consolidation §6-7): {"bpa": {...}, "pbir": {...}}.
     # Nested disable/severity/extend keys are validated by _rule_overlay.py
     # itself at use time, not here.

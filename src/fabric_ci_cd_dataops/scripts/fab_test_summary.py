@@ -16,6 +16,7 @@ from typing import Any
 from tabulate import tabulate
 
 from ._analyzer_envelope import _severity_counts, normalize_findings
+from ._report_html import resolve_report, write_index
 from ._target import target_from_args
 from .fab_test_registry import ANALYZER_REGISTRY, discover_artifacts
 
@@ -585,6 +586,13 @@ def _print_all_summary(
             f"  Totals: {total_errors} error(s), {total_warnings} warning(s) "
             f"across {analyzed} artifact(s)"
         )
+        # Built from these same rows, so the index can never report counts
+        # that disagree with the table just printed. Only for a multi-analyzer
+        # run: indexing one analyzer is a page pointing at a single link.
+        if resolve_report(args) and len(analyzers) > 1:
+            index = write_index(rows, output_dir)
+            if index:
+                print(f"  Index:  {_display_path(index)}")
     print(sep)
     return 1 if any_failed else 0
 

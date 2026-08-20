@@ -191,6 +191,75 @@ def test_write_report_creates_the_file_and_returns_its_path(tmp_path):
     assert target.read_text(encoding="utf-8").startswith("<!DOCTYPE html>")
 
 
+# --------------------------------------------------------------------------- #
+# The per-run index (§6)
+# --------------------------------------------------------------------------- #
+
+
+def _index_rows(tmp_path):
+    return [
+        {
+            "analyzer": "bpa",
+            "artifact": "Sales",
+            "status": "warning",
+            "errors": 0,
+            "warnings": 21,
+            "output_path": str(tmp_path / "bpa" / "Sales" / "envelope.json"),
+            "report_path": str(tmp_path / "bpa" / "Sales" / "report.html"),
+        },
+        {
+            "analyzer": "pql_test",
+            "artifact": "Sales",
+            "status": "skipped",
+            "errors": 0,
+            "warnings": 0,
+            "output_path": str(tmp_path / "pql_test" / "Sales" / "envelope.json"),
+            "report_path": None,
+        },
+    ]
+
+
+@pytest.mark.fab_test
+def test_index_totals_match_the_rows_it_was_given(tmp_path):
+    """Built from the summary's own rows, so the two cannot disagree."""
+    from fabric_ci_cd_dataops.scripts._report_html import render_index
+
+    html = render_index(_index_rows(tmp_path), tmp_path)
+
+    assert "21 warning(s)" in html
+    assert "2 artifact(s)" in html
+
+
+@pytest.mark.fab_test
+def test_index_links_are_relative_to_the_index_location(tmp_path):
+    """The page must survive being moved or downloaded as a CI artifact."""
+    from fabric_ci_cd_dataops.scripts._report_html import render_index
+
+    html = render_index(_index_rows(tmp_path), tmp_path)
+
+    assert 'href="bpa/Sales/report.html"' in html
+    assert str(tmp_path) not in html, "absolute path leaked into a link"
+
+
+@pytest.mark.fab_test
+def test_index_marks_a_missing_report_rather_than_linking_nothing(tmp_path):
+    from fabric_ci_cd_dataops.scripts._report_html import render_index
+
+    html = render_index(_index_rows(tmp_path), tmp_path)
+
+    assert html.count("<a href=") == 3, "2 envelopes + 1 report expected"
+
+
+@pytest.mark.fab_test
+def test_write_index_returns_the_written_path(tmp_path):
+    from fabric_ci_cd_dataops.scripts._report_html import write_index
+
+    written = write_index(_index_rows(tmp_path), tmp_path)
+
+    assert written == tmp_path / "index.html"
+    assert written.read_text(encoding="utf-8").startswith("<!DOCTYPE html>")
+
+
 @pytest.mark.fab_test
 def test_write_report_is_utf8(tmp_path):
     """Findings carry model names with non-ASCII characters."""

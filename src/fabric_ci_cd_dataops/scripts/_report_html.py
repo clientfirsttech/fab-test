@@ -19,6 +19,8 @@ artifact where nothing can be fetched.
 
 from __future__ import annotations
 
+import os
+import sys
 from html import escape
 from pathlib import Path
 from typing import Any
@@ -136,3 +138,138 @@ def write_report(envelope: dict[str, Any], path: Path | str) -> Path:
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(render_report(envelope), encoding="utf-8")
     return target
+
+
+INDEX_FILENAME = "index.html"
+
+_TRUTHY = {"1", "true", "yes", "on"}
+
+
+def resolve_report(args: Any, file_config: dict[str, Any] | None = None) -> bool:
+    """Resolve whether reports are on, via the centralized precedence chain.
+
+    ``--report`` / ``--no-report`` > ``ANALYZER_REPORT`` > config file >
+    default. Lives here rather than in `fab_test.py` so the summary module
+    can ask the same question without importing the CLI, which would be a
+    cycle. Default False: generation is opt-in.
+    """
+    from ._config import resolve_setting
+
+    config = file_config if file_config is not None else getattr(args, "file_config", None)
+    value, _origin = resolve_setting(
+        "report",
+        cli_value=getattr(args, "report", None),
+        env_var="ANALYZER_REPORT",
+        file_config=config or {},
+        packaged_default=False,
+    )
+    if isinstance(value, str):
+        return value.strip().lower() in _TRUTHY
+    return bool(value)
+
+
+def render_index(rows: list[dict[str, Any]], base_dir: Path) -> str:
+    """Render the per-run index linking every report and envelope.
+
+    Takes the same rows the aggregate summary prints, so the two cannot
+    report different counts for one run -- there is no second pass over
+    the envelopes to disagree with.
+
+    Links are relative to ``base_dir`` (where the index is written) so the
+    page keeps working when the results directory is moved or downloaded
+    as a CI artifact.
+    """
+
+    def _link(path: str | None) -> str:
+        if not path:
+            return '<span class="none">—</span>'
+        try:
+            href = Path(path).resolve().relative_to(base_dir.resolve()).as_posix()
+        except ValueError:
+            href = Path(path).as_posix()
+        return f'<a href="{escape(href)}">{escape(Path(path).name)}</a>'
+
+    body = []
+    for r in rows:
+        css = _row_class(r.get("status"))
+        attr = f' class="{css}"' if css else ""
+        body.append(
+            f"<tr{attr}>"
+            f"<td>{escape(str(r.get('analyzer', '')))}</td>"
+            f"<td>{escape(str(r.get('artifact', '')))}</td>"
+            f"<td class=\"sev\">{escape(str(r.get('status', '')))}</td>"
+            f"<td>{escape(str(r.get('errors', 0)))}</td>"
+            f"<td>{escape(str(r.get('warnings', 0)))}</td>"
+            f"<td>{_link(r.get('report_path'))}</td>"
+            f"<td>{_link(r.get('output_path'))}</td>"
+            "</tr>"
+        )
+    headers = ("Analyzer", "Artifact", "Status", "Errors", "Warnings", "Report", "Envelope")
+    head = "".join(f"<th>{escape(h)}</th>" for h in headers)
+    totals_errors = sum(int(r.get("errors", 0) or 0) for r in rows)
+    totals_warnings = sum(int(r.get("warnings", 0) or 0) for r in rows)
+
+    return (
+        "<!DOCTYPE html>\n"
+        '<html lang="en">\n<head>\n<meta charset="utf-8">\n'
+        '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
+        "<title>fab-test run</title>\n"
+        f"<style>{_STYLE}</style>\n</head>\n<body>\n"
+        "<h1>fab-test run</h1>\n"
+        f'<p class="meta">{totals_errors} error(s), {totals_warnings} warning(s) '
+        f"across {len(rows)} artifact(s)</p>\n"
+        f"<table><thead><tr>{head}</tr></thead><tbody>{''.join(body)}</tbody></table>\n"
+        "</body>\n</html>\n"
+    )
+
+
+def write_index(rows: list[dict[str, Any]], output_dir: Path | str) -> Path | None:
+    """Write the per-run index under ``output_dir``. Never raises."""
+    base = Path(output_dir)
+    target = base / INDEX_FILENAME
+    try:
+        base.mkdir(parents=True, exist_ok=True)
+        target.write_text(render_index(rows, base), encoding="utf-8")
+    except (OSError, ValueError, TypeError) as exc:
+        print(f"::warning::could not write {target}: {exc}", file=sys.stderr)
+        return None
+    return target
+
+
+def report_enabled() -> bool:
+    """Whether report generation is switched on for this run.
+
+    Reads ``ANALYZER_REPORT``, set by `fab-test` when ``--report`` resolves
+    true — the same channel as ``ANALYZER_VERBOSITY`` and
+    ``ANALYZER_OUTPUT_MODE``, so no command builder needs a new argument.
+
+    Off by default, deliberately: generation is opt-in so no existing run
+    gets slower and no pipeline starts collecting artifacts it did not ask
+    for.
+    """
+    return os.environ.get("ANALYZER_REPORT", "").strip().lower() in _TRUTHY
+
+
+def attach_report(envelope: dict[str, Any], envelope_path: Path | str) -> None:
+    """Render a report beside ``envelope_path`` and record it on the envelope.
+
+    A no-op unless generation is enabled, and a no-op when the envelope
+    already carries ``native_html_output_path`` — that means the upstream
+    tool produced its own report (PBIR Inspector's ``TestRun.html``),
+    which is richer than anything rendered from the envelope and must not
+    be overwritten.
+
+    Never raises. A report is a convenience, so a failure to render one is
+    reported and swallowed rather than turned into a failed build: exit
+    codes belong to findings, not to presentation.
+    """
+    if not report_enabled() or envelope.get("native_html_output_path"):
+        return
+    target = Path(envelope_path).parent / "report.html"
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(render_report(envelope), encoding="utf-8")
+    except (OSError, ValueError, TypeError, KeyError, RuntimeError) as exc:
+        print(f"::warning::could not render report for {target}: {exc}", file=sys.stderr)
+        return
+    envelope["native_html_output_path"] = str(target)

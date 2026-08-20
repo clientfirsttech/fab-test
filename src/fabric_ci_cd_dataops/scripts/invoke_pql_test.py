@@ -24,6 +24,7 @@ from ._analyzer_envelope import (
     native_output_path,
     write_envelope,
 )
+from ._report_html import attach_report
 
 _VERBOSITY_LEVELS = {"summary": 0, "default": 1, "verbose": 2, "debug": 3}
 
@@ -181,6 +182,9 @@ def write_results(
         env["test_summary"] = test_summary
     if desktop_port is not None:
         env["desktop"] = {"port": desktop_port, "model_name": desktop_model_name}
+    # pql-test emits JSON only, so the readable report is rendered from the
+    # envelope. No-op unless --report was passed.
+    attach_report(env, output_path)
     write_envelope(output_path, env)
 
 
