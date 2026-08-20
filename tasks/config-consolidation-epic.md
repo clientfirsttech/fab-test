@@ -148,6 +148,8 @@ Let a developer already signed in to Azure skip secrets entirely.
 
 Make the first config file something the CLI writes, not something the user researches.
 
+**Ordering note (2026-08-19)**: this task's own requirement 3 needs `fab-test config --validate`, but that's task 11 -- a forward reference the epic's stated task order doesn't resolve. Did task 11 first so this task's own requirement can be genuinely verified rather than deferred.
+
 **Requirements**:
 - Given `fab-test init`, then a commented `fab-test.yml` and `.env.example` are created without overwriting existing files.
 - Given a config already exists, then the CLI reports what exists and exits `0` with no changes.
@@ -158,7 +160,7 @@ Make the first config file something the CLI writes, not something the user rese
 
 ---
 
-## 11. Publish a JSON Schema and `--validate`
+## 11. Publish a JSON Schema and `--validate` ✅
 
 Give editors completion and CI a check.
 

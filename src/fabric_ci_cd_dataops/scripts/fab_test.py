@@ -1240,6 +1240,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Print every effective setting with its value and origin",
     )
     config_p.add_argument(
+        "--validate",
+        action="store_true",
+        help="Confirm the config file's keys and types are valid, and exit",
+    )
+    config_p.add_argument(
         "--format",
         choices=["text", "json"],
         default=_PYPROJECT_CONFIG.get("format", "text"),
@@ -1350,6 +1355,21 @@ def _is_secret_key(key: str) -> bool:
     return any(marker in lowered for marker in _SECRET_KEY_MARKERS)
 
 
+def _config_validate(args: argparse.Namespace) -> int:
+    """Report that the config file is valid.
+
+    main() already runs merged_file_config()/validate_config() for every
+    invocation before any subcommand dispatches -- reaching this handler
+    at all means the config already passed. This just reports it.
+    """
+    output_format = getattr(args, "output_format", "text")
+    if output_format == "json":
+        print(json.dumps({"valid": True}, indent=2))
+    else:
+        print("✅ Configuration is valid.")
+    return 0
+
+
 def _config_show(args: argparse.Namespace) -> int:
     """Print every effective setting fab-test would use, and where it came from.
 
@@ -1357,6 +1377,9 @@ def _config_show(args: argparse.Namespace) -> int:
     doesn't take `--jobs`/`--timeout`/etc. itself; it reports what a bare
     invocation of another subcommand would resolve to right now.
     """
+    if getattr(args, "validate", False):
+        return _config_validate(args)
+
     output_format = getattr(args, "output_format", "text")
     file_config = getattr(args, "file_config", {})
     rows = []

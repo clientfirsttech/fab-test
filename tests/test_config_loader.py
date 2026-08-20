@@ -10,11 +10,14 @@ artifact required.
     pytest tests/test_config_loader.py -k merge
 """
 
+import json
 import subprocess
+from pathlib import Path
 
 import pytest
 
 from fabric_ci_cd_dataops.scripts._config import (
+    _VALID_KEYS,
     CONFIG_FILENAME,
     ConfigError,
     discover_config_path,
@@ -23,6 +26,14 @@ from fabric_ci_cd_dataops.scripts._config import (
     merged_file_config,
     resolve_setting,
     validate_config,
+)
+
+_SCHEMA_PATH = (
+    Path(__file__).resolve().parents[1]
+    / "src"
+    / "fabric_ci_cd_dataops"
+    / "schemas"
+    / "fab-test.schema.json"
 )
 
 
@@ -442,3 +453,112 @@ def test_resolve_setting_without_env_var_checks_config_directly():
     )
 
     assert (value, origin) == ("DEV", f"{CONFIG_FILENAME}:environment")
+
+
+# --------------------------------------------------------------------------- #
+# JSON schema and deep rule-overlay validation (Config Consolidation §11)
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.fab_test
+def test_schema_file_exists_and_is_valid_json():
+    """The packaged schema file parses as JSON."""
+    schema = json.loads(_SCHEMA_PATH.read_text(encoding="utf-8"))
+    assert schema["title"] == "fab-test.yml"
+
+
+@pytest.mark.fab_test
+def test_schema_properties_match_valid_keys():
+    """The schema's top-level properties and the loader's _VALID_KEYS can't drift."""
+    schema = json.loads(_SCHEMA_PATH.read_text(encoding="utf-8"))
+    assert set(schema["properties"].keys()) == set(_VALID_KEYS.keys())
+
+
+@pytest.mark.fab_test
+def test_schema_rule_overlay_properties_match_validator():
+    """The schema's ruleOverlay keys and validate_config's nested check can't drift."""
+    schema = json.loads(_SCHEMA_PATH.read_text(encoding="utf-8"))
+    overlay_props = set(schema["$defs"]["ruleOverlay"]["properties"].keys())
+    assert overlay_props == {"disable", "severity", "extend"}
+
+
+@pytest.mark.fab_test
+def test_validate_config_accepts_a_full_valid_rules_overlay():
+    """A structurally valid rules overlay passes."""
+    validate_config({
+        "rules": {
+            "bpa": {"disable": ["RULE_A"], "severity": {"RULE_B": "warning"}, "extend": "extra.json"},
+            "pbir": {"disable": ["RULE_C"]},
+        }
+    })  # must not raise
+
+
+@pytest.mark.fab_test
+def test_validate_config_rejects_unknown_rules_analyzer():
+    """rules.<name> for an analyzer other than bpa/pbir is rejected with a suggestion."""
+    with pytest.raises(ConfigError, match="pbir"):
+        validate_config({"rules": {"pbi": {"disable": ["X"]}}})
+
+
+@pytest.mark.fab_test
+def test_validate_config_rejects_unknown_rule_overlay_key():
+    """A typo'd overlay key (disble instead of disable) is rejected with a suggestion."""
+    with pytest.raises(ConfigError, match="disable"):
+        validate_config({"rules": {"bpa": {"disble": ["X"]}}})
+
+
+@pytest.mark.fab_test
+def test_validate_config_rejects_non_list_disable():
+    """rules.bpa.disable must be a list, not a bare string."""
+    with pytest.raises(ConfigError, match="disable"):
+        validate_config({"rules": {"bpa": {"disable": "RULE_A"}}})
+
+
+@pytest.mark.fab_test
+def test_validate_config_rejects_non_string_items_in_disable():
+    """rules.bpa.disable's items must all be strings."""
+    with pytest.raises(ConfigError, match="disable"):
+        validate_config({"rules": {"bpa": {"disable": [123]}}})
+
+
+@pytest.mark.fab_test
+def test_validate_config_rejects_non_string_severity_values():
+    """rules.bpa.severity must map rule IDs to string labels."""
+    with pytest.raises(ConfigError, match="severity"):
+        validate_config({"rules": {"bpa": {"severity": {"RULE_A": 2}}}})
+
+
+@pytest.mark.fab_test
+def test_config_validate_real_cli_reports_success_for_a_valid_config(tmp_path):
+    """fab-test config --validate exits 0 and reports success for a valid config."""
+    (tmp_path / CONFIG_FILENAME).write_text("jobs: 2\n", encoding="utf-8")
+
+    result = subprocess.run(
+        ["fab-test", "config", "--validate"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        cwd=tmp_path,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "valid" in (result.stdout + result.stderr).lower()
+
+
+@pytest.mark.fab_test
+def test_config_validate_real_cli_exits_2_for_invalid_config(tmp_path):
+    """fab-test config --validate exits 2 for a config with an unknown key."""
+    (tmp_path / CONFIG_FILENAME).write_text("not_a_real_key: 1\n", encoding="utf-8")
+
+    result = subprocess.run(
+        ["fab-test", "config", "--validate"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        cwd=tmp_path,
+        check=False,
+    )
+
+    assert result.returncode == 2
+    assert "not_a_real_key" in result.stderr
