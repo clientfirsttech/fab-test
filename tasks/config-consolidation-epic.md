@@ -112,9 +112,11 @@ Make the engine reachable from the analyzers that own rule files.
 
 ---
 
-## 8. Auto-Discover `.env`
+## 8. Auto-Discover `.env` ✅
 
 Remove the `--env-file` ceremony from the common path.
+
+**Verification note (2026-08-19)**: `load_config(env_file=None)` already fell back to `repo_root / ".env"` and every playwright wrapper's `--env-file` already defaulted to `None`, so auto-discovery, explicit-override precedence, and non-leakage into `to_test_case_dict()` all already worked -- but none of it had a regression test proving it. This task turned out to be test coverage: added 4 tests that would have caught a regression in any of the three requirements below.
 
 **Requirements**:
 - Given a `.env` at the repository root, then it is discovered without `--env-file`.
