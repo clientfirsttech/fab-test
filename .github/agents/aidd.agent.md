@@ -38,6 +38,17 @@ When the user invokes you with any of these phrases, execute the corresponding w
 | **run test**, **execute test** | `aidd-user-testing`, `aidd-please` | Execute AI agent test |
 | **log**, **log changes**, **changelog** | `aidd-log`, `aidd-please` | Document completed work |
 | **commit**, **create commit** | `aidd-please` | Create conventional commit |
+| **document**, **update docs**, **sync docs**, **update readme** | `document` | Sync README, QUICK-VALIDATION, and the fab-test skill together |
+| **requirements**, **functional spec**, **given/should** | `aidd-requirements` | Write functional requirements |
+| **pr**, **pull request**, **review comments** | `aidd-pr`, `aidd-please` | Triage and address PR review comments |
+| **parallel**, **fan out**, **sub-agents** | `aidd-parallel`, `aidd-please` | Delegate to parallel sub-agents |
+| **pipeline**, **step-by-step pipeline** | `aidd-pipeline`, `aidd-please` | Run a markdown task list as a pipeline |
+| **upskill**, **create skill** | `aidd-upskill`, `aidd-sudolang-syntax` | Author a new AIDD skill |
+| **security**, **jwt**, **timing** | `aidd-jwt-security` or `aidd-timing-safe-compare` | Targeted security review |
+| **deploy**, **fabric deploy** | `fabric-cicd-deployment` | Fabric artifact deployment pattern |
+
+This table mirrors the Command Map in `.github/skills/aidd-workflow/SKILL.md`, which is
+the authority. If the two ever disagree, the workflow skill wins — and fix this table.
 
 ## Workflow Protocol
 
@@ -45,19 +56,22 @@ Before executing any command:
 
 1. **Read vision.md first** - Verify alignment with project goals and constraints
 2. **Load workflow skill** - Read `.github/skills/aidd-workflow/SKILL.md` to resolve the command and apply project constraints
-3. **Load command file** - Read `.github/commands/[command-name].md`
-4. **Load skills** - Read all referenced `.github/skills/[skill-name]/SKILL.md` files
-5. **Follow constraints** - Respect all constraints in skill files
-6. **Execute workflow** - Follow the step-by-step process defined in skills
+3. **Load skills** - Read all referenced `.github/skills/[skill-name]/SKILL.md` files
+4. **Follow constraints** - Respect all constraints in skill files
+5. **Execute workflow** - Follow the step-by-step process defined in skills
+
+Commands resolve through the workflow skill's Command Map. This project has no
+`.github/commands/` directory — skills carry the workflow, so there is no separate
+command file to load.
 
 Example: When user says "task: add validation":
 ```
 1. Read: vision.md
 2. Load: .github/skills/aidd-workflow/SKILL.md
-3. Load: .github/commands/task.md
-4. Load: .github/skills/aidd-task-creator/SKILL.md
-5. Load: .github/skills/aidd-please/SKILL.md
-6. Load: .github/skills/aidd-tdd/SKILL.md
+3. Load: .github/skills/aidd-task-creator/SKILL.md
+4. Load: .github/skills/aidd-please/SKILL.md
+5. Load: .github/skills/aidd-tdd/SKILL.md
+6. Load: .github/skills/aidd-python/SKILL.md   (this project is Python)
 7. Execute: Task planning and execution workflow
 ```
 
@@ -99,6 +113,14 @@ Brief task description
 4. **Epic-Driven**: Document all work in epic files
 5. **Review Regularly**: After every 3 tasks, review and commit progress
 6. **Vision Alignment**: Flag conflicts with vision.md before proceeding
+7. **Documentation Is Part of Done**: An epic is not complete until all three callers
+   are covered — the agent has an updated skill, the human has updated README and
+   docs, and the pipeline has a copy-pasteable YAML snippet. Any one missing means
+   not done. Use the `document` command so the three cannot drift apart. See the
+   Definition of Done table in [vision.md](../../vision.md).
+8. **Verify Through the Real Entry Point**: Confirm a change works the way a user
+   invokes it — the installed console script, not just a test run that may resolve
+   to a different source tree. A green suite against the wrong tree proves nothing.
 
 ## Constraints
 
@@ -113,8 +135,10 @@ Brief task description
 
 This project's agent customization lives under `.github/`:
 - `.github/agents/aidd.agent.md` - This file
-- `.github/skills/aidd-workflow/SKILL.md` - Project-specific command resolver
+- `.github/skills/aidd-workflow/SKILL.md` - Project-specific command resolver (the authority)
 - `.github/skills/fabric-cicd-deployment/SKILL.md` - Fabric deployment pattern
+- `.github/skills/document/SKILL.md` - Doc sync across the three callers
+- `.github/skills/fab-test/SKILL.md` - fab-test CLI reference
 - `.github/copilot-instructions.md` - VS Code Copilot guidelines
 
 ## Skill Locations
@@ -131,7 +155,19 @@ All skills are in `.github/skills/<name>/SKILL.md`:
 - `aidd-user-testing` - Test generation
 - `aidd-structure` - Code organization
 - `aidd-workflow` - Project command resolver (load first)
+- `aidd-python` - Python practices, simplicity budgets, over-engineering review lens
+- `aidd-requirements` - Functional requirements (given/should)
+- `aidd-pr` - Pull-request review triage
+- `aidd-parallel` - Sub-agent delegation
+- `aidd-pipeline` - Markdown task list as a pipeline
+- `aidd-upskill` / `aidd-sudolang-syntax` - Authoring new skills
+- `document` - Sync README, QUICK-VALIDATION, and the fab-test skill
+- `fab-test` - fab-test CLI reference (subcommands, targeting grammar, auth, exit codes)
 - `fabric-cicd-deployment` - Fabric artifact deployment
+
+This project is Python: skip the JS/TS skills (`aidd-javascript`, `aidd-lit`,
+`aidd-react`, `aidd-autodux`, `aidd-ecs`) and load `aidd-python` instead for any
+task that writes or reviews code.
 
 ## Output Format
 
