@@ -128,9 +128,11 @@ Remove the `--env-file` ceremony from the common path.
 
 ---
 
-## 9. Fall Back to Ambient Azure Credentials
+## 9. Fall Back to Ambient Azure Credentials ✅
 
 Let a developer already signed in to Azure skip secrets entirely.
+
+**Scope note**: requirement 3 ("the run manifest records the source name") is satisfied up to this task's stated file scope: `FabricServiceClient.credential_source` is a clean, tested public attribute (`"service-principal"` or `"ambient:DefaultAzureCredential"`) that never carries the token. Actually writing it into `analyzer-results/run.json` needs a `fab_test.py`/`_run_manifest.py` change (playwright's wrapper has no connection to `RunManifest` today), which is outside this task's listed files -- tracked as a follow-up in plan.md.
 
 **Requirements**:
 - Given no service-principal variables are set, then `DefaultAzureCredential` is attempted before failing.

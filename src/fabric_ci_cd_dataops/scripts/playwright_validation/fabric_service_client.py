@@ -74,6 +74,35 @@ def _authenticate_service_principal(
     return token.token
 
 
+def _authenticate_ambient() -> str:
+    """Acquire an access token via whatever ambient Azure credential is
+    available (``az login``, a managed identity, VS Code sign-in, an
+    environment credential, ...), so a developer already signed in to Azure
+    can skip service-principal secrets entirely.
+
+    Raises FabricServiceClientError when azure-identity isn't installed or
+    no credential in the chain succeeds -- never propagates the underlying
+    azure-core exception directly, so callers only need to catch one type.
+    """
+    try:
+        from azure.identity import DefaultAzureCredential  # type: ignore[import-untyped]
+    except ImportError as exc:
+        raise FabricServiceClientError(
+            "azure-identity is required for ambient credential authentication."
+        ) from exc
+
+    from azure.core.exceptions import ClientAuthenticationError  # type: ignore[import-untyped]
+
+    resource = "https://analysis.windows.net/powerbi/api"
+    try:
+        token = DefaultAzureCredential().get_token(f"{resource}/.default")
+    except ClientAuthenticationError as exc:
+        raise FabricServiceClientError(
+            "DefaultAzureCredential could not find a usable ambient credential."
+        ) from exc
+    return token.token
+
+
 class FabricServiceClient(ServiceClient):
     """Client backed by Azure Identity auth and direct Fabric REST calls.
 
@@ -97,6 +126,31 @@ class FabricServiceClient(ServiceClient):
         self._access_token = _authenticate_service_principal(credentials)
         self._api_root = _api_root_for(credentials.cloud)
         self._fabric_api_root = _fabric_api_root_for(credentials.cloud)
+        self.credential_source = "service-principal"
+
+    @classmethod
+    def from_access_token(
+        cls,
+        access_token: str,
+        *,
+        cloud: str = "public",
+        timeout_seconds: int = 30,
+        credential_source: str = "ambient",
+    ) -> FabricServiceClient:
+        """Build a client from an already-acquired access token (e.g. from
+        ``DefaultAzureCredential``), bypassing service-principal auth.
+
+        ``credential_source`` is a plain label for the run manifest / logs --
+        it never carries the token itself.
+        """
+        instance = cls.__new__(cls)
+        instance._credentials = None
+        instance._timeout = timeout_seconds
+        instance._access_token = access_token
+        instance._api_root = _api_root_for(cloud)
+        instance._fabric_api_root = _fabric_api_root_for(cloud)
+        instance.credential_source = credential_source
+        return instance
 
     def _headers(self) -> dict[str, str]:
         return {
@@ -224,6 +278,10 @@ def build_fabric_service_client(
     1. Explicit arguments
     2. Environment variables (FABRIC_TENANT_ID, FABRIC_CLIENT_ID, ...)
     3. Optional .env file parsed without mutating ``os.environ``
+    4. Ambient Azure credential (``DefaultAzureCredential``) -- attempted
+       only when *none* of the service-principal variables are set at all;
+       a partially-set service principal (e.g. tenant_id but no secret) is
+       treated as a mistake, not silently overridden by ambient auth.
     """
     from .config import _parse_env_file
 
@@ -261,6 +319,24 @@ def build_fabric_service_client(
         }.items()
         if not value
     ]
+    if not (tenant_id or client_id or client_secret):
+        try:
+            token = _authenticate_ambient()
+        except FabricServiceClientError:
+            pass
+        else:
+            return FabricServiceClient.from_access_token(
+                token, cloud=cloud, credential_source="ambient:DefaultAzureCredential"
+            )
+        raise ServiceResolutionError(
+            "No Fabric credentials found. Tried, in order: explicit arguments, "
+            "environment variables (FABRIC_TENANT_ID/FABRIC_CLIENT_ID/FABRIC_CLIENT_SECRET "
+            "or FABRIC_SERVICE_PRINCIPAL_ID/FABRIC_SERVICE_PRINCIPAL_SECRET), --env-file, "
+            "and DefaultAzureCredential (az login, a managed identity, VS Code sign-in, "
+            "an environment credential). Provide a service principal or sign in with "
+            "`az login`."
+        )
+
     if missing:
         raise ServiceResolutionError(
             "Missing Fabric service principal credentials: "
