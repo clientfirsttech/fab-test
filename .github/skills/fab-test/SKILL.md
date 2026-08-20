@@ -92,6 +92,15 @@ Every analyzer invocation (a single subcommand or `all`) writes one `run.json` u
   "schema_version": 1,
   "fab_test_version": "1.0.0",
   "origin": "local",
+  "target": {
+    "raw": "local/SampleModel-PQLAssert",
+    "scope": "desktop",
+    "name": "SampleModel-PQLAssert",
+    "type": null,
+    "workspace": null,
+    "workspace_id": null,
+    "path": null
+  },
   "command": ["fab-test", "bpa", "--format", "json"],
   "artifacts": [
     {
@@ -111,7 +120,9 @@ Every analyzer invocation (a single subcommand or `all`) writes one `run.json` u
 
 Per-artifact `status` is one of `passed` / `failed` / `skipped` / `timeout` / `preflight_failed` (the last two cover an aborted run). `detail` is `null` for a normal completion and carries the human-readable failure reason for the two abort statuses — the resolved remediation message for `preflight_failed`, the exceeded duration for `timeout` — so a caller never has to fall back to stderr to learn what to fix. `origin` is `"local"` when no CI environment variable is detected, or the detected CI system's name (`"github-actions"`, `"gitlab-ci"`, `"circleci"`, `"azure-devops"`) otherwise — the envelope schema, `status` values, and result layout are identical either way; this is the only field that differs between a local run and a CI run. The `command` field is sanitized: known credential flags (`--client-secret`, `--password`, `--token`, `--secret`, `--api-key`) and any `key=value`-shaped token have their value redacted before the file is written — no credential ever appears in the manifest.
 
-`doctor`, `list`, `explain`, and `clean-tools` never write a manifest — they don't run an analyzer.
+`target` is the resolved target as a structured object, or `null` when the run discovered artifacts instead of being pointed at one. Branch on `scope` (`path` / `desktop` / `workspace`) rather than parsing `raw`. Where `origin` says local versus CI, `target` says whether the run read files on disk, a running Desktop instance, or a deployed workspace item — a distinction `origin` alone never answered. `workspace_id` is the GUID resolved from a workspace name; it names a workspace and grants access to nothing, so it is safe to record.
+
+`doctor`, `list`, `explain`, `auth`, and `clean-tools` never write a manifest — they don't run an analyzer.
 
 ## Subcommands
 
@@ -132,12 +143,94 @@ Per-artifact `status` is one of `passed` / `failed` / `skipped` / `timeout` / `p
  fab-test config --show    — Print every effective setting with its value and origin
  fab-test config --validate — Confirm fab-test.yml's keys and types are valid
  fab-test init             — Scaffold a commented fab-test.yml and .env.example
+ fab-test auth status      — Show which identity fab-test would use, verified for real
+ fab-test auth login       — Delegate sign-in to the tool that owns the credential
  fab-test clean-tools      — Remove or inspect the .fab-test-tools downloaded-binary cache
 ```
 
 Underscore spellings (`pql_test`, `pql_lint`, `playwright_impact`) still work silently as aliases —
 existing scripts and muscle memory keep working. Result directories under `analyzer-results/`
 use the original underscore names regardless of which spelling you invoke.
+
+## Targeting
+
+Every analyzer subcommand takes an optional positional `TARGET` naming what to test. Omit it and `fab-test` discovers every matching artifact, exactly as before. The grammar is the one `pql-test` and the Fabric CLI already use, so a target pasted from either means the same thing here.
+
+| Target | Means |
+|--------|-------|
+| *(omitted)* | Discover every matching artifact under `--artifact-dir` |
+| `Sales` | The artifact named `Sales`; the analyzer's own glob picks the type |
+| `Sales.SemanticModel` | That name **and** type — `Sales.Report` is not selected |
+| `./src/Sales.SemanticModel` | Exactly that folder, wherever it lives (not confined to `--artifact-dir`) |
+| `local/Sales` | The copy open in a running Power BI Desktop instance |
+| `"Sales Dev.Workspace/Sales.SemanticModel"` | A deployed item in the named Fabric workspace |
+
+Quote any target containing spaces. `./local/Sales` addresses a directory genuinely named `local` rather than the Desktop scheme.
+
+### Which scopes each analyzer accepts
+
+Run `fab-test list` for this table at any time — it has a Scopes column.
+
+| Analyzer | path / name | `local/` | `WORKSPACE.Workspace/` |
+|----------|-------------|----------|------------------------|
+| `bpa`, `pbir`, `pql-lint` | yes | yes | **no** |
+| `pql-test` | yes | yes | yes |
+| `playwright`, `playwright-impact`, `dependencies` | yes | **no** | yes |
+
+The file-reading analyzers accept `local/` because the artifact is on disk either way — only `pql-test` actually *binds* to the running instance. They refuse a workspace target because reading a deployed item would mean exporting its definition first, which belongs to `fabric-cicd-deployment`, not here. Asking for one exits `2` and names the forms that work:
+
+```
+$ fab-test bpa "Sales Dev.Workspace/Sales.SemanticModel"
+  ✗ fab-test: bpa reads artifact files on disk and cannot fetch a deployed item.
+    Use local/NAME for a running Power BI Desktop instance; a path
+    (./src/Sales.SemanticModel) or a name (Sales.SemanticModel)
+```
+
+`fab-test all` **skips** an analyzer that cannot honor the target and says so, rather than failing the batch — so `fab-test all local/Sales` still runs everything that reads files.
+
+### Scope-specific behavior
+
+- `local/NAME` states the Desktop binding, so an ambient `FABRIC_WORKSPACE_ID` will **not** quietly turn the run remote. No running instance has that artifact open → exit `127`.
+- A workspace name resolves to its ID before the analyzer runs. A GUID is used verbatim with no lookup. No match exits `1` and lists the workspaces the identity can see; an ambiguous name exits `2` and lists the candidate IDs.
+- A `workspace:` key in `fab-test.yml` supplies a default; a positional workspace-qualified target overrides it. Passing both `--workspace-id` and a workspace-qualified target that disagree exits `2` naming both.
+- `--artifact STEM` is a deprecated alias for `TARGET` and still works. Passing both exits `2`.
+
+## Credentials
+
+**`fab-test` stores no credentials of its own** — no token, no cache, no credential file anywhere. It reads whatever the environment already provides, and delegates sign-in to the tool that owns the credential. There is no `fab-test` token cache to look for.
+
+### `fab-test auth status`
+
+Reports which identity would be used, and unlike `doctor` it verifies for real — this is the one command allowed to acquire a token.
+
+```bash
+fab-test auth status                      # readable table
+fab-test auth status --format json        # one JSON document on stdout
+fab-test auth status --workspace-id <id>  # also check that workspace is reachable
+```
+
+| Code | Meaning |
+|------|---------|
+| `0` | An identity resolved and was verified |
+| `1` | Credentials are fine, but the named workspace is not reachable with them |
+| `127` | Nothing resolvable, or an ambient credential that failed to acquire a token |
+
+Resolution order matches what actually authenticates: environment variables → `.env` file → ambient Azure credential (`az login`, managed identity, VS Code sign-in). A *partially* configured service principal is reported as a mistake rather than silently falling through to ambient auth.
+
+`doctor` uses the same chain but never acquires a token, so it reports an ambient credential as `unverified` and points here. That is expected, not a failure.
+
+### `fab-test auth login`
+
+Mints nothing. It runs the underlying tool's login, printing the exact command first so you can reproduce it without `fab-test`:
+
+```bash
+fab-test auth login                # delegates to `pql-test auth login`
+fab-test auth login --cloud USGov  # sovereign cloud
+```
+
+With no delegable tool on PATH it exits `127` naming `az login` and the service-principal variables.
+
+> **`--env` is not `--cloud`.** In `fab-test`, `--env` is the *test environment label* (`DEV`, `PROD`, `ANY`) and exists on the analyzer subcommands. `--cloud` selects the *Azure cloud* and exists only on `auth login`. `pql-test` spells its cloud flag `--environment`; the names are deliberately kept apart here so the two never collide.
 
 ## Configuration
 
@@ -203,7 +296,8 @@ The full schema ships with the package at `schemas/fab-test.schema.json` (draft 
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--artifact STEM` | (all) | Only analyze the artifact whose stem matches STEM exactly |
+| `TARGET` (positional) | (discover all) | What to test — see [Targeting](#targeting) for the grammar |
+| `--artifact STEM` | (all) | Deprecated alias for `TARGET`; passing both exits `2` |
 | `--artifact-dir DIR` | `.fabric/artifacts` (repository root for `local`) | Root directory to discover artifacts |
 | `--output-dir DIR` | `analyzer-results` | Root directory for result envelopes |
 | `--dry-run` | off | List matching artifacts without running any analyzer |
@@ -216,12 +310,14 @@ The full schema ships with the package at `schemas/fab-test.schema.json` (draft 
 ### Isolating a single artifact
 
 ```bash
-fab-test pql-test --artifact SampleModel-PQLAssert
-fab-test bpa --artifact SampleModel-PQLAssert
-fab-test all --artifact SampleModel-PQLAssert
+fab-test pql-test SampleModel-PQLAssert
+fab-test bpa SampleModel-PQLAssert.SemanticModel   # name and type
+fab-test all SampleModel-PQLAssert
 ```
 
-The stem is the artifact folder name without its extension (`.SemanticModel`, `.Report`).
+The stem is the artifact folder name without its extension (`.SemanticModel`, `.Report`). Adding the type makes the selection explicit, which matters under `all`: `fab-test all Sales.SemanticModel` never picks up `Sales.Report`.
+
+The older spelling still works: `fab-test bpa --artifact SampleModel-PQLAssert`.
 
 ## Subcommand-Specific Flags
 

@@ -108,6 +108,43 @@ fab-test playwright --artifact "Not Working Visuals" --env dev --env-file .env
 fab-test dependencies --semantic-model SalesModel --env dev --env-file .env
 ```
 
+### Naming what to test
+
+Every analyzer subcommand takes an optional target. Omit it and `fab-test` discovers everything matching, as before. The grammar is the one `pql-test` and the Fabric CLI already use, so a target pasted from either works here unchanged.
+
+| Target | Means |
+|--------|-------|
+| *(omitted)* | Discover every matching artifact under `--artifact-dir` |
+| `Sales` | The artifact named `Sales`; the analyzer's own glob picks the type |
+| `Sales.SemanticModel` | That name **and** type — `Sales.Report` is not selected |
+| `./src/Sales.SemanticModel` | Exactly that folder, wherever it lives (not confined to `--artifact-dir`) |
+| `local/Sales` | The copy open in a running Power BI Desktop instance |
+| `"Sales Dev.Workspace/Sales.SemanticModel"` | A deployed item in the named Fabric workspace |
+
+```bash
+fab-test bpa Sales.SemanticModel                          # one artifact, by name and type
+fab-test pql-test local/Sales                             # bind to Power BI Desktop
+fab-test pql-test "Sales Dev.Workspace/Sales.SemanticModel"   # a deployed model
+fab-test all local/Sales                                  # everything that can run locally
+```
+
+Not every analyzer accepts every form — `bpa` reads files on disk and cannot fetch a deployed item. Run `fab-test list` for the Scopes column, and see the [targeting reference](.github/skills/fab-test/SKILL.md#targeting) for the rules. `--artifact STEM` still works as a deprecated alias.
+
+### Credentials
+
+**`fab-test` stores no credentials** — no token, no cache, no credential file. It reads what your environment already provides and delegates sign-in to the tool that owns the credential, so there is no `fab-test` token cache to look for.
+
+```bash
+fab-test auth status        # which identity would be used, verified for real
+fab-test auth login         # delegates to `pql-test auth login`
+```
+
+`auth status` resolves in the same order that actually authenticates — environment variables, then `.env`, then an ambient Azure credential (`az login`, managed identity, VS Code sign-in). It exits `0` when verified, `127` when nothing resolves, and `1` when credentials work but a named workspace is unreachable.
+
+`fab-test doctor` uses the same chain but never acquires a token, so it reports an ambient credential as `unverified` and points at `auth status`. That is expected.
+
+> `--env` is the test environment label (`DEV`, `PROD`). `--cloud`, on `auth login` only, selects the Azure cloud. They are deliberately different names.
+
 ### The machine-readable workflow (agents and pipelines)
 
 `fab-test` is designed to be called the same way by a human, a CI pipeline, or an AI agent. The four-command loop:

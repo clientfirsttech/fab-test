@@ -105,9 +105,36 @@ fab-test pql-lint
 ### Isolate one artifact
 
 ```bash
-fab-test bpa --artifact SampleModel-PQLAssert
-fab-test pql-test --artifact SampleModel-PQLAssert --env DEV
+fab-test bpa SampleModel-PQLAssert
+fab-test pql-test SampleModel-PQLAssert --env DEV
 ```
+
+`--artifact SampleModel-PQLAssert` still works as a deprecated alias.
+
+### Naming what to test
+
+Every analyzer subcommand takes an optional target. Omit it and `fab-test` discovers everything matching. The grammar matches `pql-test` and the Fabric CLI, so a target pasted from either works unchanged.
+
+| Target | Means |
+|--------|-------|
+| *(omitted)* | Discover every matching artifact under `--artifact-dir` |
+| `Sales` | The artifact named `Sales`; the analyzer's own glob picks the type |
+| `Sales.SemanticModel` | That name **and** type — `Sales.Report` is not selected |
+| `./src/Sales.SemanticModel` | Exactly that folder, wherever it lives (not confined to `--artifact-dir`) |
+| `local/Sales` | The copy open in a running Power BI Desktop instance |
+| `"Sales Dev.Workspace/Sales.SemanticModel"` | A deployed item in the named Fabric workspace |
+
+Not every analyzer accepts every form. `fab-test list` has a Scopes column; `bpa`, `pbir`, and `pql-lint` refuse a workspace target because reading a deployed item would mean exporting it first. `fab-test all` skips an analyzer that cannot honor the target rather than failing the batch.
+
+### Check which identity you are using
+
+```bash
+fab-test auth status                      # verified for real, unlike doctor
+fab-test auth status --workspace-id <id>  # also confirm that workspace is reachable
+fab-test auth login                       # delegates to `pql-test auth login`
+```
+
+`fab-test` stores no credentials of its own. `auth status` exits `0` verified, `127` when nothing resolves, `1` when credentials work but the workspace is unreachable. `doctor` never acquires a token, so it reports an ambient `az login` credential as `unverified` and points here.
 
 ### Run the default analyzer set
 
@@ -166,6 +193,35 @@ Precedence, for every setting:
 
 See the [Configuration section of the fab-test skill](../.github/skills/fab-test/SKILL.md#configuration) for the full settings list and rule-overlay keys.
 
+### Pipeline snippet: targeting a deployed item by name
+
+The workspace belongs in committed config; only the credentials come from secrets. With `workspace:` set in `fab-test.yml`, the workflow names the artifact and nothing else:
+
+```yaml
+# fab-test.yml — committed, no secrets:
+#   workspace: Sales Prod
+```
+
+```yaml
+- name: Confirm the pipeline identity before doing any work
+  env:
+    FABRIC_TENANT_ID: ${{ secrets.FABRIC_TENANT_ID }}
+    FABRIC_CLIENT_ID: ${{ secrets.FABRIC_CLIENT_ID }}
+    FABRIC_CLIENT_SECRET: ${{ secrets.FABRIC_CLIENT_SECRET }}
+  run: fab-test auth status --format json
+
+- name: Run DAX tests against the deployed model
+  env:
+    FABRIC_TENANT_ID: ${{ secrets.FABRIC_TENANT_ID }}
+    FABRIC_CLIENT_ID: ${{ secrets.FABRIC_CLIENT_ID }}
+    FABRIC_CLIENT_SECRET: ${{ secrets.FABRIC_CLIENT_SECRET }}
+  run: fab-test pql-test "Sales Prod.Workspace/Sales.SemanticModel" --env PROD --format json
+```
+
+Spell the workspace out in the target when a job spans more than one, and quote it — display names usually contain spaces. A GUID works in the same position and skips the name lookup. `auth status` is worth running first: it exits `127` before any analyzer starts if the service principal is missing or half-configured, which is a clearer failure than an analyzer timing out against an unreachable workspace.
+
+The resolved target lands in `run.json` under `target`, so an uploaded manifest records whether the job read files on disk or hit a workspace — and which one.
+
 ### Pipeline snippet: doctor as a gate, run.json as the artifact
 
 A copy-pasteable step for a CI job — gate on readiness, run with `--format json`, upload the manifest instead of globbing result directories:
@@ -184,7 +240,7 @@ A copy-pasteable step for a CI job — gate on readiness, run with `--format jso
     path: analyzer-results/run.json
 ```
 
-`run.json` records `schema_version`, `fab_test_version`, `origin` (`"local"` locally, the detected CI system in a pipeline), the invoked command (credentials redacted), per-artifact status, envelope paths, totals, and the final exit code — see the [Agent Contract](../.github/skills/fab-test/SKILL.md#agent-contract) for the full schema.
+`run.json` records `schema_version`, `fab_test_version`, `origin` (`"local"` locally, the detected CI system in a pipeline), `target` (the resolved target, or `null` for a discovery run), the invoked command (credentials redacted), per-artifact status, envelope paths, totals, and the final exit code — see the [Agent Contract](../.github/skills/fab-test/SKILL.md#agent-contract) for the full schema.
 
 ### Running the local-Desktop analyzer set in CI
 
