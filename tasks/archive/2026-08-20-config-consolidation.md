@@ -1,6 +1,6 @@
 # Config Consolidation Epic
 
-**Status**: 🚧 IN-PROGRESS
+**Status**: ✅ COMPLETED (2026-08-20) — 13/13 tasks; 1 deferred (Shared Base Configuration, see bottom of this file)
 **Goal**: One front door for configuration and rule tuning, with a single precedence rule and no forked rule files.
 
 ## Overview
