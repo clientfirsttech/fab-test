@@ -9,13 +9,15 @@
 
 Two decisions fix the scope. Targeting is a **positional grammar over an internal `(workspace, name, type)` model**: the surface is what a user pastes from `pql-test` or the Fabric CLI, the internals stay flag-shaped so `fab-test.yml` and `--workspace-id` compose with it. Auth is **read-only plus delegation**: `auth status` reports the resolved identity chain, `auth login` mints nothing and instead runs the underlying tool's login or names the exact variables to set. `fab-test` owning a token cache was rejected as a fourth credential store on one laptop and a violation of *facade, not fork* — see Deferred.
 
-Tasks 1–5 (targeting) can start immediately. Tasks 7–9 (auth) depend on Config Consolidation tasks 8–9 landing first, since those define the credential chain `auth status` reports on; building the report first means rewriting it. Task 6 depends on neither and is independently shippable.
+**Sequencing update (2026-08-20)**: Config Consolidation closed 13/13, shipping the `.env` auto-discovery and `DefaultAzureCredential` fallback that tasks 7–9 were waiting on. Every task is now unblocked. That also makes task 6 immediately stale in one respect — its `_credential_source()` recognizes only service-principal variables and says so in a comment, so a developer signed in with `az login` is now told they are not ready when they are. Task 7 moves up to run next, ahead of tasks 2–5, because it closes that gap rather than merely adding to it.
 
 ---
 
-## 1. Parse the Target Grammar
+## 1. Parse the Target Grammar ✅
 
 Introduce a target parser with nothing wired to it yet, so the grammar can be pinned down before it has callers.
+
+**Done (2026-08-20)**: `_target.py` with `parse_target`, `ResolvedTarget`, and `TargetError`. Scope is decided by the first path segment: an explicit path prefix (`./`, `../`, `/`, `C:`) wins outright, then the reserved `local/` scheme, then a `.Workspace` suffix, else path. That ordering gives `./local/Sales` as the escape hatch for a directory genuinely named `local`. `path` is populated only when the target contains a separator, so a bare `Sales.SemanticModel` stays a discovery filter rather than a location. `KNOWN_ARTIFACT_TYPES` is asserted against the `ANALYZER_REGISTRY` globs so the two cannot drift.
 
 New `_target.py` turns one string into a `ResolvedTarget` dataclass of `scope` (`path` | `desktop` | `workspace`), `workspace`, `name`, `type`, and `path`. Parsing only — no filesystem access, no network.
 
@@ -127,7 +129,7 @@ Fix the false green. Independently shippable — depends on no other task in thi
 
 Report which identity `fab-test` would actually use, once there is a chain worth reporting.
 
-**Depends on Config Consolidation tasks 8 and 9** (`.env` auto-discovery, `DefaultAzureCredential` fallback) — those define the chain, and probing before they land means rewriting this.
+**Unblocked (2026-08-20)**: Config Consolidation tasks 8 and 9 have landed, so the chain this reports on now exists — `build_client_from_env` in `playwright_validation/fabric_service_client.py` documents it as explicit arguments, then environment variables, then `.env`, then `DefaultAzureCredential`, with ambient auth attempted only when *no* service-principal variable is set so a half-configured principal is surfaced as the mistake it is. Runs next, ahead of tasks 2–5, since task 6 currently under-reports readiness for anyone signed in via `az login`.
 
 **Requirements**:
 - Given resolvable credentials, then the probe reports the source that won (`env`, `.env`, ambient Azure, Desktop) and the tenant.
