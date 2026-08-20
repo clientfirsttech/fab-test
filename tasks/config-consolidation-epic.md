@@ -174,9 +174,11 @@ Give editors completion and CI a check.
 
 ---
 
-## 12. Sweep Backward Compatibility
+## 12. Sweep Backward Compatibility ✅
 
 Guarantee existing repositories keep working untouched.
+
+**Finding (not fixed here -- outside this task's file scope)**: `resolve_setting`'s origin label is always `fab-test.yml:<key>` for a config-sourced value, even when the value actually came from `[tool.fab-test]` in `pyproject.toml` and no `fab-test.yml` exists at all -- `merged_file_config` merges both sources into one dict before `resolve_setting` ever sees it, losing which file a key came from. The resolved *value* is always correct; only the displayed origin string doesn't distinguish the two files. Revisit if this becomes confusing in practice (e.g. `fab-test config --show` misattributing a pyproject-sourced setting to a nonexistent fab-test.yml).
 
 **Requirements**:
 - Given a repository with only `[tool.fab-test]` and `analyzers.json`, then every current command produces the same results as before this epic.

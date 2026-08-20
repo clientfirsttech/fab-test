@@ -139,3 +139,46 @@ def test_init_json_format_lists_created_files(tmp_path):
     created_names = {p.split("/")[-1].split("\\")[-1] for p in data["created"]}
     assert created_names == {"fab-test.yml", ".env.example"}
     assert data["already_existed"] == []
+
+
+@pytest.mark.fab_test
+def test_init_dry_run_reports_without_writing_anything(tmp_path):
+    """--dry-run reports what would be created and writes nothing."""
+    result = subprocess.run(
+        ["fab-test", "init", "--dry-run", "--format", "json"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        cwd=tmp_path,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert not (tmp_path / "fab-test.yml").exists()
+    assert not (tmp_path / ".env.example").exists()
+    data = json.loads(result.stdout)
+    would_create_names = {p.split("/")[-1].split("\\")[-1] for p in data["would_create"]}
+    assert would_create_names == {"fab-test.yml", ".env.example"}
+    assert data["created"] == []
+
+
+@pytest.mark.fab_test
+def test_init_dry_run_reports_existing_files_without_listing_them_as_would_create(tmp_path):
+    """--dry-run against an existing fab-test.yml reports it as already existing, not pending creation."""
+    (tmp_path / "fab-test.yml").write_text("jobs: 1\n", encoding="utf-8")
+
+    result = subprocess.run(
+        ["fab-test", "init", "--dry-run", "--format", "json"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        cwd=tmp_path,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    data = json.loads(result.stdout)
+    would_create_names = {p.split("/")[-1].split("\\")[-1] for p in data["would_create"]}
+    already_existed_names = {p.split("/")[-1].split("\\")[-1] for p in data["already_existed"]}
+    assert "fab-test.yml" not in would_create_names
+    assert "fab-test.yml" in already_existed_names

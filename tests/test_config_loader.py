@@ -562,3 +562,122 @@ def test_config_validate_real_cli_exits_2_for_invalid_config(tmp_path):
 
     assert result.returncode == 2
     assert "not_a_real_key" in result.stderr
+
+
+# --------------------------------------------------------------------------- #
+# Backward-compatibility sweep (Config Consolidation §12)
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.fab_test
+def test_only_pyproject_config_produces_identical_command_behavior(tmp_path):
+    """A repository with only [tool.fab-test] (no fab-test.yml) behaves exactly
+    as it did before this epic: config --show resolves every value from
+    pyproject.toml's table, with no fab-test.yml in the picture at all.
+    """
+    _write_pyproject_table(tmp_path, jobs=3, format="json", timeout=45)
+    assert not (tmp_path / CONFIG_FILENAME).exists()
+
+    result = subprocess.run(
+        ["fab-test", "config", "--show", "--format", "json"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        cwd=tmp_path,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    data = json.loads(result.stdout)
+    by_key = {row["key"]: row for row in data["settings"]}
+    assert by_key["jobs"]["value"] == 3
+    assert by_key["format"]["value"] == "json"
+    assert by_key["timeout"]["value"] == 45
+    # Known imprecision (not fixed here -- outside this sweep task's file
+    # scope): resolve_setting's origin label is always "fab-test.yml:key"
+    # for a config-sourced value, even when it actually came from
+    # [tool.fab-test] and no fab-test.yml exists. The *value* is correct;
+    # only the displayed origin string doesn't distinguish the two files.
+    assert by_key["jobs"]["origin"] == f"{CONFIG_FILENAME}:jobs"
+
+
+@pytest.mark.parametrize(
+    ("env_var", "config_key", "config_value", "env_value", "expected"),
+    [
+        ("ANALYZER_TIMEOUT", "timeout", 300, "45", 45),
+        ("FABRIC_ENVIRONMENT", "environment", "PROD", "STAGING", "STAGING"),
+    ],
+)
+@pytest.mark.fab_test
+def test_every_documented_env_var_still_overrides_config_file(
+    monkeypatch, env_var, config_key, config_value, env_value, expected
+):
+    """Every documented env var (ANALYZER_TIMEOUT, FABRIC_ENVIRONMENT) overrides
+    the config file, exactly as it did before this epic's resolver existed.
+    """
+    monkeypatch.setenv(env_var, env_value)
+
+    value, origin = resolve_setting(
+        config_key,
+        cli_value=None,
+        env_var=env_var,
+        file_config={config_key: config_value},
+        packaged_default=None,
+        cast=int if isinstance(expected, int) else None,
+    )
+
+    assert value == expected
+    assert origin == f"env:{env_var}"
+
+
+@pytest.mark.parametrize(
+    ("config_key", "env_var"),
+    [("timeout", "ANALYZER_TIMEOUT"), ("environment", "FABRIC_ENVIRONMENT")],
+)
+@pytest.mark.fab_test
+def test_cli_flag_wins_over_config_for_every_resolver_backed_setting(config_key, env_var):
+    """A CLI flag wins over both the config file and its env var, for every
+    setting routed through resolve_setting.
+    """
+    value, origin = resolve_setting(
+        config_key,
+        cli_value="explicit-cli-value",
+        env_var=env_var,
+        file_config={config_key: "config-value"},
+        packaged_default="default-value",
+    )
+
+    assert value == "explicit-cli-value"
+    assert origin == "flag"
+
+
+@pytest.mark.fab_test
+def test_cli_flag_wins_over_config_for_every_argparse_backed_setting(monkeypatch):
+    """A CLI flag wins over [tool.fab-test] for jobs/format/artifact-dir/output-dir --
+    the settings that still use baked-in argparse defaults rather than the resolver.
+    """
+    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+
+    monkeypatch.setattr(
+        fab_test_module,
+        "_PYPROJECT_CONFIG",
+        {
+            "jobs": 4,
+            "format": "json",
+            "artifact_dir": "/configured/artifacts",
+            "output_dir": "/configured/results",
+        },
+    )
+    parser = fab_test_module.build_parser()
+    ns = parser.parse_args([
+        "bpa", "--dry-run",
+        "--jobs", "9",
+        "--format", "text",
+        "--artifact-dir", "/explicit/artifacts",
+        "--output-dir", "/explicit/results",
+    ])
+
+    assert ns.jobs == 9
+    assert ns.output_format == "text"
+    assert ns.artifact_dir == "/explicit/artifacts"
+    assert ns.output_dir == "/explicit/results"

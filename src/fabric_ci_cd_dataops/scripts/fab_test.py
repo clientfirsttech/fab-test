@@ -1264,6 +1264,11 @@ def build_parser() -> argparse.ArgumentParser:
         dest="output_format",
         help="Output format for the scaffold report (default: text)",
     )
+    init_p.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Report what would be created without writing anything",
+    )
 
     # --- list ---
     list_p = subs.add_parser(
@@ -1463,15 +1468,18 @@ def _init(args: argparse.Namespace) -> int:
     """Scaffold a commented fab-test.yml and .env.example.
 
     Never overwrites an existing file -- each is reported and left
-    untouched instead.
+    untouched instead. --dry-run reports what would be created without
+    writing anything.
     """
     output_format = getattr(args, "output_format", "text")
+    dry_run = getattr(args, "dry_run", False)
     templates = {
         REPO_ROOT / CONFIG_FILENAME: _FAB_TEST_YML_TEMPLATE,
         REPO_ROOT / ".env.example": _ENV_EXAMPLE_TEMPLATE,
     }
 
     created = []
+    would_create = []
     already_existed = []
     for path, template in templates.items():
         if path.exists():
@@ -1480,13 +1488,19 @@ def _init(args: argparse.Namespace) -> int:
                 f"  • fab-test init: already exists, left untouched: {path}",
                 output_format=output_format,
             )
+        elif dry_run:
+            would_create.append(str(path))
+            narrate(f"  fab-test init: would create {path}", output_format=output_format)
         else:
             path.write_text(template, encoding="utf-8")
             created.append(str(path))
             narrate(f"  ✓ fab-test init: created {path}", output_format=output_format)
 
     if output_format == "json":
-        print(json.dumps({"created": created, "already_existed": already_existed}, indent=2))
+        print(json.dumps(
+            {"created": created, "would_create": would_create, "already_existed": already_existed},
+            indent=2,
+        ))
     return 0
 
 
