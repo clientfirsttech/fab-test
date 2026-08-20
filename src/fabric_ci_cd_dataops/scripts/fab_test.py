@@ -1252,6 +1252,19 @@ def build_parser() -> argparse.ArgumentParser:
         help="Output format for the settings report (default: text)",
     )
 
+    # --- init ---
+    init_p = subs.add_parser(
+        "init",
+        help="Scaffold a commented fab-test.yml and .env.example",
+    )
+    init_p.add_argument(
+        "--format",
+        choices=["text", "json"],
+        default=_PYPROJECT_CONFIG.get("format", "text"),
+        dest="output_format",
+        help="Output format for the scaffold report (default: text)",
+    )
+
     # --- list ---
     list_p = subs.add_parser(
         "list",
@@ -1395,6 +1408,86 @@ def _config_show(args: argparse.Namespace) -> int:
         display_value = "<redacted>" if _is_secret_key(key) else value
         rows.append({"key": key, "value": display_value, "origin": origin})
     return _print_config_show(rows, output_format)
+
+
+_FAB_TEST_YML_TEMPLATE = """\
+# fab-test.yml -- optional config-file front door for the fab-test CLI.
+#
+# Every key below is entirely optional and commented out: an absent key
+# falls back to its environment variable (where one exists) and then its
+# packaged default. Uncomment and edit only the settings you want to pin.
+#
+# Precedence for every setting: CLI flag > environment variable >
+# this file > packaged default. Run `fab-test config --show` to see the
+# effective value and origin of each setting right now.
+
+# artifact_dir: .fabric/artifacts   # root to discover artifacts (repo root for `fab-test local`)
+# output_dir: analyzer-results      # root for result envelopes and the run manifest
+# jobs: 1                          # artifacts to run in parallel for the same analyzer
+# format: text                     # text | json
+# timeout: 120                     # per-artifact subprocess timeout in seconds [env: ANALYZER_TIMEOUT]
+# environment: DEV                 # default environment label [env: FABRIC_ENVIRONMENT]
+
+# Rule overlays: deltas applied to a packaged ruleset instead of forking it.
+# rules:
+#   bpa:
+#     disable: [RULE_ID]                  # remove a rule from the effective ruleset
+#     severity: {RULE_ID: warning}        # info | warning | error
+#     extend: path/to/extra-rules.json    # append rules from another file
+#   pbir:
+#     disable: [RULE_ID]
+#     severity: {RULE_ID: warning}        # warning | error (PBIR Inspector has no "info" level)
+"""
+
+_ENV_EXAMPLE_TEMPLATE = """\
+# .env.example -- copy to .env and fill in the values you need.
+# .env is auto-discovered at the repository root; --env-file overrides it.
+# Never commit the real .env -- it holds credentials.
+
+# Service principal for Fabric/Power BI REST API access.
+# Leave all three unset to fall back to DefaultAzureCredential (az login,
+# a managed identity, VS Code sign-in, ...).
+FABRIC_TENANT_ID=
+FABRIC_CLIENT_ID=
+FABRIC_CLIENT_SECRET=
+
+# Playwright visual/error validation target.
+PLAYWRIGHT_WORKSPACE_ID=
+PLAYWRIGHT_REPORT_ID=
+PLAYWRIGHT_REPORT_NAME=
+PLAYWRIGHT_DATASET_ID=
+"""
+
+
+def _init(args: argparse.Namespace) -> int:
+    """Scaffold a commented fab-test.yml and .env.example.
+
+    Never overwrites an existing file -- each is reported and left
+    untouched instead.
+    """
+    output_format = getattr(args, "output_format", "text")
+    templates = {
+        REPO_ROOT / CONFIG_FILENAME: _FAB_TEST_YML_TEMPLATE,
+        REPO_ROOT / ".env.example": _ENV_EXAMPLE_TEMPLATE,
+    }
+
+    created = []
+    already_existed = []
+    for path, template in templates.items():
+        if path.exists():
+            already_existed.append(str(path))
+            narrate(
+                f"  • fab-test init: already exists, left untouched: {path}",
+                output_format=output_format,
+            )
+        else:
+            path.write_text(template, encoding="utf-8")
+            created.append(str(path))
+            narrate(f"  ✓ fab-test init: created {path}", output_format=output_format)
+
+    if output_format == "json":
+        print(json.dumps({"created": created, "already_existed": already_existed}, indent=2))
+    return 0
 
 
 def _doctor_local(args: argparse.Namespace) -> int:
@@ -1559,6 +1652,7 @@ _ADMIN_COMMAND_HANDLERS: dict[str, Callable[[argparse.Namespace], int]] = {
     "list": _list_analyzers,
     "explain": _explain_analyzer,
     "config": _config_show,
+    "init": _init,
 }
 
 
