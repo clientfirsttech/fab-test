@@ -83,7 +83,7 @@ Answer "where did this value come from?" without reading source.
 
 ---
 
-## 6. Build the Rule Overlay Engine
+## 6. Build the Rule Overlay Engine ✅
 
 Apply deltas to a packaged ruleset instead of forking it.
 
