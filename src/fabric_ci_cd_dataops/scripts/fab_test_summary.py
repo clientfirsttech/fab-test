@@ -16,6 +16,7 @@ from typing import Any
 from tabulate import tabulate
 
 from ._analyzer_envelope import _severity_counts, _severity_rank
+from ._target import target_from_args
 from .fab_test_registry import ANALYZER_REGISTRY, discover_artifacts
 
 
@@ -406,6 +407,26 @@ def _envelope_error_warning_counts(data: dict[str, Any] | None) -> tuple[int, in
     return _severity_counts(findings)
 
 
+def _display_path(path: Path | str) -> str:
+    """Return ``path`` relative to the working directory when it sits inside it.
+
+    Result paths were truncated to fit the summary table, which cut off
+    the analyzer and artifact segments and left a string that could be
+    neither clicked nor copied. A terminal resolves a relative path
+    against its own cwd, so the short form stays clickable and still fits.
+
+    A path outside the working directory -- an ``--output-dir`` somewhere
+    else -- keeps its absolute form. `relative_to` refuses those rather
+    than emitting a ``../../`` chain, which is the behavior wanted here:
+    such a chain would be longer than the absolute path and harder to read.
+    """
+    resolved = Path(path).resolve()
+    try:
+        return str(resolved.relative_to(Path.cwd()))
+    except ValueError:
+        return str(resolved)
+
+
 def _print_all_summary(
     output_dir: Path,
     analyzers: tuple[str, ...],
@@ -414,7 +435,10 @@ def _print_all_summary(
 ) -> int:
     """Print aggregate summary after `fab-test all` finishes."""
     artifact_dir = Path(args.artifact_dir)
-    stem_filter = getattr(args, "artifact", None)
+    # Must be the resolved target, not args.artifact: this runs its own
+    # discovery pass, and a raw stem string would ignore a positional
+    # target entirely and reach discover_artifacts as the wrong type.
+    target = target_from_args(args)
     dry_run = getattr(args, "dry_run", False)
     output_format = getattr(args, "output_format", "text")
 
@@ -425,7 +449,7 @@ def _print_all_summary(
 
     for analyzer, code in zip(analyzers, codes):
         glob, _ = ANALYZER_REGISTRY[analyzer]
-        stems = [a.stem for a in discover_artifacts(artifact_dir, glob, stem_filter)]
+        stems = [a.stem for a in discover_artifacts(artifact_dir, glob, target)]
         if not stems:
             rows.append({
                 "analyzer": analyzer,
@@ -525,7 +549,9 @@ def _print_all_summary(
             _status_label(r["status"]),
             str(r["errors"]),
             str(r["warnings"]),
-            _truncate(r["output_path"], 50),
+            # Not truncated: a cut path is neither clickable nor copyable,
+            # and the tail is the half that says which analyzer it came from.
+            _display_path(r["output_path"]) if r["output_path"] else "",
         )
         for r in rows
     ]
