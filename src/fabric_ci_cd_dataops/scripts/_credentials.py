@@ -80,6 +80,27 @@ def ambient_credential_available() -> bool:
     return importlib.util.find_spec("azure.identity") is not None
 
 
+def redact_secrets(text: str) -> str:
+    """Replace any live credential value found in ``text`` with a marker.
+
+    Value-based, unlike `_sanitize_command`'s flag-name matching: a secret
+    interpolated into prose has no flag in front of it. The values come
+    from the environment, so this catches exactly the strings that would
+    be damaging to print. Very short values are skipped -- redacting a
+    two-character secret would blank unrelated text and make the output
+    less trustworthy, not more.
+
+    Only the client secret is redacted. A tenant or client ID names a
+    directory and an application; `auth status` reports the tenant on
+    purpose, and blanking it would remove the answer the caller came for.
+    """
+    for var in _CLIENT_SECRET_VARS:
+        value = os.environ.get(var, "")
+        if len(value) >= 8:
+            text = text.replace(value, "<redacted>")
+    return text
+
+
 def _parse_env_file(env_file: Path) -> dict[str, str]:
     """Read KEY=VALUE pairs from ``env_file`` without mutating ``os.environ``."""
     from .playwright_validation.config import _parse_env_file as _parse
