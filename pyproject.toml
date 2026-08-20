@@ -73,6 +73,7 @@ include = ["fabric_ci_cd_dataops*"]
 "fabric_ci_cd_dataops" = [
     "agents/*",
     "skills/*/*",
+    "schemas/*.json",
 ]
 
 [tool.ruff]

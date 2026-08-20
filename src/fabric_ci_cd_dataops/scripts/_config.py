@@ -89,13 +89,47 @@ def merged_file_config(
     return {**pyproject_config, **yaml_config}, warnings
 
 
+_RULE_OVERLAY_ANALYZERS = ("bpa", "pbir")
+_RULE_OVERLAY_KEYS: dict[str, type] = {"disable": list, "severity": dict, "extend": str}
+
+
+def _validate_rule_overlay(analyzer: str, overlay: Any) -> None:
+    """Validate one `rules.<analyzer>` overlay's keys, types, and item shapes."""
+    path = f"rules.{analyzer}"
+    if not isinstance(overlay, dict):
+        raise ConfigError(f"config key '{path}' must be of type dict, got {type(overlay).__name__}")
+    for key, value in overlay.items():
+        key_path = f"{path}.{key}"
+        if key not in _RULE_OVERLAY_KEYS:
+            suggestion = difflib.get_close_matches(key, _RULE_OVERLAY_KEYS, n=1)
+            hint = f" (did you mean '{suggestion[0]}'?)" if suggestion else ""
+            raise ConfigError(f"unknown config key '{key_path}'{hint}")
+        expected_type = _RULE_OVERLAY_KEYS[key]
+        if not isinstance(value, expected_type):
+            raise ConfigError(
+                f"config key '{key_path}' must be of type {expected_type.__name__}, "
+                f"got {type(value).__name__}"
+            )
+        if key == "disable" and not all(isinstance(item, str) for item in value):
+            raise ConfigError(f"config key '{key_path}' must be a list of rule ID strings")
+        if key == "severity" and not all(
+            isinstance(k, str) and isinstance(v, str) for k, v in value.items()
+        ):
+            raise ConfigError(
+                f"config key '{key_path}' must map rule ID strings to severity label strings"
+            )
+
+
 def validate_config(config: dict[str, Any]) -> None:
     """Validate a merged config dict's keys and value types.
 
     Raises ConfigError naming the offending key -- with the closest valid
     key when one is close enough, or the expected type for a type
     mismatch. A single pass over a handful of keys; adds no measurable
-    startup cost for a valid config.
+    startup cost for a valid config. `rules.<analyzer>.*` overlays are
+    validated recursively; rule-ID existence against the actual upstream
+    ruleset is `_rule_overlay.py`'s job at use time, not this structural
+    check.
     """
     for key, value in config.items():
         if key not in _VALID_KEYS:
@@ -108,6 +142,15 @@ def validate_config(config: dict[str, Any]) -> None:
                 f"config key '{key}' must be of type {expected_type.__name__}, "
                 f"got {type(value).__name__}"
             )
+
+    rules = config.get("rules")
+    if isinstance(rules, dict):
+        for analyzer, overlay in rules.items():
+            if analyzer not in _RULE_OVERLAY_ANALYZERS:
+                suggestion = difflib.get_close_matches(analyzer, _RULE_OVERLAY_ANALYZERS, n=1)
+                hint = f" (did you mean '{suggestion[0]}'?)" if suggestion else ""
+                raise ConfigError(f"unknown config key 'rules.{analyzer}'{hint}")
+            _validate_rule_overlay(analyzer, overlay)
 
 
 def load_config(repo_root: Path, explicit_path: str | None = None) -> dict[str, Any]:
