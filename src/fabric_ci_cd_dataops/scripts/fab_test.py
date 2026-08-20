@@ -1354,7 +1354,11 @@ def build_parser() -> argparse.ArgumentParser:
     local_p = subs.add_parser(
         "local",
         help=(
-            "Run pql-lint, BPA, PBIR Inspector, and Desktop-bound pql-test "
+            # Deliberately not enumerated: the bundle includes the hidden
+            # pql-lint, and naming only the visible members would be
+            # incomplete rather than merely brief. `local --dry-run` lists
+            # exactly what would run.
+            "Run the local analyzer bundle "
             "against every discovered .pbip project -- no cloud required"
         ),
     )
