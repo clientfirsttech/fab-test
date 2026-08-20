@@ -277,6 +277,12 @@ def test_validate_config_passes_for_valid_config():
 
 
 @pytest.mark.fab_test
+def test_validate_config_passes_for_rules_overlay_key():
+    """rules (bpa/pbir overlay config) is a valid top-level key."""
+    validate_config({"rules": {"bpa": {"disable": ["SOME_RULE"]}}})  # must not raise
+
+
+@pytest.mark.fab_test
 def test_validate_config_raises_naming_unknown_key_and_suggestion():
     """A typo'd key exits naming the key and the closest valid key."""
     with pytest.raises(ConfigError, match="artifact_dir"):

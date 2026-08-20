@@ -29,6 +29,10 @@ _VALID_KEYS: dict[str, type] = {
     "format": str,
     "timeout": int,
     "environment": str,
+    # Rule overlays (Config Consolidation §6-7): {"bpa": {...}, "pbir": {...}}.
+    # Nested disable/severity/extend keys are validated by _rule_overlay.py
+    # itself at use time, not here.
+    "rules": dict,
 }
 
 

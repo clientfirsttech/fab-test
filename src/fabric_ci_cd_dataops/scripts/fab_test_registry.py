@@ -22,6 +22,7 @@ from ._analyzer_tool_bootstrap import (
 )
 from ._desktop import DesktopMatchError, detect_desktop_instances, match_instance_to_artifact
 from ._pbip_discovery import discover_pbip_projects
+from ._rule_overlay import apply_overlay, apply_pbir_overlay
 
 # Reuse the same repo-root logic as fab_test.py so paths stay consistent.
 
@@ -143,6 +144,44 @@ def discover_artifacts(
     return artifacts
 
 
+def _write_resolved_rules(resolved: Any, output_dir: Path, subdir: str) -> Path:
+    """Write an overlay-resolved ruleset under the run output directory and
+    return its path, so it's traceable from the envelope's rules_file field.
+    """
+    resolved_path = output_dir / subdir / "_resolved-rules.json"
+    resolved_path.parent.mkdir(parents=True, exist_ok=True)
+    resolved_path.write_text(json.dumps(resolved, indent=2), encoding="utf-8")
+    return resolved_path
+
+
+def _resolve_bpa_rules_path(args: argparse.Namespace, output_dir: Path) -> Path:
+    """Resolve the BPA rules file: overlay-applied unless --bpa-rules-path
+    was passed explicitly, in which case it's used verbatim.
+    """
+    explicit = getattr(args, "bpa_rules_path", _DEFAULT_BPA_RULES)
+    if explicit != _DEFAULT_BPA_RULES:
+        return Path(explicit)
+    overlay = getattr(args, "file_config", {}).get("rules", {}).get("bpa", {})
+    if not overlay:
+        return Path(_DEFAULT_BPA_RULES)
+    resolved = apply_overlay(Path(_DEFAULT_BPA_RULES), overlay)
+    return _write_resolved_rules(resolved, output_dir, "bpa")
+
+
+def _resolve_pbir_rules_path(args: argparse.Namespace, output_dir: Path) -> Path:
+    """Resolve the PBIR Inspector rules file: overlay-applied unless
+    --rules-path was passed explicitly, in which case it's used verbatim.
+    """
+    explicit = getattr(args, "rules_path", _DEFAULT_PBIR_RULES)
+    if explicit != _DEFAULT_PBIR_RULES:
+        return Path(explicit)
+    overlay = getattr(args, "file_config", {}).get("rules", {}).get("pbir", {})
+    if not overlay:
+        return Path(_DEFAULT_PBIR_RULES)
+    resolved = apply_pbir_overlay(Path(_DEFAULT_PBIR_RULES), overlay)
+    return _write_resolved_rules(resolved, output_dir, "pbir")
+
+
 def build_bpa_command(
     artifact: Path,
     args: argparse.Namespace,
@@ -153,7 +192,7 @@ def build_bpa_command(
         getattr(args, "tabular_editor_path", None)
         or _env("TABULAR_EDITOR_PATH", _DEFAULT_TE_PATH)
     )
-    rules_path = getattr(args, "bpa_rules_path", _DEFAULT_BPA_RULES)
+    rules_path = _resolve_bpa_rules_path(args, output_dir)
     output = output_dir / "bpa" / artifact.stem / "envelope.json"
     return [
         sys.executable,
@@ -180,7 +219,7 @@ def build_pbir_command(
         getattr(args, "inspector_path", None)
         or _env("PBIR_INSPECTOR_PATH", _DEFAULT_INSPECTOR_PATH)
     )
-    rules_path = getattr(args, "rules_path", _DEFAULT_PBIR_RULES)
+    rules_path = _resolve_pbir_rules_path(args, output_dir)
     output = output_dir / "pbir" / artifact.stem / "envelope.json"
     return [
         sys.executable,
