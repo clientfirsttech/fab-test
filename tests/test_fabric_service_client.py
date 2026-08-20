@@ -11,6 +11,7 @@ from fabric_ci_cd_dataops.scripts.playwright_validation.fabric_service_client im
     FabricServiceClient,
     FabricServiceClientError,
     ServicePrincipalCredentials,
+    _authenticate_ambient,
     _authenticate_service_principal,
     build_fabric_service_client,
 )
@@ -58,15 +59,25 @@ def test_authenticate_service_principal_uses_azure_identity() -> None:
     mock_credential.get_token.assert_called_once()
 
 
-def test_build_client_fails_without_credentials() -> None:
-    """Given no credentials, should fail with actionable guidance."""
-    with pytest.raises(ServiceResolutionError) as exc_info:
+def test_build_client_fails_without_credentials(monkeypatch) -> None:
+    """Given no credentials and no usable ambient credential, should fail."""
+    for var in (
+        "FABRIC_TENANT_ID", "FABRIC_CLIENT_ID", "FABRIC_CLIENT_SECRET",
+        "FABRIC_SERVICE_PRINCIPAL_ID", "FABRIC_SERVICE_PRINCIPAL_SECRET",
+    ):
+        monkeypatch.delenv(var, raising=False)
+    with patch(
+        "fabric_ci_cd_dataops.scripts.playwright_validation.fabric_service_client._authenticate_ambient",
+        side_effect=FabricServiceClientError("no ambient credential"),
+    ), pytest.raises(ServiceResolutionError) as exc_info:
         build_fabric_service_client(
             tenant_id="",
             client_id="",
             client_secret="",
         )
-    assert "Missing Fabric service principal credentials" in str(exc_info.value)
+    assert "No Fabric credentials found" in str(exc_info.value)
+    assert "DefaultAzureCredential" in str(exc_info.value)
+    assert "az login" in str(exc_info.value)
 
 
 def test_build_client_reads_env_file(tmp_path: Path) -> None:
@@ -279,3 +290,102 @@ def test_rest_request_raises_on_non_json(
             client._rest_request("GET", "/test")
 
     assert "Non-JSON response" in str(exc_info.value)
+
+
+# --------------------------------------------------------------------------- #
+# Ambient (DefaultAzureCredential) fallback (Config Consolidation §9)
+# --------------------------------------------------------------------------- #
+
+
+def _clear_service_principal_env(monkeypatch):
+    for var in (
+        "FABRIC_TENANT_ID", "FABRIC_CLIENT_ID", "FABRIC_CLIENT_SECRET",
+        "FABRIC_SERVICE_PRINCIPAL_ID", "FABRIC_SERVICE_PRINCIPAL_SECRET",
+    ):
+        monkeypatch.delenv(var, raising=False)
+
+
+def test_authenticate_ambient_uses_default_azure_credential() -> None:
+    """Given azure-identity is available, uses DefaultAzureCredential."""
+    mock_credential = MagicMock()
+    mock_credential.get_token.return_value.token = "ambient-token"
+
+    with patch("azure.identity.DefaultAzureCredential", return_value=mock_credential):
+        token = _authenticate_ambient()
+
+    assert token == "ambient-token"
+    mock_credential.get_token.assert_called_once()
+
+
+def test_authenticate_ambient_wraps_client_authentication_error() -> None:
+    """A failed ambient credential chain raises FabricServiceClientError, not the raw azure-core error."""
+    from azure.core.exceptions import ClientAuthenticationError
+
+    mock_credential = MagicMock()
+    mock_credential.get_token.side_effect = ClientAuthenticationError("no credential available")
+
+    with patch("azure.identity.DefaultAzureCredential", return_value=mock_credential), pytest.raises(
+        FabricServiceClientError
+    ):
+        _authenticate_ambient()
+
+
+def test_build_client_falls_back_to_ambient_when_no_service_principal_vars(monkeypatch) -> None:
+    """No service-principal variables set at all: DefaultAzureCredential is attempted and used."""
+    _clear_service_principal_env(monkeypatch)
+
+    with patch(
+        "fabric_ci_cd_dataops.scripts.playwright_validation.fabric_service_client._authenticate_ambient",
+        return_value="ambient-token",
+    ):
+        client = build_fabric_service_client(tenant_id="", client_id="", client_secret="")
+
+    assert client.credential_source == "ambient:DefaultAzureCredential"
+
+
+def test_build_client_prefers_service_principal_over_ambient(monkeypatch) -> None:
+    """A fully-configured service principal is used directly -- ambient auth is never attempted."""
+    _clear_service_principal_env(monkeypatch)
+
+    def _fail_if_called(*_a, **_k):
+        raise AssertionError("_authenticate_ambient must not be called when a service principal is configured")
+
+    with patch(
+        "fabric_ci_cd_dataops.scripts.playwright_validation.fabric_service_client._authenticate_ambient",
+        side_effect=_fail_if_called,
+    ), patch(
+        "fabric_ci_cd_dataops.scripts.playwright_validation.fabric_service_client._authenticate_service_principal",
+        return_value="sp-token",
+    ):
+        client = build_fabric_service_client(
+            tenant_id="t", client_id="c", client_secret="s"
+        )
+
+    assert client.credential_source == "service-principal"
+
+
+def test_build_client_partial_service_principal_does_not_fall_back_to_ambient(monkeypatch) -> None:
+    """A partially-configured service principal (a likely typo) fails outright, not silently via ambient."""
+    _clear_service_principal_env(monkeypatch)
+
+    def _fail_if_called(*_a, **_k):
+        raise AssertionError("_authenticate_ambient must not be called for a partial service principal")
+
+    with patch(
+        "fabric_ci_cd_dataops.scripts.playwright_validation.fabric_service_client._authenticate_ambient",
+        side_effect=_fail_if_called,
+    ), pytest.raises(ServiceResolutionError) as exc_info:
+        build_fabric_service_client(tenant_id="t", client_id="", client_secret="")
+
+    assert "Missing Fabric service principal credentials" in str(exc_info.value)
+
+
+def test_from_access_token_never_exposes_the_token_itself() -> None:
+    """The client's public credential_source is a label, never the token value."""
+    client = FabricServiceClient.from_access_token(
+        "super-secret-token", credential_source="ambient:DefaultAzureCredential"
+    )
+
+    assert client.credential_source == "ambient:DefaultAzureCredential"
+    assert "super-secret-token" not in repr(client)
+    assert "super-secret-token" not in str(vars(client).get("credential_source", ""))
