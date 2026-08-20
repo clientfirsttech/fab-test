@@ -4,9 +4,16 @@ Guiding vision and constraints: [vision.md](vision.md)
 
 ## Active Epics
 
-None currently — see Standalone Tasks below for open follow-ups.
+- [Artifact Targeting and Auth](tasks/artifact-targeting-and-auth-epic.md) — 📋 PLANNED. One grammar for naming any artifact (`./Sales.SemanticModel`, `local/Sales`, `"Sales Dev.Workspace/Sales.SemanticModel"`), plus a read-only `auth status` and a delegating `auth login` that stores no credentials. **10 tasks**, 2 deferred. Config Consolidation shipped the `.env` auto-discovery and `DefaultAzureCredential` fallback that tasks 7–9 were waiting on, so every task is unblocked.
 
 ## Standalone Tasks
+
+- **Fix AIDD framework drift** — [.github/agents/aidd.agent.md](.github/agents/aidd.agent.md) has fallen out of sync with [aidd-workflow/SKILL.md](.github/skills/aidd-workflow/SKILL.md), the resolver it is supposed to front. Two defects:
+
+  1. **Dead path.** Workflow Protocol step 3 and Loading Protocol step 4 both read `.github/commands/[command-name].md`. That directory does not exist, so both steps silently no-op on every command.
+  2. **Missing commands and skills.** The Available Commands table omits `document`, `requirements`, `pr`, `parallel`, `pipeline`, `upskill`, and `deploy`; the Skill Locations list omits `document`, `fab-test`, and `aidd-python`. All exist under `.github/skills/`.
+
+  The consequence worth fixing: the documentation-as-done rule from [vision.md](vision.md) reaches an agent only via the workflow resolver's `document` row. Enter through the agent file — which presents itself as the front door — and nothing says an epic is incomplete until the `fab-test` skill is updated. Add the rule to the agent file's Core Principles so it survives either entry point. Deliberately not bundled into the Artifact Targeting and Auth branch, to keep that scoped to the CLI.
 
 - **Wire up the Power BI Desktop Bridge CLI** — deferred from Local Desktop First Run tasks 6-8. `doctor --local` already detects the bridge's presence (path only), but report-render capture (`invoke_desktop_report.py`, screenshot storage) needs its actual `status`/`screenshot`/`screenshot-all` command output schema, which couldn't be verified from the npm README (blocked) or any example output, and there's no live Desktop session in this environment to check against. Revisit once the schema is confirmed from a real installation or Microsoft's docs stabilize (currently preview, dated July 2026).
 - **Wire coverage enforcement** — add `pytest-cov` to the `dev` optional-dependency group, scope `[tool.coverage.run]` to `src/`, and put `--cov-fail-under=80` in the CI invocation only (never `pytest.ini`, which would fail every granular marker run). Makes the `vision.md` coverage constraint enforceable rather than aspirational. The `dev` group now exists, so this is the only missing piece.
