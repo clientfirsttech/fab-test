@@ -1,6 +1,6 @@
 # Artifact Targeting and Auth Epic
 
-**Status**: 🚧 IN-PROGRESS
+**Status**: ✅ COMPLETED (10/10 tasks, 2 deferred)
 **Goal**: Name any artifact — local file, running Desktop instance, or deployed workspace item — with one grammar, and answer "which identity am I about to use?" without reading source.
 
 ## Overview
@@ -41,7 +41,7 @@ New `_target.py` turns one string into a `ResolvedTarget` dataclass of `scope` (
 
 Wire the parser to the two scopes that need no network, and make `--artifact` an alias rather than a second mechanism.
 
-`_add_common_flags` gains an optional positional `TARGET`. `discover_artifacts` takes a `ResolvedTarget` instead of a bare `stem_filter`, so type-qualified selection stops being the accident it is today ([`fab_test_registry.py:137-142`](../src/fabric_ci_cd_dataops/scripts/fab_test_registry.py#L137-L142) already matches full names, undocumented).
+`_add_common_flags` gains an optional positional `TARGET`. `discover_artifacts` takes a `ResolvedTarget` instead of a bare `stem_filter`, so type-qualified selection stops being the accident it is today ([`fab_test_registry.py:137-142`](../../src/fabric_ci_cd_dataops/scripts/fab_test_registry.py#L137-L142) already matches full names, undocumented).
 
 **Requirements**:
 - Given `fab-test bpa ./src/Sales.SemanticModel`, then only that artifact is analyzed.
@@ -68,7 +68,7 @@ Wire the parser to the two scopes that need no network, and make `--artifact` an
 
 Turn a workspace *name* into the IDs the analyzers already accept.
 
-[`resolver.py`](../src/fabric_ci_cd_dataops/scripts/playwright_validation/resolver.py) already resolves an item name to an ID *within* a workspace; only workspace-name-to-ID is missing, one `GET /v1/workspaces` call. A `workspace` key joins `_VALID_KEYS` in `_config.py` so the value can live in `fab-test.yml` and resolve through the precedence chain built in Config Consolidation task 4.
+[`resolver.py`](../../src/fabric_ci_cd_dataops/scripts/playwright_validation/resolver.py) already resolves an item name to an ID *within* a workspace; only workspace-name-to-ID is missing, one `GET /v1/workspaces` call. A `workspace` key joins `_VALID_KEYS` in `_config.py` so the value can live in `fab-test.yml` and resolve through the precedence chain built in Config Consolidation task 4.
 
 **Requirements**:
 - Given `Sales Dev.Workspace/Sales.SemanticModel`, then the workspace name resolves to its ID and the item name to its ID before the analyzer is invoked.
@@ -92,7 +92,7 @@ Turn a workspace *name* into the IDs the analyzers already accept.
 
 Parse the grammar universally, then fail honestly where it cannot be honored.
 
-Only `pql-test` and `playwright` can act on a deployed item. `bpa`, `pbir`, and `pql-lint` read files on disk; making them accept a workspace target would mean downloading the artifact first, which is `fabric-cicd-deployment`'s job and a stated non-goal in [vision.md](../vision.md). The registry gains a supported-scope set per analyzer.
+Only `pql-test` and `playwright` can act on a deployed item. `bpa`, `pbir`, and `pql-lint` read files on disk; making them accept a workspace target would mean downloading the artifact first, which is `fabric-cicd-deployment`'s job and a stated non-goal in [vision.md](../../vision.md). The registry gains a supported-scope set per analyzer.
 
 **Requirements**:
 - Given `fab-test bpa "Sales Dev.Workspace/Sales.SemanticModel"`, then the CLI exits `2` explaining that `bpa` reads files and naming the path and `local/` forms that work.
@@ -109,7 +109,7 @@ Only `pql-test` and `playwright` can act on a deployed item. `bpa`, `pbir`, and 
 
 **Done (2026-08-20)**: `ResolvedTarget.as_dict()` returns a structured object — never an interpolated string — carried by `run.json`, `explain`, and `--dry-run` in both formats. `run.json` gains a `target` field, null for a discovery run, which is what distinguishes "read files" from "hit a workspace" in a way `origin` (local vs CI) never could. `explain` takes an optional `TARGET` and refuses a scope the analyzer cannot honor, since explaining an impossible command would be explaining a lie.
 
-Adding `target` to `run.json` tripped its own key-set drift guard in `tests/test_run_manifest.py`, the same way the `workspace` config key tripped the schema guard in task 3. Both were working as designed. The field is additive and `RUN_MANIFEST_SCHEMA_VERSION` stays at 1, per the backward-compatibility constraint in [vision.md](../vision.md).
+Adding `target` to `run.json` tripped its own key-set drift guard in `tests/test_run_manifest.py`, the same way the `workspace` config key tripped the schema guard in task 3. Both were working as designed. The field is additive and `RUN_MANIFEST_SCHEMA_VERSION` stays at 1, per the backward-compatibility constraint in [vision.md](../../vision.md).
 
 
 Make what `fab-test` decided visible, which is where the agent-caller value actually lands.
@@ -132,7 +132,7 @@ Fix the false green. Independently shippable — depends on no other task in thi
 
 **Done (2026-08-19)**: `_CLOUD_ANALYZERS` (`pql_test`, `playwright`, `playwright-impact`, `dependencies`) now route through `_cloud_readiness`, which reports the target it would use or names every accepted source. Added `desktop_ports()` to `_desktop.py` — the presence-only half of `detect_desktop_instances`, since the latter shells out to PowerShell to resolve which file is open and `check_readiness` is contractually forbidden from spawning a subprocess. Credential detection covers both accepted spellings of the client pair; the ambient-Azure source arrives with Config Consolidation task 9 and task 7 reports the full chain.
 
-[`check_readiness`](../src/fabric_ci_cd_dataops/scripts/fab_test_registry.py#L454-L467) short-circuits to `ready: true, "no external tool required"` for every analyzer without an external binary, so `doctor` greenlights `pql-test` and `playwright` with no credentials and no workspace.
+[`check_readiness`](../../src/fabric_ci_cd_dataops/scripts/fab_test_registry.py#L454-L467) short-circuits to `ready: true, "no external tool required"` for every analyzer without an external binary, so `doctor` greenlights `pql-test` and `playwright` with no credentials and no workspace.
 
 **Requirements**:
 - Given an analyzer that needs a workspace or credentials and neither is resolvable, then `doctor` reports it not ready with remediation naming what to set.
@@ -151,7 +151,7 @@ Report which identity `fab-test` would actually use, once there is a chain worth
 
 **Done (2026-08-20)**: new `_credentials.py` with `probe_credentials()` and a frozen `CredentialStatus`, mirroring `build_client_from_env`'s precedence — environment, then `.env`, then ambient — including its rule that a partially-configured service principal is surfaced as a mistake rather than silently overridden by ambient auth. `_cloud_readiness` now consumes it, so `doctor` and (next) `auth status` read one chain instead of two.
 
-Built as its own module rather than inside `fab_test_registry.py` as first planned: there are two real callers, `fab_test_registry.py` is already on the complexity watchlist in [plan.md](../plan.md), and the probe has nothing to do with the analyzer registry.
+Built as its own module rather than inside `fab_test_registry.py` as first planned: there are two real callers, `fab_test_registry.py` is already on the complexity watchlist in [plan.md](../../plan.md), and the probe has nothing to do with the analyzer registry.
 
 **Ambient credentials resolve as unverified.** Proving one works means acquiring a token — a network call or an `az` subprocess — and `check_readiness` is forbidden both. So an available ambient credential reports ready, labelled unverified, naming `fab-test auth status` as the check. Chosen over the alternatives because reporting not-ready shows red for every developer signed in with `az login`, and reporting verified would reintroduce exactly the false green task 6 removed.
 
@@ -220,9 +220,25 @@ Give the human a next step without `fab-test` becoming a credential store.
 
 ---
 
-## 10. Document for All Three Callers
+## 10. Document for All Three Callers ✅
 
-Cover the agent, the human, and the pipeline together, per the documentation constraint in [vision.md](../vision.md). Use the `document` skill so the three cannot drift.
+**Done (2026-08-20)**: the same target-grammar table appears in the skill, README, and QUICK-VALIDATION, worded identically. The skill gained a Targeting section (grammar, the per-analyzer scope table, and the scope-specific rules for `local/`, workspace resolution, and `--artifact`), a Credentials section (`auth status`/`auth login` with their exit codes), the `target` field in the `run.json` schema, and the `TARGET` positional in the global-flags table. QUICK-VALIDATION gained a pipeline snippet putting `workspace:` in committed config and only credentials in secrets, with `auth status` as a pre-flight gate that fails clearly before an analyzer times out against an unreachable workspace.
+
+Every documented command and message was executed against the merged code before being written down, including the `bpa` workspace-refusal text, which is pasted verbatim rather than paraphrased.
+
+The `--env` versus `--cloud` distinction is stated in all three surfaces, since that is the one place a reader moving between `fab-test` and `pql-test` can silently get it wrong.
+
+---
+
+## Retrospective
+
+Two things worth carrying forward.
+
+**Verify through the real entry point.** Tasks 1–9 were developed in a git worktree while the editable install pointed at the main checkout, so every test run needed a `PYTHONPATH` prefix to reach the branch. The results were real but described a source tree the user's shell could not see: `fab-test auth status` did not exist for them until the branch merged. A single run through the actual installed command would have caught it immediately.
+
+**Re-check the base before each task, not each epic.** Config Consolidation landed mid-epic and made task 6 stale within a day — its `_credential_source()` recognized only service-principal variables hours after `DefaultAzureCredential` support shipped on `dev`.
+
+Cover the agent, the human, and the pipeline together, per the documentation constraint in [vision.md](../../vision.md). Use the `document` skill so the three cannot drift.
 
 **Requirements**:
 - Given the `fab-test` skill, then it documents the full target grammar, which scopes each analyzer accepts, and the `auth` subcommands with their exit codes, so an agent can target an artifact without reading source.
@@ -238,8 +254,8 @@ Cover the agent, the human, and the pipeline together, per the documentation con
 
 ## Deferred — Downloading Workspace Artifacts for Static Analyzers
 
-Making `bpa`, `pbir`, and `pql-lint` accept a workspace target requires exporting the item definition from Fabric first. That is artifact movement, which [vision.md](../vision.md) assigns to `fabric-cicd-deployment` and lists under Non-Goals. Task 4 rejects the combination with a message naming the forms that work. Revisit only if a caller demonstrates a workflow where exporting inside `fab-test` beats deploying and pointing at the repository.
+Making `bpa`, `pbir`, and `pql-lint` accept a workspace target requires exporting the item definition from Fabric first. That is artifact movement, which [vision.md](../../vision.md) assigns to `fabric-cicd-deployment` and lists under Non-Goals. Task 4 rejects the combination with a message naming the forms that work. Revisit only if a caller demonstrates a workflow where exporting inside `fab-test` beats deploying and pointing at the repository.
 
 ## Deferred — A `fab-test` Token Cache
 
-Full `auth login|logout` parity with `pql-test`, `fab`, and `az` — persistent token storage, refresh, sovereign-cloud handling — was cut for two reasons. It makes `fab-test` a credential store, which is the largest possible surface against the secrets constraint in [vision.md](../vision.md); and it is the fourth token cache on a machine that already has three, duplicating what upstream maintains against the *facade, not fork* principle. Task 9's delegation gives the same ergonomics with none of the storage. Revisit if a caller needs an identity that no underlying tool can itself acquire.
+Full `auth login|logout` parity with `pql-test`, `fab`, and `az` — persistent token storage, refresh, sovereign-cloud handling — was cut for two reasons. It makes `fab-test` a credential store, which is the largest possible surface against the secrets constraint in [vision.md](../../vision.md); and it is the fourth token cache on a machine that already has three, duplicating what upstream maintains against the *facade, not fork* principle. Task 9's delegation gives the same ergonomics with none of the storage. Revisit if a caller needs an identity that no underlying tool can itself acquire.
