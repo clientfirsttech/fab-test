@@ -10,6 +10,7 @@ through one precedence resolver.
 from __future__ import annotations
 
 import difflib
+import os
 from pathlib import Path
 from typing import Any
 
@@ -129,3 +130,38 @@ def load_config(repo_root: Path, explicit_path: str | None = None) -> dict[str, 
             f"{path} must contain a YAML mapping at the top level, got {type(data).__name__}"
         )
     return data
+
+
+def resolve_setting(
+    key: str,
+    *,
+    cli_value: Any,
+    env_var: str | None,
+    file_config: dict[str, Any],
+    packaged_default: Any,
+    cast: type | None = None,
+) -> tuple[Any, str]:
+    """Resolve one setting: CLI flag > environment variable > config file > packaged default.
+
+    ``cli_value`` must be ``None`` when the flag wasn't explicitly passed --
+    the caller's argparse default should be ``None`` precisely so this can
+    be told apart from "explicitly set to the packaged default". Returns
+    ``(value, origin)``; origin is one of ``"flag"``, ``"env:NAME"``,
+    ``"fab-test.yml:KEY"``, or ``"default"``. A malformed env var (fails
+    ``cast``) falls through to the config file / packaged default rather
+    than raising.
+    """
+    if cli_value is not None:
+        return cli_value, "flag"
+    if env_var:
+        raw = os.environ.get(env_var, "")
+        if raw:
+            if cast is None:
+                return raw, f"env:{env_var}"
+            try:
+                return cast(raw), f"env:{env_var}"
+            except ValueError:
+                pass
+    if key in file_config:
+        return file_config[key], f"{CONFIG_FILENAME}:{key}"
+    return packaged_default, "default"
