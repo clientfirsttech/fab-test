@@ -21,6 +21,7 @@ from fabric_ci_cd_dataops.scripts._config import (
     load_config,
     load_pyproject_config,
     merged_file_config,
+    resolve_setting,
     validate_config,
 )
 
@@ -331,3 +332,107 @@ def test_main_exits_2_on_wrong_type_config_value(tmp_path):
 
     assert result.returncode == 2
     assert "jobs" in result.stderr
+
+
+# --------------------------------------------------------------------------- #
+# Centralized precedence resolution (Config Consolidation §4)
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.fab_test
+def test_resolve_setting_cli_flag_wins_over_everything(monkeypatch):
+    """An explicit CLI value wins over env var, config, and packaged default."""
+    monkeypatch.setenv("ANALYZER_TIMEOUT", "60")
+
+    value, origin = resolve_setting(
+        "timeout",
+        cli_value=300,
+        env_var="ANALYZER_TIMEOUT",
+        file_config={"timeout": 999},
+        packaged_default=120,
+        cast=int,
+    )
+
+    assert (value, origin) == (300, "flag")
+
+
+@pytest.mark.fab_test
+def test_resolve_setting_env_var_wins_over_config_and_default(monkeypatch):
+    """The env var wins when no CLI value is given."""
+    monkeypatch.setenv("ANALYZER_TIMEOUT", "200")
+
+    value, origin = resolve_setting(
+        "timeout",
+        cli_value=None,
+        env_var="ANALYZER_TIMEOUT",
+        file_config={"timeout": 999},
+        packaged_default=120,
+        cast=int,
+    )
+
+    assert (value, origin) == (200, "env:ANALYZER_TIMEOUT")
+
+
+@pytest.mark.fab_test
+def test_resolve_setting_config_wins_over_packaged_default(monkeypatch):
+    """The config file wins when no CLI value or env var is given."""
+    monkeypatch.delenv("ANALYZER_TIMEOUT", raising=False)
+
+    value, origin = resolve_setting(
+        "timeout",
+        cli_value=None,
+        env_var="ANALYZER_TIMEOUT",
+        file_config={"timeout": 999},
+        packaged_default=120,
+        cast=int,
+    )
+
+    assert (value, origin) == (999, f"{CONFIG_FILENAME}:timeout")
+
+
+@pytest.mark.fab_test
+def test_resolve_setting_falls_back_to_packaged_default(monkeypatch):
+    """The packaged default wins when nothing else is set."""
+    monkeypatch.delenv("ANALYZER_TIMEOUT", raising=False)
+
+    value, origin = resolve_setting(
+        "timeout",
+        cli_value=None,
+        env_var="ANALYZER_TIMEOUT",
+        file_config={},
+        packaged_default=120,
+        cast=int,
+    )
+
+    assert (value, origin) == (120, "default")
+
+
+@pytest.mark.fab_test
+def test_resolve_setting_ignores_malformed_env_var(monkeypatch):
+    """A malformed env var (fails cast) falls through to config/default instead of raising."""
+    monkeypatch.setenv("ANALYZER_TIMEOUT", "not-a-number")
+
+    value, origin = resolve_setting(
+        "timeout",
+        cli_value=None,
+        env_var="ANALYZER_TIMEOUT",
+        file_config={"timeout": 999},
+        packaged_default=120,
+        cast=int,
+    )
+
+    assert (value, origin) == (999, f"{CONFIG_FILENAME}:timeout")
+
+
+@pytest.mark.fab_test
+def test_resolve_setting_without_env_var_checks_config_directly():
+    """A setting with no env_var (e.g. environment/--env) skips straight to config."""
+    value, origin = resolve_setting(
+        "environment",
+        cli_value=None,
+        env_var=None,
+        file_config={"environment": "DEV"},
+        packaged_default="",
+    )
+
+    assert (value, origin) == ("DEV", f"{CONFIG_FILENAME}:environment")

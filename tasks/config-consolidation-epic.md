@@ -53,9 +53,11 @@ Catch typos at the config layer instead of silently ignoring them.
 
 ---
 
-## 4. Centralize Precedence Resolution
+## 4. Centralize Precedence Resolution ✅
 
 Route every setting through one resolver so precedence cannot drift per flag.
+
+**Scope decision (2026-08-19)**: built `resolve_setting()` in `_config.py` with origin tracking, and made `_resolve_timeout`/`_apply_environment_default` thin wrappers around it. `jobs`, `format`, `artifact_dir`, and `output_dir` keep their existing (working) CLI > config > default behavior via baked-in argparse defaults rather than migrating to the same None-sentinel + resolver pattern — they have no env var today, and per user direction that migration is deferred to task 5, once `fab-test config --show` reveals what origin tracking actually needs for them.
 
 **Requirements**:
 - Given any setting, then precedence is CLI flag > environment variable > config file > packaged default, with no per-setting exceptions.

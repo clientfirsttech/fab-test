@@ -48,7 +48,13 @@ from ._analyzer_annotations import (
 )
 from ._analyzer_envelope import _severity_counts
 from ._cli_utils import narrate
-from ._config import CONFIG_FILENAME, ConfigError, merged_file_config, validate_config
+from ._config import (
+    CONFIG_FILENAME,
+    ConfigError,
+    merged_file_config,
+    resolve_setting,
+    validate_config,
+)
 from ._desktop import bridge_cli_path, detect_desktop_instances
 from ._pbip_discovery import discover_pbip_projects as _discover_pbip_projects
 from ._run_manifest import RunManifest
@@ -177,38 +183,40 @@ _DEFAULT_SUBPROCESS_TIMEOUT = 120
 def _resolve_timeout(
     args: argparse.Namespace, config: dict[str, Any] | None = None
 ) -> int:
-    """Resolve the per-artifact subprocess timeout.
+    """Resolve the per-artifact subprocess timeout via the centralized resolver.
 
-    Precedence: --timeout > ANALYZER_TIMEOUT > [tool.fab-test].timeout > default.
+    Precedence: --timeout > ANALYZER_TIMEOUT > config file > default.
     """
-    cli_timeout = getattr(args, "timeout", None)
-    if cli_timeout is not None:
-        return cli_timeout
-    env_timeout = os.environ.get("ANALYZER_TIMEOUT", "")
-    if env_timeout:
-        try:
-            return int(env_timeout)
-        except ValueError:
-            pass
     config = _PYPROJECT_CONFIG if config is None else config
-    if "timeout" in config:
-        return config["timeout"]
-    return _DEFAULT_SUBPROCESS_TIMEOUT
+    value, _origin = resolve_setting(
+        "timeout",
+        cli_value=getattr(args, "timeout", None),
+        env_var="ANALYZER_TIMEOUT",
+        file_config=config,
+        packaged_default=_DEFAULT_SUBPROCESS_TIMEOUT,
+        cast=int,
+    )
+    return value
 
 
 def _apply_environment_default(
     args: argparse.Namespace, config: dict[str, Any]
 ) -> None:
-    """Fill --env from FABRIC_ENVIRONMENT or [tool.fab-test] when not passed.
+    """Fill --env via the centralized resolver when not passed.
 
-    No-op for subcommands without an --env flag. CLI values are never
-    overwritten; env var still takes precedence over the config file.
+    No-op for subcommands without an --env flag. Precedence:
+    --env > FABRIC_ENVIRONMENT > config file > "" (no default environment).
     """
-    if not hasattr(args, "environment") or args.environment:
+    if not hasattr(args, "environment"):
         return
-    args.environment = os.environ.get("FABRIC_ENVIRONMENT") or config.get(
-        "environment", ""
+    value, _origin = resolve_setting(
+        "environment",
+        cli_value=args.environment or None,
+        env_var="FABRIC_ENVIRONMENT",
+        file_config=config,
+        packaged_default="",
     )
+    args.environment = value
 
 
 def _telemetry_enabled(args: argparse.Namespace) -> bool:
