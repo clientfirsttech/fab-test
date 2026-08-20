@@ -277,18 +277,43 @@ def test_cloud_analyzer_ready_with_workspace_and_service_principal(monkeypatch):
 
 @pytest.mark.fab_test
 def test_cloud_analyzer_with_workspace_but_no_credentials_is_not_ready(monkeypatch):
-    """A workspace alone is not enough, and the remediation asks only for credentials."""
+    """A workspace alone is not enough, and the remediation asks only for credentials.
+
+    Ambient Azure is switched off explicitly: azure-identity is installed
+    in this environment, so leaving it on would resolve the chain and make
+    this analyzer ready for a different (and correct) reason. See
+    tests/test_credentials.py for the ambient path itself.
+    """
+    from fabric_ci_cd_dataops.scripts import _credentials
     from fabric_ci_cd_dataops.scripts import fab_test_registry as registry
 
     _clear_cloud_env(monkeypatch)
     monkeypatch.setenv("FABRIC_WORKSPACE_ID", "33333333-3333-3333-3333-333333333333")
     monkeypatch.setattr(registry, "desktop_ports", list)  # no instance running
+    monkeypatch.setattr(_credentials, "ambient_credential_available", lambda: False)
 
     result = registry.check_readiness("pql_test", None)
 
     assert result["ready"] is False
     assert "FABRIC_SERVICE_PRINCIPAL_ID" in result["remediation"]
     assert "FABRIC_WORKSPACE_ID" not in result["remediation"]
+
+
+@pytest.mark.fab_test
+def test_workspace_plus_ambient_credential_is_ready_but_flagged_unverified(monkeypatch):
+    """An az-logged-in developer is not reported red, but the reason says unproven."""
+    from fabric_ci_cd_dataops.scripts import _credentials
+    from fabric_ci_cd_dataops.scripts import fab_test_registry as registry
+
+    _clear_cloud_env(monkeypatch)
+    monkeypatch.setenv("FABRIC_WORKSPACE_ID", "33333333-3333-3333-3333-333333333333")
+    monkeypatch.setattr(_credentials, "ambient_credential_available", lambda: True)
+
+    result = registry.check_readiness("pql_test", None)
+
+    assert result["ready"] is True
+    assert "unverified" in result["reason"]
+    assert "auth status" in result["reason"]
 
 
 @pytest.mark.fab_test

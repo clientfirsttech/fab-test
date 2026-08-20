@@ -125,9 +125,17 @@ Fix the false green. Independently shippable — depends on no other task in thi
 
 ---
 
-## 7. Probe the Credential Chain
+## 7. Probe the Credential Chain ✅
 
 Report which identity `fab-test` would actually use, once there is a chain worth reporting.
+
+**Done (2026-08-20)**: new `_credentials.py` with `probe_credentials()` and a frozen `CredentialStatus`, mirroring `build_client_from_env`'s precedence — environment, then `.env`, then ambient — including its rule that a partially-configured service principal is surfaced as a mistake rather than silently overridden by ambient auth. `_cloud_readiness` now consumes it, so `doctor` and (next) `auth status` read one chain instead of two.
+
+Built as its own module rather than inside `fab_test_registry.py` as first planned: there are two real callers, `fab_test_registry.py` is already on the complexity watchlist in [plan.md](../plan.md), and the probe has nothing to do with the analyzer registry.
+
+**Ambient credentials resolve as unverified.** Proving one works means acquiring a token — a network call or an `az` subprocess — and `check_readiness` is forbidden both. So an available ambient credential reports ready, labelled unverified, naming `fab-test auth status` as the check. Chosen over the alternatives because reporting not-ready shows red for every developer signed in with `az login`, and reporting verified would reintroduce exactly the false green task 6 removed.
+
+**One requirement moved to task 8**: "given a named workspace, the probe reports whether that workspace is reachable". Reachability is a network call, which this probe must not make. It belongs to `auth status`, which can, and is folded into that task's requirements rather than dropped.
 
 **Unblocked (2026-08-20)**: Config Consolidation tasks 8 and 9 have landed, so the chain this reports on now exists — `build_client_from_env` in `playwright_validation/fabric_service_client.py` documents it as explicit arguments, then environment variables, then `.env`, then `DefaultAzureCredential`, with ambient auth attempted only when *no* service-principal variable is set so a half-configured principal is surfaced as the mistake it is. Runs next, ahead of tasks 2–5, since task 6 currently under-reports readiness for anyone signed in via `az login`.
 
@@ -153,6 +161,8 @@ Promote the credential probe to a first-class noun, so "which identity am I usin
 - Given no credentials at all, then the command exits `127` — the established code for a missing prerequisite — and names each accepted source.
 - Given credentials resolve, then the command exits `0` and prints no secret in either format.
 - Given `auth status`, then it reuses the task 7 probe rather than reimplementing resolution.
+- Given a named workspace, then `auth status` reports whether it is reachable with the resolved identity — moved here from task 7, whose probe must make no network call.
+- Given an ambient credential reported unverified by the probe, then `auth status` resolves it for real and reports verified or names why it failed.
 
 **Files**: `fab_test.py`, `fab_test_summary.py`
 **Tests**: `pytest -m fab_test tests/test_auth.py -k status`

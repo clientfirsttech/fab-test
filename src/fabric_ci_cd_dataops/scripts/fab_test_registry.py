@@ -20,6 +20,7 @@ from ._analyzer_tool_bootstrap import (
     probe_executable,
     resolve_executable,
 )
+from ._credentials import probe_credentials
 from ._desktop import (
     DesktopMatchError,
     desktop_ports,
@@ -92,11 +93,9 @@ _CLOUD_ANALYZERS = {"pql_test", "playwright", "playwright-impact", "dependencies
 # workspace. Only pql_test does today; see build_pql_test_command.
 _DESKTOP_CAPABLE_ANALYZERS = {"pql_test"}
 
-# Service principal variables. playwright_validation/config.py accepts
-# either spelling for the client pair, so readiness must too.
-_CLIENT_ID_VARS = ("FABRIC_CLIENT_ID", "FABRIC_SERVICE_PRINCIPAL_ID")
-_CLIENT_SECRET_VARS = ("FABRIC_CLIENT_SECRET", "FABRIC_SERVICE_PRINCIPAL_SECRET")
-
+# Which variables actually resolve a credential lives in _credentials.py,
+# the single chain both `doctor` and `auth status` read. This is only the
+# phrasing used when no workspace is set and there is nothing to probe yet.
 _SERVICE_PRINCIPAL_HINT = (
     "FABRIC_TENANT_ID, FABRIC_SERVICE_PRINCIPAL_ID, and FABRIC_SERVICE_PRINCIPAL_SECRET"
 )
@@ -515,22 +514,6 @@ def preflight_error(name: str, args: argparse.Namespace) -> tuple[str, int] | No
         return None
 
 
-def _credential_source() -> str | None:
-    """Return the name of the credential source that would be used, or None.
-
-    Presence only: reads no secret value, acquires no token, and makes no
-    network call. The ambient-Azure fallback is Config Consolidation task
-    9 and is not wired yet; when it lands this grows a branch, and
-    `auth status` reports the whole chain with its precedence.
-    """
-    has_tenant = bool(_env("FABRIC_TENANT_ID"))
-    has_client = any(_env(var) for var in _CLIENT_ID_VARS)
-    has_secret = any(_env(var) for var in _CLIENT_SECRET_VARS)
-    if has_tenant and has_client and has_secret:
-        return "service principal (environment)"
-    return None
-
-
 def _cloud_readiness(name: str, args: argparse.Namespace | None) -> dict[str, Any]:
     """Return readiness for an analyzer that needs a workspace or Desktop.
 
@@ -545,19 +528,24 @@ def _cloud_readiness(name: str, args: argparse.Namespace | None) -> dict[str, An
     workspace_id = workspace_id or _env("FABRIC_WORKSPACE_ID")
 
     if workspace_id:
-        credential = _credential_source()
-        if credential:
+        status = probe_credentials()
+        if status.resolved:
+            reason = (
+                f"workspace configured, credentials from {status.source}"
+                if status.verified
+                else f"workspace configured; {status.detail}"
+            )
             return {
                 "ready": True,
                 "resolved_path": None,
-                "reason": f"workspace configured, credentials from {credential}",
+                "reason": reason,
                 "remediation": None,
             }
         return {
             "ready": False,
             "resolved_path": None,
-            "reason": "workspace configured but no credentials resolved",
-            "remediation": f"Set {_SERVICE_PRINCIPAL_HINT}",
+            "reason": f"workspace configured but {status.detail}",
+            "remediation": status.remediation,
         }
 
     desktop_capable = name in _DESKTOP_CAPABLE_ANALYZERS
