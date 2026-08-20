@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -149,3 +150,83 @@ def test_load_config_not_required_allows_missing() -> None:
     config = load_config(Path("/nonexistent/.env"), required=False)
     assert config.workspace_id == ""
     assert config.client_secret == ""
+
+
+# --------------------------------------------------------------------------- #
+# Auto-discovering .env at the repository root (Config Consolidation §8)
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.playwright
+def test_load_config_auto_discovers_env_at_repo_root(tmp_path, monkeypatch):
+    """No --env-file: a .env at the repo root (cwd) is discovered automatically."""
+    monkeypatch.delenv("PLAYWRIGHT_ENV_FILE", raising=False)
+    monkeypatch.delenv("GITHUB_WORKSPACE", raising=False)
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / ".env").write_text(
+        "PLAYWRIGHT_WORKSPACE_ID=auto-ws\nPLAYWRIGHT_REPORT_ID=auto-rpt\n",
+        encoding="utf-8",
+    )
+
+    config = load_config(None, required=False)
+
+    assert config.workspace_id == "auto-ws"
+    assert config.report_id == "auto-rpt"
+
+
+@pytest.mark.playwright
+def test_load_config_returns_empty_when_no_env_file_discovered(tmp_path, monkeypatch):
+    """No --env-file and no .env at the repo root: behaves as if nothing was set."""
+    monkeypatch.delenv("PLAYWRIGHT_ENV_FILE", raising=False)
+    monkeypatch.delenv("GITHUB_WORKSPACE", raising=False)
+    monkeypatch.delenv("PLAYWRIGHT_WORKSPACE_ID", raising=False)
+    monkeypatch.chdir(tmp_path)
+
+    config = load_config(None, required=False)
+
+    assert config.workspace_id == ""
+
+
+@pytest.mark.playwright
+def test_load_config_explicit_env_file_overrides_auto_discovery(tmp_path, monkeypatch):
+    """--env-file PATH is used instead of the auto-discovered repo-root .env."""
+    monkeypatch.delenv("PLAYWRIGHT_ENV_FILE", raising=False)
+    monkeypatch.delenv("GITHUB_WORKSPACE", raising=False)
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / ".env").write_text("PLAYWRIGHT_WORKSPACE_ID=auto-ws\n", encoding="utf-8")
+    custom = tmp_path / "custom.env"
+    custom.write_text("PLAYWRIGHT_WORKSPACE_ID=custom-ws\n", encoding="utf-8")
+
+    config = load_config(custom, required=False)
+
+    assert config.workspace_id == "custom-ws"
+
+
+@pytest.mark.playwright
+def test_discovered_env_secrets_never_appear_in_test_case_dict(tmp_path, monkeypatch):
+    """A discovered .env's credentials never leak into to_test_case_dict()."""
+    monkeypatch.delenv("PLAYWRIGHT_ENV_FILE", raising=False)
+    monkeypatch.delenv("GITHUB_WORKSPACE", raising=False)
+    monkeypatch.delenv("FABRIC_CLIENT_ID", raising=False)
+    monkeypatch.delenv("FABRIC_CLIENT_SECRET", raising=False)
+    monkeypatch.delenv("FABRIC_TENANT_ID", raising=False)
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / ".env").write_text(
+        "\n".join(
+            [
+                "PLAYWRIGHT_WORKSPACE_ID=auto-ws",
+                "FABRIC_CLIENT_ID=super-secret-id",
+                "FABRIC_CLIENT_SECRET=super-secret-value",
+                "FABRIC_TENANT_ID=super-secret-tenant",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    config = load_config(None, required=False)
+    test_case_dict = config.to_test_case_dict()
+
+    assert "super-secret-value" not in json.dumps(test_case_dict)
+    assert "client_secret" not in test_case_dict
+    assert "client_id" not in test_case_dict
+    assert "tenant_id" not in test_case_dict
