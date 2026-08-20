@@ -144,7 +144,7 @@ Let a developer already signed in to Azure skip secrets entirely.
 
 ---
 
-## 10. Add `fab-test init`
+## 10. Add `fab-test init` ✅
 
 Make the first config file something the CLI writes, not something the user researches.
 
