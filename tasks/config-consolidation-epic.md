@@ -69,7 +69,7 @@ Route every setting through one resolver so precedence cannot drift per flag.
 
 ---
 
-## 5. Add `fab-test config --show`
+## 5. Add `fab-test config --show` ✅
 
 Answer "where did this value come from?" without reading source.
 
