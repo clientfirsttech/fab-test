@@ -58,6 +58,22 @@ def _discover_ports(workspaces_root: Path) -> list[int]:
     return [port for port in ports if port is not None]
 
 
+def desktop_ports(workspaces_root: Path | None = None) -> list[int]:
+    """Return the ports of running Power BI Desktop instances, presence only.
+
+    The cheap half of `detect_desktop_instances`: it answers "is anything
+    running?" with a directory scan and never resolves which file each
+    instance has open, which costs a PowerShell call. `check_readiness`
+    needs exactly this much and is contractually forbidden from spawning a
+    subprocess. Returns an empty list off Windows, as `_discover_ports`
+    would find no workspaces root there anyway.
+    """
+    if platform.system() != "Windows":
+        return []
+    root = workspaces_root if workspaces_root is not None else _default_workspaces_root()
+    return _discover_ports(root)
+
+
 def _extract_file_arg(command_line: str) -> Path | None:
     """Pull the .pbix/.pbip argument off a PBIDesktop.exe command line, if present."""
     match = _FILE_ARG_PATTERN.search(command_line)

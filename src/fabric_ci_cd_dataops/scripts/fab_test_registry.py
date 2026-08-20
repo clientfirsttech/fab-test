@@ -20,7 +20,12 @@ from ._analyzer_tool_bootstrap import (
     probe_executable,
     resolve_executable,
 )
-from ._desktop import DesktopMatchError, detect_desktop_instances, match_instance_to_artifact
+from ._desktop import (
+    DesktopMatchError,
+    desktop_ports,
+    detect_desktop_instances,
+    match_instance_to_artifact,
+)
 from ._pbip_discovery import discover_pbip_projects
 from ._rule_overlay import apply_overlay, apply_pbir_overlay
 
@@ -75,6 +80,26 @@ ANALYZER_REGISTRY: dict[str, tuple[str, str]] = {
 
 # Analyzers that depend on an external binary/tool.
 _BOOTSTRAPPED_ANALYZERS = {"bpa", "pbir"}
+
+# Analyzers that resolve no external binary but still cannot run on a bare
+# checkout: they need a Fabric workspace plus credentials, or -- pql_test
+# only -- a running Power BI Desktop instance to bind to. Without this set,
+# check_readiness reported them ready on the strength of having no tool to
+# find, a green light `doctor` could not honor.
+_CLOUD_ANALYZERS = {"pql_test", "playwright", "playwright-impact", "dependencies"}
+
+# The subset that can bind to a running Desktop instance instead of a
+# workspace. Only pql_test does today; see build_pql_test_command.
+_DESKTOP_CAPABLE_ANALYZERS = {"pql_test"}
+
+# Service principal variables. playwright_validation/config.py accepts
+# either spelling for the client pair, so readiness must too.
+_CLIENT_ID_VARS = ("FABRIC_CLIENT_ID", "FABRIC_SERVICE_PRINCIPAL_ID")
+_CLIENT_SECRET_VARS = ("FABRIC_CLIENT_SECRET", "FABRIC_SERVICE_PRINCIPAL_SECRET")
+
+_SERVICE_PRINCIPAL_HINT = (
+    "FABRIC_TENANT_ID, FABRIC_SERVICE_PRINCIPAL_ID, and FABRIC_SERVICE_PRINCIPAL_SECRET"
+)
 
 # Maps fab-test subcommand name to the matching analyzer registry key in
 # .github/metadata/analyzers.json.
@@ -490,13 +515,92 @@ def preflight_error(name: str, args: argparse.Namespace) -> tuple[str, int] | No
         return None
 
 
+def _credential_source() -> str | None:
+    """Return the name of the credential source that would be used, or None.
+
+    Presence only: reads no secret value, acquires no token, and makes no
+    network call. The ambient-Azure fallback is Config Consolidation task
+    9 and is not wired yet; when it lands this grows a branch, and
+    `auth status` reports the whole chain with its precedence.
+    """
+    has_tenant = bool(_env("FABRIC_TENANT_ID"))
+    has_client = any(_env(var) for var in _CLIENT_ID_VARS)
+    has_secret = any(_env(var) for var in _CLIENT_SECRET_VARS)
+    if has_tenant and has_client and has_secret:
+        return "service principal (environment)"
+    return None
+
+
+def _cloud_readiness(name: str, args: argparse.Namespace | None) -> dict[str, Any]:
+    """Return readiness for an analyzer that needs a workspace or Desktop.
+
+    Reports the target it would actually use, or names every source it
+    accepts, so a caller is never told "ready" for a run that cannot
+    reach anything. Stays as cheap as the rest of the probe: no
+    subprocess, no network call, and no secret value in any field --
+    whether the workspace is genuinely *reachable* is `auth status`'s
+    question, not this one's.
+    """
+    workspace_id = (getattr(args, "workspace_id", "") or "") if args is not None else ""
+    workspace_id = workspace_id or _env("FABRIC_WORKSPACE_ID")
+
+    if workspace_id:
+        credential = _credential_source()
+        if credential:
+            return {
+                "ready": True,
+                "resolved_path": None,
+                "reason": f"workspace configured, credentials from {credential}",
+                "remediation": None,
+            }
+        return {
+            "ready": False,
+            "resolved_path": None,
+            "reason": "workspace configured but no credentials resolved",
+            "remediation": f"Set {_SERVICE_PRINCIPAL_HINT}",
+        }
+
+    desktop_capable = name in _DESKTOP_CAPABLE_ANALYZERS
+    if desktop_capable and desktop_ports():
+        return {
+            "ready": True,
+            "resolved_path": None,
+            "reason": "no workspace set; would bind to a running Power BI Desktop instance",
+            "remediation": None,
+        }
+
+    remediation = (
+        f"Set FABRIC_WORKSPACE_ID (or pass --workspace-id) plus {_SERVICE_PRINCIPAL_HINT}"
+    )
+    if desktop_capable:
+        return {
+            "ready": False,
+            "resolved_path": None,
+            "reason": "no workspace, credentials, or running Desktop instance",
+            "remediation": (
+                f"{remediation}; or open the .pbip in Power BI Desktop to run locally"
+            ),
+        }
+    return {
+        "ready": False,
+        "resolved_path": None,
+        "reason": "no workspace or credentials resolved",
+        "remediation": remediation,
+    }
+
+
 def check_readiness(name: str, args: argparse.Namespace | None) -> dict[str, Any]:
     """Return a readiness dict for analyzer ``name`` (the engine behind `doctor`).
 
-    Never reads an artifact or spawns a subprocess. Analyzers without an
-    external tool to resolve (pql_test, pql_lint, playwright, ...) are always
-    ready. See ``probe_executable`` for the bootstrapped-analyzer shape.
+    Never reads an artifact or spawns a subprocess. Three cases: an
+    analyzer needing a workspace or Desktop instance (`_CLOUD_ANALYZERS`)
+    is probed by ``_cloud_readiness``; one needing neither a binary nor a
+    workspace (pql_lint) is always ready; the rest resolve an external
+    tool -- see ``probe_executable`` for that shape.
     """
+    if name in _CLOUD_ANALYZERS:
+        return _cloud_readiness(name, args)
+
     if name not in _BOOTSTRAPPED_ANALYZERS:
         return {
             "ready": True,

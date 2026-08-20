@@ -1,6 +1,6 @@
 # Artifact Targeting and Auth Epic
 
-**Status**: 📋 PLANNED
+**Status**: 🚧 IN-PROGRESS
 **Goal**: Name any artifact — local file, running Desktop instance, or deployed workspace item — with one grammar, and answer "which identity am I about to use?" without reading source.
 
 ## Overview
@@ -104,9 +104,11 @@ Make what `fab-test` decided visible, which is where the agent-caller value actu
 
 ---
 
-## 6. Stop Reporting Cloud Analyzers as Unconditionally Ready
+## 6. Stop Reporting Cloud Analyzers as Unconditionally Ready ✅
 
 Fix the false green. Independently shippable — depends on no other task in this epic and on nothing in Config Consolidation.
+
+**Done (2026-08-19)**: `_CLOUD_ANALYZERS` (`pql_test`, `playwright`, `playwright-impact`, `dependencies`) now route through `_cloud_readiness`, which reports the target it would use or names every accepted source. Added `desktop_ports()` to `_desktop.py` — the presence-only half of `detect_desktop_instances`, since the latter shells out to PowerShell to resolve which file is open and `check_readiness` is contractually forbidden from spawning a subprocess. Credential detection covers both accepted spellings of the client pair; the ambient-Azure source arrives with Config Consolidation task 9 and task 7 reports the full chain.
 
 [`check_readiness`](../src/fabric_ci_cd_dataops/scripts/fab_test_registry.py#L454-L467) short-circuits to `ready: true, "no external tool required"` for every analyzer without an external binary, so `doctor` greenlights `pql-test` and `playwright` with no credentials and no workspace.
 
