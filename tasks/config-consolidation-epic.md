@@ -190,7 +190,7 @@ Guarantee existing repositories keep working untouched.
 
 ---
 
-## 13. Document for All Three Callers
+## 13. Document for All Three Callers ✅
 
 Cover the agent, the human, and the pipeline together, per the documentation constraint in [vision.md](../vision.md).
 

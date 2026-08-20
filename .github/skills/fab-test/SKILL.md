@@ -129,12 +129,75 @@ Per-artifact `status` is one of `passed` / `failed` / `skipped` / `timeout` / `p
  fab-test doctor --local   — Check readiness for the local Desktop workflow specifically
  fab-test list             — List subcommands with artifact glob, matched count, and required tool
  fab-test explain ANALYZER — Show the resolved command for one analyzer without running it
+ fab-test config --show    — Print every effective setting with its value and origin
+ fab-test config --validate — Confirm fab-test.yml's keys and types are valid
+ fab-test init             — Scaffold a commented fab-test.yml and .env.example
  fab-test clean-tools      — Remove or inspect the .fab-test-tools downloaded-binary cache
 ```
 
 Underscore spellings (`pql_test`, `pql_lint`, `playwright_impact`) still work silently as aliases —
 existing scripts and muscle memory keep working. Result directories under `analyzer-results/`
 use the original underscore names regardless of which spelling you invoke.
+
+## Configuration
+
+`fab-test.yml` at the repository root is an entirely optional config-file front door. No file at all means every setting resolves exactly as it did before this file existed.
+
+```bash
+fab-test --config custom.yml bpa   # --config must come before the subcommand: it's a top-level flag
+fab-test init                      # scaffold a commented fab-test.yml and .env.example
+fab-test init --dry-run            # see what init would create without writing anything
+fab-test config --show             # every effective setting, its value, and where it came from
+fab-test config --validate         # confirm the config file's keys and types are valid
+```
+
+### Precedence
+
+| Priority | Source | Example |
+|----------|--------|---------|
+| 1 (highest) | CLI flag | `--jobs 4` |
+| 2 | Environment variable | `ANALYZER_TIMEOUT=300` |
+| 3 | `fab-test.yml` (or `[tool.fab-test]` in `pyproject.toml`) | `jobs: 4` |
+| 4 (lowest) | Packaged default | `120` seconds |
+
+If both `fab-test.yml` and `[tool.fab-test]` are present, `fab-test.yml` wins per key and the CLI warns once about the duplicate source. `fab-test config --show --format json` reports each setting's origin as one of `flag`, `env:NAME`, `fab-test.yml:key`, or `default`.
+
+### Settings
+
+| Key | Type | Env var | Default |
+|-----|------|---------|---------|
+| `artifact_dir` | string | — | `.fabric/artifacts` (repository root for `fab-test local`) |
+| `output_dir` | string | — | `analyzer-results` |
+| `jobs` | integer | — | `1` |
+| `format` | string (`text`\|`json`) | — | `text` |
+| `timeout` | integer | `ANALYZER_TIMEOUT` | `120` |
+| `environment` | string | `FABRIC_ENVIRONMENT` | (none) |
+| `rules` | object | — | (none) — see Rule Overlays below |
+
+An unknown key exits `2` naming the key and the closest valid key (e.g. `artifac_dir` → "did you mean 'artifact_dir'?"); a key with the wrong type exits `2` naming the expected type.
+
+### Rule Overlays
+
+Tune one Best Practice Analyzer or PBIR Inspector rule without forking the packaged rules file:
+
+```yaml
+rules:
+  bpa:
+    disable: [AVOID_FLOATING_POINT_DATA_TYPES]   # remove a rule from the effective ruleset
+    severity: {SOME_RULE_ID: warning}            # info | warning | error
+    extend: path/to/extra-bpa-rules.json         # append rules from another file
+  pbir:
+    disable: [REMOVE_UNUSED_CUSTOM_VISUALS]
+    severity: {SOME_RULE_ID: warning}            # warning | error (PBIR Inspector has no "info" level)
+```
+
+An overlay naming a rule ID that doesn't exist upstream exits `2` listing every unmatched ID. When any overlay is configured, the resolved ruleset is written to `<output_dir>/{bpa,pbir}/_resolved-rules.json` and passed to the tool; the envelope's `rules_file` field always names whichever rules file was actually used, so a finding is traceable back to the resolved ruleset it came from. Passing `--bpa-rules-path`/`--rules-path` explicitly bypasses the overlay entirely — that file is used verbatim.
+
+The full schema ships with the package at `schemas/fab-test.schema.json` (draft 2020-12) for editor completion.
+
+### What belongs in `fab-test.yml` vs. repository secrets
+
+`fab-test.yml` is meant to be committed — it holds no credentials. Service-principal credentials (`FABRIC_TENANT_ID`, `FABRIC_CLIENT_ID`, `FABRIC_CLIENT_SECRET`) belong in a `.env` file (auto-discovered at the repository root, gitignored) or, in a pipeline, in the CI system's own secrets store — never in `fab-test.yml`. With no service-principal variables set at all, Fabric REST calls fall back to `DefaultAzureCredential` (`az login`, a managed identity, VS Code sign-in, ...).
 
 ## Global Flags (all subcommands)
 
