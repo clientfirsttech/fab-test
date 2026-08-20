@@ -69,6 +69,26 @@ class ResolvedTarget:
     path: Path | None
     raw: str
 
+    def as_dict(self, workspace_id: str = "") -> dict[str, object]:
+        """Return a JSON-serializable view, for `run.json` and `--format json`.
+
+        A structured object rather than an interpolated string, so a
+        consumer can branch on ``scope`` without parsing prose.
+        ``workspace_id`` is the GUID resolved from ``workspace``, passed in
+        because resolving it needs a network call this module never makes.
+        Carries no credential: a workspace ID names a workspace, it does
+        not grant access to one.
+        """
+        return {
+            "raw": self.raw,
+            "scope": self.scope,
+            "name": self.name,
+            "type": self.type,
+            "workspace": self.workspace,
+            "workspace_id": workspace_id or None,
+            "path": str(self.path) if self.path is not None else None,
+        }
+
 
 def _canonical_type(candidate: str) -> str | None:
     """Return the canonically-cased known type matching ``candidate``, or None."""
@@ -155,6 +175,44 @@ def _parse_workspace(segments: list[str], raw: str) -> ResolvedTarget:
         path=None,
         raw=raw,
     )
+
+
+def workspace_conflict(
+    target: ResolvedTarget | None, workspace_id_flag: str | None
+) -> str | None:
+    """Return an error message when a target and ``--workspace-id`` disagree.
+
+    Compared as written, with no lookup: a display name and a GUID cannot
+    be compared without a round trip, and one invocation naming two
+    different workspaces is a mistake whichever of them is correct. Saying
+    the same thing twice is merely redundant and passes.
+    """
+    if target is None or target.workspace is None or not workspace_id_flag:
+        return None
+    if target.workspace.strip() == workspace_id_flag.strip():
+        return None
+    return (
+        f"target names workspace '{target.workspace}' but --workspace-id says "
+        f"'{workspace_id_flag}'; pass one or the other"
+    )
+
+
+def select_target(positional: str | None, artifact_flag: str | None) -> ResolvedTarget | None:
+    """Resolve the one target from the positional argument and ``--artifact``.
+
+    ``--artifact`` predates the grammar and keeps working, routed through
+    the same parser so it gains type awareness for free. Supplying both is
+    refused rather than given a precedence rule: two ways to name one
+    artifact in a single invocation is a mistake, and silently preferring
+    one would hide it.
+    """
+    if positional and artifact_flag:
+        raise TargetError(
+            f"pass either a TARGET ('{positional}') or --artifact "
+            f"('{artifact_flag}'), not both"
+        )
+    raw = positional or artifact_flag
+    return parse_target(raw) if raw else None
 
 
 def parse_target(raw: str) -> ResolvedTarget:

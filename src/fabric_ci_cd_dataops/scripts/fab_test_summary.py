@@ -32,12 +32,13 @@ def _print_list(rows: list[dict[str, Any]], output_format: str = "text") -> int:
             r["glob"] or "(repository)",
             str(r["matched_artifacts"]),
             r["required_tool"] or "(none)",
+            ", ".join(r.get("scopes", ())) or "-",
         )
         for r in rows
     ]
     table = tabulate(
         display_rows,
-        headers=("Analyzer", "Aliases", "Glob", "Matched", "Required Tool"),
+        headers=("Analyzer", "Aliases", "Glob", "Matched", "Required Tool", "Scopes"),
         tablefmt="simple",
         stralign="left",
     )

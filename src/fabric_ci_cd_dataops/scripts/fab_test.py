@@ -58,6 +58,7 @@ from ._config import (
 from ._desktop import bridge_cli_path, detect_desktop_instances
 from ._pbip_discovery import discover_pbip_projects as _discover_pbip_projects
 from ._run_manifest import RunManifest
+from ._target import TargetError, select_target, workspace_conflict
 from .eventhouse_logger import publish_analyzer_telemetry
 from .fab_test_registry import (
     _DEFAULT_BPA_RULES,
@@ -69,7 +70,13 @@ from .fab_test_registry import (
     ANALYZER_REGISTRY as _ANALYZER_REGISTRY,
 )
 from .fab_test_registry import (
+    ANALYZER_SCOPES as _ANALYZER_SCOPES,
+)
+from .fab_test_registry import (
     applicable_analyzers as _applicable_analyzers,
+)
+from .fab_test_registry import (
+    bound_desktop_instance as _bound_desktop_instance,
 )
 from .fab_test_registry import (
     build_command as _build_command,
@@ -92,6 +99,9 @@ from .fab_test_registry import (
 from .fab_test_registry import (
     preflight_error as _preflight_error,
 )
+from .fab_test_registry import (
+    unsupported_scope_error as _unsupported_scope_error,
+)
 from .fab_test_summary import (
     _print_all_summary,
     _print_config_show,
@@ -101,6 +111,7 @@ from .fab_test_summary import (
     _print_summary,
     _read_artifact_envelope,
 )
+from .playwright_validation.resolver import resolve_workspace_id
 
 # Ensure UTF-8 output on Windows where the default pipe encoding is cp1252.
 if hasattr(sys.stdout, "reconfigure"):
@@ -546,6 +557,68 @@ def _run_one_artifact(
     return (artifact.stem, artifact_code)
 
 
+def _manifest_target(args: argparse.Namespace) -> dict[str, Any] | None:
+    """Return the resolved target as a plain dict for `run.json`, or None."""
+    target = getattr(args, "resolved_target", None)
+    if target is None:
+        return None
+    return target.as_dict(getattr(args, "workspace_id", "") or "")
+
+
+def _resolve_workspace_target(args: argparse.Namespace) -> int | None:
+    """Turn a workspace *name* into the ID the analyzers accept.
+
+    Returns an exit code on failure, or None when there is nothing to do
+    -- which is the overwhelmingly common case, so the Fabric client is
+    imported and built only when a workspace was actually named. A GUID
+    short-circuits inside `resolve_workspace_id` without a round trip.
+    """
+    target = _target_of(args)
+    if target is not None and target.workspace:
+        name = target.workspace
+    elif not getattr(args, "workspace_id", ""):
+        name = (getattr(args, "file_config", None) or {}).get("workspace", "")
+    else:
+        name = ""
+    if not name:
+        return None
+
+    from .playwright_validation.fabric_service_client import build_fabric_service_client
+    from .playwright_validation.resolver import (
+        AmbiguousWorkspaceError,
+        ServiceResolutionError,
+        WorkspaceNotFoundError,
+    )
+
+    try:
+        client = build_fabric_service_client(env_file=getattr(args, "playwright_env_file", None))
+        args.workspace_id = resolve_workspace_id(client, name)
+    except AmbiguousWorkspaceError as exc:
+        print(f"  ✗ fab-test: {exc}", file=sys.stderr)
+        return 2
+    except WorkspaceNotFoundError as exc:
+        print(f"  ✗ fab-test: {exc}", file=sys.stderr)
+        return 1
+    except ServiceResolutionError as exc:
+        print(f"  ✗ fab-test: could not resolve workspace '{name}': {exc}", file=sys.stderr)
+        return 1
+    return None
+
+
+def _target_of(args: argparse.Namespace):
+    """Return the resolved target for ``args``, deriving it if `main` has not.
+
+    `main` resolves once and stashes the result so the whole run agrees.
+    `list`, `explain`, and tests that construct a Namespace directly never
+    pass through it, so derive here rather than making every caller
+    remember to.
+    """
+    cached = getattr(args, "resolved_target", None)
+    if cached is not None:
+        return cached
+    return select_target(getattr(args, "target", None), getattr(args, "artifact", None))
+
+
 def _run_analyzer(
     name: str,
     args: argparse.Namespace,
@@ -572,14 +645,24 @@ def _run_analyzer(
         # locally.
         artifacts = [Path(".")]
     else:
-        artifacts = _discover(artifact_dir, glob, getattr(args, "artifact", None))
+        artifacts = _discover(artifact_dir, glob, _target_of(args))
 
     if not artifacts:
-        narrate(
-            f"  ⚠ fab-test {name}: no {glob} artifacts or .pbip projects found under "
-            f"{artifact_dir}",
-            output_format=output_format,
-        )
+        target = _target_of(args)
+        if target is not None and target.path is not None:
+            # A path target named a specific location, so reporting what
+            # the scan of --artifact-dir turned up would answer a question
+            # the caller did not ask.
+            narrate(
+                f"  ⚠ fab-test {name}: no {glob} artifact at {target.path}",
+                output_format=output_format,
+            )
+        else:
+            narrate(
+                f"  ⚠ fab-test {name}: no {glob} artifacts or .pbip projects found under "
+                f"{artifact_dir}",
+                output_format=output_format,
+            )
         if emit_own_json:
             print(json.dumps({"analyzer": name, "artifacts": []}, indent=2))
         return 0
@@ -590,6 +673,13 @@ def _run_analyzer(
             f"{len(artifacts)} artifact(s):",
             output_format=output_format,
         )
+        resolved = _manifest_target(args)
+        if resolved:
+            narrate(
+                f"  target: {resolved['raw']} → scope {resolved['scope']}"
+                + (f", workspace {resolved['workspace_id']}" if resolved["workspace_id"] else ""),
+                output_format=output_format,
+            )
         pbip_sources = _discover_pbip_sources(artifact_dir)
         for a in artifacts:
             analyzers = ", ".join(_applicable_analyzers(a)) or "none"
@@ -615,6 +705,7 @@ def _run_analyzer(
                     {
                         "analyzer": name,
                         "dry_run": True,
+                        "target": resolved,
                         "artifacts": [a.name for a in artifacts],
                     },
                     indent=2,
@@ -635,6 +726,29 @@ def _run_analyzer(
                 name, "*", "preflight_failed", None, 0, 0, detail=message
             )
         return exit_code
+
+    # A local/ target states the Desktop binding, so a missing instance is a
+    # prerequisite failure rather than the silent fall-through to remote XMLA
+    # that an unset --workspace-id gets.
+    target = _target_of(args)
+    if target is not None and target.scope == "desktop":
+        unbound = [a for a in artifacts if _bound_desktop_instance(a) is None]
+        if unbound:
+            message = (
+                f"no running Power BI Desktop instance has "
+                f"{', '.join(a.name for a in unbound)} open.\n"
+                "  Open the .pbip in Power BI Desktop, or drop the 'local/' "
+                "prefix to run against a workspace."
+            )
+            narrate(
+                f"\n  ✗ fab-test {name}: missing prerequisite\n  {message}\n",
+                output_format=output_format,
+            )
+            if manifest is not None:
+                manifest.record_artifact(
+                    name, "*", "preflight_failed", None, 0, 0, detail=message
+                )
+            return 127
 
     in_ci = _is_ci()
     _sub_env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
@@ -690,10 +804,21 @@ def _add_common_flags(
         help="Discover and list matching artifacts without running any analyzer",
     )
     parser.add_argument(
+        "target",
+        nargs="?",
+        default=None,
+        metavar="TARGET",
+        help=(
+            "Artifact to analyze: a path (./src/Sales.SemanticModel), a name "
+            "(Sales or Sales.SemanticModel), local/NAME for a running Power BI "
+            "Desktop instance, or WORKSPACE.Workspace/NAME.Type for a deployed item"
+        ),
+    )
+    parser.add_argument(
         "--artifact",
         default=None,
         metavar="STEM",
-        help="Only analyze the artifact whose stem matches STEM",
+        help="Deprecated alias for the TARGET argument; only analyze this stem",
     )
     parser.add_argument(
         "--timeout",
@@ -1300,6 +1425,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="Analyzer to explain (e.g. bpa, pbir, pql_test)",
     )
     explain_p.add_argument(
+        "target",
+        nargs="?",
+        default=None,
+        metavar="TARGET",
+        help="Optional target to resolve and explain (e.g. local/Sales)",
+    )
+    explain_p.add_argument(
         "--artifact-dir",
         default=str(_PYPROJECT_CONFIG.get("artifact_dir", ARTIFACT_ROOT)),
         metavar="DIR",
@@ -1600,6 +1732,7 @@ def _list_analyzers(args: argparse.Namespace) -> int:
                 "glob": glob or None,
                 "matched_artifacts": count,
                 "required_tool": _TOOL_DISPLAY_NAMES.get(name),
+                "scopes": sorted(_ANALYZER_SCOPES.get(name, frozenset())),
             }
         )
     return _print_list(rows, output_format)
@@ -1621,10 +1754,20 @@ def _explain_analyzer(args: argparse.Namespace) -> int:
     artifact_dir = Path(getattr(args, "artifact_dir", str(ARTIFACT_ROOT)))
     glob, _description = _ANALYZER_REGISTRY[name]
 
+    try:
+        args.resolved_target = _target_of(args)
+    except TargetError as exc:
+        print(f"  ✗ fab-test explain: {exc}", file=sys.stderr)
+        return 2
+    refusal = _unsupported_scope_error(name, args.resolved_target)
+    if refusal:
+        print(f"  ✗ fab-test explain: {refusal}", file=sys.stderr)
+        return 2
+
     if _is_repository_scoped(name):
         artifact = Path(".")
     else:
-        matches = _discover(artifact_dir, glob, getattr(args, "artifact", None))
+        matches = _discover(artifact_dir, glob, _target_of(args))
         # No real artifact to point at; show an illustrative command shape.
         artifact = matches[0] if matches else artifact_dir / f"<artifact>{glob.lstrip('*')}"
 
@@ -1639,6 +1782,7 @@ def _explain_analyzer(args: argparse.Namespace) -> int:
     payload = {
         "analyzer": name,
         "artifact": str(artifact),
+        "target": _manifest_target(args),
         "command": command,
         "tool_path": readiness.get("resolved_path"),
         "rules_path": rules_path,
@@ -1650,6 +1794,12 @@ def _explain_analyzer(args: argparse.Namespace) -> int:
         return 0
 
     print(f"fab-test explain {name}")
+    target = payload["target"]
+    if target:
+        located = target["workspace_id"] or target["workspace"] or target["path"] or "-"
+        print(f"  Target:   {target['raw']}")
+        print(f"  Scope:    {target['scope']}  (name: {target['name']}, "
+              f"type: {target['type'] or 'any'}, at: {located})")
     print(f"  Artifact: {payload['artifact']}")
     if payload["tool_path"]:
         print(f"  Tool:     {payload['tool_path']}")
@@ -1809,7 +1959,9 @@ def _run_local(args: argparse.Namespace) -> int:
             print(json.dumps(plan, indent=2))
         return 0
 
-    manifest = RunManifest(_FAB_TEST_VERSION, sys.argv, origin=_detect_origin())
+    manifest = RunManifest(
+        _FAB_TEST_VERSION, sys.argv, origin=_detect_origin(), target=_manifest_target(args)
+    )
 
     results: list[dict[str, Any]] = []
     for name in _LOCAL_ANALYZERS:
@@ -1854,6 +2006,35 @@ def main() -> int:
     if admin_exit_code is not None:
         return admin_exit_code
 
+    # Resolved once here so every downstream consumer -- discovery, the
+    # command builders, the run manifest -- reads the same target rather
+    # than re-deriving it from args and drifting.
+    try:
+        args.resolved_target = select_target(
+            getattr(args, "target", None), getattr(args, "artifact", None)
+        )
+    except TargetError as exc:
+        print(f"  ✗ fab-test: {exc}", file=sys.stderr)
+        return 2
+
+    conflict = workspace_conflict(args.resolved_target, getattr(args, "workspace_id", ""))
+    if conflict:
+        print(f"  ✗ fab-test: {conflict}", file=sys.stderr)
+        return 2
+
+    # Refuse an impossible scope before any network call: asking Fabric to
+    # resolve a workspace for an analyzer that could never read a deployed
+    # item wastes a round trip and reports the wrong failure.
+    if args.analyzer not in ("all", "local"):
+        refusal = _unsupported_scope_error(args.analyzer, args.resolved_target)
+        if refusal:
+            print(f"  ✗ fab-test: {refusal}", file=sys.stderr)
+            return 2
+
+    workspace_exit_code = _resolve_workspace_target(args)
+    if workspace_exit_code is not None:
+        return workspace_exit_code
+
     _apply_environment_default(args, _PYPROJECT_CONFIG)
     output_dir = Path(args.output_dir)
 
@@ -1868,13 +2049,37 @@ def main() -> int:
     if args.analyzer == "local":
         return _run_local(args)
 
-    manifest = RunManifest(_FAB_TEST_VERSION, sys.argv, origin=_detect_origin())
+    manifest = RunManifest(
+        _FAB_TEST_VERSION, sys.argv, origin=_detect_origin(), target=_manifest_target(args)
+    )
+
+    target = args.resolved_target
 
     if args.analyzer == "all":
         analyzers = _all_analyzers()
-        if analyzers:
-            codes = [_run_analyzer(name, args, output_dir, manifest) for name in analyzers]
-            exit_code = _print_all_summary(output_dir, analyzers, codes, args)
+        # An analyzer that cannot honor the target is skipped rather than
+        # failing the batch: `all local/Sales` should still run everything
+        # that reads files, and saying which were skipped is more useful
+        # than refusing the whole invocation.
+        runnable = []
+        for name in analyzers:
+            refusal = _unsupported_scope_error(name, target)
+            if refusal:
+                narrate(
+                    f"  ⚠ fab-test all: skipping {name} — {refusal}",
+                    output_format=args.output_format,
+                )
+            else:
+                runnable.append(name)
+        if runnable:
+            codes = [_run_analyzer(name, args, output_dir, manifest) for name in runnable]
+            exit_code = _print_all_summary(output_dir, runnable, codes, args)
+        elif analyzers:
+            narrate(
+                "  ✗ fab-test all: no configured analyzer can run against that target",
+                output_format=args.output_format,
+            )
+            exit_code = 2
         else:
             narrate(
                 "  ⚠ fab-test all: no analyzers configured in analyzers.json",
@@ -1882,6 +2087,8 @@ def main() -> int:
             )
             exit_code = 0
     else:
+        # The scope refusal for a single analyzer already ran above, before
+        # any network call.
         exit_code = _run_analyzer(args.analyzer, args, output_dir, manifest)
 
     manifest.write(output_dir, exit_code)

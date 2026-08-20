@@ -50,10 +50,16 @@ class RunManifest:
         fab_test_version: str,
         invoked_command: list[str],
         origin: str = "unknown",
+        target: dict[str, Any] | None = None,
     ):
         self.fab_test_version = fab_test_version
         self.invoked_command = _sanitize_command(invoked_command)
         self.origin = origin
+        # The resolved target, or None when the run discovered artifacts
+        # rather than being pointed at one. Recorded so a finished run says
+        # whether it read files, a Desktop instance, or a workspace --
+        # which `origin` alone (local vs CI) does not answer.
+        self.target = target
         self.artifacts: list[dict[str, Any]] = []
 
     def record_artifact(
@@ -92,6 +98,7 @@ class RunManifest:
             "schema_version": RUN_MANIFEST_SCHEMA_VERSION,
             "fab_test_version": self.fab_test_version,
             "origin": self.origin,
+            "target": self.target,
             "command": self.invoked_command,
             "artifacts": self.artifacts,
             "totals": {"errors": total_errors, "warnings": total_warnings},

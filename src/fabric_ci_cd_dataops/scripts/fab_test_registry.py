@@ -29,6 +29,7 @@ from ._desktop import (
 )
 from ._pbip_discovery import discover_pbip_projects
 from ._rule_overlay import apply_overlay, apply_pbir_overlay
+from ._target import ResolvedTarget
 
 # Reuse the same repo-root logic as fab_test.py so paths stay consistent.
 
@@ -78,6 +79,57 @@ ANALYZER_REGISTRY: dict[str, tuple[str, str]] = {
     "playwright-impact": ("", "Playwright impact manifest builder"),
     "dependencies": ("", "Report dependency discovery"),
 }
+
+# Which target scopes each analyzer can actually honor, declared once so the
+# check cannot drift per command builder.
+#
+# The file-reading analyzers accept `desktop` as well as `path`: for them
+# `local/Sales` is just a name, since the artifact is on disk either way.
+# Only pql_test truly *binds* to a running instance, which is why the
+# running-instance preflight keys off _DESKTOP_CAPABLE_ANALYZERS instead.
+#
+# None of them accept `workspace` except the ones that call the Fabric API.
+# Making bpa read a deployed item would mean exporting its definition
+# first, which is fabric-cicd-deployment's job and a stated non-goal.
+ANALYZER_SCOPES: dict[str, frozenset[str]] = {
+    "bpa": frozenset({"path", "desktop"}),
+    "pbir": frozenset({"path", "desktop"}),
+    "pql_lint": frozenset({"path", "desktop"}),
+    "pql_test": frozenset({"path", "desktop", "workspace"}),
+    "playwright": frozenset({"path", "workspace"}),
+    "playwright-impact": frozenset({"path", "workspace"}),
+    "dependencies": frozenset({"path", "workspace"}),
+}
+
+_SCOPE_HINTS = {
+    "path": "a path (./src/Sales.SemanticModel) or a name (Sales.SemanticModel)",
+    "desktop": "local/NAME for a running Power BI Desktop instance",
+    "workspace": "WORKSPACE.Workspace/NAME.Type for a deployed item",
+}
+
+_SCOPE_REFUSALS = {
+    "workspace": "reads artifact files on disk and cannot fetch a deployed item",
+    "desktop": "does not bind to a running Power BI Desktop instance",
+}
+
+
+def unsupported_scope_error(name: str, target: ResolvedTarget | None) -> str | None:
+    """Return an error message when ``name`` cannot honor ``target``'s scope.
+
+    Parsing the grammar universally and refusing here -- rather than
+    refusing at the parser -- is what lets the message name the analyzer
+    and the forms that *would* work, instead of rejecting a target that is
+    perfectly valid for the analyzer standing next to it.
+    """
+    if target is None:
+        return None
+    supported = ANALYZER_SCOPES.get(name)
+    if supported is None or target.scope in supported:
+        return None
+    reason = _SCOPE_REFUSALS.get(target.scope, "does not support that target")
+    alternatives = "; ".join(_SCOPE_HINTS[scope] for scope in sorted(supported))
+    return f"{name} {reason}. Use {alternatives}"
+
 
 # Analyzers that depend on an external binary/tool.
 _BOOTSTRAPPED_ANALYZERS = {"bpa", "pbir"}
@@ -141,16 +193,26 @@ def discover_pbip_sources(artifact_dir: Path) -> dict[Path, Path]:
 def discover_artifacts(
     artifact_dir: Path,
     glob: str,
-    stem_filter: str | None,
+    target: ResolvedTarget | None,
 ) -> list[Path]:
-    """Return sorted artifact paths matching ``glob`` and optional stem filter.
+    """Return sorted artifact paths matching ``glob``, narrowed by ``target``.
 
     Includes artifacts found directly under ``artifact_dir`` and any
     matching folder paired with a `.pbip` project discovered recursively
     within ``artifact_dir`` — a developer's `.pbip` need not sit at the top
-    level of the directory being scanned. Search never leaves
-    ``artifact_dir``.
+    level of the directory being scanned.
+
+    A target naming a *location* short-circuits discovery entirely and is
+    not confined to ``artifact_dir``: the caller pointed at a specific
+    folder, so scanning elsewhere and filtering would be both slower and
+    wrong. Every other scope narrows the scan by name, and by type when
+    the target carries one — which is how ``Sales.SemanticModel`` stops
+    selecting ``Sales.Report``.
     """
+    if target is not None and target.path is not None:
+        resolved = target.path.resolve()
+        return [resolved] if resolved.is_dir() and resolved.name.endswith(glob.lstrip("*")) else []
+
     if not artifact_dir.exists():
         return []
     suffix = glob.lstrip("*")
@@ -159,13 +221,15 @@ def discover_artifacts(
         path for path in discover_pbip_sources(artifact_dir) if path.name.endswith(suffix)
     )
     artifacts = sorted(matches)
-    if stem_filter:
-        # Accept either the artifact stem or the full artifact name
-        # (e.g. "SampleModel-PQLAssert" or "SampleModel-PQLAssert.SemanticModel").
-        artifacts = [
-            a for a in artifacts if a.stem == stem_filter or a.name == stem_filter
-        ]
-    return artifacts
+    if target is None:
+        return artifacts
+
+    if target.type is not None and not suffix.endswith(target.type):
+        # The target names a type this analyzer does not read at all.
+        return []
+    # Accept either the artifact stem or the full artifact name
+    # (e.g. "SampleModel-PQLAssert" or "SampleModel-PQLAssert.SemanticModel").
+    return [a for a in artifacts if a.stem == target.name or a.name == target.name]
 
 
 def _write_resolved_rules(resolved: Any, output_dir: Path, subdir: str) -> Path:
@@ -261,9 +325,13 @@ def build_pbir_command(
     ]
 
 
-def _bound_desktop_instance(artifact: Path):
+def bound_desktop_instance(artifact: Path):
     """Return the (port, model_name) of a Desktop instance with this artifact's
     .pbip open, or None when there's no pairing or no unambiguous match.
+
+    Public because `fab-test`'s preflight calls it too: a ``local/`` target
+    states the Desktop binding outright, so failing to find one is a
+    missing prerequisite to report rather than a silent fallback.
     """
     pbip_path = discover_pbip_sources(artifact.parent).get(artifact.resolve())
     if pbip_path is None:
@@ -290,6 +358,11 @@ def build_pql_test_command(
     open, its port and model name are added so the envelope can record what
     it bound to. Desktop detection is skipped entirely once a workspace ID
     is supplied -- that's the remote XMLA path.
+
+    A ``local/`` target overrides that: it says Desktop outright, so an
+    ambient FABRIC_WORKSPACE_ID does not quietly turn the run remote. The
+    caller stated the scope, and honoring it is the whole point of saying
+    so rather than relying on a variable being unset.
     """
     output = output_dir / "pql_test" / artifact.stem / "envelope.json"
     cmd = [
@@ -303,14 +376,18 @@ def build_pql_test_command(
         "--output-path",
         str(output),
     ]
-    workspace_id = getattr(args, "workspace_id", "") or _env("FABRIC_WORKSPACE_ID")
+    target = getattr(args, "resolved_target", None)
+    if target is not None and target.scope == "desktop":
+        workspace_id = ""
+    else:
+        workspace_id = getattr(args, "workspace_id", "") or _env("FABRIC_WORKSPACE_ID")
     environment = getattr(args, "environment", "") or _env("FABRIC_ENVIRONMENT")
     if workspace_id:
         cmd += ["--workspace-id", workspace_id]
     if environment:
         cmd += ["--env", environment]
     if not workspace_id:
-        bound = _bound_desktop_instance(artifact)
+        bound = bound_desktop_instance(artifact)
         if bound is not None:
             port, model_name = bound
             cmd += ["--desktop-port", str(port), "--desktop-model-name", model_name]

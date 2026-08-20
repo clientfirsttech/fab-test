@@ -189,6 +189,22 @@ class FabricServiceClient(ServiceClient):
                 body=response.text,
             ) from exc
 
+    def list_workspaces(self) -> list[dict[str, Any]]:
+        """Return every workspace visible to the current identity.
+
+        Backs `resolve_workspace_id`, so a target can name a workspace the
+        way a person does rather than by GUID.
+        """
+        data = self._rest_request(
+            "GET",
+            "/v1/workspaces",
+            api_root=self._fabric_api_root,
+        )
+        return [
+            {"id": item.get("id", ""), "displayName": item.get("displayName", "")}
+            for item in data.get("value", [])
+        ]
+
     def list_items(
         self,
         workspace_id: str,

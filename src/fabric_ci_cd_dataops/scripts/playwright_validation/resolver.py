@@ -8,6 +8,7 @@ lookups supply a client implementing the small ``ServiceClient`` protocol.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
@@ -34,6 +35,16 @@ class ServiceResolutionError(Exception):
         self.candidates = candidates or []
 
 
+class WorkspaceNotFoundError(ServiceResolutionError):
+    """No workspace matches the name. Exit 1: a real lookup failure."""
+
+
+class AmbiguousWorkspaceError(ServiceResolutionError):
+    """More than one workspace matches. Exit 2: the invocation is unusable
+    as written, and passing a GUID resolves it.
+    """
+
+
 class ServiceClient(Protocol):
     """Minimal protocol for service-backed item/dependency lookups."""
 
@@ -48,6 +59,8 @@ class ServiceClient(Protocol):
         workspace_id: str,
         semantic_model_id: str,
     ) -> list[dict[str, Any]]: ...
+
+    def list_workspaces(self) -> list[dict[str, Any]]: ...
 
 
 @dataclass(frozen=True)
@@ -163,6 +176,65 @@ def _normalize_name(name: str) -> str:
         if name.endswith(suffix):
             return name[: -len(suffix)]
     return name
+
+
+_GUID_PATTERN = re.compile(
+    r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+)
+
+
+def _normalize_workspace_name(name: str) -> str:
+    """Fold a workspace display name for comparison.
+
+    Deliberately more forgiving than `_normalize_name`, which is exact:
+    an item name usually arrives copied from a folder on disk, whereas a
+    workspace name is typed by hand into a shell, where case and stray
+    spaces are noise rather than signal.
+    """
+    return name.strip().casefold()
+
+
+def resolve_workspace_id(client: ServiceClient, name_or_id: str) -> str:
+    """Return the workspace ID for a display name, or a GUID unchanged.
+
+    The counterpart to `resolve_item`, which already resolves an item name
+    *within* a workspace: this resolves the workspace half of a
+    ``Sales Dev.Workspace/Sales.SemanticModel`` target.
+
+    A value that is already a GUID short-circuits the lookup rather than
+    confirming it -- confirming would cost a round trip and turn a
+    perfectly valid ID into a failure whenever the identity cannot list
+    workspaces.
+    """
+    candidate = name_or_id.strip()
+    if _GUID_PATTERN.match(candidate):
+        return candidate
+
+    workspaces = client.list_workspaces()
+    normalized = _normalize_workspace_name(candidate)
+    matches = [
+        workspace
+        for workspace in workspaces
+        if _normalize_workspace_name(workspace.get("displayName", "")) == normalized
+    ]
+
+    if not matches:
+        visible = [w.get("displayName", "") for w in workspaces]
+        visible_note = ", ".join(visible) if visible else "none visible to this identity"
+        raise WorkspaceNotFoundError(
+            f"No workspace named '{candidate}'. Visible workspaces: {visible_note}.",
+            candidates=visible,
+        )
+
+    if len(matches) > 1:
+        ids = [w.get("id", "") for w in matches]
+        raise AmbiguousWorkspaceError(
+            f"Multiple workspaces are named '{candidate}': {', '.join(ids)}. "
+            f"Use the ID instead of the name.",
+            candidates=ids,
+        )
+
+    return matches[0]["id"]
 
 
 def resolve_item(
