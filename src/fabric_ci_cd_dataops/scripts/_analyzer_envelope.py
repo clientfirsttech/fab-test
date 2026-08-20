@@ -36,6 +36,21 @@ ENVELOPE_REQUIRED_KEYS: frozenset = frozenset(
     }
 )
 
+# Keys an analyzer may add but none is obliged to. Optional means *absent*
+# rather than null: a consumer tests presence, so a key is never a promise
+# pointing nowhere.
+#
+# native_html_output_path is a human-readable report for this artifact --
+# an upstream one where the tool produces it (PBIR Inspector's TestRun.html)
+# or a generated one otherwise. `fab-test all` surfaces it in the Report
+# column, which is why it needs to be part of the contract rather than a
+# field one wrapper happened to set.
+ENVELOPE_OPTIONAL_KEYS: frozenset = frozenset(
+    {
+        "native_html_output_path",
+    }
+)
+
 # Output layout: analyzer-results/<analyzer>/<artifact-stem>/
 _RESULTS_ROOT = "analyzer-results"
 
@@ -131,10 +146,16 @@ def build_envelope(
     message: str = "",
     findings: list[dict[str, Any]] | None = None,
     native_output_path_str: str = "",
+    native_html_output_path_str: str = "",
     duration_ms: int = 0,
 ) -> dict[str, Any]:
-    """Build a standards-compliant result envelope dictionary."""
-    return {
+    """Build a standards-compliant result envelope dictionary.
+
+    ``native_html_output_path_str`` is optional and omitted entirely when
+    empty, rather than written as an empty string -- see
+    ``ENVELOPE_OPTIONAL_KEYS`` for why absence is the signal.
+    """
+    envelope = {
         "schema_version": ENVELOPE_SCHEMA_VERSION,
         "status": status,
         "message": message,
@@ -144,6 +165,9 @@ def build_envelope(
         "native_output_path": native_output_path_str,
         "duration_ms": duration_ms,
     }
+    if native_html_output_path_str:
+        envelope["native_html_output_path"] = native_html_output_path_str
+    return envelope
 
 
 def write_envelope(path: Path, envelope: dict[str, Any]) -> None:

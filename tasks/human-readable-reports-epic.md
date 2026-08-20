@@ -1,6 +1,6 @@
 # Human-Readable Reports Epic
 
-**Status**: 📋 PLANNED
+**Status**: 🚧 IN-PROGRESS (2/7)
 **Goal**: Every analyzer produces a report a person can open and read, and the summary points at it.
 
 ## Overview
@@ -13,9 +13,11 @@ One renderer, not three. The envelope already normalizes findings, and [`fab_tes
 
 ---
 
-## 1. Add a Report Column to the Aggregate Summary
+## 1. Add a Report Column to the Aggregate Summary ✅
 
 Surface the readable artifact that already exists before generating any new ones.
+
+**Done (2026-08-20)**: the `all` summary gains a `Report` column, populated from the envelope's optional HTML key. Both path columns are relative and untruncated, so both stay clickable. The column is omitted entirely when nothing in the run produced a report — a header over nothing but blanks is noise. JSON gains `report_path` as a separate field, always present and null when absent, so a consumer tests one thing; `output_path` keeps its meaning.
 
 **Requirements**:
 - Given an analyzer whose envelope records an HTML report, then the `all` summary shows that path in a `Report` column.
@@ -29,9 +31,11 @@ Surface the readable artifact that already exists before generating any new ones
 
 ---
 
-## 2. Make the HTML Path a Real Envelope Key
+## 2. Make the HTML Path a Real Envelope Key ✅
 
 Turn an ad-hoc field into part of the contract, so the Report column reads a documented key rather than a PBIR implementation detail.
+
+**Done (2026-08-20)**: `ENVELOPE_OPTIONAL_KEYS` joins `ENVELOPE_REQUIRED_KEYS` in `_analyzer_envelope.py`, with `native_html_output_path` its first member and a test asserting the two sets never overlap. `build_envelope` takes `native_html_output_path_str` and **omits the key entirely when empty** rather than writing an empty string — optional means absent, so a consumer tests presence and a key is never a promise pointing nowhere. Purely additive: existing envelopes without it stay valid.
 
 `native_html_output_path` is currently set only in [`invoke_pbir_inspector.py`](../src/fabric_ci_cd_dataops/scripts/invoke_pbir_inspector.py#L140) and appears in no schema.
 

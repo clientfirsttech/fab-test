@@ -407,6 +407,19 @@ def _envelope_error_warning_counts(data: dict[str, Any] | None) -> tuple[int, in
     return _severity_counts(findings)
 
 
+def _report_path_for(envelope: dict[str, Any] | None) -> str | None:
+    """Return the human-readable report path from an envelope, or None.
+
+    Reads the optional ``native_html_output_path`` key. None covers three
+    cases a caller should not have to distinguish: no envelope (a dry run
+    read nothing), an analyzer that produces no report, and a key present
+    but empty.
+    """
+    if not envelope:
+        return None
+    return envelope.get("native_html_output_path") or None
+
+
 def _display_path(path: Path | str) -> str:
     """Return ``path`` relative to the working directory when it sits inside it.
 
@@ -458,6 +471,7 @@ def _print_all_summary(
                 "errors": 0,
                 "warnings": 0,
                 "output_path": "",
+                "report_path": None,
             })
             continue
         for stem in stems:
@@ -486,6 +500,7 @@ def _print_all_summary(
                 "errors": errors,
                 "warnings": warnings,
                 "output_path": output_path,
+                "report_path": _report_path_for(data),
             })
 
     if not rows or all(r["artifact"] == "(none)" for r in rows):
@@ -542,8 +557,12 @@ def _print_all_summary(
             return "⏭️ skipped"
         return status
 
-    display_rows = [
-        (
+    # Only worth a column when something in this run actually produced a
+    # report; otherwise it is a header over nothing but blanks.
+    any_report = any(r.get("report_path") for r in rows)
+
+    def _cells(r: dict[str, Any]) -> tuple[str, ...]:
+        base = (
             r["analyzer"],
             r["artifact"],
             _status_label(r["status"]),
@@ -553,12 +572,18 @@ def _print_all_summary(
             # and the tail is the half that says which analyzer it came from.
             _display_path(r["output_path"]) if r["output_path"] else "",
         )
-        for r in rows
-    ]
+        if not any_report:
+            return base
+        report = r.get("report_path")
+        return (*base, _display_path(report) if report else "")
+
+    headers = ["Analyzer", "Artifact", "Status", "Errors", "Warnings", "Output"]
+    if any_report:
+        headers.append("Report")
 
     table = tabulate(
-        display_rows,
-        headers=("Analyzer", "Artifact", "Status", "Errors", "Warnings", "Output"),
+        [_cells(r) for r in rows],
+        headers=headers,
         tablefmt="simple",
         stralign="left",
     )
