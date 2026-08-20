@@ -16,7 +16,7 @@ import subprocess
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts.fab_test_registry import ANALYZER_REGISTRY
+from fabric_ci_cd_dataops.scripts.fab_test_registry import visible_analyzers
 from fabric_ci_cd_dataops.scripts.fab_test_summary import _print_doctor
 
 _DOCTOR_KEYS = {"analyzer", "ready", "reason", "resolved_path", "remediation"}
@@ -34,7 +34,7 @@ def test_doctor_lists_every_analyzer_text_format():
         check=False,
     )
     assert result.returncode in (0, 1), result.stderr
-    for name in ANALYZER_REGISTRY:
+    for name in visible_analyzers():
         assert name in result.stdout, f"{name} missing from doctor text output"
 
 
@@ -52,7 +52,7 @@ def test_doctor_json_format_has_stable_keys():
     assert result.returncode in (0, 1), result.stderr
     summary = json.loads(result.stdout)
     assert "analyzers" in summary
-    assert len(summary["analyzers"]) == len(ANALYZER_REGISTRY)
+    assert len(summary["analyzers"]) == len(visible_analyzers())
     for entry in summary["analyzers"]:
         assert set(entry.keys()) == _DOCTOR_KEYS, f"key mismatch: {entry.keys()}"
 

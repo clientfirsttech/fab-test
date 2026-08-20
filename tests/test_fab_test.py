@@ -70,7 +70,10 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 FAB_TEST = "fab-test"
 ARTIFACT_ROOT = REPO_ROOT / ".fabric" / "artifacts"
 
-_ALL_SUBCOMMANDS = ("bpa", "pbir", "pql_test", "pql_lint", "all")
+# pql_lint is deliberately absent: it is hidden from the advertised surface
+# (see HIDDEN_ANALYZERS and tests/test_hidden_analyzers.py) while remaining
+# fully invocable.
+_ALL_SUBCOMMANDS = ("bpa", "pbir", "pql_test", "all")
 
 
 # --------------------------------------------------------------------------- #
@@ -3326,7 +3329,10 @@ def test_help_displays_hyphenated_form_as_canonical():
     )
     assert result.returncode == 0, result.stderr
     assert "pql-test (pql_test)" in result.stdout
-    assert "pql-lint (pql_lint)" in result.stdout
+    # playwright-impact stands in for pql-lint here, which is now hidden
+    # from the listing; the point is that an aliased subcommand shows its
+    # hyphenated form as canonical with the underscore form in parentheses.
+    assert "playwright-impact (playwright_impact)" in result.stdout
 
 
 @pytest.mark.fab_test
