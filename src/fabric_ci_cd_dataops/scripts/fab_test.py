@@ -94,6 +94,7 @@ from .fab_test_registry import (
 )
 from .fab_test_summary import (
     _print_all_summary,
+    _print_config_show,
     _print_doctor,
     _print_list,
     _print_local_doctor,
@@ -1228,6 +1229,24 @@ def build_parser() -> argparse.ArgumentParser:
         help="Check prerequisites for the local Desktop workflow (fab-test local)",
     )
 
+    # --- config ---
+    config_p = subs.add_parser(
+        "config",
+        help="Show effective configuration and where each setting came from",
+    )
+    config_p.add_argument(
+        "--show",
+        action="store_true",
+        help="Print every effective setting with its value and origin",
+    )
+    config_p.add_argument(
+        "--format",
+        choices=["text", "json"],
+        default=_PYPROJECT_CONFIG.get("format", "text"),
+        dest="output_format",
+        help="Output format for the settings report (default: text)",
+    )
+
     # --- list ---
     list_p = subs.add_parser(
         "list",
@@ -1309,6 +1328,50 @@ def _clean_tools(repo_root: Path, dry_run: bool) -> int:
     shutil.rmtree(cache_dir)
     print(f"  ✓ fab-test clean-tools: removed {cache_dir}")
     return 0
+
+
+# (key, env_var, packaged_default, cast) for every setting resolve_setting
+# can currently resolve. Keep in sync with _config._VALID_KEYS.
+_SETTING_SPECS: list[tuple[str, str | None, Any, type | None]] = [
+    ("artifact_dir", None, str(ARTIFACT_ROOT), None),
+    ("output_dir", None, str(RESULTS_ROOT), None),
+    ("jobs", None, 1, None),
+    ("format", None, "text", None),
+    ("timeout", "ANALYZER_TIMEOUT", _DEFAULT_SUBPROCESS_TIMEOUT, int),
+    ("environment", "FABRIC_ENVIRONMENT", "", None),
+]
+
+_SECRET_KEY_MARKERS = ("secret", "password", "token", "api_key")
+
+
+def _is_secret_key(key: str) -> bool:
+    """Whether a config key name looks like it holds a credential."""
+    lowered = key.lower()
+    return any(marker in lowered for marker in _SECRET_KEY_MARKERS)
+
+
+def _config_show(args: argparse.Namespace) -> int:
+    """Print every effective setting fab-test would use, and where it came from.
+
+    Never reflects an explicit CLI flag from *this* invocation -- `config`
+    doesn't take `--jobs`/`--timeout`/etc. itself; it reports what a bare
+    invocation of another subcommand would resolve to right now.
+    """
+    output_format = getattr(args, "output_format", "text")
+    file_config = getattr(args, "file_config", {})
+    rows = []
+    for key, env_var, packaged_default, cast in _SETTING_SPECS:
+        value, origin = resolve_setting(
+            key,
+            cli_value=None,
+            env_var=env_var,
+            file_config=file_config,
+            packaged_default=packaged_default,
+            cast=cast,
+        )
+        display_value = "<redacted>" if _is_secret_key(key) else value
+        rows.append({"key": key, "value": display_value, "origin": origin})
+    return _print_config_show(rows, output_format)
 
 
 def _doctor_local(args: argparse.Namespace) -> int:
@@ -1472,6 +1535,7 @@ _ADMIN_COMMAND_HANDLERS: dict[str, Callable[[argparse.Namespace], int]] = {
     "doctor": _doctor,
     "list": _list_analyzers,
     "explain": _explain_analyzer,
+    "config": _config_show,
 }
 
 
@@ -1643,8 +1707,8 @@ def main() -> int:
     args.analyzer = _SUBCOMMAND_ALIASES.get(args.analyzer, args.analyzer)
 
     try:
-        # Nothing consumes this yet -- a later Config Consolidation task
-        # routes every setting through one precedence resolver.
+        # Consumed by resolve_setting() calls (_resolve_timeout,
+        # _apply_environment_default, fab-test config --show).
         args.file_config, file_config_warnings = merged_file_config(
             REPO_ROOT, REPO_ROOT / "pyproject.toml", args.config
         )

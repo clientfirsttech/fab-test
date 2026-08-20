@@ -65,6 +65,21 @@ def _print_doctor(rows: list[dict[str, Any]], output_format: str = "text") -> in
     return 0 if any_ready else 1
 
 
+def _print_config_show(rows: list[dict[str, Any]], output_format: str = "text") -> int:
+    """Print `fab-test config --show`'s effective settings and their origin.
+
+    Always returns 0 -- this is a reporting command, never a failure.
+    """
+    if output_format == "json":
+        print(json.dumps({"settings": rows}, indent=2))
+        return 0
+
+    width = max((len(r["key"]) for r in rows), default=0)
+    for r in rows:
+        print(f"{r['key']:<{width}} = {r['value']!r}  ({r['origin']})")
+    return 0
+
+
 def _print_local_doctor(
     rows: list[dict[str, Any]], would_run: list[str], output_format: str = "text"
 ) -> int:

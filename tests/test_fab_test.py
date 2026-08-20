@@ -3551,7 +3551,7 @@ _STDOUT_PURITY_EXTRA_ARGS = {
 
 # Admin/reporting subcommands (not part of the analyzer-run pipeline) don't
 # necessarily narrate anything to stderr, and some don't take --dry-run.
-_NO_NARRATION_SUBCOMMANDS = {"doctor", "list", "explain"}
+_NO_NARRATION_SUBCOMMANDS = {"doctor", "list", "explain", "config"}
 _EXPECTED_EXIT_CODES = {"doctor": (0, 1)}
 
 
