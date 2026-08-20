@@ -1,6 +1,6 @@
 # Human-Readable Reports Epic
 
-**Status**: 🚧 IN-PROGRESS (2/7)
+**Status**: 🚧 IN-PROGRESS (3/7)
 **Goal**: Every analyzer produces a report a person can open and read, and the summary points at it.
 
 ## Overview
@@ -49,9 +49,17 @@ Turn an ad-hoc field into part of the contract, so the Report column reads a doc
 
 ---
 
-## 3. Build the Envelope-to-HTML Renderer
+## 3. Build the Envelope-to-HTML Renderer ✅
 
 One renderer, driven by the envelope, reusing the finding formatters that already exist.
+
+**Done (2026-08-20)**: new `_report_html.py` with `render_report` and `write_report`. Self-contained — inline CSS, no script, no font or stylesheet link — with a test asserting no `http://`, `https://`, `<script src`, or `<link ` appears anywhere in the output. Everything is escaped through `html.escape`, guarded by a test that feeds a `<script>` tag in as a rule name.
+
+**Extracted `normalize_findings` into `_analyzer_envelope.py`** rather than writing a second normalization. `_build_findings_table` already collapsed BPA's PascalCase keys and PBIR's lowercase keys into one row shape and sorted by severity; that logic now lives in one place and both the terminal summary and the report call it, so a finding can never read differently or sort differently between them.
+
+**Simplified against the requirement**: findings are rendered pre-sorted, most severe first, rather than client-side sortable. Column sorting would mean inline JavaScript to maintain and test for a nicety, which the simplicity constraint in [vision.md](../vision.md) argues against. Revisit if reading a severity-sorted table proves insufficient.
+
+Rendering is deterministic — the same envelope produces identical bytes, with no generation timestamp — so two reports of one run never differ for a reason no reader benefits from.
 
 **Requirements**:
 - Given any envelope, then a self-contained HTML file is produced with no external CSS, JS, or font requests — it must open from disk and survive being uploaded as a CI artifact.
@@ -88,8 +96,10 @@ Wire the renderer into the analyzers whose upstream tools cannot emit HTML.
 
 Rendering on every run costs time and clutters CI artifacts; never rendering makes the feature invisible.
 
+**Decided (2026-08-20, user)**: **opt-in — reports are generated only behind `--report`.** Off by default, so no existing run gets slower and no pipeline starts collecting artifacts it did not ask for. PBIR is unaffected either way: its `TestRun.html` comes from the upstream tool, not from us, so it keeps appearing in the Report column with no flag.
+
 **Requirements**:
-- Given no flag, then the default behavior is settled and documented, with the reasoning recorded here.
+- Given no flag, then no report is generated and the run behaves exactly as it does today.
 - Given `--report` / `--no-report`, then generation is forced on or off regardless of the default.
 - Given a `report` key in `fab-test.yml`, then it resolves through the existing precedence chain (CLI > env > config > default).
 - Given `--dry-run`, then no report is written.

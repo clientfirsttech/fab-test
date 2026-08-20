@@ -15,7 +15,7 @@ from typing import Any
 
 from tabulate import tabulate
 
-from ._analyzer_envelope import _severity_counts, _severity_rank
+from ._analyzer_envelope import _severity_counts, normalize_findings
 from ._target import target_from_args
 from .fab_test_registry import ANALYZER_REGISTRY, discover_artifacts
 
@@ -205,21 +205,9 @@ def _build_findings_table(
     if findings and _is_pql_test_finding(findings[0]):
         return _build_pql_test_table(findings, max_width)
 
-    rows = []
-    for f in findings:
-        rule = f.get("rule") or f.get("RuleName") or "?"
-        sev = f.get("severity") or f.get("Severity") or ""
-        obj = f.get("object") or f.get("ObjectName") or ""
-        msg = (
-            f.get("message")
-            or f.get("Message")
-            or f.get("description")
-            or ""
-        )
-        rows.append((rule, sev, obj, msg))
-
-    # Sort by severity descending so the most important findings appear first.
-    rows.sort(key=lambda r: (-_severity_rank(r[1]), r[0].lower(), r[2].lower()))
+    # Shared with the HTML report so a finding never reads differently, or
+    # sorts differently, between the terminal and the report.
+    _kind, rows = normalize_findings(findings)
 
     # Allocate column widths: keep severity compact, cap rule/object widths,
     # and guarantee the message column at least 20 characters.

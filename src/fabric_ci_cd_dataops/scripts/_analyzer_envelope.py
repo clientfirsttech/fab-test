@@ -55,6 +55,67 @@ ENVELOPE_OPTIONAL_KEYS: frozenset = frozenset(
 _RESULTS_ROOT = "analyzer-results"
 
 
+def is_test_finding(finding: dict) -> bool:
+    """Return True when a finding uses the pql-test suite/test/expected shape."""
+    return (
+        "test_name" in finding
+        or "suite_name" in finding
+        or ("passed" in finding and ("expected" in finding or "actual" in finding))
+    )
+
+
+def _test_status(finding: dict) -> str:
+    """Map a pql-test result dict to a status label."""
+    if finding.get("error"):
+        return "ERROR"
+    if finding.get("skipped"):
+        return "SKIPPED"
+    if finding.get("passed"):
+        return "PASS"
+    return "FAIL"
+
+
+def normalize_findings(findings: list[dict]) -> tuple[str, list[tuple]]:
+    """Return ``(kind, sorted rows)`` for a list of findings.
+
+    ``kind`` is ``"rules"`` — (rule, severity, object, message) — or
+    ``"tests"`` — (suite, test, expected, actual, status). Collapsing
+    BPA's PascalCase keys and PBIR's lowercase keys here is what stops one
+    analyzer's findings rendering differently from another's.
+
+    Shared by the terminal summary and the HTML report so the two can
+    never disagree about what a finding says or which order findings come
+    in. Rendering-free by design: no widths, no escaping, no markup.
+    """
+    if findings and is_test_finding(findings[0]):
+        rows = [
+            (
+                f.get("suite_name") or "?",
+                f.get("test_name") or "?",
+                f.get("expected") or "",
+                f.get("actual") or "",
+                _test_status(f),
+            )
+            for f in findings
+        ]
+        status_rank = {"ERROR": 0, "FAIL": 1, "SKIPPED": 2, "PASS": 3}
+        rows.sort(key=lambda r: (status_rank.get(r[4], 1), str(r[0]).lower(), str(r[1]).lower()))
+        return "tests", rows
+
+    rows = [
+        (
+            f.get("rule") or f.get("RuleName") or "?",
+            f.get("severity") or f.get("Severity") or "",
+            f.get("object") or f.get("ObjectName") or "",
+            f.get("message") or f.get("Message") or f.get("description") or "",
+        )
+        for f in findings
+    ]
+    # Most severe first, then stable by rule and object.
+    rows.sort(key=lambda r: (-_severity_rank(r[1]), str(r[0]).lower(), str(r[2]).lower()))
+    return "rules", rows
+
+
 def _severity_rank(severity: Any) -> int:
     """Return a numeric severity rank for sorting (higher = more severe).
 
