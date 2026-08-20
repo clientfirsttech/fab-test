@@ -2967,6 +2967,34 @@ def test_common_flags_cli_overrides_pyproject_config(monkeypatch):
 
 
 @pytest.mark.fab_test
+def test_backward_compat_real_command_with_only_pyproject_config(tmp_path):
+    """A repository with only [tool.fab-test] and no fab-test.yml: a real
+    fab-test invocation resolves --artifact-dir from pyproject.toml exactly
+    as it did before this epic, with no fab-test.yml involved at all.
+    """
+    artifact_dir = tmp_path / "configured-artifacts"
+    (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
+    pyproject = tmp_path / "pyproject.toml"
+    pyproject.write_text(
+        f'[tool.fab-test]\nartifact_dir = "{artifact_dir.as_posix()}"\n',
+        encoding="utf-8",
+    )
+    assert not (tmp_path / "fab-test.yml").exists()
+
+    result = subprocess.run(
+        ["fab-test", "bpa", "--dry-run"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        cwd=tmp_path,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "SampleModel" in result.stdout
+
+
+@pytest.mark.fab_test
 def test_resolve_timeout_uses_config_when_no_cli_or_env(monkeypatch):
     """A config-file timeout is used when neither --timeout nor the env is set."""
     monkeypatch.delenv("ANALYZER_TIMEOUT", raising=False)
