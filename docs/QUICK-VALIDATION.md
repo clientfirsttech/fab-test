@@ -126,6 +126,46 @@ fab-test doctor
 fab-test doctor --analyzer bpa --format json
 ```
 
+## Configuring fab-test
+
+`fab-test.yml` at the repository root is an entirely optional config-file front door — no file at all means every setting behaves exactly as it always has.
+
+```bash
+fab-test init                # scaffold a commented fab-test.yml and .env.example
+fab-test config --show       # every effective setting, its value, and where it came from
+fab-test config --validate   # confirm the config file's keys and types are valid
+```
+
+Precedence, for every setting:
+
+| Priority | Source | Example |
+|----------|--------|---------|
+| 1 (highest) | CLI flag | `--jobs 4` |
+| 2 | Environment variable | `ANALYZER_TIMEOUT=300` |
+| 3 | `fab-test.yml` (or `[tool.fab-test]` in `pyproject.toml`) | `jobs: 4` |
+| 4 (lowest) | Packaged default | `120` seconds |
+
+`fab-test.yml` is safe to commit — it never holds credentials, only settings and rule overlays. Credentials belong in a `.env` file (auto-discovered at the repository root, gitignored) or, in a pipeline, the CI system's own secrets store:
+
+```yaml
+# committed alongside the workflow file:
+#   fab-test.yml           <- settings and rule overlays, no secrets
+# repository/organization secrets, injected at run time:
+#   FABRIC_TENANT_ID, FABRIC_CLIENT_ID, FABRIC_CLIENT_SECRET
+
+- name: Run bpa with a committed rule overlay
+  run: fab-test bpa --format json   # fab-test.yml's rules.bpa overlay applies automatically
+
+- name: Run pql-test against the deployed workspace
+  env:
+    FABRIC_TENANT_ID: ${{ secrets.FABRIC_TENANT_ID }}
+    FABRIC_CLIENT_ID: ${{ secrets.FABRIC_CLIENT_ID }}
+    FABRIC_CLIENT_SECRET: ${{ secrets.FABRIC_CLIENT_SECRET }}
+  run: fab-test pql-test --env PROD --workspace-id ${{ vars.FABRIC_WORKSPACE_ID }} --format json
+```
+
+See the [Configuration section of the fab-test skill](../.github/skills/fab-test/SKILL.md#configuration) for the full settings list and rule-overlay keys.
+
 ### Pipeline snippet: doctor as a gate, run.json as the artifact
 
 A copy-pasteable step for a CI job — gate on readiness, run with `--format json`, upload the manifest instead of globbing result directories:

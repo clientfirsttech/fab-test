@@ -125,6 +125,27 @@ Full CLI reference: [`.github/skills/fab-test/SKILL.md`](.github/skills/fab-test
 
 See [`docs/QUICK-VALIDATION.md`](docs/QUICK-VALIDATION.md) for a complete local build-and-test workflow.
 
+## Configuration
+
+`fab-test.yml` at the repository root is an entirely optional config-file front door — no file at all means every setting behaves exactly as it always has.
+
+```bash
+fab-test init                # scaffold a commented fab-test.yml and .env.example
+fab-test config --show       # every effective setting, its value, and where it came from
+fab-test config --validate   # confirm the config file's keys and types are valid
+```
+
+Precedence, for every setting:
+
+| Priority | Source | Example |
+|----------|--------|---------|
+| 1 (highest) | CLI flag | `--jobs 4` |
+| 2 | Environment variable | `ANALYZER_TIMEOUT=300` |
+| 3 | `fab-test.yml` (or `[tool.fab-test]` in `pyproject.toml`) | `jobs: 4` |
+| 4 (lowest) | Packaged default | `120` seconds |
+
+`fab-test.yml` is meant to be committed — it holds no credentials, only settings and rule overlays (tune one BPA/PBIR Inspector rule without forking the packaged rules file). Credentials belong in a `.env` file (auto-discovered, gitignored) or a pipeline's own secrets store. See the [Configuration section of the fab-test skill](.github/skills/fab-test/SKILL.md#configuration) for the full settings list and rule-overlay keys.
+
 ## Usage
 
 `fab-test` runs analyzers against your `.fabric/artifacts`. It is the local equivalent of the CI artifact validation gate. See the [Run manual tests locally](#run-manual-tests-locally) section above for common commands, and [`.github/skills/fab-test/SKILL.md`](.github/skills/fab-test/SKILL.md) for the full CLI reference.
