@@ -170,7 +170,34 @@ def test_cli_positional_target_limits_the_dry_run(artifact_tree):
 
 @pytest.mark.fab_test
 def test_cli_typed_target_under_all_selects_one_type(artifact_tree):
-    """`all Sales.SemanticModel` plans the model and never the report."""
+    """`all Sales.SemanticModel` plans the model and never the report.
+
+    Asserts on the per-analyzer plans rather than the aggregate summary:
+    the summary prints artifact *stems*, and both artifacts here are named
+    "Sales", so a substring check against the whole of stdout would pass
+    whether or not the filter actually worked.
+    """
+    result = _run_cli(
+        "all",
+        "Sales.SemanticModel",
+        "--artifact-dir",
+        str(artifact_tree),
+        "--dry-run",
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "Sales.SemanticModel" in result.stdout
+    assert "Sales.Report" not in result.stdout
+
+
+@pytest.mark.fab_test
+def test_all_aggregate_summary_honors_the_target(artifact_tree):
+    """The summary must reflect what ran, not re-discover everything.
+
+    `_print_all_summary` runs its own discovery pass, so it needs the same
+    target the analyzers got. Without it, the summary lists rows for
+    artifacts that were never analyzed.
+    """
     result = _run_cli(
         "all",
         "Sales.SemanticModel",
@@ -182,7 +209,30 @@ def test_cli_typed_target_under_all_selects_one_type(artifact_tree):
     )
 
     assert result.returncode == 0, result.stderr
-    assert "Sales.Report" not in result.stdout
+    payload = json.loads(result.stdout)
+    stems = {row["artifact"] for row in payload["artifacts"]}
+    assert "Other" not in stems, "summary discovered artifacts the target excluded"
+
+
+@pytest.mark.fab_test
+def test_all_with_the_legacy_artifact_flag_does_not_crash(artifact_tree):
+    """Regression: `all --artifact X` passed a raw string where a target was due.
+
+    `discover_artifacts` began taking a ResolvedTarget, but this call site
+    still handed it `args.artifact`, so the deprecated flag raised
+    AttributeError instead of filtering.
+    """
+    result = _run_cli(
+        "all",
+        "--artifact",
+        "Sales",
+        "--artifact-dir",
+        str(artifact_tree),
+        "--dry-run",
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "Traceback" not in result.stderr
 
 
 @pytest.mark.fab_test

@@ -59,7 +59,7 @@ from ._credentials import probe_credentials
 from ._desktop import bridge_cli_path, detect_desktop_instances
 from ._pbip_discovery import discover_pbip_projects as _discover_pbip_projects
 from ._run_manifest import RunManifest
-from ._target import TargetError, select_target, workspace_conflict
+from ._target import TargetError, select_target, target_from_args, workspace_conflict
 from .eventhouse_logger import publish_analyzer_telemetry
 from .fab_test_registry import (
     _DEFAULT_BPA_RULES,
@@ -607,18 +607,10 @@ def _resolve_workspace_target(args: argparse.Namespace) -> int | None:
     return None
 
 
-def _target_of(args: argparse.Namespace):
-    """Return the resolved target for ``args``, deriving it if `main` has not.
-
-    `main` resolves once and stashes the result so the whole run agrees.
-    `list`, `explain`, and tests that construct a Namespace directly never
-    pass through it, so derive here rather than making every caller
-    remember to.
-    """
-    cached = getattr(args, "resolved_target", None)
-    if cached is not None:
-        return cached
-    return select_target(getattr(args, "target", None), getattr(args, "artifact", None))
+# One definition, shared with fab_test_summary, so a second discovery pass
+# cannot drift back to reading args.artifact directly -- which it did, and
+# which crashed `fab-test all --artifact X`.
+_target_of = target_from_args
 
 
 def _run_analyzer(

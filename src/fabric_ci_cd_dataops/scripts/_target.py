@@ -177,6 +177,21 @@ def _parse_workspace(segments: list[str], raw: str) -> ResolvedTarget:
     )
 
 
+def target_from_args(args: object) -> ResolvedTarget | None:
+    """Return the resolved target for ``args``, deriving it if `main` has not.
+
+    `main` resolves once and stashes the result on ``args`` so the whole
+    run agrees. Anything that discovers artifacts must read it through
+    here rather than reaching for ``args.artifact``: that attribute is the
+    raw deprecated string, and passing it where a `ResolvedTarget` is due
+    silently ignores a positional target -- or raises.
+    """
+    cached = getattr(args, "resolved_target", None)
+    if cached is not None:
+        return cached
+    return select_target(getattr(args, "target", None), getattr(args, "artifact", None))
+
+
 def workspace_conflict(
     target: ResolvedTarget | None, workspace_id_flag: str | None
 ) -> str | None:
