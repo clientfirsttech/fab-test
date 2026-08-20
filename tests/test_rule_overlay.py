@@ -13,7 +13,11 @@ import json
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts._rule_overlay import RuleOverlayError, apply_overlay
+from fabric_ci_cd_dataops.scripts._rule_overlay import (
+    RuleOverlayError,
+    apply_overlay,
+    apply_pbir_overlay,
+)
 
 _RULE_A = {"ID": "RULE_A", "Name": "Rule A", "Severity": 1}
 _RULE_B = {"ID": "RULE_B", "Name": "Rule B", "Severity": 2}
@@ -135,5 +139,103 @@ def test_apply_overlay_never_rewrites_the_upstream_file(tmp_path):
     original_text = upstream.read_text(encoding="utf-8")
 
     apply_overlay(upstream, {"disable": ["RULE_A"], "severity": {"RULE_B": "error"}})
+
+    assert upstream.read_text(encoding="utf-8") == original_text
+
+
+# --------------------------------------------------------------------------- #
+# PBIR Inspector's own rule shape: {"rules": [{"id", "disabled", "logType"}]}
+# --------------------------------------------------------------------------- #
+
+_PBIR_RULE_A = {"id": "RULE_A", "name": "Rule A", "disabled": False, "logType": "warning"}
+_PBIR_RULE_B = {"id": "RULE_B", "name": "Rule B", "disabled": False, "logType": "warning"}
+
+
+def _write_pbir_rules(path, rules):
+    path.write_text(json.dumps({"rules": rules}), encoding="utf-8")
+
+
+@pytest.mark.fab_test
+def test_apply_pbir_overlay_marks_a_rule_disabled(tmp_path):
+    """PBIR's own convention: disabling sets disabled=true rather than removing the rule."""
+    upstream = tmp_path / "rules.json"
+    _write_pbir_rules(upstream, [_PBIR_RULE_A, _PBIR_RULE_B])
+
+    resolved = apply_pbir_overlay(upstream, {"disable": ["RULE_A"]})
+
+    by_id = {r["id"]: r for r in resolved["rules"]}
+    assert by_id["RULE_A"]["disabled"] is True
+    assert by_id["RULE_B"]["disabled"] is False
+
+
+@pytest.mark.fab_test
+def test_apply_pbir_overlay_overrides_log_type(tmp_path):
+    """A severity override sets logType directly -- PBIR already uses these labels."""
+    upstream = tmp_path / "rules.json"
+    _write_pbir_rules(upstream, [_PBIR_RULE_A])
+
+    resolved = apply_pbir_overlay(upstream, {"severity": {"RULE_A": "error"}})
+
+    assert resolved["rules"][0]["logType"] == "error"
+
+
+@pytest.mark.fab_test
+def test_apply_pbir_overlay_extends_with_additional_rules(tmp_path):
+    """Rules from the extend file are appended."""
+    upstream = tmp_path / "rules.json"
+    _write_pbir_rules(upstream, [_PBIR_RULE_A])
+    extra = tmp_path / "extra.json"
+    extra_rule = {"id": "CUSTOM", "name": "Custom", "disabled": False, "logType": "warning"}
+    _write_pbir_rules(extra, [extra_rule])
+
+    resolved = apply_pbir_overlay(upstream, {"extend": str(extra)})
+
+    ids = {r["id"] for r in resolved["rules"]}
+    assert ids == {"RULE_A", "CUSTOM"}
+
+
+@pytest.mark.fab_test
+def test_apply_pbir_overlay_raises_for_unmatched_id(tmp_path):
+    """Disabling an unknown rule ID raises, naming it."""
+    upstream = tmp_path / "rules.json"
+    _write_pbir_rules(upstream, [_PBIR_RULE_A])
+
+    with pytest.raises(RuleOverlayError, match="NONEXISTENT"):
+        apply_pbir_overlay(upstream, {"disable": ["NONEXISTENT"]})
+
+
+@pytest.mark.fab_test
+def test_apply_pbir_overlay_rejects_info_severity_label(tmp_path):
+    """'info' is not an observed PBIR logType value -- reject it rather than
+    silently passing through something PBIR Inspector may not recognize.
+    """
+    upstream = tmp_path / "rules.json"
+    _write_pbir_rules(upstream, [_PBIR_RULE_A])
+
+    with pytest.raises(RuleOverlayError, match="info"):
+        apply_pbir_overlay(upstream, {"severity": {"RULE_A": "info"}})
+
+
+@pytest.mark.fab_test
+def test_apply_pbir_overlay_preserves_other_top_level_keys(tmp_path):
+    """Top-level keys besides "rules" (if any) survive the overlay unchanged."""
+    upstream = tmp_path / "rules.json"
+    upstream.write_text(
+        json.dumps({"rules": [_PBIR_RULE_A], "paramMaxVisualsPerPage": 20}), encoding="utf-8"
+    )
+
+    resolved = apply_pbir_overlay(upstream, {})
+
+    assert resolved["paramMaxVisualsPerPage"] == 20
+
+
+@pytest.mark.fab_test
+def test_apply_pbir_overlay_never_rewrites_upstream_file(tmp_path):
+    """apply_pbir_overlay never mutates or rewrites the upstream file."""
+    upstream = tmp_path / "rules.json"
+    _write_pbir_rules(upstream, [_PBIR_RULE_A])
+    original_text = upstream.read_text(encoding="utf-8")
+
+    apply_pbir_overlay(upstream, {"disable": ["RULE_A"]})
 
     assert upstream.read_text(encoding="utf-8") == original_text

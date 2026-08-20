@@ -50,7 +50,11 @@ from fabric_ci_cd_dataops.scripts.fab_test import (
     build_parser,
 )
 from fabric_ci_cd_dataops.scripts.fab_test_registry import (
+    _DEFAULT_BPA_RULES,
+    _DEFAULT_PBIR_RULES,
     applicable_analyzers,
+    build_bpa_command,
+    build_pbir_command,
     build_pql_test_command,
     discover_artifacts,
     discover_pbip_sources,
@@ -411,6 +415,114 @@ def test_build_pql_test_command_omits_desktop_flags_when_artifact_has_no_pbip(tm
     cmd = build_pql_test_command(model_dir, args, REPO_ROOT / "analyzer-results")
 
     assert "--desktop-port" not in cmd
+
+
+# --------------------------------------------------------------------------- #
+# Wiring rule overlays into bpa/pbir command builders (Config Consolidation §7)
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.fab_test
+def test_build_bpa_command_uses_default_rules_verbatim_when_no_overlay(tmp_path):
+    """No overlay configured: --bpa-rules-path points at the packaged default, unchanged."""
+    artifact = tmp_path / "Model.SemanticModel"
+    artifact.mkdir()
+    args = argparse.Namespace(file_config={})
+
+    cmd = build_bpa_command(artifact, args, tmp_path / "results")
+
+    idx = cmd.index("--bpa-rules-path")
+    assert cmd[idx + 1] == _DEFAULT_BPA_RULES
+    assert not (tmp_path / "results" / "bpa" / "_resolved-rules.json").exists()
+
+
+@pytest.mark.fab_test
+def test_build_bpa_command_writes_resolved_rules_when_overlay_configured(tmp_path):
+    """An overlay writes a resolved ruleset under output_dir and points --bpa-rules-path at it."""
+    artifact = tmp_path / "Model.SemanticModel"
+    artifact.mkdir()
+    args = argparse.Namespace(file_config={"rules": {"bpa": {"disable": ["AVOID_FLOATING_POINT_DATA_TYPES"]}}})
+    output_dir = tmp_path / "results"
+
+    cmd = build_bpa_command(artifact, args, output_dir)
+
+    idx = cmd.index("--bpa-rules-path")
+    resolved_path = Path(cmd[idx + 1])
+    assert resolved_path == output_dir / "bpa" / "_resolved-rules.json"
+    resolved_rules = json.loads(resolved_path.read_text(encoding="utf-8"))
+    ids = {r["ID"] for r in resolved_rules}
+    assert "AVOID_FLOATING_POINT_DATA_TYPES" not in ids
+
+
+@pytest.mark.fab_test
+def test_build_bpa_command_ignores_overlay_when_rules_path_passed_explicitly(tmp_path):
+    """--bpa-rules-path explicit override wins verbatim, even with an overlay configured."""
+    artifact = tmp_path / "Model.SemanticModel"
+    artifact.mkdir()
+    custom_rules = tmp_path / "custom-rules.json"
+    custom_rules.write_text("[]", encoding="utf-8")
+    args = argparse.Namespace(
+        bpa_rules_path=str(custom_rules),
+        file_config={"rules": {"bpa": {"disable": ["ANYTHING"]}}},
+    )
+    output_dir = tmp_path / "results"
+
+    cmd = build_bpa_command(artifact, args, output_dir)
+
+    idx = cmd.index("--bpa-rules-path")
+    assert cmd[idx + 1] == str(custom_rules)
+    assert not (output_dir / "bpa" / "_resolved-rules.json").exists()
+
+
+@pytest.mark.fab_test
+def test_build_pbir_command_uses_default_rules_verbatim_when_no_overlay(tmp_path):
+    """No overlay configured: --rules-path points at the packaged default, unchanged."""
+    artifact = tmp_path / "Model.Report"
+    artifact.mkdir()
+    args = argparse.Namespace(file_config={})
+
+    cmd = build_pbir_command(artifact, args, tmp_path / "results")
+
+    idx = cmd.index("--rules-path")
+    assert cmd[idx + 1] == _DEFAULT_PBIR_RULES
+
+
+@pytest.mark.fab_test
+def test_build_pbir_command_writes_resolved_rules_when_overlay_configured(tmp_path):
+    """An overlay writes a resolved ruleset under output_dir and points --rules-path at it."""
+    artifact = tmp_path / "Model.Report"
+    artifact.mkdir()
+    args = argparse.Namespace(file_config={"rules": {"pbir": {"disable": ["REMOVE_UNUSED_CUSTOM_VISUALS"]}}})
+    output_dir = tmp_path / "results"
+
+    cmd = build_pbir_command(artifact, args, output_dir)
+
+    idx = cmd.index("--rules-path")
+    resolved_path = Path(cmd[idx + 1])
+    assert resolved_path == output_dir / "pbir" / "_resolved-rules.json"
+    resolved_doc = json.loads(resolved_path.read_text(encoding="utf-8"))
+    by_id = {r["id"]: r for r in resolved_doc["rules"]}
+    assert by_id["REMOVE_UNUSED_CUSTOM_VISUALS"]["disabled"] is True
+
+
+@pytest.mark.fab_test
+def test_build_pbir_command_ignores_overlay_when_rules_path_passed_explicitly(tmp_path):
+    """--rules-path explicit override wins verbatim, even with an overlay configured."""
+    artifact = tmp_path / "Model.Report"
+    artifact.mkdir()
+    custom_rules = tmp_path / "custom-rules.json"
+    custom_rules.write_text('{"rules": []}', encoding="utf-8")
+    args = argparse.Namespace(
+        rules_path=str(custom_rules),
+        file_config={"rules": {"pbir": {"disable": ["ANYTHING"]}}},
+    )
+    output_dir = tmp_path / "results"
+
+    cmd = build_pbir_command(artifact, args, output_dir)
+
+    idx = cmd.index("--rules-path")
+    assert cmd[idx + 1] == str(custom_rules)
+    assert not (output_dir / "pbir" / "_resolved-rules.json").exists()
 
 
 @pytest.mark.fab_test

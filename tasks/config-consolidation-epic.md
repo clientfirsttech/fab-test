@@ -98,7 +98,7 @@ Apply deltas to a packaged ruleset instead of forking it.
 
 ---
 
-## 7. Wire Overlays Into BPA and PBIR
+## 7. Wire Overlays Into BPA and PBIR ✅
 
 Make the engine reachable from the analyzers that own rule files.
 
