@@ -32,6 +32,10 @@
       "type": "string",
       "description": "Default environment label, e.g. DEV/PROD/ANY [env: FABRIC_ENVIRONMENT]."
     },
+    "report": {
+      "type": "boolean",
+      "description": "Write a readable HTML report beside each result envelope. Opt-in; false unless set. PBIR Inspector's own TestRun.html is unaffected and appears regardless."
+    },
     "workspace": {
       "type": "string",
       "description": "Default Fabric workspace for targets that name an artifact but not a workspace. A display name or a GUID [env: FABRIC_WORKSPACE_ID]; a positional WORKSPACE.Workspace/NAME.Type target overrides it."

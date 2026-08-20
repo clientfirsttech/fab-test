@@ -1,6 +1,6 @@
 # Human-Readable Reports Epic
 
-**Status**: 🚧 IN-PROGRESS (3/7)
+**Status**: 🚧 IN-PROGRESS (6/7)
 **Goal**: Every analyzer produces a report a person can open and read, and the summary points at it.
 
 ## Overview
@@ -74,7 +74,11 @@ Rendering is deterministic — the same envelope produces identical bytes, with 
 
 ---
 
-## 4. Generate Reports for BPA and pql-test
+## 4. Generate Reports for BPA and pql-test ✅
+
+**Done (2026-08-20)**: `attach_report` renders a report beside the envelope and records its path, called from `invoke_tabular_editor_bpa.py` and `invoke_pql_test.py` just before `write_envelope`. It is a no-op when the envelope already carries `native_html_output_path`, which is what leaves PBIR's upstream `TestRun.html` untouched without a special case. Never raises: a render failure prints a warning and is swallowed, because exit codes belong to findings, not to presentation.
+
+The toggle reaches the wrappers through `ANALYZER_REPORT` in the subprocess environment -- the same channel as `ANALYZER_VERBOSITY` and `ANALYZER_OUTPUT_MODE` -- so no command builder needed a new argument.
 
 Wire the renderer into the analyzers whose upstream tools cannot emit HTML.
 
@@ -92,7 +96,7 @@ Wire the renderer into the analyzers whose upstream tools cannot emit HTML.
 
 ---
 
-## 5. Decide When Reports Are Generated
+## 5. Decide When Reports Are Generated ✅
 
 Rendering on every run costs time and clutters CI artifacts; never rendering makes the feature invisible.
 
@@ -109,7 +113,9 @@ Rendering on every run costs time and clutters CI artifacts; never rendering mak
 
 ---
 
-## 6. Add a Per-Run Index Page
+## 6. Add a Per-Run Index Page ✅
+
+**Done (2026-08-20)**: `write_index` builds `analyzer-results/index.html` from the *same rows* the aggregate summary prints, so the index cannot report counts that disagree with the table above it -- there is no second pass over the envelopes to drift. Links are relative to the index's own directory, so the page survives being moved or downloaded as a CI artifact. Written only for a multi-analyzer run with `--report`, and the summary names it once.
 
 `fab-test all` produces one report per analyzer per artifact. Opening four files to review one run is worse than opening one.
 

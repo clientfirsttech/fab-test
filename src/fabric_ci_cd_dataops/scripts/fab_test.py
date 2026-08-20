@@ -58,6 +58,7 @@ from ._config import (
 from ._credentials import probe_credentials
 from ._desktop import bridge_cli_path, detect_desktop_instances
 from ._pbip_discovery import discover_pbip_projects as _discover_pbip_projects
+from ._report_html import resolve_report
 from ._run_manifest import RunManifest
 from ._target import TargetError, select_target, target_from_args, workspace_conflict
 from .eventhouse_logger import publish_analyzer_telemetry
@@ -195,6 +196,11 @@ def _verbosity_env(args: argparse.Namespace) -> str:
 # Default per-artifact subprocess timeout (seconds), used when neither
 # --timeout nor ANALYZER_TIMEOUT is set. Matches the longest wrapper timeout.
 _DEFAULT_SUBPROCESS_TIMEOUT = 120
+
+
+# Defined in _report_html so fab_test_summary can ask the same question
+# without importing this module, which would be a cycle.
+_resolve_report = resolve_report
 
 
 def _resolve_timeout(
@@ -754,6 +760,11 @@ def _run_analyzer(
         _sub_env["ANALYZER_VERBOSITY"] = verbosity
     if output_format == "json":
         _sub_env["ANALYZER_OUTPUT_MODE"] = "json"
+    if _resolve_report(args):
+        # Same channel as ANALYZER_VERBOSITY: the analyzer wrappers write the
+        # envelope, so they are what must know, and no command builder needs
+        # a new argument.
+        _sub_env["ANALYZER_REPORT"] = "1"
     timeout = _resolve_timeout(args)
     jobs = max(1, getattr(args, "jobs", 1) or 1)
 
@@ -843,6 +854,20 @@ def _add_common_flags(
             "Increase output verbosity (one -v for per-finding detail, "
             "two -v for command + stdout/stderr; same as ANALYZER_VERBOSITY)"
         ),
+    )
+    report_group = parser.add_mutually_exclusive_group()
+    report_group.add_argument(
+        "--report",
+        action="store_true",
+        dest="report",
+        default=None,
+        help="Write a readable HTML report beside each result envelope",
+    )
+    report_group.add_argument(
+        "--no-report",
+        action="store_false",
+        dest="report",
+        help="Suppress HTML report generation (the default)",
     )
     telemetry_group = parser.add_mutually_exclusive_group()
     telemetry_group.add_argument(
