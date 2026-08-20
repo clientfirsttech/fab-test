@@ -11,6 +11,7 @@ an open file path, but only when exactly one instance is running.
 
 import argparse
 import json
+import os
 import subprocess
 
 import pytest
@@ -83,6 +84,33 @@ def test_doctor_exits_zero_when_at_least_one_analyzer_is_ready():
         check=False,
     )
     assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.fab_test
+def test_doctor_does_not_greenlight_a_cloud_analyzer_without_credentials(tmp_path):
+    """End-to-end guard for the §6 false green.
+
+    Runs with every workspace and credential variable stripped and
+    LOCALAPPDATA pointed at an empty directory, so neither ambient
+    credentials nor a Power BI Desktop session the developer happens to
+    have open can make this pass by accident. Before the fix, pql_test
+    reported ready here on the strength of having no binary to resolve.
+    """
+    env = {k: v for k, v in os.environ.items() if not k.startswith("FABRIC_")}
+    env["LOCALAPPDATA"] = str(tmp_path)
+    result = subprocess.run(
+        ["fab-test", "doctor", "--analyzer", "pql_test", "--format", "json"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        env=env,
+        check=False,
+    )
+    entry = json.loads(result.stdout)["analyzers"][0]
+    assert entry["analyzer"] == "pql_test"
+    assert entry["ready"] is False
+    assert "FABRIC_WORKSPACE_ID" in entry["remediation"]
 
 
 @pytest.mark.fab_test

@@ -176,7 +176,12 @@ def test_check_readiness_bpa_delegates_to_probe(tmp_path, monkeypatch):
 
 @pytest.mark.fab_test
 def test_check_readiness_non_bootstrapped_analyzer_is_always_ready():
-    """Analyzers with no external tool (pql_lint, pql_test, ...) are always ready."""
+    """An analyzer with no external tool and no cloud dependency is always ready.
+
+    pql_lint only reads files on disk. pql_test and playwright also resolve
+    no binary but do need a workspace or a Desktop instance, so they take
+    the cloud branch instead -- see the §6 tests at the end of this file.
+    """
     result = check_readiness("pql_lint", None)
 
     assert result["ready"] is True
@@ -193,3 +198,193 @@ def test_check_readiness_returns_same_shape_for_every_analyzer():
     for name in ANALYZER_REGISTRY:
         result = check_readiness(name, None)
         assert set(result.keys()) == expected_keys, f"{name} readiness shape mismatch"
+
+
+# --------------------------------------------------------------------------- #
+# Cloud-analyzer readiness (Artifact Targeting and Auth §6)
+#
+# check_readiness used to short-circuit to ready for every analyzer without an
+# external binary, so `doctor` greenlit pql_test and playwright with no
+# credentials and no reachable workspace. These tests pin the honest answer.
+# --------------------------------------------------------------------------- #
+
+_CLOUD_ENV_VARS = (
+    "FABRIC_WORKSPACE_ID",
+    "FABRIC_TENANT_ID",
+    "FABRIC_SERVICE_PRINCIPAL_ID",
+    "FABRIC_SERVICE_PRINCIPAL_SECRET",
+    "FABRIC_CLIENT_ID",
+    "FABRIC_CLIENT_SECRET",
+)
+
+
+def _clear_cloud_env(monkeypatch):
+    """Remove every workspace and credential variable the probe consults."""
+    for var in _CLOUD_ENV_VARS:
+        monkeypatch.delenv(var, raising=False)
+
+
+def _set_service_principal(monkeypatch):
+    monkeypatch.setenv("FABRIC_TENANT_ID", "11111111-1111-1111-1111-111111111111")
+    monkeypatch.setenv("FABRIC_SERVICE_PRINCIPAL_ID", "22222222-2222-2222-2222-222222222222")
+    monkeypatch.setenv("FABRIC_SERVICE_PRINCIPAL_SECRET", "s3cr3t-do-not-print")
+
+
+@pytest.mark.fab_test
+def test_cloud_analyzer_not_ready_without_workspace_credentials_or_desktop(monkeypatch):
+    """pql_test with nothing configured is not ready -- the false green this fixes."""
+    from fabric_ci_cd_dataops.scripts import fab_test_registry as registry
+
+    _clear_cloud_env(monkeypatch)
+    monkeypatch.setattr(registry, "desktop_ports", list)  # no instance running
+
+    result = registry.check_readiness("pql_test", None)
+
+    assert result["ready"] is False
+    assert result["remediation"] is not None
+
+
+@pytest.mark.fab_test
+def test_cloud_analyzer_remediation_names_every_accepted_source(monkeypatch):
+    """Not-ready remediation names the workspace variable, the credentials, and Desktop."""
+    from fabric_ci_cd_dataops.scripts import fab_test_registry as registry
+
+    _clear_cloud_env(monkeypatch)
+    monkeypatch.setattr(registry, "desktop_ports", list)  # no instance running
+
+    remediation = registry.check_readiness("pql_test", None)["remediation"]
+
+    assert "FABRIC_WORKSPACE_ID" in remediation
+    assert "FABRIC_SERVICE_PRINCIPAL_ID" in remediation
+    assert "Desktop" in remediation
+
+
+@pytest.mark.fab_test
+def test_cloud_analyzer_ready_with_workspace_and_service_principal(monkeypatch):
+    """A workspace plus resolvable credentials reports ready and names the source."""
+    from fabric_ci_cd_dataops.scripts import fab_test_registry as registry
+
+    _clear_cloud_env(monkeypatch)
+    monkeypatch.setenv("FABRIC_WORKSPACE_ID", "33333333-3333-3333-3333-333333333333")
+    _set_service_principal(monkeypatch)
+
+    result = registry.check_readiness("playwright", None)
+
+    assert result["ready"] is True
+    assert "workspace" in result["reason"].lower()
+    assert result["remediation"] is None
+
+
+@pytest.mark.fab_test
+def test_cloud_analyzer_with_workspace_but_no_credentials_is_not_ready(monkeypatch):
+    """A workspace alone is not enough, and the remediation asks only for credentials."""
+    from fabric_ci_cd_dataops.scripts import fab_test_registry as registry
+
+    _clear_cloud_env(monkeypatch)
+    monkeypatch.setenv("FABRIC_WORKSPACE_ID", "33333333-3333-3333-3333-333333333333")
+    monkeypatch.setattr(registry, "desktop_ports", list)  # no instance running
+
+    result = registry.check_readiness("pql_test", None)
+
+    assert result["ready"] is False
+    assert "FABRIC_SERVICE_PRINCIPAL_ID" in result["remediation"]
+    assert "FABRIC_WORKSPACE_ID" not in result["remediation"]
+
+
+@pytest.mark.fab_test
+def test_pql_test_is_ready_via_a_running_desktop_instance(monkeypatch):
+    """A running Desktop instance makes pql_test ready with no workspace at all."""
+    from fabric_ci_cd_dataops.scripts import fab_test_registry as registry
+
+    _clear_cloud_env(monkeypatch)
+    monkeypatch.setattr(registry, "desktop_ports", lambda: [51001])
+
+    result = registry.check_readiness("pql_test", None)
+
+    assert result["ready"] is True
+    assert "desktop" in result["reason"].lower()
+
+
+@pytest.mark.fab_test
+def test_playwright_does_not_fall_back_to_desktop(monkeypatch):
+    """Only pql_test binds to Desktop; playwright needs a real workspace."""
+    from fabric_ci_cd_dataops.scripts import fab_test_registry as registry
+
+    _clear_cloud_env(monkeypatch)
+    monkeypatch.setattr(registry, "desktop_ports", lambda: [51001])
+
+    result = registry.check_readiness("playwright", None)
+
+    assert result["ready"] is False
+
+
+@pytest.mark.fab_test
+def test_explicit_workspace_id_argument_is_honored(monkeypatch):
+    """--workspace-id counts as a resolved workspace even with no env var set."""
+    from fabric_ci_cd_dataops.scripts import fab_test_registry as registry
+
+    class _CloudArgs:
+        workspace_id = "44444444-4444-4444-4444-444444444444"
+
+    _clear_cloud_env(monkeypatch)
+    _set_service_principal(monkeypatch)
+
+    result = registry.check_readiness("pql_test", _CloudArgs())
+
+    assert result["ready"] is True
+
+
+@pytest.mark.fab_test
+def test_file_only_analyzer_stays_ready_without_any_credentials(monkeypatch):
+    """pql_lint reads files on disk, so it is ready with nothing configured."""
+    _clear_cloud_env(monkeypatch)
+
+    result = check_readiness("pql_lint", None)
+
+    assert result["ready"] is True
+    assert "no external tool" in result["reason"]
+
+
+@pytest.mark.fab_test
+def test_readiness_never_echoes_a_credential_value(monkeypatch):
+    """The secrets constraint: no probe output ever contains the secret itself."""
+    from fabric_ci_cd_dataops.scripts import fab_test_registry as registry
+
+    _clear_cloud_env(monkeypatch)
+    monkeypatch.setenv("FABRIC_WORKSPACE_ID", "33333333-3333-3333-3333-333333333333")
+    _set_service_principal(monkeypatch)
+
+    result = registry.check_readiness("pql_test", None)
+
+    assert "s3cr3t-do-not-print" not in json.dumps(result)
+
+
+@pytest.mark.fab_test
+def test_cloud_analyzer_readiness_keeps_the_stable_four_keys(monkeypatch):
+    """A not-ready cloud row has the same shape as every other row (JSON consumers)."""
+    from fabric_ci_cd_dataops.scripts import fab_test_registry as registry
+
+    _clear_cloud_env(monkeypatch)
+    monkeypatch.setattr(registry, "desktop_ports", list)  # no instance running
+
+    result = registry.check_readiness("pql_test", None)
+
+    assert set(result.keys()) == {"ready", "resolved_path", "reason", "remediation"}
+
+
+@pytest.mark.fab_test
+def test_readiness_probe_spawns_no_subprocess_for_a_cloud_analyzer(monkeypatch):
+    """The probe stays cheap: no subprocess, per check_readiness's contract."""
+    import subprocess
+
+    from fabric_ci_cd_dataops.scripts import fab_test_registry as registry
+
+    _clear_cloud_env(monkeypatch)
+
+    def _fail(*args, **kwargs):
+        raise AssertionError("check_readiness must not spawn a subprocess")
+
+    monkeypatch.setattr(subprocess, "run", _fail)
+    monkeypatch.setattr(subprocess, "Popen", _fail)
+
+    registry.check_readiness("pql_test", None)
