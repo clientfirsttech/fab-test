@@ -32,6 +32,10 @@
       "type": "string",
       "description": "Default environment label, e.g. DEV/PROD/ANY [env: FABRIC_ENVIRONMENT]."
     },
+    "workspace": {
+      "type": "string",
+      "description": "Default Fabric workspace for targets that name an artifact but not a workspace. A display name or a GUID [env: FABRIC_WORKSPACE_ID]; a positional WORKSPACE.Workspace/NAME.Type target overrides it."
+    },
     "rules": {
       "type": "object",
       "description": "Rule overlays: deltas applied to a packaged ruleset instead of forking it.",

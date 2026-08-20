@@ -34,7 +34,10 @@ New `_target.py` turns one string into a `ResolvedTarget` dataclass of `scope` (
 
 ---
 
-## 2. Accept a Positional Target for Local Scopes
+## 2. Accept a Positional Target for Local Scopes ✅
+
+**Done (2026-08-20)**: `_add_common_flags` gained an optional positional `TARGET`; `select_target` refuses a positional and `--artifact` together rather than inventing a precedence; `main` resolves once into `args.resolved_target` so discovery, the command builders, and the manifest all read the same value. `discover_artifacts` now takes a `ResolvedTarget`: a path target short-circuits discovery and is deliberately *not* confined to `--artifact-dir`, since the caller pointed at a folder. A `local/` target suppresses an ambient `FABRIC_WORKSPACE_ID` — stating the scope is the whole point of saying it — and a missing Desktop instance exits `127` through the same preflight path as a missing tool.
+
 
 Wire the parser to the two scopes that need no network, and make `--artifact` an alias rather than a second mechanism.
 
@@ -54,7 +57,14 @@ Wire the parser to the two scopes that need no network, and make `--artifact` an
 
 ---
 
-## 3. Resolve Workspace-Qualified Targets
+## 3. Resolve Workspace-Qualified Targets ✅
+
+**Done (2026-08-20)**: `list_workspaces()` on the Fabric client plus `resolve_workspace_id` in `resolver.py`, alongside the `resolve_item` that already resolved the item half. A GUID short-circuits the lookup rather than confirming it — confirming costs a round trip and would fail a valid ID whenever the identity cannot list workspaces. `WorkspaceNotFoundError` and `AmbiguousWorkspaceError` subclass `ServiceResolutionError` so the CLI can map them to exit `1` and `2` without string-matching. `workspace_conflict` compares a target and `--workspace-id` as written, with no lookup. `workspace` joins the config keys and the published JSON schema.
+
+**Deliberate divergence**: workspace names match case- and whitespace-insensitively, unlike `resolve_item`'s exact matching. An item name usually arrives copied from a folder on disk; a workspace name is typed by hand into a shell.
+
+**Narrower than specified**: item *IDs* are not resolved here. The analyzers that need one already resolve it themselves — `playwright`'s resolver calls `resolve_item` — so doing it again in `fab-test` would duplicate a lookup and a failure mode. `run.json` records the workspace ID and the item name and type.
+
 
 Turn a workspace *name* into the IDs the analyzers already accept.
 
@@ -73,7 +83,12 @@ Turn a workspace *name* into the IDs the analyzers already accept.
 
 ---
 
-## 4. Reject Unsupported Scopes Per Analyzer
+## 4. Reject Unsupported Scopes Per Analyzer ✅
+
+**Done (2026-08-20)**: `ANALYZER_SCOPES` declares the supported scopes once, with a test asserting every registered analyzer appears so a new one cannot silently inherit "accepts everything". The refusal runs *before* workspace resolution — asking Fabric to resolve a workspace for an analyzer that could never read a deployed item wastes a round trip and reports the wrong failure. `fab-test list` gained a Scopes column.
+
+**Two scope decisions worth recording.** The file-reading analyzers accept `desktop` as well as `path`: to `bpa`, `local/Sales` is just a name, and refusing it would make `fab-test all local/Sales` — the natural local-dev invocation — fail on everything except `pql_test`. And `all` *skips* an analyzer that cannot honor the target, narrating what it skipped, rather than failing the batch; a direct invocation still exits `2`, since asking one analyzer for something it cannot do is a caller error.
+
 
 Parse the grammar universally, then fail honestly where it cannot be honored.
 
@@ -90,7 +105,12 @@ Only `pql-test` and `playwright` can act on a deployed item. `bpa`, `pbir`, and 
 
 ---
 
-## 5. Report the Resolved Target
+## 5. Report the Resolved Target ✅
+
+**Done (2026-08-20)**: `ResolvedTarget.as_dict()` returns a structured object — never an interpolated string — carried by `run.json`, `explain`, and `--dry-run` in both formats. `run.json` gains a `target` field, null for a discovery run, which is what distinguishes "read files" from "hit a workspace" in a way `origin` (local vs CI) never could. `explain` takes an optional `TARGET` and refuses a scope the analyzer cannot honor, since explaining an impossible command would be explaining a lie.
+
+Adding `target` to `run.json` tripped its own key-set drift guard in `tests/test_run_manifest.py`, the same way the `workspace` config key tripped the schema guard in task 3. Both were working as designed. The field is additive and `RUN_MANIFEST_SCHEMA_VERSION` stays at 1, per the backward-compatibility constraint in [vision.md](../vision.md).
+
 
 Make what `fab-test` decided visible, which is where the agent-caller value actually lands.
 

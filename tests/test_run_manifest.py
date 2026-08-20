@@ -22,6 +22,10 @@ _REQUIRED_KEYS = {
     "schema_version",
     "fab_test_version",
     "origin",
+    # The resolved target, or null for a discovery run (Artifact Targeting
+    # and Auth §5). Additive: `origin` says local vs CI, this says whether
+    # the run read files, a Desktop instance, or a workspace.
+    "target",
     "command",
     "artifacts",
     "totals",
