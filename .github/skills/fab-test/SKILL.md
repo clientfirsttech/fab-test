@@ -130,7 +130,6 @@ Per-artifact `status` is one of `passed` / `failed` / `skipped` / `timeout` / `p
  fab-test bpa              — Tabular Editor Best Practice Analyzer (SemanticModel artifacts)
  fab-test pbir             — PBIR Inspector static report analysis (Report artifacts)
  fab-test pql-test         — pql-test DAX/PQL test runner (SemanticModel artifacts) [alias: pql_test]
- fab-test pql-lint         — pqlint Power Query linter (SemanticModel artifacts) [alias: pql_lint]
  fab-test playwright       — Playwright visual/error validation (Report artifacts)
  fab-test playwright-impact — Build impacted-report manifest from changed artifacts [alias: playwright_impact]
  fab-test dependencies     — Discover reports that depend on a deployed semantic model
@@ -147,6 +146,10 @@ Per-artifact `status` is one of `passed` / `failed` / `skipped` / `timeout` / `p
  fab-test auth login       — Delegate sign-in to the tool that owns the credential
  fab-test clean-tools      — Remove or inspect the .fab-test-tools downloaded-binary cache
 ```
+
+### Hidden subcommands
+
+`pql-lint` is **hidden from the advertised surface**: it is absent from `--help`, `fab-test list`, and the default `doctor` report. It remains fully invocable — `fab-test pql-lint`, its `pql_lint` alias, `fab-test pql-lint --help`, `fab-test explain pql_lint`, and `fab-test doctor --analyzer pql_lint` all work exactly as before, and `fab-test local` still runs it. Hiding is a visibility state, never a removal: the backward-compatibility constraint in [vision.md](../../../vision.md) means existing commands keep working.
 
 Underscore spellings (`pql_test`, `pql_lint`, `playwright_impact`) still work silently as aliases —
 existing scripts and muscle memory keep working. Result directories under `analyzer-results/`

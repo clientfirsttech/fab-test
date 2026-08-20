@@ -103,6 +103,9 @@ from .fab_test_registry import (
 from .fab_test_registry import (
     unsupported_scope_error as _unsupported_scope_error,
 )
+from .fab_test_registry import (
+    visible_analyzers as _visible_analyzers,
+)
 from .fab_test_summary import (
     _print_all_summary,
     _print_auth_status,
@@ -1108,7 +1111,11 @@ def build_parser() -> argparse.ArgumentParser:
     pql_lint_p = subs.add_parser(
         "pql-lint",
         aliases=["pql_lint"],
-        help="pqlint Power Query linter (SemanticModel artifacts)",
+        # Omitting `help` (rather than passing argparse.SUPPRESS, which
+        # renders a literal "==SUPPRESS==" line) keeps this out of the
+        # subcommand listing while leaving it fully invocable. See
+        # HIDDEN_ANALYZERS. Its own --help still works via `description`.
+        description="pqlint Power Query linter (SemanticModel artifacts)",
     )
     _add_common_flags(pql_lint_p)
 
@@ -1751,7 +1758,9 @@ def _doctor(args: argparse.Namespace) -> int:
         )
         return 2
 
-    names = [only] if only else list(_ANALYZER_REGISTRY.keys())
+    # Naming one explicitly reports it even when hidden — hiding a name from
+    # the menu should not refuse to answer a direct question about it.
+    names = [only] if only else list(_visible_analyzers())
     rows = [{"analyzer": name, **_check_readiness(name, args)} for name in names]
     return _print_doctor(rows, output_format)
 
@@ -1768,7 +1777,8 @@ def _list_analyzers(args: argparse.Namespace) -> int:
     output_format = getattr(args, "output_format", "text")
 
     rows = []
-    for name, (glob, description) in _ANALYZER_REGISTRY.items():
+    for name in _visible_analyzers():
+        glob, description = _ANALYZER_REGISTRY[name]
         count = 1 if _is_repository_scoped(name) else len(_discover(artifact_dir, glob, None))
         canonical = _canonical_name(name)
         rows.append(

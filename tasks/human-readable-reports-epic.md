@@ -62,19 +62,21 @@ One renderer, driven by the envelope, reusing the finding formatters that alread
 
 ---
 
-## 4. Generate Reports for BPA, pql-test, and pql-lint
+## 4. Generate Reports for BPA and pql-test
 
 Wire the renderer into the analyzers whose upstream tools cannot emit HTML.
+
+`pql-lint` is **out of scope for this version**: it is hidden from the advertised CLI surface (see `HIDDEN_ANALYZERS`), so generating a report nobody is pointed at would be work with no reader. The renderer is analyzer-agnostic, so if `pql-lint` is unhidden later it gains a report by being added to one list.
 
 **Requirements**:
 - Given a BPA run, then a report is written and its path recorded in `native_html_output_path`.
 - Given a `pql-test` run, then the same, with test-level pass/fail detail.
-- Given a `pql-lint` run, then the same.
+- Given `pql-lint`, then no report is generated and nothing about its current behavior changes.
 - Given PBIR, then its upstream `TestRun.html` is still used and no report is generated over it.
 - Given any analyzer, then a failure to render is reported as a warning and never changes the run's exit code — a broken report must not fail a passing build.
 
 **Files**: `fab_test_registry.py`, `_report_html.py`, `_analyzer_envelope.py`
-**Tests**: `pytest -m bpa` then `pytest -m pql_test` then `pytest -m pql_lint`
+**Tests**: `pytest -m bpa` then `pytest -m pql_test`
 
 ---
 
@@ -122,6 +124,14 @@ Per the documentation constraint in [vision.md](../vision.md). Use the `document
 **Tests**: `pytest` (full suite with coverage before commit)
 
 ---
+
+## Deferred — A Report for `pql-lint`
+
+Cut when `pql-lint` was hidden from the advertised CLI surface: a report nobody is pointed at is work with no reader. The renderer is analyzer-agnostic, so unhiding `pql-lint` and adding it to task 4's list is all this would take.
+
+## Open Question — Should `fab-test local` Still Run `pql-lint`?
+
+`_LOCAL_ANALYZERS` still includes it, and the `local` subcommand's help text names it, which is accurate but sits oddly against hiding it everywhere else. Left as-is deliberately: dropping it from `local` changes what a documented workflow *does*, which is a behavior change rather than the visibility change that was asked for. Worth an explicit decision before this epic closes.
 
 ## Deferred — Playwright Report Integration
 

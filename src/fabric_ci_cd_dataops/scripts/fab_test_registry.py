@@ -80,6 +80,21 @@ ANALYZER_REGISTRY: dict[str, tuple[str, str]] = {
     "dependencies": ("", "Report dependency discovery"),
 }
 
+# Analyzers kept out of the advertised surface: absent from `--help`,
+# `fab-test list`, and the default `doctor` report. They stay fully
+# invocable, aliases included -- the backward-compatibility constraint in
+# vision.md says existing commands keep working, so this is a visibility
+# state and never a removal. `doctor --analyzer <name>` still reports one
+# on request, because hiding a name from a menu should not refuse to
+# answer a direct question about it.
+HIDDEN_ANALYZERS: frozenset[str] = frozenset({"pql_lint"})
+
+
+def visible_analyzers() -> tuple[str, ...]:
+    """Return the analyzer names that belong on the advertised surface."""
+    return tuple(name for name in ANALYZER_REGISTRY if name not in HIDDEN_ANALYZERS)
+
+
 # Which target scopes each analyzer can actually honor, declared once so the
 # check cannot drift per command builder.
 #

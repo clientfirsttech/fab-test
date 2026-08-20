@@ -16,7 +16,7 @@ import subprocess
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts.fab_test_registry import ANALYZER_REGISTRY
+from fabric_ci_cd_dataops.scripts.fab_test_registry import visible_analyzers
 
 
 @pytest.mark.fab_test
@@ -29,7 +29,7 @@ def test_list_text_shows_every_analyzer_with_glob_and_tool():
         check=False,
     )
     assert result.returncode == 0, result.stderr
-    for name in ANALYZER_REGISTRY:
+    for name in visible_analyzers():
         assert name in result.stdout, f"{name} missing from list output"
     assert "Tabular Editor" in result.stdout
     assert "*.SemanticModel" in result.stdout
@@ -37,7 +37,7 @@ def test_list_text_shows_every_analyzer_with_glob_and_tool():
 
 @pytest.mark.fab_test
 def test_list_json_format_is_one_document():
-    """--format json emits one document covering every registered analyzer."""
+    """--format json emits one document covering every *visible* analyzer."""
     result = subprocess.run(
         ["fab-test", "list", "--format", "json"],
         capture_output=True,
@@ -46,7 +46,7 @@ def test_list_json_format_is_one_document():
     )
     assert result.returncode == 0, result.stderr
     summary = json.loads(result.stdout)
-    assert len(summary["analyzers"]) == len(ANALYZER_REGISTRY)
+    assert len(summary["analyzers"]) == len(visible_analyzers())
     bpa_row = next(r for r in summary["analyzers"] if r["analyzer"] == "bpa")
     assert bpa_row["glob"] == "*.SemanticModel"
     assert bpa_row["required_tool"] == "Tabular Editor"

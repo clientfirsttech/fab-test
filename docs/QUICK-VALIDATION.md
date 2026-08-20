@@ -99,8 +99,9 @@ fab-test pql-test --dry-run
 fab-test bpa --tabular-editor-path "/path/to/TabularEditor.exe"
 fab-test pbir --inspector-path "/path/to/PBIRInspectorCLI"
 fab-test pql-test --env DEV
-fab-test pql-lint
 ```
+
+`pql-lint` is hidden from `--help`, `list`, and `doctor` for now, but still runs if you invoke it directly (`fab-test pql-lint`), and `fab-test local` still includes it.
 
 ### Isolate one artifact
 
