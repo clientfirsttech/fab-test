@@ -4,7 +4,7 @@ Guiding vision and constraints: [vision.md](vision.md)
 
 ## Active Epics
 
-None currently — see Standalone Tasks below for open follow-ups.
+- [Human-Readable Reports](tasks/human-readable-reports-epic.md) — 📋 PLANNED. A `Report` column in the `all` summary, `native_html_output_path` promoted to a documented envelope key, and one envelope-to-HTML renderer serving every analyzer — because Tabular Editor emits TRX and `pql-test` emits JSON, so neither can produce a readable report on its own. PBIR keeps its richer upstream `TestRun.html`. **7 tasks**, 2 deferred. Task 1 surfaces the PBIR report that already exists and is worth doing on its own.
 
 ## Standalone Tasks
 
