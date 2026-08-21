@@ -4,7 +4,7 @@ Guiding vision and constraints: [vision.md](vision.md)
 
 ## Active Epics
 
-- [Complexity and Coverage](tasks/complexity-and-coverage-epic.md) — 📋 PLANNED. Wire the coverage floor (measured at **75%**, below the 80% vision.md declares), then split the seven functions past every threshold. **8 tasks**, 3 deferred. Coverage first: refactoring 2,400 lines unmeasured is how a branch quietly disappears.
+None currently — see Standalone Tasks below for open follow-ups.
 
 ## Standalone Tasks
 
@@ -12,6 +12,7 @@ Guiding vision and constraints: [vision.md](vision.md)
 
 ## Completed Epics
 
+- [Complexity and Coverage](tasks/archive/2026-08-21-complexity-and-coverage.md) — The 80% coverage floor made real (measured **75%**, now **82%** and enforced in CI) and the complexity report cut from **45 findings to 31**. `main`, `_run_analyzer`, `_print_all_summary`, `run_bpa`, and `run_pql_test` all left the report; a shared `run_tool` holds the three-way failure classification every analyzer wrapper had duplicated. Both floors are now ratchets guarded by tests — the coverage omit list cannot go stale or swallow library code, and the complexity total cannot grow. 8/8 tasks; 3 deferred (`run_inspector`, `validate_environments_yaml`, and the long tail).
 - [Human-Readable Reports](tasks/archive/2026-08-21-human-readable-reports.md) — A readable HTML report per artifact behind `--report`, a per-run `index.html`, and `native_html_output_path`/`started_at` promoted to documented optional envelope keys. One renderer serves every analyzer because the envelope already normalizes findings; PBIR keeps its richer upstream `TestRun.html`. Also rebuilt the `all` summary — paths moved out of the table (a row was 210 chars in an 80-column terminal), emoji status replaced with text, and colour added for status and non-zero counts. 7/7 tasks; 3 deferred (a `pql-lint` report, Playwright report integration, trend/baseline views).
 - [CLI Global Options](tasks/cli-global-options-epic.md) — Added `--help` epilog and `--version`/`-V` to the `fab-test` CLI.
 - [CLI Quality Backlog](tasks/archive/2026-08-18-cli-quality-backlog-epic.md) — Hardened `fab-test` into a predictable, fast, and CI-friendly CLI (exit codes, input validation, checksum verification, `--timeout`/`--jobs`/config-file support, `clean-tools`, shell completions, subcommand aliases, per-artifact progress).
