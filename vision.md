@@ -63,7 +63,7 @@ The coverage floor and the granular-test constraint pull in opposite directions 
 
 Rules: coverage is scoped to `src/fabric_ci_cd_dataops` (tests are excluded from the denominator), the 80% floor is a ratchet that does not go down, and the threshold lives in the CI invocation — **not** in `pytest.ini`, where it would fail every granular run and defeat the token-saving constraint.
 
-> Not yet wired: there is no `pytest-cov` dependency or coverage config in the repo today, so this constraint is currently guidance rather than enforcement. See [plan.md](plan.md).
+Four modules are omitted from the denominator, by explicit path in `[tool.coverage.run]`: `eventhouse_logger.py`, the two `smoke_test_*` harnesses, and `validate_fabric_service_client.py`. Each needs a live service to execute at all, so a unit test could only assert that its argument parser accepts flags — which would inflate the figure rather than improve it. Exclusions are single files, never patterns, so library code added later cannot fall into the gap; `tests/test_coverage_config.py` fails if an entry goes stale or if a core CLI module is ever listed.
 
 ## Definition of Done — Documentation
 

@@ -49,6 +49,7 @@ dependencies = [
 dev = [
     "ruff>=0.15",
     "pytest",
+    "pytest-cov",
 ]
 
 [project.urls]
@@ -74,6 +75,46 @@ include = ["fabric_ci_cd_dataops*"]
     "agents/*",
     "skills/*/*",
     "schemas/*.json",
+]
+
+[tool.coverage.run]
+# Scoped to the package: tests are excluded from the denominator, per the
+# "How Coverage Is Measured" table in vision.md. The 80% floor lives in the
+# CI invocation (--cov-fail-under=80), never here and never in pytest.ini,
+# where it would fail every granular `pytest -m <marker>` run.
+source = ["src/fabric_ci_cd_dataops"]
+branch = false
+
+# Operational scripts, not library code. Each needs a live service to
+# execute at all, so a unit test can only assert that its argument parser
+# accepts flags -- which measures nothing worth measuring and would inflate
+# the figure rather than improve it. Excluded by explicit path so library
+# code added later can never fall into the gap; a test asserts every entry
+# still matches a real file and that no core CLI module appears here.
+#
+# To bring one back: give it a seam that can be driven without the live
+# service (as playwright_validation's client protocol already does), then
+# delete its line.
+omit = [
+    # Needs a reachable Eventhouse cluster and a Kusto ingest endpoint.
+    "src/fabric_ci_cd_dataops/scripts/eventhouse_logger.py",
+    # CI smoke harnesses: they orchestrate the installed console scripts
+    # end to end, which is what the smoke job itself does.
+    "src/fabric_ci_cd_dataops/scripts/smoke_test_orchestrator.py",
+    "src/fabric_ci_cd_dataops/scripts/smoke_test_pql_test.py",
+    # Connects to Fabric to prove credentials work; there is nothing to
+    # assert offline that build_fabric_service_client's tests do not.
+    "src/fabric_ci_cd_dataops/scripts/validate_fabric_service_client.py",
+]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    'if __name__ == "__main__":',
 ]
 
 [tool.ruff]
