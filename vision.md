@@ -46,6 +46,10 @@ Constraints {
   (documentation) => an epic is not done until all three callers are documented: the
                      agent has a skill, the human has updated docs, and the pipeline
                      has YAML that is easy to produce. Any one missing => not done
+  (blast radius)  => a change to code with more than one caller is unverified until
+                     every caller is exercised through the real CLI, not only the one
+                     that prompted the change. Enumerate them before editing, and run
+                     each afterwards
 }
 ```
 
@@ -66,6 +70,36 @@ Rules: coverage is scoped to `src/fabric_ci_cd_dataops` (tests are excluded from
 Four modules are omitted from the denominator, by explicit path in `[tool.coverage.run]`: `eventhouse_logger.py`, the two `smoke_test_*` harnesses, and `validate_fabric_service_client.py`. Each needs a live service to execute at all, so a unit test could only assert that its argument parser accepts flags — which would inflate the figure rather than improve it. Exclusions are single files, never patterns, so library code added later cannot fall into the gap; `tests/test_coverage_config.py` fails if an entry goes stale or if a core CLI module is ever listed.
 
 Complexity is ratcheted the same way, by count rather than per function: `tests/test_complexity_budget.py` fails if the report grows. Gating each function would block a PR over one extra branch, which is a gate people route around; leaving it unwatched is how the report went from 36 findings to 45 across two epics before anyone looked.
+
+## Blast Radius
+
+`fab-test` is small enough that most helpers have several callers and large enough
+that it is easy to forget which. Five defects reached the CLI in a single session,
+all the same shape: shared code changed, one caller verified.
+
+| Defect | Shared code | Callers exercised |
+|--------|-------------|-------------------|
+| `all --artifact X` raised `AttributeError` | `discover_artifacts` | 2 of 3 |
+| Summary table overflowed the terminal | the column width budget | 1 of 3 |
+| `pql-test` output crashed the reader thread | the subprocess arguments | 1 of 2 wrappers |
+| `--report` wrote a file and never said so | report surfacing | `all` only |
+| `all` then named every report twice | report surfacing | one analyzer only |
+
+A green suite reported none of them. Each was found by running the CLI — which is
+what "verify through the real entry point" already asks for, and was still not
+enough, because one entry point was run and the change had touched several.
+
+The callers worth enumerating for the surfaces that keep biting:
+
+| Surface | Callers |
+|---------|---------|
+| Per-artifact summary and its paths | one analyzer, `fab-test all`, `fab-test local` |
+| Artifact discovery | `_run_analyzer`, `list`, `explain`, the aggregate summary |
+| Table widths | the summary, the findings tables, the analyzer wrappers |
+| Envelope writing | every `invoke_*` wrapper |
+
+Before editing one of these, list its callers. After editing, run each. "It worked for
+the command I was asked about" is the failure mode, not the verification.
 
 ## Definition of Done — Documentation
 

@@ -314,3 +314,95 @@ def test_single_analyzer_json_carries_report_path_like_all_does(tmp_path, capsys
     row = json.loads(capsys.readouterr().out)["artifacts"][0]
     assert "report_path" in row, "report_path must be present, as it is under `all`"
     assert row["report_path"] == str(report)
+
+
+@pytest.mark.fab_test
+def test_all_suppresses_the_per_analyzer_report_line(tmp_path, monkeypatch):
+    """Regression: `all` named every report twice.
+
+    `_print_summary` runs once per analyzer inside `all`, so surfacing the
+    report there duplicated the aggregate listing that already existed.
+    Asserts the wiring rather than the rendered output, because `all`
+    really runs the analyzers and would overwrite any fixture envelope.
+    """
+    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+
+    seen: dict[str, bool] = {}
+
+    def _spy(name, results, **kwargs):
+        seen[name] = kwargs.get("show_reports", True)
+        return 0
+
+    monkeypatch.setattr(fab_test_module, "_print_summary", _spy)
+    monkeypatch.setattr(fab_test_module, "_preflight", lambda *a, **k: None)
+    monkeypatch.setattr(fab_test_module, "_run_one_artifact", lambda *a, **k: ("Sales", 0))
+    (tmp_path / "Sales.SemanticModel").mkdir()
+
+    import argparse
+
+    args = argparse.Namespace(
+        analyzer="all", artifact_dir=str(tmp_path), output_format="text",
+        dry_run=False, artifact=None, target=None, resolved_target=None,
+        jobs=1, timeout=None, file_config={}, report=True, telemetry=False,
+    )
+    fab_test_module._run_analyzer("bpa", args, tmp_path / "results")
+
+    assert seen == {"bpa": False}, "under `all`, the per-analyzer Report line must be off"
+
+
+@pytest.mark.fab_test
+def test_a_standalone_run_keeps_the_per_analyzer_report_line(tmp_path, monkeypatch):
+    """One analyzer has no aggregate listing, so the line is the only mention."""
+    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+
+    seen: dict[str, bool] = {}
+    monkeypatch.setattr(
+        fab_test_module, "_print_summary",
+        lambda name, results, **kw: (seen.setdefault(name, kw.get("show_reports", True)) and 0) or 0,
+    )
+    monkeypatch.setattr(fab_test_module, "_preflight", lambda *a, **k: None)
+    monkeypatch.setattr(fab_test_module, "_run_one_artifact", lambda *a, **k: ("Sales", 0))
+    (tmp_path / "Sales.SemanticModel").mkdir()
+
+    import argparse
+
+    args = argparse.Namespace(
+        analyzer="bpa", artifact_dir=str(tmp_path), output_format="text",
+        dry_run=False, artifact=None, target=None, resolved_target=None,
+        jobs=1, timeout=None, file_config={}, report=True, telemetry=False,
+    )
+    fab_test_module._run_analyzer("bpa", args, tmp_path / "results")
+
+    assert seen == {"bpa": True}
+
+
+@pytest.mark.fab_test
+def test_local_still_names_its_reports(tmp_path):
+    """`local` has no aggregate listing, so its per-analyzer lines must stay.
+
+    Suppressing the Report line for every bundle would have removed the
+    information from `local` entirely rather than de-duplicating it.
+    """
+    from fabric_ci_cd_dataops.scripts.fab_test_summary import _print_summary
+
+    path = tmp_path / "pql_lint" / "Sales"
+    path.mkdir(parents=True)
+    (path / "envelope.json").write_text(
+        json.dumps(
+            build_envelope(
+                analyzer="pql_lint",
+                artifact_path="Sales",
+                status="passed",
+                native_html_output_path_str=str(path / "report.html"),
+            )
+        ),
+        encoding="utf-8",
+    )
+    import contextlib
+    import io
+
+    buffer = io.StringIO()
+    with contextlib.redirect_stdout(buffer):
+        _print_summary("pql_lint", [("Sales", 0)], output_dir=tmp_path, show_reports=True)
+
+    assert "report.html" in buffer.getvalue()

@@ -719,7 +719,16 @@ def _print_summary(
     output_dir: Path | None = None,
     verbosity: str = "",
     output_format: str = "text",
+    *,
+    show_reports: bool = True,
 ) -> int:
+    """Print the per-analyzer summary and return 0 or 1.
+
+    ``show_reports`` is False under `fab-test all`, which lists every
+    report beneath its aggregate table -- printing them here too named
+    each one twice. `local` keeps them, because it has no aggregate
+    listing and would otherwise lose the information entirely.
+    """
     if output_format == "json":
         rows: list[dict[str, Any]] = []
         for stem, code in results:
@@ -765,6 +774,7 @@ def _print_summary(
 
     # A report that is written but never named reads as a flag that did
     # nothing -- which is exactly how `--report` was first reported as broken.
-    for report in reports:
-        print(f"  Report: {report}")
+    if show_reports:
+        for report in reports:
+            print(f"  Report: {report}")
     return 1 if any_failed else 0
