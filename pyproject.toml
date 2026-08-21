@@ -165,8 +165,10 @@ max-complexity = 15
 max-args = 8
 
 [tool.ruff.lint.per-file-ignores]
-# Scanners deliberately swallow per-file errors so one bad file cannot abort a scan.
-"src/fabric_ci_cd_dataops/scripts/fab_test.py" = ["BLE001", "S110"]
+# Scanners deliberately swallow per-file errors so one bad file cannot abort
+# a scan. fab_test.py was once listed here too, which was wrong: it is the CLI
+# orchestrator, not a scanner, and the exemption meant each new blind except
+# landed unexamined. Its three are now justified individually.
 "src/fabric_ci_cd_dataops/scripts/scan_credentials.py" = ["BLE001", "S110"]
 "src/fabric_ci_cd_dataops/scripts/scan_entropy.py" = ["BLE001", "S110"]
 "src/fabric_ci_cd_dataops/scripts/invoke_tabular_editor_bpa.py" = ["S314"]

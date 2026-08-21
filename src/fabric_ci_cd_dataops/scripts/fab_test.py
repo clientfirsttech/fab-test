@@ -259,11 +259,14 @@ def _git_command_output(cmd: list[str]) -> str:
     """Run a local git command and return trimmed stdout, or "" on any failure."""
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
-        if proc.returncode == 0:
-            return proc.stdout.strip()
-    except Exception:
-        pass
-    return ""
+    except Exception:  # noqa: BLE001 - boundary: git is optional context
+        # Swallowed silently on purpose. This only enriches telemetry with
+        # the repository, branch, and actor, and every caller already reads
+        # "" as "unknown". Warning here would fire on every run outside a
+        # git checkout -- a normal way to use fab-test -- so the noise would
+        # train people to ignore it.
+        return ""
+    return proc.stdout.strip() if proc.returncode == 0 else ""
 
 
 def _git_context() -> dict[str, str]:
@@ -424,7 +427,7 @@ def _send_telemetry(
         return
     try:
         publish_analyzer_telemetry(table, validated, force=True)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - boundary: telemetry never fails a run
         narrate(
             f"::warning::Telemetry failed for {artifact.stem}: {exc}",
             output_format=output_format,
@@ -2077,7 +2080,8 @@ def _auth_status(args: argparse.Namespace) -> int:
     if not verified:
         try:
             _verify_ambient_credential()
-        except Exception as exc:  # any auth failure is reported, never re-raised
+        except Exception as exc:  # noqa: BLE001 - boundary: any credential
+            # failure becomes a reported status, never a traceback
             return _print_auth_status(
                 {
                     "identity": {

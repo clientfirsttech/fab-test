@@ -1,6 +1,6 @@
 # Review Cleanup Epic
 
-**Status**: 🚧 IN-PROGRESS (2/6)
+**Status**: 🚧 IN-PROGRESS (3/6)
 **Goal**: Close the five findings from the 2026-08-21 review, three of which are debt created that same day.
 
 ## Overview
@@ -67,7 +67,11 @@ Chose a new module over the alternatives because both candidates were worse: lea
 
 ---
 
-## 3. Retire the Blanket Lint Exemption on `fab_test.py`
+## 3. Retire the Blanket Lint Exemption on `fab_test.py` ✅
+
+**Done (2026-08-21)**: removed from `per-file-ignores`, and the comment above the remaining two entries now says why it was wrong to be there — otherwise the next person re-adds it. Each of the three sites carries a `# noqa: BLE001 - boundary: ...` naming its boundary: git as optional context, telemetry never failing a run, and any credential failure becoming a reported status rather than a traceback.
+
+`_git_command_output` was restructured rather than annotated. It previously ran the command *and* read the result inside one `try`, ending in a bare `pass` that `S110` flagged. Now only the call is guarded, the early return replaces the `pass`, and a comment states the case for silence: warning here would fire on every run outside a git checkout, which is a normal way to use `fab-test`, so the noise would train people to ignore it.
 
 `pyproject.toml` grants `fab_test.py` a file-level `BLE001, S110` exemption under the comment *"Scanners deliberately swallow per-file errors so one bad file cannot abort a scan."* It is grouped with `scan_credentials.py` and `scan_entropy.py`, which are scanners. **`fab_test.py` is the CLI orchestrator; the justification does not describe it.**
 
