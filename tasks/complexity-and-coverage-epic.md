@@ -1,6 +1,6 @@
 # Complexity and Coverage Epic
 
-**Status**: 📋 PLANNED
+**Status**: 🚧 IN-PROGRESS (3/8)
 **Goal**: Make the coverage floor real, then pay down the seven functions that have grown past every threshold.
 
 ## Overview
@@ -15,7 +15,9 @@ Coverage comes first, deliberately. Refactoring 2,400 lines without measurement 
 
 ---
 
-## 1. Wire Coverage Measurement
+## 1. Wire Coverage Measurement ✅
+
+**Done (2026-08-21)**: `pytest-cov` in the `dev` extras, `[tool.coverage.run]` scoped to `src/fabric_ci_cd_dataops`, and `[tool.coverage.report]` with `show_missing`. `pytest.ini` deliberately untouched, guarded by a test.
 
 Turn the floor from an aspiration into a number that appears on every run.
 
@@ -33,7 +35,11 @@ Turn the floor from an aspiration into a number that appears on every run.
 
 ---
 
-## 2. Decide the Coverage Denominator
+## 2. Decide the Coverage Denominator ✅
+
+**Done (2026-08-21)**: four modules omitted by explicit path — `eventhouse_logger.py`, both `smoke_test_*` harnesses, and `validate_fabric_service_client.py`. Each needs a live service to execute, so a unit test could only assert its argument parser accepts flags, inflating the figure rather than improving it. **Measured 75% → 81.45%**, clearing the floor without lowering it.
+
+`tests/test_coverage_config.py` guards the two ways this rots: an omit entry that stops matching any file (silently protecting nothing) and an entry broad enough to swallow library code added later. Every entry must be a single `.py` path, must still exist, must be explained inline, and no core CLI module may appear.
 
 75% against 80% is a real gap, and how it closes is a decision rather than a detail.
 
@@ -50,7 +56,9 @@ The shortfall is not in library code — the modules written most recently measu
 
 ---
 
-## 3. Enforce the Floor in CI
+## 3. Enforce the Floor in CI ✅
+
+**Done (2026-08-21)**: `pytest -q --cov --cov-fail-under=80` in `build.yml`, with a comment recording why the threshold cannot move to `pytest.ini`. Verified with the exact CI invocation locally: exit 0 at 81.45%.
 
 **Requirements**:
 - Given the CI workflow, then it runs the full suite with `--cov-fail-under=80`.
