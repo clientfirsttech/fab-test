@@ -178,6 +178,38 @@ fab-test auth login         # delegates to `pql-test auth login`
 
 > `--env` is the test environment label (`DEV`, `PROD`). `--cloud`, on `auth login` only, selects the Azure cloud. They are deliberately different names.
 
+### Readable reports
+
+The result envelopes are the machine contract. To see *what actually failed* without reading JSON, ask for a report:
+
+```bash
+fab-test all --report
+```
+
+Reports are **opt-in** — nothing is written without the flag, so no existing run gets slower. Add `report: true` to `fab-test.yml` to turn them on for good.
+
+Each artifact gets a self-contained HTML page beside its envelope, and `fab-test all --report` also writes `analyzer-results/index.html` linking them all, so one run means one page to open:
+
+```
+  ╭────────────┬───────────────────────┬──────────┬───────┬────────╮
+  │ Analyzer   │ Artifact              │ Status   │   Err │   Warn │
+  ├────────────┼───────────────────────┼──────────┼───────┼────────┤
+  │ pbir       │ SampleModel-PQLAssert │ FAILED   │     4 │      1 │
+  │ bpa        │ SampleModel-PQLAssert │ warning  │     0 │     21 │
+  ╰────────────┴───────────────────────┴──────────┴───────┴────────╯
+
+  pbir/SampleModel-PQLAssert
+    analyzer-results/pbir/SampleModel-PQLAssert/native.json/TestRun.html
+  bpa/SampleModel-PQLAssert
+    analyzer-results/bpa/SampleModel-PQLAssert/report.html
+
+  Index:  analyzer-results/index.html
+```
+
+PBIR Inspector writes its own `TestRun.html` and it appears **with or without** `--report` — it is richer than anything generated from the envelope, so `fab-test` never overwrites it. Tabular Editor emits TRX and `pql-test` emits JSON, so those two get a generated `report.html`.
+
+Status and non-zero counts are coloured in a terminal. Colour is off when output is redirected, off whenever `NO_COLOR` is set, and never present under `--format json`.
+
 ### The machine-readable workflow (agents and pipelines)
 
 `fab-test` is designed to be called the same way by a human, a CI pipeline, or an AI agent. The four-command loop:

@@ -4,7 +4,7 @@ Guiding vision and constraints: [vision.md](vision.md)
 
 ## Active Epics
 
-- [Human-Readable Reports](tasks/human-readable-reports-epic.md) — 📋 PLANNED. A `Report` column in the `all` summary, `native_html_output_path` promoted to a documented envelope key, and one envelope-to-HTML renderer serving every analyzer — because Tabular Editor emits TRX and `pql-test` emits JSON, so neither can produce a readable report on its own. PBIR keeps its richer upstream `TestRun.html`. **7 tasks**, 2 deferred. Task 1 surfaces the PBIR report that already exists and is worth doing on its own.
+None currently — see Standalone Tasks below for open follow-ups.
 
 ## Standalone Tasks
 
@@ -26,6 +26,7 @@ Guiding vision and constraints: [vision.md](vision.md)
 
 ## Completed Epics
 
+- [Human-Readable Reports](tasks/archive/2026-08-21-human-readable-reports.md) — A readable HTML report per artifact behind `--report`, a per-run `index.html`, and `native_html_output_path`/`started_at` promoted to documented optional envelope keys. One renderer serves every analyzer because the envelope already normalizes findings; PBIR keeps its richer upstream `TestRun.html`. Also rebuilt the `all` summary — paths moved out of the table (a row was 210 chars in an 80-column terminal), emoji status replaced with text, and colour added for status and non-zero counts. 7/7 tasks; 3 deferred (a `pql-lint` report, Playwright report integration, trend/baseline views).
 - [CLI Global Options](tasks/cli-global-options-epic.md) — Added `--help` epilog and `--version`/`-V` to the `fab-test` CLI.
 - [CLI Quality Backlog](tasks/archive/2026-08-18-cli-quality-backlog-epic.md) — Hardened `fab-test` into a predictable, fast, and CI-friendly CLI (exit codes, input validation, checksum verification, `--timeout`/`--jobs`/config-file support, `clean-tools`, shell completions, subcommand aliases, per-artifact progress).
 - [Telemetry Context](tasks/archive/2026-08-18-telemetry-context-epic.md) — Analyzer telemetry now always carries repository, branch, actor, and run context (local git fallback, `origin` field, machine context + PII redaction, payload schema validation, `--telemetry --dry-run` preview).

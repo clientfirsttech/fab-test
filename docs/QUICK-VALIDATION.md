@@ -195,6 +195,29 @@ Precedence, for every setting:
 
 See the [Configuration section of the fab-test skill](../.github/skills/fab-test/SKILL.md#configuration) for the full settings list and rule-overlay keys.
 
+### Pipeline snippet: a reviewable report as the build artifact
+
+`run.json` is what a pipeline *parses*; `index.html` is what a person *opens* when the build goes red. Reports are opt-in, so a job that wants one asks for it:
+
+```yaml
+- name: Run analyzers with reports
+  run: fab-test all --report --format json
+  continue-on-error: true      # upload the report even when findings fail the build
+
+- name: Upload the reviewable report
+  if: always()
+  uses: actions/upload-artifact@v4
+  with:
+    name: fab-test-report
+    path: |
+      analyzer-results/index.html
+      analyzer-results/**/report.html
+      analyzer-results/**/TestRun.html
+      analyzer-results/run.json
+```
+
+`if: always()` matters: the run you most want to read is the one that failed. Colour is automatically off because stdout is not a terminal — set `FORCE_COLOR: "1"` if your CI log viewer renders ANSI and you want it back.
+
 ### Pipeline snippet: targeting a deployed item by name
 
 The workspace belongs in committed config; only the credentials come from secrets. With `workspace:` set in `fab-test.yml`, the workflow names the artifact and nothing else:
