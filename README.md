@@ -275,13 +275,16 @@ Precedence, for every setting:
 
 ## AI agent guidance
 
-The package ships the AIDD agent instructions and skills used by the reference repository. After install, locate them under the installed package path:
+The AIDD agent instructions and skills live in the repository, not in the wheel: [`.github/agents/`](.github/agents/) and [`.github/skills/`](.github/skills/). Clone the repository to get them. The `fab-test` CLI reference an agent needs is [`.github/skills/fab-test/SKILL.md`](.github/skills/fab-test/SKILL.md).
+
+What the distribution *does* carry is the metadata the analyzers need, so `bpa`, `pbir`, and `doctor` work from a plain `pip install` with no checkout:
 
 ```python
-import fabric_ci_cd_dataops
 import importlib.resources as resources
 
-print(resources.files("fabric_ci_cd_dataops").joinpath("agents/aidd.agent.md"))
+metadata = resources.files("fabric_ci_cd_dataops").joinpath("metadata")
+print(metadata.joinpath("rules/BPARules.json"))  # packaged BPA ruleset
+print(metadata.joinpath("analyzers.json"))       # tool install URLs doctor reads
 ```
 
 ## License

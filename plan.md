@@ -4,7 +4,7 @@ Guiding vision and constraints: [vision.md](vision.md)
 
 ## Active Epics
 
-- [TestPyPI Release](tasks/testpypi-release-epic.md) — 📋 PLANNED. Get `fab-test` onto TestPyPI and document the install for all three callers. The name is unregistered on both indexes, `publish.yml` has never fired, and its tag glob would send a `v1.0.1rc1` rehearsal straight to production PyPI. TestPyPI also cannot resolve `pql-test==0.1.12` or current `fabric-cicd`, so every install command needs `--extra-index-url https://pypi.org/simple`. **6 tasks**.
+- [TestPyPI Release](tasks/testpypi-release-epic.md) — 📋 PLANNED. Publish `fab-test` `1.0.0.0.dev1` to TestPyPI as an installable package. Blocker found while planning: the wheel ships no rulesets, so `bpa`/`pbir` resolve `BPARules.json` under the caller's own `.github/metadata/` and fail validation outside this checkout. Packages the metadata, adds `.fab-test/metadata/` as the consumer override (`.github/metadata/` keeps working), and fixes the tag glob that would send a `dev` rehearsal to production PyPI. TestPyPI also lacks `pql-test==0.1.12` and current `fabric-cicd`, so installs need `--extra-index-url https://pypi.org/simple`. **8 tasks**.
 
 ## Standalone Tasks
 

@@ -58,6 +58,7 @@ from ._config import (
 )
 from ._credentials import probe_credentials
 from ._desktop import bridge_cli_path, detect_desktop_instances
+from ._metadata import ANALYZERS, BPA_RULES, PBIR_RULES, metadata_path, resolve_metadata
 from ._pbip_discovery import discover_pbip_projects as _discover_pbip_projects
 from ._report_html import resolve_report
 from ._run_manifest import RunManifest
@@ -1691,8 +1692,7 @@ def _print_help(parser: argparse.ArgumentParser, topic: str | None) -> int:
 
 def _all_analyzers() -> tuple[str, ...]:
     """Resolve which analyzers `fab-test all` should run."""
-    metadata_path = REPO_ROOT / ".github" / "metadata" / "analyzers.json"
-    return _load_fab_test_all_analyzers(metadata_path)
+    return _load_fab_test_all_analyzers(metadata_path(ANALYZERS, REPO_ROOT))
 
 
 def _clean_tools(repo_root: Path, dry_run: bool) -> int:
@@ -1749,6 +1749,21 @@ def _config_validate(args: argparse.Namespace) -> int:
     return 0
 
 
+def _ruleset_rows() -> list[dict[str, Any]]:
+    """Return `config --show` rows naming where each ruleset resolved from.
+
+    The path alone does not say whether it is a `.fab-test/metadata`
+    override, this repository's legacy `.github/metadata` copy, or the copy
+    packaged in the wheel -- and a consumer debugging an unexpected finding
+    needs to know which ruleset produced it.
+    """
+    rows = []
+    for key, relative in (("rules.bpa", BPA_RULES), ("rules.pbir", PBIR_RULES)):
+        resolved, origin = resolve_metadata(relative, REPO_ROOT)
+        rows.append({"key": key, "value": str(resolved), "origin": origin})
+    return rows
+
+
 def _config_show(args: argparse.Namespace) -> int:
     """Print every effective setting fab-test would use, and where it came from.
 
@@ -1773,6 +1788,7 @@ def _config_show(args: argparse.Namespace) -> int:
         )
         display_value = "<redacted>" if _is_secret_key(key) else value
         rows.append({"key": key, "value": display_value, "origin": origin})
+    rows.extend(_ruleset_rows())
     return _print_config_show(rows, output_format)
 
 
