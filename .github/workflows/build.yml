@@ -23,13 +23,17 @@ jobs:
       - name: Ruff
         run: ruff check .
 
-      # Not a gate. Complexity and argument-count rules report the code that has
-      # outgrown its shape, so the trend is visible without blocking a PR on it.
-      # See the "Reduce analyzer complexity" task in plan.md.
+      # Not a gate here: blocking a PR because a function grew one branch is
+      # the kind of gate people learn to route around. The *total* is
+      # ratcheted instead, by tests/test_complexity_budget.py in the test job
+      # — a report nobody reads is how this went from 36 findings to 45 over
+      # two epics before anyone noticed.
       - name: Complexity report
         if: always()
         run: |
           echo "### Complexity signals (non-gating)" >> "$GITHUB_STEP_SUMMARY"
+          echo "Ceiling is ratcheted in tests/test_complexity_budget.py." \
+            >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
           ruff check src --select C901,PLR0911,PLR0912,PLR0913,PLR0915 --statistics \
             >> "$GITHUB_STEP_SUMMARY" || true

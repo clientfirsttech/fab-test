@@ -155,6 +155,21 @@ fab-test doctor
 fab-test doctor --analyzer bpa --format json
 ```
 
+## Coverage and complexity
+
+Both are enforced, and both are ratchets — they move down, never up.
+
+```bash
+pytest -q --cov                      # measure locally, no gate
+pytest -q --cov --cov-fail-under=80  # exactly what CI runs
+```
+
+The 80% floor is scoped to `src/fabric_ci_cd_dataops` with tests excluded. Four modules are omitted by explicit path — `eventhouse_logger.py`, both `smoke_test_*` harnesses, and `validate_fabric_service_client.py` — because each needs a live service to execute, so a unit test could only assert that its argument parser accepts flags. `tests/test_coverage_config.py` fails if one of those entries goes stale or if a core CLI module is ever added to the list.
+
+**Never put a coverage flag in `pytest.ini`.** A granular `pytest -m bpa` run covers a fraction of `src/` by design; gating it would fail every marker run and defeat the point of having them.
+
+Complexity is reported but not gated per-function — blocking a PR because a function grew one branch is a gate people route around. The *total* is ratcheted in `tests/test_complexity_budget.py`, which also names the functions a past epic refactored so one cannot quietly grow back while another improves.
+
 ## Configuring fab-test
 
 `fab-test.yml` at the repository root is an entirely optional config-file front door — no file at all means every setting behaves exactly as it always has.

@@ -65,6 +65,8 @@ Rules: coverage is scoped to `src/fabric_ci_cd_dataops` (tests are excluded from
 
 Four modules are omitted from the denominator, by explicit path in `[tool.coverage.run]`: `eventhouse_logger.py`, the two `smoke_test_*` harnesses, and `validate_fabric_service_client.py`. Each needs a live service to execute at all, so a unit test could only assert that its argument parser accepts flags — which would inflate the figure rather than improve it. Exclusions are single files, never patterns, so library code added later cannot fall into the gap; `tests/test_coverage_config.py` fails if an entry goes stale or if a core CLI module is ever listed.
 
+Complexity is ratcheted the same way, by count rather than per function: `tests/test_complexity_budget.py` fails if the report grows. Gating each function would block a PR over one extra branch, which is a gate people route around; leaving it unwatched is how the report went from 36 findings to 45 across two epics before anyone looked.
+
 ## Definition of Done — Documentation
 
 Documentation follows the same three callers as the CLI itself. Shipping for one and not the others leaves the epic incomplete.

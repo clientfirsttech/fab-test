@@ -1,11 +1,11 @@
 # Complexity and Coverage Epic
 
-**Status**: 🚧 IN-PROGRESS (6/8)
+**Status**: ✅ COMPLETED (8/8 tasks, 3 deferred)
 **Goal**: Make the coverage floor real, then pay down the seven functions that have grown past every threshold.
 
 ## Overview
 
-[vision.md](../vision.md) declares an 80% line-coverage floor and then admits, in its own words, that it "is currently guidance rather than enforcement". Measured today the figure is **75%**, so the constraint has been quietly unmet rather than merely unwired. At the same time the non-gating complexity report has grown from 36 findings to **45**, and the growth is concentrated in the code most recently changed: `fab_test.py` is now 2,405 lines and its `main` carries 10 return statements.
+[vision.md](../../vision.md) declares an 80% line-coverage floor and then admits, in its own words, that it "is currently guidance rather than enforcement". Measured today the figure is **75%**, so the constraint has been quietly unmet rather than merely unwired. At the same time the non-gating complexity report has grown from 36 findings to **45**, and the growth is concentrated in the code most recently changed: `fab_test.py` is now 2,405 lines and its `main` carries 10 return statements.
 
 Coverage comes first, deliberately. Refactoring 2,400 lines without measurement is how a branch quietly disappears, and the point of splitting a 122-statement function is to make its parts individually testable — which is only observable if coverage is being watched. Doing it the other way round means refactoring blind and then measuring what survived.
 
@@ -147,7 +147,15 @@ The two worst: 30 and 23 complexity, 122 and 106 statements. Both follow the sam
 
 ---
 
-## 7. Lower the Complexity Budget
+## 7. Lower the Complexity Budget ✅
+
+**Done (2026-08-21)**: not by lowering `max-complexity`, which turned out not to be the lever. Measured, it is already 15 — tighter than every surviving function, the worst being `run_inspector` at 24. Tightening it further would flag more code without catching the thing that actually went wrong.
+
+What went wrong was the *total* drifting unwatched from 36 to 45 across two epics. So the count is ratcheted instead, in `tests/test_complexity_budget.py`: the report may shrink or hold but not grow, the ceiling cannot be left slack after a cleanup, and the five functions this epic refactored are named individually — a count alone would let one grow back while another improved and net out to no visible change.
+
+Per-function gating stays off deliberately. Blocking a PR because a function gained one branch is the kind of gate people learn to route around, which is worse than a report they occasionally read.
+
+**A bug in my own test**: the first version matched a bare `` `main` ``, which also matches `deploy.py`'s — a different function, still over threshold. Now matched on file *and* name.
 
 A threshold nothing can exceed is worth more than a report nobody reads.
 
@@ -161,7 +169,11 @@ A threshold nothing can exceed is worth more than a report nobody reads.
 
 ---
 
-## 8. Document for All Three Callers
+## 8. Document for All Three Callers ✅
+
+**Done (2026-08-21)**: `vision.md` loses its "Not yet wired" note — replaced with what is actually excluded from the denominator and why, plus the complexity ratchet alongside it. QUICK-VALIDATION gains a "Coverage and complexity" section with the exact CI invocation and the warning about never putting a coverage flag in `pytest.ini`.
+
+**The `fab-test` skill is deliberately unchanged.** No CLI behavior moved in this epic: same subcommands, same flags, same exit codes, same output — verified byte-for-byte against a pre-refactor baseline. Saying so explicitly matters, because an unchanged agent-facing skill after a large diff usually means someone forgot.
 
 **Requirements**:
 - Given a contributor, then the coverage floor, what it measures, and what it excludes are documented where they will look.
