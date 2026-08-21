@@ -172,10 +172,11 @@ def test_cli_positional_target_limits_the_dry_run(artifact_tree):
 def test_cli_typed_target_under_all_selects_one_type(artifact_tree):
     """`all Sales.SemanticModel` plans the model and never the report.
 
-    Asserts on the per-analyzer plans rather than the aggregate summary:
-    the summary prints artifact *stems*, and both artifacts here are named
-    "Sales", so a substring check against the whole of stdout would pass
-    whether or not the filter actually worked.
+    The negative half carries the weight: the per-analyzer dry-run plans
+    print full artifact names, so `Sales.Report` appearing anywhere means
+    pbir was handed an artifact the type filter should have excluded.
+    Confirmed by mutation — disabling the type check in `discover_artifacts`
+    makes this fail.
     """
     result = _run_cli(
         "all",
@@ -280,5 +281,12 @@ def test_cli_desktop_target_without_an_instance_exits_127(artifact_tree):
 
     # Narration goes to stdout in text mode (stderr is reserved for --format
     # json), matching how the existing missing-tool preflight reports.
-    assert result.returncode == 127, result.stdout
-    assert "Desktop" in result.stdout + result.stderr
+    #
+    # Asserts the diagnosis, not just the word "Desktop": that appears in the
+    # remediation line too, so a bare substring check passed even when the
+    # failure message itself changed. Found by mutating the message.
+    output = result.stdout + result.stderr
+    assert result.returncode == 127, output
+    assert "no running Power BI Desktop instance has" in output
+    assert "Sales.SemanticModel" in output, "the message must name the artifact"
+    assert "drop the 'local/' prefix" in output, "and offer the way out"
