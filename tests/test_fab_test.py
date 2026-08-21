@@ -136,6 +136,97 @@ def test_cli_help_shows_version_and_docs():
 
 
 # --------------------------------------------------------------------------- #
+# `fab-test help` — the git spelling, for anyone who reaches for it first
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.fab_test
+def test_help_subcommand_prints_the_same_text_as_the_flag():
+    bare = subprocess.run(
+        ["fab-test", "help"], capture_output=True, text=True, check=False
+    )
+    flag = subprocess.run(
+        ["fab-test", "--help"], capture_output=True, text=True, check=False
+    )
+
+    assert bare.returncode == 0, bare.stderr
+    assert bare.stdout == flag.stdout
+
+
+@pytest.mark.fab_test
+def test_help_subcommand_takes_a_topic():
+    """`fab-test help bpa` is `fab-test bpa --help`."""
+    result = subprocess.run(
+        ["fab-test", "help", "bpa"], capture_output=True, text=True, check=False
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "--bpa-rules-path" in result.stdout
+
+
+@pytest.mark.fab_test
+def test_help_subcommand_rejects_an_unknown_topic():
+    result = subprocess.run(
+        ["fab-test", "help", "nonsense"], capture_output=True, text=True, check=False
+    )
+
+    assert result.returncode == 2
+    assert "unknown analyzer 'nonsense'" in result.stderr
+
+
+@pytest.mark.fab_test
+def test_help_is_listed_as_a_subcommand():
+    """It only helps the caller who does not know about --help if it is visible."""
+    result = subprocess.run(
+        ["fab-test", "--help"], capture_output=True, text=True, check=False
+    )
+
+    assert "\n    help " in result.stdout, result.stdout
+
+
+@pytest.mark.fab_test
+def test_help_works_even_when_the_config_file_is_broken(tmp_path):
+    """Help is what you reach for when something is already wrong."""
+    broken = tmp_path / "fab-test.yml"
+    broken.write_text("timeout: not-a-number\n", encoding="utf-8")
+
+    result = subprocess.run(
+        ["fab-test", "--config", str(broken), "help"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr + result.stdout
+
+
+# --------------------------------------------------------------------------- #
+# Unknown analyzer
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.fab_test
+def test_unknown_analyzer_suggests_the_closest_command():
+    result = subprocess.run(
+        ["fab-test", "doctr"], capture_output=True, text=True, check=False
+    )
+
+    assert result.returncode == 2
+    assert "did you mean 'fab-test doctor'?" in result.stderr
+
+
+@pytest.mark.fab_test
+def test_unknown_analyzer_without_a_near_miss_just_lists_the_commands():
+    result = subprocess.run(
+        ["fab-test", "zzzzzzzz"], capture_output=True, text=True, check=False
+    )
+
+    assert result.returncode == 2
+    assert "did you mean" not in result.stderr
+    assert "choose from bpa, pbir" in result.stderr
+
+
+# --------------------------------------------------------------------------- #
 # Version
 # --------------------------------------------------------------------------- #
 

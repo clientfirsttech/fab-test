@@ -682,7 +682,10 @@ class TestPrintFindingsTable:
         captured = capsys.readouterr()
         out = captured.out
         assert "PERF_01" in out
-        assert "Avoid bi-directional" in out
+        # A prefix, not the whole name: the Rule column is truncated to the
+        # terminal's width budget, and boxed borders spend more of it than
+        # the borderless format did.
+        assert "Avoid bi-" in out
         assert "[Sales]" in out
         assert "3" in out
         assert "Performance" in out

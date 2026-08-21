@@ -24,6 +24,7 @@ Global flags (all subcommands):
 
 import argparse
 import contextlib
+import difflib
 import hashlib
 import importlib.util
 import json
@@ -73,6 +74,9 @@ from .fab_test_registry import (
 )
 from .fab_test_registry import (
     ANALYZER_SCOPES as _ANALYZER_SCOPES,
+)
+from .fab_test_registry import (
+    HIDDEN_ANALYZERS as _HIDDEN_ANALYZERS,
 )
 from .fab_test_registry import (
     applicable_analyzers as _applicable_analyzers,
@@ -938,6 +942,7 @@ def _completion_subcommands() -> str:
             *(_canonical_name(name) for name in _ANALYZER_REGISTRY),
             "all",
             "clean-tools",
+            "help",
         )
     )
 
@@ -1017,8 +1022,43 @@ class _PrintCompletionAction(argparse.Action):
         parser.exit()
 
 
+class _FabTestParser(argparse.ArgumentParser):
+    """Parser whose unknown-analyzer error names only the advertised commands.
+
+    argparse renders `invalid choice` straight from the subparser table,
+    which holds every alias spelling *and* the hidden analyzers — exactly
+    the names the help listing works to keep off the surface (see
+    HIDDEN_ANALYZERS). A wrong first word would otherwise be the one place
+    that leaks them. The rewrite lists canonical spellings only, and points
+    a near miss at what the caller probably meant.
+    """
+
+    #: Canonical, visible subcommand names, in the order they were declared.
+    advertised_subcommands: tuple[str, ...] = ()
+    #: Every accepted spelling, aliases and hidden names included, used only
+    #: to match a typo — answering a direct question is not advertising.
+    accepted_subcommands: tuple[str, ...] = ()
+
+    def error(self, message: str):
+        match = re.match(r"argument ANALYZER: invalid choice: '([^']*)'", message)
+        if match and self.advertised_subcommands:
+            message = self._unknown_analyzer_message(match.group(1))
+        super().error(message)
+
+    def _unknown_analyzer_message(self, name: str) -> str:
+        close = difflib.get_close_matches(name, self.accepted_subcommands, n=1, cutoff=0.6)
+        suggestion = ""
+        if close:
+            canonical = _canonical_name(_SUBCOMMAND_ALIASES.get(close[0], close[0]))
+            suggestion = f"did you mean '{self.prog} {canonical}'? "
+        return (
+            f"unknown analyzer '{name}' -- {suggestion}"
+            f"choose from {', '.join(self.advertised_subcommands)}"
+        )
+
+
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
+    parser = _FabTestParser(
         prog="fab-test",
         description=(
             "Run Fabric artifact analyzers locally.\n\n"
@@ -1540,7 +1580,43 @@ def build_parser() -> argparse.ArgumentParser:
         help="Output format for the explanation (default: text)",
     )
 
+    # --- help ---
+    help_p = subs.add_parser(
+        "help",
+        help="Show this help, or one analyzer's help (fab-test help bpa)",
+    )
+    help_p.add_argument(
+        "help_topic",
+        nargs="?",
+        default=None,
+        metavar="ANALYZER",
+        help="Analyzer or command to show help for (e.g. bpa, doctor)",
+    )
+
+    # Read back from the subparser table rather than maintained by hand, so
+    # a new subcommand cannot be added without the error message learning
+    # about it.
+    accepted = tuple(subs.choices)
+    parser.accepted_subcommands = accepted
+    parser.advertised_subcommands = tuple(
+        dict.fromkeys(
+            _canonical_name(_SUBCOMMAND_ALIASES.get(name, name))
+            for name in accepted
+            if _SUBCOMMAND_ALIASES.get(name, name) not in _HIDDEN_ANALYZERS
+        )
+    )
+
     return parser
+
+
+def _print_help(parser: argparse.ArgumentParser, topic: str | None) -> int:
+    """`fab-test help [ANALYZER]` -- the git spelling of `--help`."""
+    if topic:
+        # Prints the subcommand's own help and exits; an unknown topic
+        # exits 2 with the same message `fab-test <typo>` gives.
+        parser.parse_args([topic, "--help"])
+    parser.print_help()
+    return 0
 
 
 def _all_analyzers() -> tuple[str, ...]:
@@ -2213,6 +2289,10 @@ def _run_local(args: argparse.Namespace) -> int:
 def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
+    if args.analyzer == "help":
+        # Answered before the config is read: help is what you reach for
+        # when something is already wrong, including the config itself.
+        return _print_help(parser, args.help_topic)
     args.analyzer = _SUBCOMMAND_ALIASES.get(args.analyzer, args.analyzer)
 
     try:

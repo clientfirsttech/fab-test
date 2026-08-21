@@ -212,10 +212,14 @@ def test_a_row_without_a_report_is_blank_not_the_envelope_path(tmp_path, capsys)
     )
 
     out = capsys.readouterr().out
-    bpa_line = next(line for line in out.splitlines() if line.strip().startswith("bpa"))
+    # Rows are boxed, so strip the border characters before reading a cell.
+    bpa_line = next(
+        line for line in out.splitlines() if line.strip().lstrip("│ ").startswith("bpa")
+    )
     assert "TestRun.html" not in bpa_line
-    assert bpa_line.rstrip().endswith("envelope.json"), (
-        f"bpa's Report cell should be empty, got: {bpa_line!r}"
+    report_cell = bpa_line.strip().strip("│").rsplit("│", 1)[-1]
+    assert not report_cell.strip(), (
+        f"bpa's Report cell should be empty, got: {report_cell!r}"
     )
 
 

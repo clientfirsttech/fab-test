@@ -167,3 +167,37 @@ def test_its_own_help_still_describes_it(artifact_tree):
 
     assert result.returncode == 0, result.stderr
     assert "--artifact-dir" in result.stdout
+
+
+# --------------------------------------------------------------------------- #
+# Hidden from the unknown-analyzer error, too
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.fab_test
+def test_unknown_analyzer_error_does_not_leak_hidden_names():
+    """argparse's own `invalid choice` names every alias, hidden ones included."""
+    result = _run_cli("definitely-not-an-analyzer")
+
+    assert result.returncode == 2
+    assert "pql-lint" not in result.stderr
+    assert "pql_lint" not in result.stderr
+    assert "bpa" in result.stderr
+
+
+@pytest.mark.fab_test
+def test_unknown_analyzer_error_lists_canonical_spellings_only():
+    """One spelling per command: the alias list belongs in --help, not here."""
+    result = _run_cli("definitely-not-an-analyzer")
+
+    assert "pql-test" in result.stderr
+    assert "pql_test" not in result.stderr
+
+
+@pytest.mark.fab_test
+def test_a_near_miss_on_a_hidden_analyzer_still_gets_the_suggestion():
+    """Hiding a name from the menu should not refuse a direct question."""
+    result = _run_cli("pql-lnt")
+
+    assert result.returncode == 2
+    assert "fab-test pql-lint" in result.stderr

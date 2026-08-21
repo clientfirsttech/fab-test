@@ -36,6 +36,8 @@ from ._analyzer_envelope import (
     write_envelope,
 )
 from ._report_html import attach_report
+from .fab_test_summary import _TABLE_FORMAT as TABLE_FORMAT
+from .fab_test_summary import table_padding
 
 _VERBOSITY_LEVELS = {"summary": 0, "default": 1, "verbose": 2, "debug": 3}
 
@@ -216,7 +218,7 @@ def _print_findings_table(findings: list[dict[str, Any]]) -> None:
         category = f.get("Category") or f.get("category") or ""
         rows.append((sev, rule_id, rule_name, obj, category))
 
-    padding = 2 * (5 - 1)
+    padding = table_padding(5)
     sev_w = min(max((len("Severity"), *(len(r[0]) for r in rows))), 10)
     rule_id_w = min(max((len("Rule ID"), *(len(r[1]) for r in rows))), 15)
     rule_w = min(max((len("Rule"), *(len(r[2]) for r in rows))), 30)
@@ -244,7 +246,7 @@ def _print_findings_table(findings: list[dict[str, Any]]) -> None:
         tabulate(
             truncated,
             headers=("Severity", "Rule ID", "Rule", "Object", "Category"),
-            tablefmt="simple",
+            tablefmt=TABLE_FORMAT,
             stralign="left",
         )
     )
@@ -259,6 +261,7 @@ def write_results(
     message: str = "",
     native_out: Path | None = None,
     duration_ms: int = 0,
+    started_at: str = "",
     test_summary: dict[str, int] | None = None,
 ) -> None:
     """Write standardized BPA envelope JSON (replaces legacy flat JSON)."""
@@ -269,6 +272,7 @@ def write_results(
         message=message,
         findings=findings,
         native_output_path_str=str(native_out) if native_out else "",
+        started_at=started_at,
         duration_ms=duration_ms,
     )
     # Keep legacy keys so existing unit tests that read the flat schema still pass.
@@ -519,6 +523,7 @@ def run_bpa(args: argparse.Namespace) -> int:
             message=message,
             native_out=native_out,
             duration_ms=timer.elapsed_ms,
+            started_at=timer.started_at,
             test_summary=test_summary,
         )
         if level >= _VERBOSITY_LEVELS["default"]:
@@ -538,6 +543,7 @@ def run_bpa(args: argparse.Namespace) -> int:
         message=message,
         native_out=native_out,
         duration_ms=timer.elapsed_ms,
+            started_at=timer.started_at,
         test_summary=test_summary,
     )
 

@@ -18,6 +18,7 @@ promotion gates) can assert the schema they expect via ``ENVELOPE_SCHEMA_VERSION
 
 import json
 import time
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -48,6 +49,9 @@ ENVELOPE_REQUIRED_KEYS: frozenset = frozenset(
 ENVELOPE_OPTIONAL_KEYS: frozenset = frozenset(
     {
         "native_html_output_path",
+        # UTC ISO-8601 wall-clock time the analyzer run started, from
+        # Timer. duration_ms says how long; this says when.
+        "started_at",
     }
 )
 
@@ -208,6 +212,7 @@ def build_envelope(
     findings: list[dict[str, Any]] | None = None,
     native_output_path_str: str = "",
     native_html_output_path_str: str = "",
+    started_at: str = "",
     duration_ms: int = 0,
 ) -> dict[str, Any]:
     """Build a standards-compliant result envelope dictionary.
@@ -228,6 +233,8 @@ def build_envelope(
     }
     if native_html_output_path_str:
         envelope["native_html_output_path"] = native_html_output_path_str
+    if started_at:
+        envelope["started_at"] = started_at
     return envelope
 
 
@@ -244,9 +251,16 @@ class Timer:
     def __init__(self) -> None:
         self._start: float = 0.0
         self.elapsed_ms: int = 0
+        # Wall-clock UTC, recorded alongside the monotonic clock: elapsed_ms
+        # answers "how long" but has no epoch, so it cannot answer "when".
+        # Reports need the latter, and it belongs in the envelope so the
+        # renderer displays a recorded fact rather than the time it happened
+        # to run.
+        self.started_at: str = ""
 
     def __enter__(self) -> "Timer":
         self._start = time.monotonic()
+        self.started_at = datetime.now(UTC).isoformat(timespec="seconds")
         return self
 
     def __exit__(self, *_: Any) -> None:
