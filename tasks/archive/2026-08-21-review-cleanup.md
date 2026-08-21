@@ -1,6 +1,6 @@
 # Review Cleanup Epic
 
-**Status**: 🚧 IN-PROGRESS (4/6)
+**Status**: ✅ COMPLETED (6/6 tasks, 3 deferred)
 **Goal**: Close the five findings from the 2026-08-21 review, three of which are debt created that same day.
 
 ## Overview
@@ -50,7 +50,7 @@ Chose a new module over the alternatives because both candidates were worse: lea
 
 **The layering guard found more than the task scoped.** `tests/test_module_layering.py` asserts no wrapper imports the CLI layer or a private name from another module — and immediately flagged `_severity_counts` and `_severity_rank`, imported privately by four modules and therefore public API in all but name. Renamed to `severity_counts` and `severity_rank`; 16 references across 4 files, mechanical. Pre-existing, but exactly the rule this task set.
 
-[`invoke_tabular_editor_bpa.py:39-40`](../src/fabric_ci_cd_dataops/scripts/invoke_tabular_editor_bpa.py#L39) imports `_TABLE_FORMAT` and `table_padding` from `fab_test_summary`. Two distinct problems:
+[`invoke_tabular_editor_bpa.py:39-40`](../../src/fabric_ci_cd_dataops/scripts/invoke_tabular_editor_bpa.py#L39) imports `_TABLE_FORMAT` and `table_padding` from `fab_test_summary`. Two distinct problems:
 
 1. It imports a **private** name across a module boundary and aliases it public.
 2. The wrapper runs as a *subprocess per artifact*. Importing `fab_test_summary` drags in `fab_test_registry`, and through it `_credentials`, `_desktop`, `_target`, and `_rule_overlay` — **measured at ~59 ms per spawn**, to obtain two formatting constants.
@@ -141,7 +141,17 @@ Seventeen assertions across the new test files match a substring against an enti
 
 ---
 
-## 5. Bring the Two Wrappers Under the Statement Budget
+## 5. Bring the Two Wrappers Under the Statement Budget ✅
+
+**Done (2026-08-21)**: both under 50. `run_bpa` 60 → under budget, `run_pql_test` 62 → under budget, and the whole report **31 → 29**, so the ratchet in `tests/test_complexity_budget.py` came down with it.
+
+Extracted `_narrate_header` and `_narrate_outcome` in each wrapper. The CI annotation moved into `_narrate_outcome` but stays unconditional on verbosity — it is what a CI system reads, not what a person chose to see, and burying it behind `-v` would have been a silent behavior change.
+
+**A dead conditional surfaced.** `run_pql_test` had two near-identical `write_results` calls, one per branch. The first passed `findings if status == "failed" else []` inside a branch entered only when the status is `passed` or `skipped` — so that expression could never be true. The same expression is correct for *both* branches, so the two calls collapsed into one and the branch now decides only narration and exit code.
+
+Also fixed stray indentation in both files, left by a regex patch during the previous epic: `started_at=` was indented four spaces too far inside a call. Valid Python, and invisible to the linter, which is exactly why it survived.
+
+**Verified against reality**: real Tabular Editor and pql-test runs, envelopes identical key-for-key with matching status and message, and 114 lines of CLI output byte-identical to the baseline.
 
 `run_bpa` (60) and `run_pql_test` (62) left `C901` and `PLR0912` in the last epic but still exceed the 50-statement budget in `[tool.ruff.lint.pylint]`. The remaining bulk in each is the verbosity narration and the final write-and-log branches.
 
@@ -159,7 +169,15 @@ Deferred last time because each further split is another chance to change behavi
 
 ---
 
-## 6. Document — Or State That Nothing Needs It
+## 6. Document — Or State That Nothing Needs It ✅
+
+**Done (2026-08-21) — nothing needed changing, and here is the evidence.**
+
+No public surface moved: same subcommands, flags, exit codes, envelope keys, and rendered output, with the last confirmed byte-for-byte against a pre-epic baseline. Every rename was internal — `finding_status`, `severity_counts`, `severity_rank`, `TABLE_FORMAT` — and a search across README, `docs/`, and `.github/skills/` finds no mention of any of them, so no document could have gone stale.
+
+Task 3's outcome is consistent with `aidd-python`'s rule that a blind `except Exception` belongs only at a process boundary and must say which: all three sites in `fab_test.py` now do, and the file-level exemption that used to make the rule unenforceable there is gone. The skill and the code agree without either changing.
+
+Recording this rather than skipping the task, because an untouched `fab-test` skill after a nine-commit diff otherwise reads as an oversight.
 
 **Requirements**:
 - Given the epic, then whether any of the three callers needs a doc change is decided explicitly rather than skipped.
