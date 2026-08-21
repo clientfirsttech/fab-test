@@ -1,15 +1,15 @@
 # Human-Readable Reports Epic
 
-**Status**: 🚧 IN-PROGRESS (6/7)
+**Status**: ✅ COMPLETED (7/7 tasks, 3 deferred)
 **Goal**: Every analyzer produces a report a person can open and read, and the summary points at it.
 
 ## Overview
 
 When `fab-test all` finishes, the Output column points at `envelope.json` — the machine contract. A human who wants to know *what actually failed* has to open a JSON file and read findings by hand, or re-run with `-v`. PBIR Inspector is the exception: it emits `TestRun.html`, a real report, and the envelope even records the path — but nothing surfaces it, so the one readable artifact in the tree is invisible. Meanwhile Tabular Editor emits TRX (Visual Studio TeamTest XML) and `pql-test` emits JSON; neither upstream tool can produce HTML at all, so for those analyzers a readable report is one `fab-test` has to render. This epic adds a Report column, promotes the HTML path to a real envelope key, and builds **one** renderer that serves every analyzer.
 
-One renderer, not three. The envelope already normalizes findings, and [`fab_test_summary.py`](../src/fabric_ci_cd_dataops/scripts/fab_test_summary.py) already knows how to format the two shapes they come in — rule/severity/object/message for BPA and PBIR, suite/test/expected/actual for `pql-test`. The renderer is an HTML backend for formatting that already exists, which is why this is a bounded change rather than a reporting subsystem, and why an analyzer added later gets a report for free.
+One renderer, not three. The envelope already normalizes findings, and [`fab_test_summary.py`](../../src/fabric_ci_cd_dataops/scripts/fab_test_summary.py) already knows how to format the two shapes they come in — rule/severity/object/message for BPA and PBIR, suite/test/expected/actual for `pql-test`. The renderer is an HTML backend for formatting that already exists, which is why this is a bounded change rather than a reporting subsystem, and why an analyzer added later gets a report for free.
 
-**On "facade, not fork"** ([vision.md](../vision.md)): rendering findings we already normalized is not reimplementing analysis. No rule is re-authored, no analyzer is reimplemented, and PBIR keeps its own upstream HTML because it is richer than anything generated from the envelope. The line held here is that `fab-test` never *computes* a finding — it only presents one it was given.
+**On "facade, not fork"** ([vision.md](../../vision.md)): rendering findings we already normalized is not reimplementing analysis. No rule is re-authored, no analyzer is reimplemented, and PBIR keeps its own upstream HTML because it is richer than anything generated from the envelope. The line held here is that `fab-test` never *computes* a finding — it only presents one it was given.
 
 ---
 
@@ -37,7 +37,7 @@ Turn an ad-hoc field into part of the contract, so the Report column reads a doc
 
 **Done (2026-08-20)**: `ENVELOPE_OPTIONAL_KEYS` joins `ENVELOPE_REQUIRED_KEYS` in `_analyzer_envelope.py`, with `native_html_output_path` its first member and a test asserting the two sets never overlap. `build_envelope` takes `native_html_output_path_str` and **omits the key entirely when empty** rather than writing an empty string — optional means absent, so a consumer tests presence and a key is never a promise pointing nowhere. Purely additive: existing envelopes without it stay valid.
 
-`native_html_output_path` is currently set only in [`invoke_pbir_inspector.py`](../src/fabric_ci_cd_dataops/scripts/invoke_pbir_inspector.py#L140) and appears in no schema.
+`native_html_output_path` is currently set only in [`invoke_pbir_inspector.py`](../../src/fabric_ci_cd_dataops/scripts/invoke_pbir_inspector.py#L140) and appears in no schema.
 
 **Requirements**:
 - Given the envelope schema, then `native_html_output_path` is a documented *optional* key, absent rather than null when there is no report.
@@ -57,7 +57,7 @@ One renderer, driven by the envelope, reusing the finding formatters that alread
 
 **Extracted `normalize_findings` into `_analyzer_envelope.py`** rather than writing a second normalization. `_build_findings_table` already collapsed BPA's PascalCase keys and PBIR's lowercase keys into one row shape and sorted by severity; that logic now lives in one place and both the terminal summary and the report call it, so a finding can never read differently or sort differently between them.
 
-**Simplified against the requirement**: findings are rendered pre-sorted, most severe first, rather than client-side sortable. Column sorting would mean inline JavaScript to maintain and test for a nicety, which the simplicity constraint in [vision.md](../vision.md) argues against. Revisit if reading a severity-sorted table proves insufficient.
+**Simplified against the requirement**: findings are rendered pre-sorted, most severe first, rather than client-side sortable. Column sorting would mean inline JavaScript to maintain and test for a nicety, which the simplicity constraint in [vision.md](../../vision.md) argues against. Revisit if reading a severity-sorted table proves insufficient.
 
 Rendering is deterministic — the same envelope produces identical bytes, with no generation timestamp — so two reports of one run never differ for a reason no reader benefits from.
 
@@ -130,9 +130,25 @@ Rendering on every run costs time and clutters CI artifacts; never rendering mak
 
 ---
 
-## 7. Document for All Three Callers
+## 7. Document for All Three Callers ✅
 
-Per the documentation constraint in [vision.md](../vision.md). Use the `document` command so the three cannot drift apart.
+**Done (2026-08-21)**: a Reports section in the skill covering the opt-in flag, where each analyzer's report comes from and why, the self-contained/deterministic guarantees, the per-run index, and the colour rules. The `report` and `workspace` config keys and the `--report`/`--no-report` flag joined their tables; the envelope section now separates required keys from optional ones (`native_html_output_path`, `started_at`) and states that optional means *absent, never null*; the results-layout tree shows `index.html`, `report.html`, and PBIR's `TestRun.html` with a note on which are conditional.
+
+README gained a "Readable reports" section with the real terminal output. QUICK-VALIDATION gained a pipeline snippet uploading `index.html` as the reviewable artifact, using `continue-on-error` plus `if: always()` — the run you most want to read is the one that failed, and without those the artifact never uploads.
+
+Every documented command was executed against the merged code first, including the mutually-exclusive `--report --no-report` error and its exit code.
+
+---
+
+## Retrospective
+
+**Two bugs reached the CLI and were caught by running it, not by the suite.** `fab-test all --artifact X` crashed with `AttributeError` because a second discovery pass still read the raw `args.artifact` string; and the table width budget kept computing borderless spacing after the switch to boxed borders, so wide cells could overflow. Both were found by invoking the command, which is Core Principle 8 earning its place a second time.
+
+**Three tests passed vacuously and had to be strengthened.** Two matched a substring against the whole of stdout where the token also appeared in unrelated narration (`Sales.Report` in a stem, `*.Report` in a glob). The lesson is narrow: assert against the specific line or structure, never against all captured output.
+
+**The first two attempts at "cleaner table output" fixed the wrong thing.** Border style and emoji width were real but minor; the actual defect was a 210-character row in an 80-column terminal, caused by two derivable path columns. Measuring the row width first would have skipped both rounds — a test now fails if any row exceeds 80 characters.
+
+Per the documentation constraint in [vision.md](../../vision.md). Use the `document` command so the three cannot drift apart.
 
 **Requirements**:
 - Given the `fab-test` skill, then it documents the `Report` column, the `native_html_output_path` envelope key, and the generation policy with its flag and config key.
@@ -159,4 +175,4 @@ Playwright has its own HTML reporter, so `playwright` should eventually populate
 
 ## Deferred — Trend and Baseline Views
 
-Comparing a run against a previous one is a different feature from rendering a run, needs somewhere to store history, and duplicates [`compare_baseline.py`](../src/fabric_ci_cd_dataops/scripts/compare_baseline.py). Revisit only if reading two reports side by side proves genuinely insufficient.
+Comparing a run against a previous one is a different feature from rendering a run, needs somewhere to store history, and duplicates [`compare_baseline.py`](../../src/fabric_ci_cd_dataops/scripts/compare_baseline.py). Revisit only if reading two reports side by side proves genuinely insufficient.

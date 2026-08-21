@@ -241,6 +241,61 @@ With no delegable tool on PATH it exits `127` naming `az login` and the service-
 
 > **`--env` is not `--cloud`.** In `fab-test`, `--env` is the *test environment label* (`DEV`, `PROD`, `ANY`) and exists on the analyzer subcommands. `--cloud` selects the *Azure cloud* and exists only on `auth login`. `pql-test` spells its cloud flag `--environment`; the names are deliberately kept apart here so the two never collide.
 
+## Reports
+
+Result envelopes are the machine contract. A person who wants to know *what actually failed* needs something else, so `fab-test` can write a readable HTML report per artifact.
+
+**Generation is opt-in.** Nothing is written unless `--report` is passed (or `report: true` in `fab-test.yml`, or `ANALYZER_REPORT=1`), so no existing run gets slower and no pipeline collects artifacts it did not ask for.
+
+```bash
+fab-test all --report          # reports for every analyzer, plus an index
+fab-test bpa --report          # one analyzer
+fab-test all --report --no-report   # invalid: mutually exclusive, exits 2
+```
+
+### Where a report comes from
+
+| Analyzer | Report | Why |
+|----------|--------|-----|
+| `pbir` | Upstream `native.json/TestRun.html` | PBIR Inspector produces its own, richer than anything rendered from the envelope. **Appears with or without `--report`.** |
+| `bpa` | Generated `report.html` | Tabular Editor emits TRX (Visual Studio TeamTest XML); there is no HTML to wrap. |
+| `pql-test` | Generated `report.html` | `pql-test` emits JSON and CI log annotations only. |
+| `pql-lint` | None | Currently hidden from the advertised surface, so a report would have no reader. |
+
+The generated report never overwrites an upstream one: `attach_report` is a no-op when the envelope already carries `native_html_output_path`.
+
+Every report is a single self-contained file — no external stylesheet, script, or font — so it opens from disk and survives being uploaded as a CI artifact. Rendering is deterministic: the same envelope always produces the same bytes, and the run time shown comes from the envelope's `started_at`, never from render time.
+
+**A failure to render is a warning, never a failed build.** Exit codes belong to findings, not to presentation.
+
+### The per-run index
+
+`fab-test all --report` also writes `analyzer-results/index.html` linking every report and envelope, so one run means one page to open rather than four. It is built from the same rows the terminal summary prints, so its counts cannot disagree with them. Written only for a multi-analyzer run — indexing one analyzer is a page pointing at a single link.
+
+### Finding the paths
+
+The `all` summary lists one path per artifact beneath the table — the report where there is one, the envelope otherwise:
+
+```
+  ╭────────────┬───────────────────────┬──────────┬───────┬────────╮
+  │ Analyzer   │ Artifact              │ Status   │   Err │   Warn │
+  ├────────────┼───────────────────────┼──────────┼───────┼────────┤
+  │ pbir       │ SampleModel-PQLAssert │ FAILED   │     4 │      1 │
+  │ bpa        │ SampleModel-PQLAssert │ warning  │     0 │     21 │
+  ╰────────────┴───────────────────────┴──────────┴───────┴────────╯
+
+  pbir/SampleModel-PQLAssert
+    analyzer-results/pbir/SampleModel-PQLAssert/native.json/TestRun.html
+  bpa/SampleModel-PQLAssert
+    analyzer-results/bpa/SampleModel-PQLAssert/report.html
+```
+
+Paths are relative to the working directory and never truncated, so they stay clickable in a terminal that linkifies them. Under `--format json` each artifact row carries `report_path` (null when absent) alongside `output_path`, which keeps its existing meaning.
+
+### Colour
+
+Status and non-zero error/warning counts are coloured in text output. Colour is **off** when stdout is not a terminal, **off** whenever `NO_COLOR` is set (any value), always **off** under `--format json`, and can be forced on with `FORCE_COLOR=1` for a CI job that renders ANSI.
+
 ## Configuration
 
 `fab-test.yml` at the repository root is an entirely optional config-file front door. No file at all means every setting resolves exactly as it did before this file existed.
@@ -274,6 +329,8 @@ If both `fab-test.yml` and `[tool.fab-test]` are present, `fab-test.yml` wins pe
 | `format` | string (`text`\|`json`) | — | `text` |
 | `timeout` | integer | `ANALYZER_TIMEOUT` | `120` |
 | `environment` | string | `FABRIC_ENVIRONMENT` | (none) |
+| `workspace` | string | `FABRIC_WORKSPACE_ID` | (none) — display name or GUID |
+| `report` | boolean | `ANALYZER_REPORT` | `false` — see Reports below |
 | `rules` | object | — | (none) — see Rule Overlays below |
 
 An unknown key exits `2` naming the key and the closest valid key (e.g. `artifac_dir` → "did you mean 'artifact_dir'?"); a key with the wrong type exits `2` naming the expected type.
@@ -311,6 +368,7 @@ The full schema ships with the package at `schemas/fab-test.schema.json` (draft 
 | `--output-dir DIR` | `analyzer-results` | Root directory for result envelopes |
 | `--dry-run` | off | List matching artifacts without running any analyzer |
 | `--telemetry` / `--no-telemetry` | env-driven | Stream/suppress Eventhouse telemetry when configured |
+| `--report` / `--no-report` | off | Write a readable HTML report beside each envelope [env: `ANALYZER_REPORT`] |
 | `--format {text,json}` | `text` | Aggregate summary output format (see Agent Contract above for the stdout guarantee) |
 | `-v`, `--verbose` | off | Increase output verbosity (one `-v` = per-finding detail, two `-v` = command + stdout/stderr) |
 | `--timeout SECONDS` | `120` | Per-artifact subprocess timeout [env: `ANALYZER_TIMEOUT`] |
@@ -521,18 +579,23 @@ All results follow the same layout regardless of analyzer:
 
 ```
 analyzer-results/
+  run.json            ← one manifest per invocation
+  index.html          ← per-run index, only with --report on a multi-analyzer run
   bpa/
     <artifact-stem>/
       envelope.json   ← standardized result (status, findings, duration_ms)
-      native.json     ← raw Tabular Editor output
+      native.json     ← raw Tabular Editor output (TRX)
+      report.html     ← generated, only with --report
   pbir/
     <artifact-stem>/
       envelope.json
-      native.json
+      native.json/
+        TestRun.html  ← PBIR Inspector's own report, always written
   pql_test/
     <artifact-stem>/
       envelope.json
       native.json     ← full pql-test JSON (model_path, passed, failed, results[])
+      report.html     ← generated, only with --report
   pql_lint/
     <artifact-stem>/
       envelope.json
@@ -549,7 +612,15 @@ analyzer-results/
         results.xml
 ```
 
-`envelope.json` schema keys: `schema_version`, `analyzer`, `artifact_path`, `status`, `message`, `findings`, `native_output_path`, `duration_ms`.
+`envelope.json` required keys: `schema_version`, `analyzer`, `artifact_path`, `status`, `message`, `findings`, `native_output_path`, `duration_ms`.
+
+Optional keys — **absent, never null**, so a consumer tests presence:
+
+| Key | Meaning |
+|-----|---------|
+| `native_html_output_path` | A readable HTML report for this artifact: PBIR Inspector's own `TestRun.html`, or the one `fab-test` generated under `--report`. |
+| `started_at` | UTC ISO-8601 wall-clock time the run started. `duration_ms` says how long; this says when. |
+
 
 For `pql_test`, the envelope also contains `test_results` (full result array from pql-test).
 
