@@ -2,11 +2,11 @@
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.4.0/schema.json",
   "name": "51ab84e49a469135920c",
   "position": {
-    "x": 217.0485792850596,
+    "x": 217.04857928505959,
     "y": 144.30797433547204,
     "z": 0,
     "height": 493.93217231897347,
-    "width": 817.7451879010083,
+    "width": 817.74518790100831,
     "tabOrder": 0
   },
   "visual": {
@@ -51,22 +51,7 @@
         "isDefaultSort": true
       }
     },
-    "drillFilterOtherVisuals": true,
-    "visualContainerObjects": {
-      "general": [
-        {
-          "properties": {
-            "altText": {
-              "expr": {
-                "Literal": {
-                  "Value": "'Current Date Time'"
-                }
-              }
-            }
-          }
-        }
-      ]
-    }
+    "drillFilterOtherVisuals": true
   },
   "filterConfig": {
     "filters": [

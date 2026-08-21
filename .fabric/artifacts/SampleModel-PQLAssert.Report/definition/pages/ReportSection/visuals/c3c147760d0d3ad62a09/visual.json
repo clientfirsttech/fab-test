@@ -1,5 +1,5 @@
 {
-  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.10.0/schema.json",
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.0.0/schema.json",
   "name": "c3c147760d0d3ad62a09",
   "position": {
     "x": 10.14977973568282,
@@ -80,7 +80,7 @@
                           [
                             {
                               "Literal": {
-                                "Value": "'Good'"
+                                "Value": "'Bad'"
                               }
                             }
                           ]
@@ -124,23 +124,5 @@
       ]
     },
     "drillFilterOtherVisuals": true
-  },
-  "filterConfig": {
-    "filters": [
-      {
-        "name": "56dc8df5b161a6bdcc23",
-        "field": {
-          "Column": {
-            "Expression": {
-              "SourceRef": {
-                "Entity": "AlignmentDim"
-              }
-            },
-            "Property": "Alignment"
-          }
-        },
-        "type": "Categorical"
-      }
-    ]
   }
 }

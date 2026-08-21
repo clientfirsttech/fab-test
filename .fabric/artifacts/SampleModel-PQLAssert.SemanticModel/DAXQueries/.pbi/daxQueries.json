@@ -11,5 +11,5 @@
     "Measures.DEV.Tests",
     "Retrieve Tests"
   ],
-  "defaultTab": "Measures.DEV.Tests"
+  "defaultTab": "BestPractices.DEV.Tests"
 }

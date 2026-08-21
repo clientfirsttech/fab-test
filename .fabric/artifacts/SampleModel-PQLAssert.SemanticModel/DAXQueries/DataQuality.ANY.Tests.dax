@@ -2,7 +2,6 @@ DEFINE
 	FUNCTION DataQuality.ANY.Tests = () =>
 	UNION (
 		// Table row count validations
-		// Benign trigger comment for CI validation run
 		PQL.Assert.Tbl.ShouldHaveRows(
 			"MarvelFact table should contain data",
 			'MarvelFact'
