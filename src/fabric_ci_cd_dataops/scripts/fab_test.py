@@ -844,6 +844,10 @@ def _run_analyzer(
         output_dir=output_dir,
         verbosity=verbosity,
         output_format=output_format,
+        # `all` lists every report beneath its aggregate table; naming them
+        # here as well printed each one twice. Same condition as
+        # emit_own_json above, and for the same reason.
+        show_reports=getattr(args, "analyzer", None) != "all",
     )
 
 

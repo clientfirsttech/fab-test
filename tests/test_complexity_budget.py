@@ -33,7 +33,13 @@ _RULES = "C901,PLR0911,PLR0912,PLR0913,PLR0915"
 COMPLEXITY_CEILING = 29
 
 
+@pytest.fixture(scope="module")
 def _report() -> list[str]:
+    """Run ruff once for the whole module.
+
+    Every test here wants the same list, and shelling out per test cost
+    about four seconds of the suite for identical output.
+    """
     ruff = shutil.which("ruff") or shutil.which("ruff.exe")
     command = (
         [ruff] if ruff else [sys.executable, "-m", "ruff"]
@@ -45,9 +51,9 @@ def _report() -> list[str]:
 
 
 @pytest.mark.fab_test
-def test_the_complexity_report_does_not_grow():
+def test_the_complexity_report_does_not_grow(_report):
     """The total may fall or hold; it may not rise without a deliberate change."""
-    findings = _report()
+    findings = _report
 
     assert len(findings) <= COMPLEXITY_CEILING, (
         f"complexity findings rose to {len(findings)} (ceiling {COMPLEXITY_CEILING}).\n"
@@ -57,14 +63,14 @@ def test_the_complexity_report_does_not_grow():
 
 
 @pytest.mark.fab_test
-def test_the_ceiling_is_not_left_slack_after_a_cleanup():
+def test_the_ceiling_is_not_left_slack_after_a_cleanup(_report):
     """A ceiling well above the real count stops being a ratchet.
 
     Allows a small margin so an unrelated one-line change does not force a
     ceiling edit, but flags the case where a cleanup landed and nobody
     tightened the number afterwards.
     """
-    findings = _report()
+    findings = _report
 
     assert COMPLEXITY_CEILING - len(findings) <= 5, (
         f"only {len(findings)} findings remain but the ceiling is "
@@ -85,12 +91,12 @@ def test_the_ceiling_is_not_left_slack_after_a_cleanup():
         ("invoke_pql_test.py", "`run_pql_test`"),
     ],
 )
-def test_a_refactored_function_stays_out_of_the_report(module, function):
+def test_a_refactored_function_stays_out_of_the_report(module, function, _report):
     """Named explicitly: these were the epic's targets and must not regress.
 
     The count ratchet alone would let one of these grow back while another
     improved, netting out to no visible change.
     """
-    offenders = [ln for ln in _report() if module in ln and function in ln]
+    offenders = [ln for ln in _report if module in ln and function in ln]
 
     assert not offenders, f"{function} in {module} is back in the report: {offenders}"

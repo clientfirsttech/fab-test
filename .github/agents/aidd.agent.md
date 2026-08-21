@@ -121,6 +121,11 @@ Brief task description
 8. **Verify Through the Real Entry Point**: Confirm a change works the way a user
    invokes it — the installed console script, not just a test run that may resolve
    to a different source tree. A green suite against the wrong tree proves nothing.
+9. **Check the Blast Radius**: One entry point is not enough when the change was
+   not. Before editing shared code, list its callers; after editing, run each.
+   Five defects reached the CLI in one session because the caller in front of
+   the change was the only one exercised. See Blast Radius in
+   [vision.md](../../vision.md).
 
 ## Constraints
 
