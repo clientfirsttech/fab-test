@@ -572,37 +572,43 @@ def _print_all_summary(
         )
     )
 
-    # Only worth a column when something in this run actually produced a
-    # report; otherwise it is a header over nothing but blanks.
-    any_report = any(r.get("report_path") for r in rows)
-
-    def _cells(r: dict[str, Any]) -> tuple[str, ...]:
-        base = (
-            r["analyzer"],
-            r["artifact"],
-            _status_label(r["status"]),
-            str(r["errors"]),
-            str(r["warnings"]),
-            # Not truncated: a cut path is neither clickable nor copyable,
-            # and the tail is the half that says which analyzer it came from.
-            _display_path(r["output_path"]) if r["output_path"] else "",
-        )
-        if not any_report:
-            return base
-        report = r.get("report_path")
-        return (*base, _display_path(report) if report else "")
-
-    headers = ["Analyzer", "Artifact", "Status", "Errors", "Warnings", "Output"]
-    if any_report:
-        headers.append("Report")
-
+    # Paths are listed below the table rather than in it. A full envelope
+    # path runs ~60 characters and is identical in shape for every row, so
+    # two path columns pushed the table past 200 characters -- it wrapped
+    # three times in an 80-column terminal, which is what made it
+    # unreadable. Out of the grid they stay whole, and therefore clickable.
     table = tabulate(
-        [_cells(r) for r in rows],
-        headers=headers,
+        [
+            (
+                r["analyzer"],
+                r["artifact"],
+                _status_label(r["status"]),
+                str(r["errors"]),
+                str(r["warnings"]),
+            )
+            for r in rows
+        ],
+        headers=("Analyzer", "Artifact", "Status", "Err", "Warn"),
         tablefmt=_TABLE_FORMAT,
         stralign="left",
     )
     print("\n".join(f"  {line}" for line in table.splitlines()))
+
+    # One clickable line per artifact: the report when there is one, since
+    # that is what a person opens, and the envelope otherwise.
+    located = [
+        (r, r.get("report_path") or r.get("output_path"))
+        for r in rows
+        if r["artifact"] != "(none)"
+    ]
+    if any(path for _r, path in located):
+        print()
+        for r, path in located:
+            if not path:
+                continue
+            print(f"  {r['analyzer']}/{r['artifact']}")
+            print(f"    {_display_path(path)}")
+
     print(sep)
     analyzed = sum(1 for r in rows if r["artifact"] != "(none)")
     if dry_run:

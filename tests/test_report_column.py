@@ -123,26 +123,40 @@ def test_report_path_is_returned_when_present():
 
 
 @pytest.mark.fab_test
-def test_summary_omits_the_column_when_no_run_produced_a_report(tmp_path):
-    """An always-empty column is noise; drop it rather than print blanks.
+def test_the_summary_table_carries_no_path_columns(tmp_path):
+    """Paths live below the table, not in it.
 
-    Checks the table header specifically. A bare substring search over
-    stdout would match the ``*.Report`` glob in the discovery narration
-    and pass whether or not the column was actually dropped.
+    A full envelope path is ~60 characters and identically shaped on every
+    row; two such columns pushed the table past 200 characters, which
+    wrapped three times in an 80-column terminal.
     """
     (tmp_path / "Sales.SemanticModel").mkdir()
 
-    result = _run_cli(
-        "all", "--artifact-dir", str(tmp_path), "--dry-run"
-    )
+    result = _run_cli("all", "--artifact-dir", str(tmp_path), "--dry-run")
 
     assert result.returncode == 0, result.stderr
     header = next(
-        (line for line in result.stdout.splitlines() if "Analyzer" in line and "Output" in line),
+        (line for line in result.stdout.splitlines() if "Analyzer" in line and "Status" in line),
         None,
     )
     assert header is not None, f"no summary table header in:\n{result.stdout}"
-    assert "Report" not in header, f"Report column present with no reports: {header}"
+    assert "Output" not in header, header
+    assert "Report" not in header, header
+
+
+@pytest.mark.fab_test
+def test_the_summary_table_fits_a_standard_terminal(tmp_path):
+    """The whole point of moving paths out: no row may wrap at 80 columns."""
+    (tmp_path / "Sales.SemanticModel").mkdir()
+    (tmp_path / "Sales.Report").mkdir()
+
+    result = _run_cli("all", "--artifact-dir", str(tmp_path), "--dry-run")
+
+    assert result.returncode == 0, result.stderr
+    table_lines = [ln for ln in result.stdout.splitlines() if "│" in ln or "╭" in ln]
+    assert table_lines, "no table rendered"
+    widest = max(len(ln) for ln in table_lines)
+    assert widest <= 80, f"table is {widest} chars wide:\n" + "\n".join(table_lines)
 
 
 def _summary_args(artifact_dir, output_dir, output_format="text"):
@@ -168,7 +182,7 @@ def _write_envelope(output_dir, analyzer, stem, **extra):
 
 
 @pytest.mark.fab_test
-def test_summary_shows_the_column_when_a_report_exists(tmp_path, capsys):
+def test_the_report_path_is_listed_below_the_table(tmp_path, capsys):
     """The point of the feature: a readable artifact stops being invisible."""
     from fabric_ci_cd_dataops.scripts.fab_test_summary import _print_all_summary
 
@@ -185,14 +199,15 @@ def test_summary_shows_the_column_when_a_report_exists(tmp_path, capsys):
     )
 
     out = capsys.readouterr().out
-    header = next(line for line in out.splitlines() if "Analyzer" in line)
-    assert "Report" in header
+    assert "pbir/Sales" in out, "the listing should name the analyzer and artifact"
     assert "TestRun.html" in out
+    # Whole, not truncated -- that is what keeps it clickable.
+    assert "..." not in out
 
 
 @pytest.mark.fab_test
-def test_a_row_without_a_report_is_blank_not_the_envelope_path(tmp_path, capsys):
-    """An analyzer with no report must not have envelope.json repeated into it."""
+def test_an_artifact_without_a_report_falls_back_to_its_envelope(tmp_path, capsys):
+    """Every artifact gets one clickable line: the report, or the envelope."""
     from fabric_ci_cd_dataops.scripts.fab_test_summary import _print_all_summary
 
     artifact_dir = tmp_path / "artifacts"
@@ -211,16 +226,13 @@ def test_a_row_without_a_report_is_blank_not_the_envelope_path(tmp_path, capsys)
         output_dir, ("pbir", "bpa"), [0, 0], _summary_args(artifact_dir, output_dir)
     )
 
-    out = capsys.readouterr().out
-    # Rows are boxed, so strip the border characters before reading a cell.
-    bpa_line = next(
-        line for line in out.splitlines() if line.strip().lstrip("│ ").startswith("bpa")
-    )
-    assert "TestRun.html" not in bpa_line
-    report_cell = bpa_line.strip().strip("│").rsplit("│", 1)[-1]
-    assert not report_cell.strip(), (
-        f"bpa's Report cell should be empty, got: {report_cell!r}"
-    )
+    lines = capsys.readouterr().out.splitlines()
+    bpa_index = next(i for i, ln in enumerate(lines) if ln.strip() == "bpa/Sales")
+    pbir_index = next(i for i, ln in enumerate(lines) if ln.strip() == "pbir/Sales")
+
+    # pbir has an upstream report; bpa has none, so it lists its envelope.
+    assert "TestRun.html" in lines[pbir_index + 1]
+    assert lines[bpa_index + 1].strip().endswith("envelope.json")
 
 
 @pytest.mark.fab_test
