@@ -290,3 +290,61 @@ def test_cli_desktop_target_without_an_instance_exits_127(artifact_tree):
     assert "no running Power BI Desktop instance has" in output
     assert "Sales.SemanticModel" in output, "the message must name the artifact"
     assert "drop the 'local/' prefix" in output, "and offer the way out"
+
+
+# --------------------------------------------------------------------------- #
+# Suffix-based recursive discovery (Discover From CWD §3)
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.fab_test
+def test_an_artifact_without_a_pbip_is_discovered(tmp_path):
+    """The shape of artifacts committed for CI rather than opened in
+    Desktop. Top-level globbing plus `.pbip` pairing made these invisible."""
+    folder = tmp_path / "deployed" / "prod" / "Sales.SemanticModel"
+    folder.mkdir(parents=True)
+
+    assert discover_artifacts(tmp_path, "*.SemanticModel", None) == [folder.resolve()]
+
+
+@pytest.mark.fab_test
+def test_pbip_pairing_still_enriches_a_discovered_artifact(tmp_path):
+    """Pairing stopped deciding whether an artifact exists. It must not have
+    stopped supplying the `[from X.pbip]` note and the Desktop binding."""
+    from fabric_ci_cd_dataops.scripts.fab_test_registry import discover_pbip_sources
+
+    model = tmp_path / "Sales.SemanticModel"
+    model.mkdir()
+    (tmp_path / "Sales.pbip").write_text(
+        json.dumps({"version": "1.0", "artifacts": [{"report": {"path": "Sales.Report"}}]}),
+        encoding="utf-8",
+    )
+    (tmp_path / "Sales.Report").mkdir()
+
+    assert discover_pbip_sources(tmp_path)
+
+
+@pytest.mark.fab_test
+def test_the_run_output_directory_is_not_rediscovered(tmp_path):
+    """Results are written to folders named after the artifacts that
+    produced them, so an unpruned scan compounds every run."""
+    real = tmp_path / "Sales.SemanticModel"
+    real.mkdir()
+    results = tmp_path / "analyzer-results" / "bpa"
+    (results / "Sales.SemanticModel").mkdir(parents=True)
+
+    found = discover_artifacts(
+        tmp_path, "*.SemanticModel", None, output_dir=tmp_path / "analyzer-results"
+    )
+
+    assert found == [real.resolve()]
+
+
+@pytest.mark.fab_test
+def test_a_nested_checkout_does_not_multiply_this_repository():
+    """Measured before the change: a naive recursive scan of this repository
+    returns 8 artifacts, 5 of them worktree copies of the other 3."""
+    root = Path(__file__).resolve().parent.parent
+    found = discover_artifacts(root, "*.SemanticModel", None, output_dir=root / "analyzer-results")
+
+    assert [p.name for p in found] == ["SampleModel-PQLAssert.SemanticModel"]

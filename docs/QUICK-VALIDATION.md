@@ -84,7 +84,14 @@ pytest -m pql_lint      # Power Query lint wrapper only
 
 ## Run artifact analyzers with fab-test
 
-`fab-test` exercises the actual analyzers against `.fabric/artifacts`. Each analyzer has its own tool requirements.
+`fab-test` exercises the actual analyzers against the artifacts it finds under your working directory. Each analyzer has its own tool requirements.
+
+Discovery walks down from where you run the command and treats a folder as an
+artifact when its name ends in a Fabric type suffix — at any depth, with or
+without a `.pbip` beside it. Nested git checkouts, `.venv`, `node_modules`,
+`__pycache__`, `dist`, `build`, and the run's own `--output-dir` are skipped.
+An existing `.fabric/artifacts/` layout is found exactly as before, since it
+sits inside the working directory.
 
 ### Discover artifacts without running anything
 
@@ -119,7 +126,7 @@ Every analyzer subcommand takes an optional target. Omit it and `fab-test` disco
 
 | Target | Means |
 |--------|-------|
-| *(omitted)* | Discover every matching artifact under `--artifact-dir` |
+| *(omitted)* | Discover every matching artifact under `--artifact-dir` (default: the working directory) |
 | `Sales` | The artifact named `Sales`; the analyzer's own glob picks the type |
 | `Sales.SemanticModel` | That name **and** type — `Sales.Report` is not selected |
 | `./src/Sales.SemanticModel` | Exactly that folder, wherever it lives (not confined to `--artifact-dir`) |
@@ -279,6 +286,12 @@ A copy-pasteable step for a CI job — gate on readiness, run with `--format jso
     name: fab-test-run-manifest
     path: analyzer-results/run.json
 ```
+
+**Keep `--artifact-dir` explicit in CI.** Locally the default follows your
+working directory, which is what you want at a prompt. A build should not:
+pinning the root means the job scans the same tree whichever directory the
+runner happens to start in, and a checkout that lands somewhere unexpected
+fails loudly instead of quietly analyzing nothing.
 
 `run.json` records `schema_version`, `fab_test_version`, `origin` (`"local"` locally, the detected CI system in a pipeline), `target` (the resolved target, or `null` for a discovery run), the invoked command (credentials redacted), per-artifact status, envelope paths, totals, and the final exit code — see the [Agent Contract](../.github/skills/fab-test/SKILL.md#agent-contract) for the full schema.
 

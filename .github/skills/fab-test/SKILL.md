@@ -5,7 +5,7 @@ description: fab-test CLI reference for running Fabric artifact analyzers locall
 
 # fab-test
 
-`fab-test` runs analyzers against your `.fabric/artifacts` — the local equivalent of the CI artifact validation gate.
+`fab-test` discovers and analyzes Fabric artifacts under your working directory — the local equivalent of the CI artifact validation gate.
 It is **not** `pytest`. Use `pytest` to test the analyzer wrappers; use `fab-test` to test your actual artifacts.
 
 Entry point: `scripts/fab_test.py` (installed as `fab-test` console script via `pip install -e .`).
@@ -167,7 +167,7 @@ Every analyzer subcommand takes an optional positional `TARGET` naming what to t
 
 | Target | Means |
 |--------|-------|
-| *(omitted)* | Discover every matching artifact under `--artifact-dir` |
+| *(omitted)* | Discover every matching artifact under `--artifact-dir` (default: the working directory) |
 | `Sales` | The artifact named `Sales`; the analyzer's own glob picks the type |
 | `Sales.SemanticModel` | That name **and** type — `Sales.Report` is not selected |
 | `./src/Sales.SemanticModel` | Exactly that folder, wherever it lives (not confined to `--artifact-dir`) |
@@ -203,6 +203,50 @@ $ fab-test bpa "Sales Dev.Workspace/Sales.SemanticModel"
 - A workspace name resolves to its ID before the analyzer runs. A GUID is used verbatim with no lookup. No match exits `1` and lists the workspaces the identity can see; an ambiguous name exits `2` and lists the candidate IDs.
 - A `workspace:` key in `fab-test.yml` supplies a default; a positional workspace-qualified target overrides it. Passing both `--workspace-id` and a workspace-qualified target that disagree exits `2` naming both.
 - `--artifact STEM` is a deprecated alias for `TARGET` and still works. Passing both exits `2`.
+
+## Discovery
+
+`--artifact-dir` defaults to the working directory for every subcommand,
+`all` and `local` included. Discovery walks down from there.
+
+**What counts as an artifact.** A folder whose name ends in a Fabric type
+suffix, at any depth, with or without a `.pbip` beside it. A committed
+`deployed/Sales.SemanticModel` is found; before, only top-level folders and
+`.pbip`-paired ones were. `.pbip` pairing still supplies the `[from X.pbip]`
+note and the Desktop binding — it no longer decides whether an artifact
+exists.
+
+**Where the suffixes come from.** `.github/metadata/artifact-map.json`, which
+maps nine suffixes to Fabric types. A copy ships in the distribution as a
+fallback, so an install from PyPI or a run outside a checkout behaves
+identically; a malformed map takes the same path as a missing one and warns.
+Adding a type means editing the map, not the code.
+
+**What is pruned, and why it is load-bearing.** Nested git checkouts
+(worktrees, vendored clones), `.venv`, `venv`, `env`, `node_modules`,
+`__pycache__`, `.mypy_cache`, `.pytest_cache`, `.ruff_cache`, `.tox`, `dist`,
+`build`, `.fab-test-tools`, and the run's own `--output-dir`. Without these a
+scan of this repository returns eight artifacts where three are real, the
+other five being worktree copies. Results are pruned because envelopes land
+in folders named after the artifacts that produced them, which a scan would
+otherwise rediscover as artifacts.
+
+A matched folder is not descended into: Fabric artifacts do not nest, and
+`Sales.SemanticModel/definition` is a matched artifact's contents.
+
+**Unhandled types.** All nine types parse, so a target can name one no
+analyzer reads. `fab-test bpa Sales.Notebook` exits `2` with
+`bpa reads SemanticModel artifacts; 'Sales.Notebook' is a Notebook, which no
+fab-test analyzer reads`; where another analyzer does read that type it is
+named instead. Under `all`, the analyzer is skipped with the same message
+rather than failing the batch. `fab-test list`'s Glob column shows which
+suffix each analyzer handles.
+
+**In CI, keep passing `--artifact-dir` explicitly.** A default that follows
+the working directory is right at a prompt and wrong in a build: pinning the
+root means the job scans the same tree whichever directory the runner starts
+in. An explicit path that does not exist still exits `2`; an absent default
+does not.
 
 ## Credentials
 
@@ -323,7 +367,7 @@ If both `fab-test.yml` and `[tool.fab-test]` are present, `fab-test.yml` wins pe
 
 | Key | Type | Env var | Default |
 |-----|------|---------|---------|
-| `artifact_dir` | string | — | `.fabric/artifacts` (repository root for `fab-test local`) |
+| `artifact_dir` | string | — | the working directory |
 | `output_dir` | string | — | `analyzer-results` |
 | `jobs` | integer | — | `1` |
 | `format` | string (`text`\|`json`) | — | `text` |
@@ -364,7 +408,7 @@ The full schema ships with the package at `schemas/fab-test.schema.json` (draft 
 |------|---------|-------------|
 | `TARGET` (positional) | (discover all) | What to test — see [Targeting](#targeting) for the grammar |
 | `--artifact STEM` | (all) | Deprecated alias for `TARGET`; passing both exits `2` |
-| `--artifact-dir DIR` | `.fabric/artifacts` (repository root for `local`) | Root directory to discover artifacts |
+| `--artifact-dir DIR` | the working directory | Root to discover artifacts under, recursively |
 | `--output-dir DIR` | `analyzer-results` | Root directory for result envelopes |
 | `--dry-run` | off | List matching artifacts without running any analyzer |
 | `--telemetry` / `--no-telemetry` | env-driven | Stream/suppress Eventhouse telemetry when configured |
@@ -394,7 +438,7 @@ Runs BPA, PBIR Inspector, and Desktop-bound `pql-test` against every `.pbip` pro
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--artifact-dir DIR` | repository root | Root to discover `.pbip` projects — broader default than other subcommands, since local mode's point is "wherever the `.pbip` lives" |
+| `--artifact-dir DIR` | the working directory | Root to discover `.pbip` projects — the same default every subcommand now uses |
 | `--tabular-editor-path`, `--bpa-rules-path`, `--inspector-path`, `--rules-path` | same as `bpa`/`pbir` | Passed straight through to those two analyzers |
 
 ```bash
@@ -405,7 +449,7 @@ fab-test local --format json
 
 A missing prerequisite (`pqlint` not installed, Tabular Editor/PBIR Inspector not resolved) is reported as **skipped** with a remediation hint — it never fails the run. Exit code `1` only means a real finding, never a missing tool. `pql-test` is always ready (it's a pinned `fab-test` dependency); if a Desktop instance has the project's `.pbip` open, `pql-test`'s envelope records a `desktop` field naming the port and model it bound to (see `pql-test` below and the run manifest section for the full shape).
 
-Discovery walks `--artifact-dir` recursively and skips anything inside a separate git checkout (a worktree, a vendored clone) so a broad repo-root walk never double-counts the same fixture living in two checkouts.
+Discovery walks `--artifact-dir` recursively — see [Discovery](#discovery) for the rules, which are the same for every subcommand.
 
 ### bpa
 

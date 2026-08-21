@@ -13,7 +13,7 @@ Usage:
 
 Global flags (all subcommands):
     --artifact STEM      Only analyze the artifact matching this stem
-    --artifact-dir DIR   Root for .fabric artifacts (default: .fabric/artifacts)
+    --artifact-dir DIR   Root to discover artifacts under (default: the working directory)
     --output-dir DIR     Root for result envelopes (default: analyzer-results)
     --dry-run            List matching artifacts without running any analyzer
     --telemetry          Stream telemetry to Eventhouse when configured
@@ -109,6 +109,9 @@ from .fab_test_registry import (
     unsupported_scope_error as _unsupported_scope_error,
 )
 from .fab_test_registry import (
+    unsupported_type_error as _unsupported_type_error,
+)
+from .fab_test_registry import (
     visible_analyzers as _visible_analyzers,
 )
 from .fab_test_summary import (
@@ -146,7 +149,13 @@ def _repo_root() -> Path:
 
 REPO_ROOT = _repo_root()
 SCRIPTS_DIR = REPO_ROOT / "scripts"
-ARTIFACT_ROOT = REPO_ROOT / ".fabric" / "artifacts"
+# Where discovery starts when nobody says otherwise. This was
+# `.fabric/artifacts` -- this repository's CI layout, not anything Power BI
+# Desktop or Fabric produces -- so the first command a new user typed
+# failed against a directory they had never heard of, while `fab-test
+# local` started here and found things. One answer to "where are my
+# artifacts?", and it is the directory you are standing in.
+ARTIFACT_ROOT = REPO_ROOT
 RESULTS_ROOT = REPO_ROOT / "analyzer-results"
 
 
@@ -640,7 +649,12 @@ def _discover_for(name: str, args: argparse.Namespace, glob: str) -> list[Path]:
         return [Path(".")]
     if name == "playwright" and getattr(args, "impact_manifest", None):
         return [Path(".")]
-    return _discover(Path(args.artifact_dir), glob, _target_of(args))
+    return _discover(
+        Path(args.artifact_dir),
+        glob,
+        _target_of(args),
+        output_dir=Path(getattr(args, "output_dir", RESULTS_ROOT)),
+    )
 
 
 def _report_no_artifacts(
@@ -858,7 +872,7 @@ def _add_common_flags(
         "--artifact-dir",
         default=str(_PYPROJECT_CONFIG.get("artifact_dir", artifact_dir_default)),
         metavar="DIR",
-        help=f"Root for .fabric artifacts (default: {artifact_dir_default})",
+        help="Root to discover artifacts under, recursively (default: the working directory)",
     )
     parser.add_argument(
         "--output-dir",
@@ -1583,7 +1597,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--artifact-dir",
         default=str(_PYPROJECT_CONFIG.get("artifact_dir", ARTIFACT_ROOT)),
         metavar="DIR",
-        help=f"Root for .fabric artifacts (default: {ARTIFACT_ROOT})",
+        help="Root to discover artifacts under, recursively (default: the working directory)",
     )
     list_p.add_argument(
         "--format",
@@ -1614,7 +1628,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--artifact-dir",
         default=str(_PYPROJECT_CONFIG.get("artifact_dir", ARTIFACT_ROOT)),
         metavar="DIR",
-        help=f"Root for .fabric artifacts (default: {ARTIFACT_ROOT})",
+        help="Root to discover artifacts under, recursively (default: the working directory)",
     )
     explain_p.add_argument(
         "--output-dir",
@@ -1935,12 +1949,17 @@ _TOOL_DISPLAY_NAMES = {
 def _list_analyzers(args: argparse.Namespace) -> int:
     """List every subcommand with its artifact glob, matched count, and tool."""
     artifact_dir = Path(args.artifact_dir)
+    output_dir = Path(getattr(args, "output_dir", str(RESULTS_ROOT)))
     output_format = getattr(args, "output_format", "text")
 
     rows = []
     for name in _visible_analyzers():
         glob, description = _ANALYZER_REGISTRY[name]
-        count = 1 if _is_repository_scoped(name) else len(_discover(artifact_dir, glob, None))
+        count = (
+            1
+            if _is_repository_scoped(name)
+            else len(_discover(artifact_dir, glob, None, output_dir=output_dir))
+        )
         canonical = _canonical_name(name)
         rows.append(
             {
@@ -1977,7 +1996,9 @@ def _explain_analyzer(args: argparse.Namespace) -> int:
     except TargetError as exc:
         print(f"  ✗ fab-test explain: {exc}", file=sys.stderr)
         return 2
-    refusal = _unsupported_scope_error(name, args.resolved_target)
+    refusal = _unsupported_scope_error(name, args.resolved_target) or _unsupported_type_error(
+        name, args.resolved_target
+    )
     if refusal:
         print(f"  ✗ fab-test explain: {refusal}", file=sys.stderr)
         return 2
@@ -1985,7 +2006,7 @@ def _explain_analyzer(args: argparse.Namespace) -> int:
     if _is_repository_scoped(name):
         artifact = Path(".")
     else:
-        matches = _discover(artifact_dir, glob, _target_of(args))
+        matches = _discover(artifact_dir, glob, _target_of(args), output_dir=output_dir)
         # No real artifact to point at; show an illustrative command shape.
         artifact = matches[0] if matches else artifact_dir / f"<artifact>{glob.lstrip('*')}"
 
@@ -2390,7 +2411,9 @@ def _prepare_target(args: argparse.Namespace) -> int | None:
         return 2
 
     if args.analyzer not in ("all", "local"):
-        refusal = _unsupported_scope_error(args.analyzer, args.resolved_target)
+        refusal = _unsupported_scope_error(
+            args.analyzer, args.resolved_target
+        ) or _unsupported_type_error(args.analyzer, args.resolved_target)
         if refusal:
             print(f"  ✗ fab-test: {refusal}", file=sys.stderr)
             return 2
@@ -2444,7 +2467,9 @@ def _dispatch_run(args: argparse.Namespace) -> int:
         # than refusing the whole invocation.
         runnable = []
         for name in analyzers:
-            refusal = _unsupported_scope_error(name, target)
+            refusal = _unsupported_scope_error(name, target) or _unsupported_type_error(
+                name, target
+            )
             if refusal:
                 narrate(
                     f"  ⚠ fab-test all: skipping {name} — {refusal}",
