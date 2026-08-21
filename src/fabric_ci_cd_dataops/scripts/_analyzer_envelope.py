@@ -68,7 +68,7 @@ def is_test_finding(finding: dict) -> bool:
     )
 
 
-def _test_status(finding: dict) -> str:
+def finding_status(finding: dict) -> str:
     """Map a pql-test result dict to a status label."""
     if finding.get("error"):
         return "ERROR"
@@ -98,7 +98,7 @@ def normalize_findings(findings: list[dict]) -> tuple[str, list[tuple]]:
                 f.get("test_name") or "?",
                 f.get("expected") or "",
                 f.get("actual") or "",
-                _test_status(f),
+                finding_status(f),
             )
             for f in findings
         ]
@@ -116,11 +116,11 @@ def normalize_findings(findings: list[dict]) -> tuple[str, list[tuple]]:
         for f in findings
     ]
     # Most severe first, then stable by rule and object.
-    rows.sort(key=lambda r: (-_severity_rank(r[1]), str(r[0]).lower(), str(r[2]).lower()))
+    rows.sort(key=lambda r: (-severity_rank(r[1]), str(r[0]).lower(), str(r[2]).lower()))
     return "rules", rows
 
 
-def _severity_rank(severity: Any) -> int:
+def severity_rank(severity: Any) -> int:
     """Return a numeric severity rank for sorting (higher = more severe).
 
     Supports numeric values (int/float/strings like "3") and common text
@@ -154,7 +154,7 @@ def _is_error_severity(severity: Any) -> bool:
     Severity >= 3 and unknown/missing values are treated as errors so the
     build gate remains conservative.
     """
-    rank = _severity_rank(severity)
+    rank = severity_rank(severity)
     if rank == 0 and severity is not None:
         # Non-empty but unrankable severity still treated as error.
         raw = str(severity).strip()
@@ -165,11 +165,11 @@ def _is_error_severity(severity: Any) -> bool:
 
 def _is_warning_severity(severity: Any) -> bool:
     """Return True if the severity is a known warning (rank 1 or 2)."""
-    rank = _severity_rank(severity)
+    rank = severity_rank(severity)
     return 0 < rank < 3
 
 
-def _severity_counts(findings: list[dict[str, Any]]) -> tuple[int, int]:
+def severity_counts(findings: list[dict[str, Any]]) -> tuple[int, int]:
     """Return (error_count, warning_count) for a list of findings.
 
     Unknown severities count as errors.

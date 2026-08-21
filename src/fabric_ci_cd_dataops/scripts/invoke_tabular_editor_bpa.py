@@ -27,17 +27,16 @@ from tabulate import tabulate
 
 from ._analyzer_envelope import (
     Timer,
-    _severity_counts,
-    _severity_rank,
     build_envelope,
     envelope_path,
     native_output_path,
+    severity_counts,
+    severity_rank,
     write_envelope,
 )
 from ._analyzer_process import run_tool
 from ._report_html import attach_report
-from .fab_test_summary import _TABLE_FORMAT as TABLE_FORMAT
-from .fab_test_summary import table_padding
+from ._table_style import TABLE_FORMAT, table_padding
 
 _VERBOSITY_LEVELS = {"summary": 0, "default": 1, "verbose": 2, "debug": 3}
 
@@ -145,7 +144,7 @@ def _format_bpa_message(
     exit_code: int,
 ) -> str:
     """Build a human-readable BPA message with counters and severity breakdown."""
-    error_count, warning_count = _severity_counts(findings)
+    error_count, warning_count = severity_counts(findings)
     failed = counters.get("failed", 0) if counters else len(findings)
     total = counters.get("total", 0) if counters else 0
 
@@ -203,7 +202,7 @@ def _print_findings_table(findings: list[dict[str, Any]]) -> None:
     sorted_findings = sorted(
         findings,
         key=lambda f: (
-            -_severity_rank(f.get("Severity") or f.get("severity")),
+            -severity_rank(f.get("Severity") or f.get("severity")),
             _bpa_rule_id(f).lower(),
             _bpa_rule_name(f).lower(),
         ),
@@ -563,7 +562,7 @@ def run_bpa(args: argparse.Namespace) -> int:
     )
 
     if level >= _VERBOSITY_LEVELS["default"] and test_summary:
-        error_count, warning_count = _severity_counts(findings)
+        error_count, warning_count = severity_counts(findings)
         log(
             f"📊 {test_summary.get('total', 0)} tests, "
             f"{test_summary.get('passed', 0)} passed, "

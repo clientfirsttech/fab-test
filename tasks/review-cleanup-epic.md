@@ -1,6 +1,6 @@
 # Review Cleanup Epic
 
-**Status**: 📋 PLANNED
+**Status**: 🚧 IN-PROGRESS (2/6)
 **Goal**: Close the five findings from the 2026-08-21 review, three of which are debt created that same day.
 
 ## Overview
@@ -13,7 +13,13 @@ None of it is user-visible. Every task here is structural or test-quality, so th
 
 ---
 
-## 1. Delete the Duplicated Finding Helpers
+## 1. Delete the Duplicated Finding Helpers ✅
+
+**Done (2026-08-21)**: the copies in `fab_test_summary` are gone and its callers import from `_analyzer_envelope`. `_test_status` gained a caller outside its module, so it became public — but **not** as `test_status`: pytest collects any importable name beginning with `test_`, so a test module importing it would have produced a phantom test failing on a missing `finding` fixture. Named `finding_status` instead, with a guard asserting no `test_*` name is exported from `_analyzer_envelope`.
+
+A second guard asserts each helper has exactly one definition across `src/`, which is the drift this task existed to end.
+
+**The earlier commit message overclaimed.** "Rather than write a second normalization, extracted the one that already existed" described the intent; what shipped copied two helpers and left the originals live. The code now matches the claim.
 
 The renderer epic moved `normalize_findings` into `_analyzer_envelope.py` but **copied** the two helpers it needed instead of moving them. Both originals are still live.
 
@@ -36,7 +42,13 @@ The renderer epic moved `normalize_findings` into `_analyzer_envelope.py` but **
 
 ---
 
-## 2. Break the Wrapper's Dependency on the Presentation Layer
+## 2. Break the Wrapper's Dependency on the Presentation Layer ✅
+
+**Done (2026-08-21)**: new `_table_style.py` holds `TABLE_FORMAT` and `table_padding` and imports no sibling, so both the CLI and a wrapper can reach it without dragging the other along. Measured: `fab_test_registry` and `fab_test_summary` are gone from the BPA wrapper's import graph, and its cumulative import drops **363 ms → 316 ms**, about 48 ms per artifact spawn.
+
+Chose a new module over the alternatives because both candidates were worse: leaving the constants in `fab_test_summary` is the problem, and duplicating them into each wrapper reintroduces task 1's failure in a new place.
+
+**The layering guard found more than the task scoped.** `tests/test_module_layering.py` asserts no wrapper imports the CLI layer or a private name from another module — and immediately flagged `_severity_counts` and `_severity_rank`, imported privately by four modules and therefore public API in all but name. Renamed to `severity_counts` and `severity_rank`; 16 references across 4 files, mechanical. Pre-existing, but exactly the rule this task set.
 
 [`invoke_tabular_editor_bpa.py:39-40`](../src/fabric_ci_cd_dataops/scripts/invoke_tabular_editor_bpa.py#L39) imports `_TABLE_FORMAT` and `table_padding` from `fab_test_summary`. Two distinct problems:
 

@@ -47,7 +47,7 @@ from ._analyzer_annotations import (
     emit_pr_review_comments,
     emit_workflow_annotations,
 )
-from ._analyzer_envelope import _severity_counts
+from ._analyzer_envelope import severity_counts
 from ._cli_utils import narrate
 from ._config import (
     CONFIG_FILENAME,
@@ -343,7 +343,7 @@ def _build_telemetry_payload(
     environment: str,
 ) -> dict[str, Any]:
     """Build a telemetry payload for an analyzer/artifact run."""
-    errors, warnings = _severity_counts(envelope.get("findings", []))
+    errors, warnings = severity_counts(envelope.get("findings", []))
     ctx = _git_context()
     return {
         "timestamp": datetime.now(UTC).isoformat(),
@@ -441,7 +441,7 @@ def _artifact_exit_code(
     """
     if envelope is None:
         return 1 if proc_returncode != 0 else 0
-    errors, warnings = _severity_counts(envelope.get("findings", []))
+    errors, warnings = severity_counts(envelope.get("findings", []))
     if errors > 0:
         return 1
     if proc_returncode != 0 and warnings == 0:
@@ -551,7 +551,7 @@ def _run_one_artifact(
 
     artifact_code = _artifact_exit_code(proc.returncode, envelope)
 
-    errors, warnings = _severity_counts(envelope.get("findings", []))
+    errors, warnings = severity_counts(envelope.get("findings", []))
     if ctx.in_ci:
         emit_workflow_annotations(envelope)
     if warnings > 0:

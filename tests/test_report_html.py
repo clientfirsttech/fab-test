@@ -14,6 +14,8 @@ Always passes on any machine: pure string rendering, no analyzer invoked
 and nothing written outside tmp_path.
 """
 
+import pathlib
+
 import pytest
 
 from fabric_ci_cd_dataops.scripts._analyzer_envelope import (
@@ -269,3 +271,32 @@ def test_write_report_is_utf8(tmp_path):
     write_report(_envelope([finding]), target)
 
     assert "Café — Ventas" in target.read_text(encoding="utf-8")
+
+
+# --------------------------------------------------------------------------- #
+# One definition each (Review Cleanup §1)
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.fab_test
+def test_the_finding_shape_helpers_have_exactly_one_definition():
+    """A second copy is how the terminal and the report drift apart.
+
+    The renderer work once left duplicates of both helpers in
+    fab_test_summary while adding copies in _analyzer_envelope, so "what
+    counts as a pql-test finding" briefly had two answers.
+    """
+    src = pathlib.Path(__file__).resolve().parent.parent / "src"
+    for name in ("def is_test_finding(", "def finding_status("):
+        found = [p.name for p in src.rglob("*.py") if name in p.read_text(encoding="utf-8")]
+        assert len(found) == 1, f"{name} defined in {found}"
+
+
+@pytest.mark.fab_test
+def test_no_helper_is_named_so_pytest_would_collect_it():
+    """A src function called test_* becomes a phantom test when imported."""
+    from fabric_ci_cd_dataops.scripts import _analyzer_envelope
+
+    collected = [n for n in dir(_analyzer_envelope) if n.startswith("test_")]
+
+    assert not collected, f"pytest would try to run these as tests: {collected}"
