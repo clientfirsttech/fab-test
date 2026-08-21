@@ -1,6 +1,6 @@
 # Complexity and Coverage Epic
 
-**Status**: 🚧 IN-PROGRESS (3/8)
+**Status**: 🚧 IN-PROGRESS (5/8)
 **Goal**: Make the coverage floor real, then pay down the seven functions that have grown past every threshold.
 
 ## Overview
@@ -71,7 +71,9 @@ The shortfall is not in library code — the modules written most recently measu
 
 ---
 
-## 4. Split `main` in `fab_test.py`
+## 4. Split `main` in `fab_test.py` ✅
+
+**Done (2026-08-21)**: `main` now reads as parse → prepare → dispatch. The ten inline guards became three functions (`_prepare_config`, `_prepare_target`, `_prepare_paths`) driven by a `_PREPARE_STEPS` tuple, each returning an exit code to stop on or `None` to continue. `main` drops out of the complexity report entirely: from 17 complexity, 10 returns, 19 branches, 53 statements to under every threshold with 3 returns. The step order is load-bearing and says so in a comment — config before anything reads a setting, admin commands before a target they do not need, paths last because the environment default feeds them.
 
 Complexity 17, **10 return statements**, 19 branches, 53 statements. Each early return is a distinct failure mode — config error, target parse error, workspace conflict, unsupported scope, workspace resolution — added one at a time until the function became a list of guards with a dispatch buried at the end.
 
@@ -86,7 +88,15 @@ Complexity 17, **10 return statements**, 19 branches, 53 statements. Each early 
 
 ---
 
-## 5. Split `_run_analyzer` and `_print_all_summary`
+## 5. Split `_run_analyzer` and `_print_all_summary` ✅
+
+**Done (2026-08-21)**: `_run_analyzer` is five named phases — `_discover_for`, `_report_no_artifacts`, `_report_dry_run`, `_preflight`, then execute — with the first four short-circuiting. Both preflight checks moved into one function sharing a `_fail` closure, so a missing binary and a missing Desktop session report identically; they are the same class of problem and different shapes would imply a difference that is not there. `_analyzer_sub_env` collects the environment variables that carry settings into the wrappers.
+
+`_print_all_summary` split into `build_all_summary_rows` (public, returns rows) and the printer, plus `_artifact_status` for the classification ladder. Both drop out of the complexity report.
+
+**Verified byte-for-byte**: 114 lines of real `fab-test all --report`, `bpa --dry-run`, and `list` output captured before the refactor and compared after — identical. The suite alone would not have proven that, since none of it asserts on the full rendered output.
+
+14 new unit tests assert on rows and exit codes directly rather than by parsing stdout, which is what the split was for.
 
 `_run_analyzer`: complexity 22, 23 branches, 71 statements — discovery, dry-run reporting, two preflights, execution, and summary in one body. `_print_all_summary`: complexity 18, 69 statements — row building, table rendering, the path listing, the index, and colour.
 

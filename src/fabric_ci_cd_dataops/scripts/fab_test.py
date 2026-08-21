@@ -626,113 +626,127 @@ def _resolve_workspace_target(args: argparse.Namespace) -> int | None:
 _target_of = target_from_args
 
 
-def _run_analyzer(
-    name: str,
-    args: argparse.Namespace,
-    output_dir: Path,
-    manifest: RunManifest | None = None,
-) -> int:
-    """Run one analyzer against all matching artifacts. Returns 0 or 1."""
-    glob, description = _ANALYZER_REGISTRY[name]
-    artifact_dir = Path(args.artifact_dir)
-    output_format = getattr(args, "output_format", "text")
-    # `all` emits its own aggregate JSON via _print_all_summary; a standalone
-    # analyzer must emit its own so stdout is never empty under --format json.
-    emit_own_json = output_format == "json" and getattr(args, "analyzer", None) not in (
-        "all",
-        "local",
-    )
+def _discover_for(name: str, args: argparse.Namespace, glob: str) -> list[Path]:
+    """Return the artifacts ``name`` will run against.
 
+    Two analyzers do not discover at all: a repository-scoped one runs once
+    against the repo metadata, and impact-manifest-driven Playwright
+    validates a service-resolved set regardless of what exists locally.
+    """
     if _is_repository_scoped(name):
-        # Repository-scoped analyzers run once against the repo metadata.
-        artifacts = [Path(".")]
-    elif name == "playwright" and getattr(args, "impact_manifest", None):
-        # Impact-manifest driven Playwright validates a service-resolved set
-        # of reports once, regardless of how many Report artifacts exist
-        # locally.
-        artifacts = [Path(".")]
-    else:
-        artifacts = _discover(artifact_dir, glob, _target_of(args))
+        return [Path(".")]
+    if name == "playwright" and getattr(args, "impact_manifest", None):
+        return [Path(".")]
+    return _discover(Path(args.artifact_dir), glob, _target_of(args))
 
-    if not artifacts:
-        target = _target_of(args)
-        if target is not None and target.path is not None:
-            # A path target named a specific location, so reporting what
-            # the scan of --artifact-dir turned up would answer a question
-            # the caller did not ask.
-            narrate(
-                f"  ⚠ fab-test {name}: no {glob} artifact at {target.path}",
-                output_format=output_format,
-            )
-        else:
-            narrate(
-                f"  ⚠ fab-test {name}: no {glob} artifacts or .pbip projects found under "
-                f"{artifact_dir}",
-                output_format=output_format,
-            )
-        if emit_own_json:
-            print(json.dumps({"analyzer": name, "artifacts": []}, indent=2))
-        return 0
 
-    if args.dry_run:
+def _report_no_artifacts(
+    name: str, glob: str, args: argparse.Namespace, *, emit_own_json: bool
+) -> int:
+    """Narrate an empty discovery. Always exits 0 -- nothing matched is not a failure."""
+    output_format = getattr(args, "output_format", "text")
+    target = _target_of(args)
+    if target is not None and target.path is not None:
+        # A path target named a specific location, so reporting what the
+        # scan of --artifact-dir turned up would answer a question the
+        # caller did not ask.
         narrate(
-            f"\nfab-test {name} ({description}) — dry run, "
-            f"{len(artifacts)} artifact(s):",
+            f"  ⚠ fab-test {name}: no {glob} artifact at {target.path}",
             output_format=output_format,
         )
-        resolved = _manifest_target(args)
-        if resolved:
-            narrate(
-                f"  target: {resolved['raw']} → scope {resolved['scope']}"
-                + (f", workspace {resolved['workspace_id']}" if resolved["workspace_id"] else ""),
-                output_format=output_format,
-            )
-        pbip_sources = _discover_pbip_sources(artifact_dir)
-        for a in artifacts:
-            analyzers = ", ".join(_applicable_analyzers(a)) or "none"
-            source = pbip_sources.get(a)
-            source_note = f"  [from {source.name}]" if source else ""
-            narrate(
-                f"  • {a.name}  (analyzers: {analyzers}){source_note}",
-                output_format=output_format,
-            )
-        if _telemetry_enabled(args):
-            environment = getattr(args, "environment", "") or os.getenv(
-                "FABRIC_ENVIRONMENT", ""
-            )
-            for a in artifacts:
-                preview = _build_telemetry_payload(
-                    name, a, {"status": "dry-run", "findings": []}, environment
-                )
-                narrate("\n  Telemetry preview (not sent):", output_format=output_format)
-                narrate(json.dumps(preview, indent=2), output_format=output_format)
-        if emit_own_json:
-            print(
-                json.dumps(
-                    {
-                        "analyzer": name,
-                        "dry_run": True,
-                        "target": resolved,
-                        "artifacts": [a.name for a in artifacts],
-                    },
-                    indent=2,
-                )
-            )
-        return 0
+    else:
+        narrate(
+            f"  ⚠ fab-test {name}: no {glob} artifacts or .pbip projects found under "
+            f"{Path(args.artifact_dir)}",
+            output_format=output_format,
+        )
+    if emit_own_json:
+        print(json.dumps({"analyzer": name, "artifacts": []}, indent=2))
+    return 0
 
-    # Pre-flight: check required tools exist before invoking subprocesses.
-    preflight_err = _preflight_error(name, args)
-    if preflight_err:
-        message, exit_code = preflight_err
+
+def _report_dry_run(
+    name: str,
+    description: str,
+    artifacts: list[Path],
+    args: argparse.Namespace,
+    *,
+    emit_own_json: bool,
+) -> int:
+    """Narrate the plan without running anything. Always exits 0."""
+    output_format = getattr(args, "output_format", "text")
+    artifact_dir = Path(args.artifact_dir)
+    narrate(
+        f"\nfab-test {name} ({description}) — dry run, "
+        f"{len(artifacts)} artifact(s):",
+        output_format=output_format,
+    )
+    resolved = _manifest_target(args)
+    if resolved:
+        narrate(
+            f"  target: {resolved['raw']} → scope {resolved['scope']}"
+            + (f", workspace {resolved['workspace_id']}" if resolved["workspace_id"] else ""),
+            output_format=output_format,
+        )
+    pbip_sources = _discover_pbip_sources(artifact_dir)
+    for a in artifacts:
+        analyzers = ", ".join(_applicable_analyzers(a)) or "none"
+        source = pbip_sources.get(a)
+        source_note = f"  [from {source.name}]" if source else ""
+        narrate(
+            f"  • {a.name}  (analyzers: {analyzers}){source_note}",
+            output_format=output_format,
+        )
+    if _telemetry_enabled(args):
+        environment = getattr(args, "environment", "") or os.getenv("FABRIC_ENVIRONMENT", "")
+        for a in artifacts:
+            preview = _build_telemetry_payload(
+                name, a, {"status": "dry-run", "findings": []}, environment
+            )
+            narrate("\n  Telemetry preview (not sent):", output_format=output_format)
+            narrate(json.dumps(preview, indent=2), output_format=output_format)
+    if emit_own_json:
+        print(
+            json.dumps(
+                {
+                    "analyzer": name,
+                    "dry_run": True,
+                    "target": resolved,
+                    "artifacts": [a.name for a in artifacts],
+                },
+                indent=2,
+            )
+        )
+    return 0
+
+
+def _preflight(
+    name: str,
+    args: argparse.Namespace,
+    artifacts: list[Path],
+    manifest: RunManifest | None,
+) -> int | None:
+    """Return an exit code when a prerequisite is missing, else None.
+
+    Two checks, reported identically on purpose: a missing binary and a
+    missing Desktop session are the same class of problem to the caller,
+    and giving them different shapes would imply a difference that is not
+    there.
+    """
+    output_format = getattr(args, "output_format", "text")
+
+    def _fail(message: str, exit_code: int) -> int:
         narrate(
             f"\n  ✗ fab-test {name}: missing prerequisite\n  {message}\n",
             output_format=output_format,
         )
         if manifest is not None:
-            manifest.record_artifact(
-                name, "*", "preflight_failed", None, 0, 0, detail=message
-            )
+            manifest.record_artifact(name, "*", "preflight_failed", None, 0, 0, detail=message)
         return exit_code
+
+    preflight_err = _preflight_error(name, args)
+    if preflight_err:
+        return _fail(*preflight_err)
 
     # A local/ target states the Desktop binding, so a missing instance is a
     # prerequisite failure rather than the silent fall-through to remote XMLA
@@ -741,50 +755,85 @@ def _run_analyzer(
     if target is not None and target.scope == "desktop":
         unbound = [a for a in artifacts if _bound_desktop_instance(a) is None]
         if unbound:
-            message = (
+            return _fail(
                 f"no running Power BI Desktop instance has "
                 f"{', '.join(a.name for a in unbound)} open.\n"
                 "  Open the .pbip in Power BI Desktop, or drop the 'local/' "
-                "prefix to run against a workspace."
+                "prefix to run against a workspace.",
+                127,
             )
-            narrate(
-                f"\n  ✗ fab-test {name}: missing prerequisite\n  {message}\n",
-                output_format=output_format,
-            )
-            if manifest is not None:
-                manifest.record_artifact(
-                    name, "*", "preflight_failed", None, 0, 0, detail=message
-                )
-            return 127
+    return None
 
-    in_ci = _is_ci()
-    _sub_env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
+
+def _analyzer_sub_env(args: argparse.Namespace, output_format: str) -> dict[str, str]:
+    """Build the subprocess environment the analyzer wrappers read.
+
+    These variables are how a setting reaches a wrapper without every
+    command builder growing an argument for each one.
+    """
+    sub_env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
     verbosity = _verbosity_env(args)
     if verbosity:
-        _sub_env["ANALYZER_VERBOSITY"] = verbosity
+        sub_env["ANALYZER_VERBOSITY"] = verbosity
     if output_format == "json":
-        _sub_env["ANALYZER_OUTPUT_MODE"] = "json"
+        sub_env["ANALYZER_OUTPUT_MODE"] = "json"
     if _resolve_report(args):
-        # Same channel as ANALYZER_VERBOSITY: the analyzer wrappers write the
-        # envelope, so they are what must know, and no command builder needs
-        # a new argument.
-        _sub_env["ANALYZER_REPORT"] = "1"
-    timeout = _resolve_timeout(args)
-    jobs = max(1, getattr(args, "jobs", 1) or 1)
+        sub_env["ANALYZER_REPORT"] = "1"
+    return sub_env
 
+
+def _run_analyzer(
+    name: str,
+    args: argparse.Namespace,
+    output_dir: Path,
+    manifest: RunManifest | None = None,
+) -> int:
+    """Run one analyzer against all matching artifacts.
+
+    Five phases in order: discover, report an empty result, report a dry
+    run, preflight, execute. The first four each short-circuit with their
+    own exit code, which is what keeps this readable as a sequence rather
+    than a nest.
+    """
+    glob, description = _ANALYZER_REGISTRY[name]
+    output_format = getattr(args, "output_format", "text")
+    # `all` emits its own aggregate JSON via _print_all_summary; a standalone
+    # analyzer must emit its own so stdout is never empty under --format json.
+    emit_own_json = output_format == "json" and getattr(args, "analyzer", None) not in (
+        "all",
+        "local",
+    )
+
+    artifacts = _discover_for(name, args, glob)
+    if not artifacts:
+        return _report_no_artifacts(name, glob, args, emit_own_json=emit_own_json)
+    if args.dry_run:
+        return _report_dry_run(name, description, artifacts, args, emit_own_json=emit_own_json)
+
+    preflight_exit_code = _preflight(name, args, artifacts, manifest)
+    if preflight_exit_code is not None:
+        return preflight_exit_code
+
+    verbosity = _verbosity_env(args)
+    ctx = _RunContext(
+        in_ci=_is_ci(),
+        sub_env=_analyzer_sub_env(args, output_format),
+        timeout=_resolve_timeout(args),
+        manifest=manifest,
+    )
     total = len(artifacts)
-    ctx = _RunContext(in_ci=in_ci, sub_env=_sub_env, timeout=timeout, manifest=manifest)
 
     def _run(index_artifact: tuple[int, Path]) -> tuple[str, int]:
         index, artifact = index_artifact
         return _run_one_artifact(name, artifact, args, output_dir, ctx, index, total)
 
-    indexed_artifacts = list(enumerate(artifacts, start=1))
-    if jobs > 1 and len(artifacts) > 1:
+    indexed = list(enumerate(artifacts, start=1))
+    jobs = max(1, getattr(args, "jobs", 1) or 1)
+    if jobs > 1 and total > 1:
         with ThreadPoolExecutor(max_workers=jobs) as executor:
-            results = list(executor.map(_run, indexed_artifacts))
+            results = list(executor.map(_run, indexed))
     else:
-        results = [_run(pair) for pair in indexed_artifacts]
+        results = [_run(pair) for pair in indexed]
 
     return _print_summary(
         name,
@@ -2286,35 +2335,36 @@ def _run_local(args: argparse.Namespace) -> int:
     return exit_code
 
 
-def main() -> int:
-    parser = build_parser()
-    args = parser.parse_args()
-    if args.analyzer == "help":
-        # Answered before the config is read: help is what you reach for
-        # when something is already wrong, including the config itself.
-        return _print_help(parser, args.help_topic)
-    args.analyzer = _SUBCOMMAND_ALIASES.get(args.analyzer, args.analyzer)
+def _prepare_config(args: argparse.Namespace) -> int | None:
+    """Load and validate the file config onto ``args``, or return an exit code.
 
+    Consumed downstream by every ``resolve_setting()`` call
+    (`_resolve_timeout`, `_apply_environment_default`, `fab-test config
+    --show`), which is why it runs before anything reads a setting.
+    """
     try:
-        # Consumed by resolve_setting() calls (_resolve_timeout,
-        # _apply_environment_default, fab-test config --show).
-        args.file_config, file_config_warnings = merged_file_config(
+        args.file_config, warnings = merged_file_config(
             REPO_ROOT, REPO_ROOT / "pyproject.toml", args.config
         )
         validate_config(args.file_config)
     except ConfigError as exc:
         print(f"  ✗ fab-test: {exc}", file=sys.stderr)
         return 2
-    for warning in file_config_warnings:
+    for warning in warnings:
         narrate(f"  ⚠ fab-test: {warning}", output_format=getattr(args, "output_format", "text"))
+    return None
 
-    admin_exit_code = _dispatch_admin_command(args)
-    if admin_exit_code is not None:
-        return admin_exit_code
 
-    # Resolved once here so every downstream consumer -- discovery, the
-    # command builders, the run manifest -- reads the same target rather
-    # than re-deriving it from args and drifting.
+def _prepare_target(args: argparse.Namespace) -> int | None:
+    """Resolve and validate the target onto ``args``, or return an exit code.
+
+    Four checks that have to happen in this order. The target is resolved
+    once so discovery, the command builders, and the run manifest all read
+    the same value instead of re-deriving it. The scope refusal comes
+    before workspace resolution deliberately: asking Fabric to resolve a
+    workspace for an analyzer that could never read a deployed item wastes
+    a round trip and reports the wrong failure.
+    """
     try:
         args.resolved_target = select_target(
             getattr(args, "target", None), getattr(args, "artifact", None)
@@ -2328,22 +2378,18 @@ def main() -> int:
         print(f"  ✗ fab-test: {conflict}", file=sys.stderr)
         return 2
 
-    # Refuse an impossible scope before any network call: asking Fabric to
-    # resolve a workspace for an analyzer that could never read a deployed
-    # item wastes a round trip and reports the wrong failure.
     if args.analyzer not in ("all", "local"):
         refusal = _unsupported_scope_error(args.analyzer, args.resolved_target)
         if refusal:
             print(f"  ✗ fab-test: {refusal}", file=sys.stderr)
             return 2
 
-    workspace_exit_code = _resolve_workspace_target(args)
-    if workspace_exit_code is not None:
-        return workspace_exit_code
+    return _resolve_workspace_target(args)
 
+
+def _prepare_paths(args: argparse.Namespace) -> int | None:
+    """Apply the environment default and confirm the artifact root exists."""
     _apply_environment_default(args, _PYPROJECT_CONFIG)
-    output_dir = Path(args.output_dir)
-
     artifact_dir = Path(args.artifact_dir)
     if not artifact_dir.exists():
         narrate(
@@ -2351,6 +2397,24 @@ def main() -> int:
             output_format=args.output_format,
         )
         return 2
+    return None
+
+
+# Ordered: each returns an exit code to stop on, or None to continue. The
+# order is load-bearing -- config before anything reads a setting, the admin
+# commands before a target is resolved they do not need, and paths last
+# because the environment default feeds them.
+_PREPARE_STEPS: tuple[Callable[[argparse.Namespace], int | None], ...] = (
+    _prepare_config,
+    _dispatch_admin_command,
+    _prepare_target,
+    _prepare_paths,
+)
+
+
+def _dispatch_run(args: argparse.Namespace) -> int:
+    """Run the requested analyzer (or the `all` / `local` bundle)."""
+    output_dir = Path(args.output_dir)
 
     if args.analyzer == "local":
         return _run_local(args)
@@ -2399,6 +2463,30 @@ def main() -> int:
 
     manifest.write(output_dir, exit_code)
     return exit_code
+
+
+def main() -> int:
+    """Parse arguments, run the preparation chain, then dispatch.
+
+    Reads as resolve, validate, dispatch. Each step in `_PREPARE_STEPS`
+    returns an exit code to stop on or None to continue, which is what
+    keeps the guards out of here -- they used to be ten early returns
+    inline, one per failure mode added over time.
+    """
+    parser = build_parser()
+    args = parser.parse_args()
+    if args.analyzer == "help":
+        # Answered before the config is read: help is what you reach for
+        # when something is already wrong, including the config itself.
+        return _print_help(parser, args.help_topic)
+    args.analyzer = _SUBCOMMAND_ALIASES.get(args.analyzer, args.analyzer)
+
+    for step in _PREPARE_STEPS:
+        exit_code = step(args)
+        if exit_code is not None:
+            return exit_code
+
+    return _dispatch_run(args)
 
 
 if __name__ == "__main__":
