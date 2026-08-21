@@ -32,6 +32,9 @@ __pycache__/
 bandit-report.json
 bpa-results.json
 coverage.json
+.coverage
+.coverage.*
+htmlcov/
 apm.lock.yaml
 apm.yml
 .pytest_cache/
