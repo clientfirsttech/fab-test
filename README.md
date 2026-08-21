@@ -47,11 +47,44 @@ Verify the console scripts are registered:
 fab-test --help
 ```
 
+## Assumed project format
+
+`fab-test` assumes your Power BI content is saved as a **PBIP** project, with the semantic model in **TMDL** and the report in **PBIR** (the enhanced report format):
+
+```
+Sales.pbip
+Sales.SemanticModel/
+  definition/
+    model.tmdl
+    tables/*.tmdl
+Sales.Report/
+  definition.pbir
+  definition/
+    pages/pages.json
+```
+
+The same layout applies under `.fabric/artifacts/` for artifacts committed to the repository.
+
+Every analyzer is built on that assumption:
+
+| Analyzer | Discovers | Reads on disk | Format it requires |
+|----------|-----------|---------------|--------------------|
+| `bpa` (Tabular Editor) | `*.SemanticModel` | `definition/` | TMDL |
+| `pql-test`, `pql-lint` | `*.SemanticModel` | `definition/` | TMDL |
+| `pbir` (PBIR Inspector) | `*.Report` | `definition/` | PBIR |
+| `playwright` | `*.Report` | — (renders the deployed report) | folder naming only |
+
+Deployment and dependency discovery read the report's `definition.pbir` to resolve which semantic model it points at, so that file is what pairs a report with its model.
+
+Power BI Desktop writes this layout when you **Save as** a `.pbip` project with the TMDL and enhanced report format (PBIR) options turned on — under **File → Options and settings → Options → Preview features** in the versions where they are still preview.
+
+Discovery matches on folder suffix (`*.SemanticModel`, `*.Report`), not on folder contents, so a project saved in the legacy format is still picked up — it fails inside the analyzer that cannot read it rather than being reported as an unsupported format. A bare `.pbix` is not a supported input at all.
+
 ## Run manual tests locally
 
 ### Local Desktop workflow (no cloud required)
 
-The fastest path to real findings: a `.pbip` open in Power BI Desktop, no `.fabric/artifacts` layout, no Fabric workspace, no service principal.
+The fastest path to real findings: a `.pbip` open in Power BI Desktop, no `.fabric/artifacts` layout, no Fabric workspace, no service principal. The project has to be saved in TMDL and PBIR — see [Assumed project format](#assumed-project-format).
 
 ```bash
 fab-test doctor --local     # what's ready, and what fab-test local will run
@@ -86,7 +119,7 @@ pytest -m analyzers
 
 ### Artifact validation with fab-test
 
-`fab-test` runs analyzers against your actual `.fabric/artifacts`. It requires the corresponding external tools for each analyzer.
+`fab-test` runs analyzers against your actual `.fabric/artifacts`, in the TMDL/PBIR layout described in [Assumed project format](#assumed-project-format). It requires the corresponding external tools for each analyzer.
 
 ```bash
 # Discover which artifacts would be analyzed

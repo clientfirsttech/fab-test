@@ -10,6 +10,12 @@ It is **not** `pytest`. Use `pytest` to test the analyzer wrappers; use `fab-tes
 
 Entry point: `scripts/fab_test.py` (installed as `fab-test` console script via `pip install -e .`).
 
+## Assumed artifact format
+
+Every analyzer assumes PBIP-format content: the semantic model serialized as **TMDL** (`*.SemanticModel/definition/**/*.tmdl`) and the report as **PBIR**, the enhanced report format (`*.Report/definition.pbir` plus `*.Report/definition/pages/`). Tabular Editor's BPA is handed the model's `definition/` folder; PBIR Inspector is handed the `.Report` folder.
+
+Discovery matches on folder suffix (`*.SemanticModel`, `*.Report`), never on contents, so a legacy-format folder is still discovered — it surfaces as the analyzer's own failure, not as an "unsupported format" skip. A bare `.pbix` is not an input.
+
 ## Distinction from pytest
 
 | Command | What it tests |

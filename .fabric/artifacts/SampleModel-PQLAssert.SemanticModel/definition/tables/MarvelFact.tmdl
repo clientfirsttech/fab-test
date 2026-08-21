@@ -1,7 +1,10 @@
 table MarvelFact
 	lineageTag: 743cae73-8a6b-4e03-af99-d194d47d16af
 
-	measure 'Number of Characters' = COUNTROWS('MarvelFact')
+	measure 'Number of Characters' = ```
+			COUNTROWS('MarvelFact') + 0
+			
+			```
 		formatString: 0
 		lineageTag: df54ac01-57f7-4a28-a338-2609c59c6503
 

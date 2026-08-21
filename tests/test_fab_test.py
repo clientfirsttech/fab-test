@@ -4150,3 +4150,30 @@ def test_run_analyzer_error_does_not_emit_pr_review_comment(tmp_path, monkeypatc
     assert code == 1
     assert "annotation" in calls
     assert "pr_comment" not in calls
+
+
+@pytest.mark.fab_test
+def test_build_pbir_command_omits_emit_html_without_report(tmp_path):
+    """No --report: pbir is JSON-only, matching bpa and pql_test."""
+    artifact = tmp_path / "Model.Report"
+    artifact.mkdir()
+    args = argparse.Namespace(file_config={}, report=None)
+
+    cmd = build_pbir_command(artifact, args, tmp_path / "results")
+
+    assert "--emit-html" not in cmd
+
+
+@pytest.mark.fab_test
+def test_build_pbir_command_adds_emit_html_under_report(tmp_path):
+    """--report asks the inspector for its own HTML page alongside the JSON."""
+    artifact = tmp_path / "Model.Report"
+    artifact.mkdir()
+    args = argparse.Namespace(file_config={}, report=True)
+
+    cmd = build_pbir_command(artifact, args, tmp_path / "results")
+
+    assert "--emit-html" in cmd
+    # JSON is never traded away for HTML -- the envelope's findings parse
+    # out of it, so a report must add a format, not swap one.
+    assert "--output-path" in cmd

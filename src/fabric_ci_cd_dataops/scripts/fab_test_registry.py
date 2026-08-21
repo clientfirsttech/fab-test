@@ -28,6 +28,7 @@ from ._desktop import (
     match_instance_to_artifact,
 )
 from ._pbip_discovery import discover_pbip_projects
+from ._report_html import resolve_report
 from ._rule_overlay import apply_overlay, apply_pbir_overlay
 from ._target import ResolvedTarget
 
@@ -324,7 +325,7 @@ def build_pbir_command(
     )
     rules_path = _resolve_pbir_rules_path(args, output_dir)
     output = output_dir / "pbir" / artifact.stem / "envelope.json"
-    return [
+    command = [
         sys.executable,
         "-m",
         _script_module("invoke_pbir_inspector"),
@@ -336,8 +337,16 @@ def build_pbir_command(
         str(inspector),
         "--output-path",
         str(output),
-        "--emit-html",
     ]
+    # JSON is always requested -- the envelope's findings are parsed out of
+    # it, so it is load-bearing rather than a display choice. HTML is the
+    # only part --report gates, which puts pbir on the same footing as bpa
+    # and pql_test: JSON envelope by default, a readable page on request.
+    # PBIR Inspector's own page is richer than anything rendered from the
+    # envelope, so attach_report stands aside once this one exists.
+    if resolve_report(args):
+        command.append("--emit-html")
+    return command
 
 
 def bound_desktop_instance(artifact: Path):
