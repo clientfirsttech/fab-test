@@ -2181,7 +2181,10 @@ def _dispatch_admin_command(args: argparse.Namespace) -> int | None:
     return handler(args) if handler else None
 
 
-_LOCAL_ANALYZERS = ("pql_lint", "bpa", "pbir", "pql_test")
+# pql_lint is excluded while it is hidden from the advertised surface
+# (see HIDDEN_ANALYZERS): a bundle should not run what the CLI does not
+# offer. It remains fully invocable on its own.
+_LOCAL_ANALYZERS = ("bpa", "pbir", "pql_test")
 
 
 def _pql_lint_path() -> str | None:

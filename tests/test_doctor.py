@@ -188,7 +188,10 @@ def test_doctor_local_reports_python_desktop_bridge_and_tool_checks():
         check=False,
     )
     assert result.returncode in (0, 1), result.stderr
-    for expected in ("python", "desktop", "bridge", "bpa", "pbir", "pql_lint", "pql_test"):
+    # pql_lint is deliberately absent: it is hidden from the advertised
+    # surface, and the local bundle should not run what the CLI does not
+    # offer. See HIDDEN_ANALYZERS and _LOCAL_ANALYZERS.
+    for expected in ("python", "desktop", "bridge", "bpa", "pbir", "pql_test"):
         assert expected in result.stdout.lower(), f"missing '{expected}' in:\n{result.stdout}"
 
 

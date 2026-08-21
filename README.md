@@ -89,7 +89,7 @@ The fastest path to real findings: a `.pbip` open in Power BI Desktop, no `.fabr
 ```bash
 fab-test doctor --local     # what's ready, and what fab-test local will run
 fab-test local --dry-run    # see the plan first
-fab-test local              # pql-lint, BPA, PBIR Inspector, and Desktop-bound pql-test
+fab-test local              # BPA, PBIR Inspector, and Desktop-bound pql-test
 ```
 
 A missing prerequisite (e.g. `pqlint` not installed) is reported as skipped with a remediation hint, not a failure. See [`docs/QUICKSTART-LOCAL.md`](docs/QUICKSTART-LOCAL.md) for the full walkthrough.
