@@ -524,26 +524,36 @@ def _display_path(path: Path | str) -> str:
         return str(resolved)
 
 
-def _print_all_summary(
+def _artifact_status(data: dict[str, Any] | None, code: int, errors: int, warnings: int) -> str:
+    """Classify one artifact's outcome from its envelope and the analyzer's exit code."""
+    if code != 0 or (data and data.get("status") == "failed") or errors > 0:
+        return "failed"
+    if data and data.get("status") == "skipped":
+        return "skipped"
+    return "warning" if warnings > 0 else "passed"
+
+
+def build_all_summary_rows(
     output_dir: Path,
     analyzers: tuple[str, ...],
     codes: list[int],
     args: argparse.Namespace,
-) -> int:
-    """Print aggregate summary after `fab-test all` finishes."""
+) -> list[dict[str, Any]]:
+    """Return one row per analyzer/artifact pair, before any rendering.
+
+    Separated from printing so the rows can be asserted directly instead of
+    by parsing captured stdout -- and so the per-run index can be built
+    from the same rows the table shows, which is what stops the two
+    reporting different counts.
+    """
     artifact_dir = Path(args.artifact_dir)
     # Must be the resolved target, not args.artifact: this runs its own
     # discovery pass, and a raw stem string would ignore a positional
     # target entirely and reach discover_artifacts as the wrong type.
     target = target_from_args(args)
     dry_run = getattr(args, "dry_run", False)
-    output_format = getattr(args, "output_format", "text")
 
     rows: list[dict[str, Any]] = []
-    total_errors = 0
-    total_warnings = 0
-    any_failed = any(c != 0 for c in codes)
-
     for analyzer, code in zip(analyzers, codes):
         glob, _ = ANALYZER_REGISTRY[analyzer]
         stems = [a.stem for a in discover_artifacts(artifact_dir, glob, target)]
@@ -566,26 +576,32 @@ def _print_all_summary(
             else:
                 data = _read_artifact_envelope(output_dir, analyzer, stem)
                 errors, warnings = _envelope_error_warning_counts(data)
-                if code != 0 or (data and data.get("status") == "failed") or errors > 0:
-                    status = "failed"
-                elif data and data.get("status") == "skipped":
-                    status = "skipped"
-                elif warnings > 0:
-                    status = "warning"
-                else:
-                    status = "passed"
-            total_errors += errors
-            total_warnings += warnings
-            output_path = str(output_dir / analyzer / stem / "envelope.json")
+                status = _artifact_status(data, code, errors, warnings)
             rows.append({
                 "analyzer": analyzer,
                 "artifact": stem,
                 "status": status,
                 "errors": errors,
                 "warnings": warnings,
-                "output_path": output_path,
+                "output_path": str(output_dir / analyzer / stem / "envelope.json"),
                 "report_path": _report_path_for(data),
             })
+    return rows
+
+
+def _print_all_summary(
+    output_dir: Path,
+    analyzers: tuple[str, ...],
+    codes: list[int],
+    args: argparse.Namespace,
+) -> int:
+    """Print the aggregate summary after `fab-test all` finishes."""
+    dry_run = getattr(args, "dry_run", False)
+    output_format = getattr(args, "output_format", "text")
+    rows = build_all_summary_rows(output_dir, analyzers, codes, args)
+    total_errors = sum(int(r["errors"] or 0) for r in rows)
+    total_warnings = sum(int(r["warnings"] or 0) for r in rows)
+    any_failed = any(c != 0 for c in codes)
 
     if not rows or all(r["artifact"] == "(none)" for r in rows):
         if output_format == "json":
