@@ -9,7 +9,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -41,6 +43,56 @@ def table_padding(col_count: int) -> int:
     if "outline" in _TABLE_FORMAT or "grid" in _TABLE_FORMAT:
         return 3 * col_count + 1
     return 2 * (col_count - 1)
+
+
+# Plain ANSI rather than a library: colour here marks three states, which
+# is not worth a runtime dependency for presentation alone.
+_ANSI = {
+    "red": "\033[31m",
+    "yellow": "\033[33m",
+    "green": "\033[32m",
+    "dim": "\033[2m",
+}
+_RESET = "\033[0m"
+
+_STATUS_COLORS = {
+    "FAILED": "red",
+    "failed": "red",
+    "warning": "yellow",
+    "passed": "green",
+    "skipped": "dim",
+}
+
+
+def color_enabled(stream: Any = None) -> bool:
+    """Whether ANSI colour should be written to ``stream``.
+
+    Off unless the stream is a terminal, so redirected output, piped
+    output, and captured CI logs stay plain. ``NO_COLOR`` (any value, per
+    no-color.org) always wins; ``FORCE_COLOR`` opts back in for a CI job
+    that does render ANSI.
+
+    Callers must still keep colour away from ``--format json``, whose
+    stdout is contractually a single JSON document -- this function
+    answers "can the terminal show it", not "is it allowed here".
+    """
+    if "NO_COLOR" in os.environ:
+        return False
+    if os.environ.get("FORCE_COLOR"):
+        return True
+    stream = stream if stream is not None else sys.stdout
+    return bool(getattr(stream, "isatty", None)) and stream.isatty()
+
+
+def _paint(text: str, color: str | None, *, enabled: bool) -> str:
+    """Wrap ``text`` in an ANSI colour, always resetting afterwards.
+
+    An unreset colour bleeds into everything printed after it, including
+    another program's output, so the reset is unconditional.
+    """
+    if not enabled or not color or color not in _ANSI:
+        return text
+    return f"{_ANSI[color]}{text}{_RESET}"
 
 
 def _status_label(status: str) -> str:
@@ -137,12 +189,16 @@ def _print_doctor(rows: list[dict[str, Any]], output_format: str = "text") -> in
         print(json.dumps({"analyzers": rows}, indent=2))
         return 0 if any_ready else 1
 
+    paint = color_enabled()
     for r in rows:
         icon = "✅" if r["ready"] else "❌"
         location = f" — {r['resolved_path']}" if r["resolved_path"] else ""
-        print(f"{icon} {r['analyzer']}: {r['reason']}{location}")
+        reason = _paint(r["reason"], "green" if r["ready"] else "red", enabled=paint)
+        print(f"{icon} {r['analyzer']}: {reason}{location}")
         if not r["ready"] and r["remediation"]:
-            print(f"   → {r['remediation']}")
+            # Yellow, not red: this is the actionable half, and colouring it
+            # the same as the failure would flatten the distinction.
+            print(_paint(f"   → {r['remediation']}", "yellow", enabled=paint))
     return 0 if any_ready else 1
 
 
@@ -577,14 +633,26 @@ def _print_all_summary(
     # two path columns pushed the table past 200 characters -- it wrapped
     # three times in an 80-column terminal, which is what made it
     # unreadable. Out of the grid they stay whole, and therefore clickable.
+    # Text format only: --format json returned above, so nothing here can
+    # reach a stdout that is contractually one JSON document.
+    paint = color_enabled()
+
+    def _count(value: int, color: str) -> str:
+        # Zero stays plain so the eye lands only on what needs work.
+        return _paint(str(value), color if value else None, enabled=paint)
+
     table = tabulate(
         [
             (
                 r["analyzer"],
                 r["artifact"],
-                _status_label(r["status"]),
-                str(r["errors"]),
-                str(r["warnings"]),
+                _paint(
+                    label := _status_label(r["status"]),
+                    _STATUS_COLORS.get(label),
+                    enabled=paint,
+                ),
+                _count(r["errors"], "red"),
+                _count(r["warnings"], "yellow"),
             )
             for r in rows
         ],
@@ -615,7 +683,8 @@ def _print_all_summary(
         print(f"  Dry run: {analyzed} artifact(s) would be analyzed.")
     else:
         print(
-            f"  Totals: {total_errors} error(s), {total_warnings} warning(s) "
+            f"  Totals: {_count(total_errors, 'red')} error(s), "
+            f"{_count(total_warnings, 'yellow')} warning(s) "
             f"across {analyzed} artifact(s)"
         )
         # Built from these same rows, so the index can never report counts
