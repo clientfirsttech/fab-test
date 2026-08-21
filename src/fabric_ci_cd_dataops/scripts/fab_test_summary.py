@@ -17,33 +17,11 @@ from typing import Any
 
 from tabulate import tabulate
 
-from ._analyzer_envelope import _severity_counts, normalize_findings
+from ._analyzer_envelope import normalize_findings, severity_counts
 from ._report_html import resolve_report, write_index
+from ._table_style import TABLE_FORMAT, table_padding
 from ._target import target_from_args
 from .fab_test_registry import ANALYZER_REGISTRY, discover_artifacts
-
-# Boxed borders make column boundaries unambiguous, which matters most where
-# a cell holds a long path. tabulate is already a dependency, so this costs
-# nothing; `rich` would look better still but is a runtime dependency for
-# presentation alone.
-_TABLE_FORMAT = "rounded_outline"
-
-
-def table_padding(col_count: int) -> int:
-    """Return the non-content characters a table of ``col_count`` costs.
-
-    Column widths are budgeted against the terminal, so this has to match
-    whatever `_TABLE_FORMAT` actually draws or wide cells overflow and wrap
-    — which looks worse than the truncation the budget exists to produce.
-
-    A boxed format spends ``"│ "`` on the left edge, ``" │ "`` between each
-    pair, and ``" │"`` on the right: ``3 * col_count + 1``. A borderless
-    one spends two spaces between columns and nothing at the edges.
-    """
-    if "outline" in _TABLE_FORMAT or "grid" in _TABLE_FORMAT:
-        return 3 * col_count + 1
-    return 2 * (col_count - 1)
-
 
 # Plain ANSI rather than a library: colour here marks three states, which
 # is not worth a runtime dependency for presentation alone.
@@ -132,7 +110,7 @@ def _print_list(rows: list[dict[str, Any]], output_format: str = "text") -> int:
     table = tabulate(
         display_rows,
         headers=("Analyzer", "Aliases", "Glob", "Matched", "Required Tool", "Scopes"),
-        tablefmt=_TABLE_FORMAT,
+        tablefmt=TABLE_FORMAT,
         stralign="left",
     )
     print(table)
@@ -170,7 +148,7 @@ def _print_auth_status(
     if workspace:
         rows.append(("workspace", workspace["id"]))
         rows.append(("reachable", "yes" if workspace["reachable"] else "no"))
-    print(tabulate(rows, headers=("Check", "Value"), tablefmt=_TABLE_FORMAT, stralign="left"))
+    print(tabulate(rows, headers=("Check", "Value"), tablefmt=TABLE_FORMAT, stralign="left"))
     if payload.get("detail"):
         print(f"\n  {payload['detail']}")
     if payload.get("remediation"):
@@ -333,7 +311,7 @@ def _build_findings_table(
     return rows, tabulate(
         truncated,
         headers=("Rule", "Severity", "Object", "Message"),
-        tablefmt=_TABLE_FORMAT,
+        tablefmt=TABLE_FORMAT,
         stralign="left",
     )
 
@@ -406,7 +384,7 @@ def _build_pql_test_table(
     return rows, tabulate(
         truncated,
         headers=("Test Suite", "Test", "Expected", "Actual", "Passed"),
-        tablefmt=_TABLE_FORMAT,
+        tablefmt=TABLE_FORMAT,
         stralign="left",
     )
 
@@ -425,7 +403,7 @@ def _artifact_summary_line(data: dict[str, Any]) -> str:
             f"{test_summary.get('failed', 0)} failed, "
             f"{test_summary.get('skipped', 0)} skipped"
         )
-    error_count, warning_count = _severity_counts(findings)
+    error_count, warning_count = severity_counts(findings)
     sev_summary = f"({error_count} error(s), {warning_count} warning(s))"
     if test_summary:
         return (
@@ -488,7 +466,7 @@ def _envelope_error_warning_counts(data: dict[str, Any] | None) -> tuple[int, in
     if data is None:
         return 0, 0
     findings = data.get("findings", [])
-    return _severity_counts(findings)
+    return severity_counts(findings)
 
 
 def _report_path_for(envelope: dict[str, Any] | None) -> str | None:
@@ -673,7 +651,7 @@ def _print_all_summary(
             for r in rows
         ],
         headers=("Analyzer", "Artifact", "Status", "Err", "Warn"),
-        tablefmt=_TABLE_FORMAT,
+        tablefmt=TABLE_FORMAT,
         stralign="left",
     )
     print("\n".join(f"  {line}" for line in table.splitlines()))
