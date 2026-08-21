@@ -181,15 +181,28 @@ def _env(name: str, default: str = "") -> str:
 
 
 # Maps an artifact folder suffix to the analyzers whose glob matches it.
-_SUFFIX_TO_ANALYZERS: dict[str, tuple[str, ...]] = {
-    ".SemanticModel": ("bpa", "pql_test", "pql_lint"),
-    ".Report": ("pbir", "playwright"),
-}
+def _suffix_to_analyzers() -> dict[str, tuple[str, ...]]:
+    """Group the registry's analyzers by the suffix their glob matches.
+
+    Was a hand-written dict repeating what the globs above already say.
+    Deriving it means a new analyzer is routed by declaring its glob and
+    nowhere else, instead of by remembering to edit a second list.
+
+    This answers "which analyzers handle this suffix" only. Which suffixes
+    *exist* is `_artifact_types`' question, and the two are different: a
+    Notebook is an artifact whether or not anything here reads one.
+    """
+    grouped: dict[str, list[str]] = {}
+    for name, (glob, _description) in ANALYZER_REGISTRY.items():
+        if not glob:
+            continue
+        grouped.setdefault(glob.removeprefix("*"), []).append(name)
+    return {suffix: tuple(names) for suffix, names in grouped.items()}
 
 
 def applicable_analyzers(artifact: Path) -> tuple[str, ...]:
     """Return the analyzer names whose artifact glob matches this path's suffix."""
-    return _SUFFIX_TO_ANALYZERS.get(artifact.suffix, ())
+    return _suffix_to_analyzers().get(artifact.suffix, ())
 
 
 def discover_pbip_sources(artifact_dir: Path) -> dict[Path, Path]:

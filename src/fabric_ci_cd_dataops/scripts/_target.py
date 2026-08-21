@@ -25,9 +25,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-# Every artifact type fab-test can target. `tests/test_target.py` asserts
-# this agrees with the globs in ANALYZER_REGISTRY, so the two cannot drift.
-KNOWN_ARTIFACT_TYPES = ("Report", "SemanticModel")
+from ._artifact_types import artifact_types
 
 _LOCAL_SCHEME = "local"
 _WORKSPACE_SUFFIX = ".workspace"
@@ -41,7 +39,6 @@ _ACCEPTED_FORMS = (
     "(Sales.SemanticModel), NAME (Sales), local/NAME, or "
     "WORKSPACE.Workspace/NAME.Type"
 )
-_KNOWN_TYPES_HINT = f"known types: {', '.join(KNOWN_ARTIFACT_TYPES)}"
 
 
 class TargetError(ValueError):
@@ -90,15 +87,15 @@ class ResolvedTarget:
         }
 
 
-def _canonical_type(candidate: str) -> str | None:
-    """Return the canonically-cased known type matching ``candidate``, or None."""
-    for known in KNOWN_ARTIFACT_TYPES:
-        if candidate.lower() == known.lower():
-            return known
+def _canonical_type(candidate: str, known: tuple[str, ...]) -> str | None:
+    """Return the canonically-cased type in ``known`` matching ``candidate``."""
+    for artifact_type in known:
+        if candidate.lower() == artifact_type.lower():
+            return artifact_type
     return None
 
 
-def _split_type(segment: str) -> tuple[str, str | None]:
+def _split_type(segment: str, known: tuple[str, ...]) -> tuple[str, str | None]:
     """Split ``Name.Type`` into its parts, or return the whole thing as a name.
 
     Splits on the *last* dot so a name that contains one (``Sales.2024``)
@@ -110,18 +107,21 @@ def _split_type(segment: str) -> tuple[str, str | None]:
     if "." not in segment:
         return segment, None
     name, _, candidate = segment.rpartition(".")
-    resolved = _canonical_type(candidate)
+    resolved = _canonical_type(candidate, known)
     if resolved is None:
-        raise TargetError(f"unknown artifact type '{candidate}' in '{segment}'; {_KNOWN_TYPES_HINT}")
+        raise TargetError(
+            f"unknown artifact type '{candidate}' in '{segment}'; "
+            f"known types: {', '.join(known)}"
+        )
     if not name:
         raise TargetError(f"'{segment}' names a type but no artifact; {_ACCEPTED_FORMS}")
     return name, resolved
 
 
-def _parse_path(target: str, raw: str) -> ResolvedTarget:
+def _parse_path(target: str, raw: str, known: tuple[str, ...]) -> ResolvedTarget:
     """Parse the filesystem scope, whether or not it names a real location."""
     segments = _SEPARATOR_PATTERN.split(target)
-    name, artifact_type = _split_type(segments[-1])
+    name, artifact_type = _split_type(segments[-1], known)
     has_separator = len(segments) > 1
     return ResolvedTarget(
         scope="path",
@@ -133,11 +133,11 @@ def _parse_path(target: str, raw: str) -> ResolvedTarget:
     )
 
 
-def _parse_desktop(segments: list[str], raw: str) -> ResolvedTarget:
+def _parse_desktop(segments: list[str], raw: str, known: tuple[str, ...]) -> ResolvedTarget:
     """Parse ``local/NAME``, the running-Desktop scheme."""
     if len(segments) != 2 or not segments[1].strip():
         raise TargetError(f"'{raw.strip()}' is not a valid Desktop target; {_ACCEPTED_FORMS}")
-    name, artifact_type = _split_type(segments[1].strip())
+    name, artifact_type = _split_type(segments[1].strip(), known)
     return ResolvedTarget(
         scope="desktop",
         name=name,
@@ -148,7 +148,7 @@ def _parse_desktop(segments: list[str], raw: str) -> ResolvedTarget:
     )
 
 
-def _parse_workspace(segments: list[str], raw: str) -> ResolvedTarget:
+def _parse_workspace(segments: list[str], raw: str, known: tuple[str, ...]) -> ResolvedTarget:
     """Parse ``WORKSPACE.Workspace/NAME.Type``, the Fabric CLI form."""
     if len(segments) != 2:
         raise TargetError(
@@ -161,11 +161,11 @@ def _parse_workspace(segments: list[str], raw: str) -> ResolvedTarget:
     item = segments[1].strip()
     if not item:
         raise TargetError(f"'{raw.strip()}' names no artifact; {_ACCEPTED_FORMS}")
-    name, artifact_type = _split_type(item)
+    name, artifact_type = _split_type(item, known)
     if artifact_type is None:
         raise TargetError(
             f"'{item}' needs an explicit type in a workspace target -- a deployed item "
-            f"cannot be found by name alone; {_KNOWN_TYPES_HINT}"
+            f"cannot be found by name alone; known types: {', '.join(known)}"
         )
     return ResolvedTarget(
         scope="workspace",
@@ -230,8 +230,13 @@ def select_target(positional: str | None, artifact_flag: str | None) -> Resolved
     return parse_target(raw) if raw else None
 
 
-def parse_target(raw: str) -> ResolvedTarget:
+def parse_target(raw: str, *, root: Path | None = None) -> ResolvedTarget:
     """Parse ``raw`` into a `ResolvedTarget`, or raise `TargetError`.
+
+    ``root`` is where the artifact-type map is read from, defaulting to the
+    working directory. The set of types is data, not code -- see
+    `_artifact_types` -- so a repository that declares a type this build
+    has never heard of can still name it.
 
     Scope is decided by the first path segment, in this order: an explicit
     path prefix wins outright, then the reserved ``local/`` scheme, then a
@@ -244,14 +249,16 @@ def parse_target(raw: str) -> ResolvedTarget:
     if not target:
         raise TargetError(f"empty target; {_ACCEPTED_FORMS}")
 
+    known = artifact_types(root if root is not None else Path.cwd())
+
     if _EXPLICIT_PATH_PATTERN.match(target):
-        return _parse_path(target, raw)
+        return _parse_path(target, raw, known)
 
     segments = _SEPARATOR_PATTERN.split(target)
     first = segments[0].strip().lower()
 
     if first == _LOCAL_SCHEME and len(segments) > 1:
-        return _parse_desktop(segments, raw)
+        return _parse_desktop(segments, raw, known)
     if first.endswith(_WORKSPACE_SUFFIX):
-        return _parse_workspace(segments, raw)
-    return _parse_path(target, raw)
+        return _parse_workspace(segments, raw, known)
+    return _parse_path(target, raw, known)

@@ -13,8 +13,8 @@ from pathlib import Path
 
 import pytest
 
+from fabric_ci_cd_dataops.scripts._artifact_types import artifact_types
 from fabric_ci_cd_dataops.scripts._target import (
-    KNOWN_ARTIFACT_TYPES,
     TargetError,
     parse_target,
 )
@@ -187,7 +187,7 @@ def test_unknown_type_suffix_lists_the_known_types():
         parse_target("Sales.SemmanticModel")
 
     message = str(excinfo.value)
-    for known in KNOWN_ARTIFACT_TYPES:
+    for known in artifact_types(Path.cwd()):
         assert known in message
 
 
@@ -214,12 +214,38 @@ def test_surrounding_whitespace_is_ignored():
 
 
 @pytest.mark.fab_test
-def test_known_types_match_the_analyzer_registry_globs():
-    """The type list cannot drift from the globs the analyzers actually use."""
+def test_every_analyzer_glob_names_a_declared_type():
+    """Replaces an equality assertion that enforced the wrong invariant.
+
+    That test required the set of artifact types to equal the set of types
+    an analyzer handles, which conflated two different questions and kept
+    the type list pinned at two. A type exists because Fabric has it; an
+    analyzer handles it because someone wrote a wrapper. The containment
+    that does matter is this direction: an analyzer cannot claim a glob
+    for a type the map has never heard of.
+    """
     from fabric_ci_cd_dataops.scripts.fab_test_registry import ANALYZER_REGISTRY
 
     from_globs = {
         glob.lstrip("*.") for glob, _description in ANALYZER_REGISTRY.values() if glob
     }
 
-    assert set(KNOWN_ARTIFACT_TYPES) == from_globs
+    assert from_globs <= set(artifact_types(Path.cwd()))
+
+
+@pytest.mark.fab_test
+def test_a_type_no_analyzer_handles_still_parses():
+    """`Sales.Notebook` was rejected as unknown while the repository's own
+    map declared Notebook. Parsing is not the place to refuse it."""
+    target = parse_target("Sales.Notebook")
+
+    assert target.name == "Sales"
+    assert target.type == "Notebook"
+
+
+@pytest.mark.fab_test
+def test_the_type_list_comes_from_the_map_not_the_code():
+    """A repository declaring a type this build predates can still name it."""
+    root = Path(__file__).resolve().parent.parent
+
+    assert len(artifact_types(root)) >= 9
