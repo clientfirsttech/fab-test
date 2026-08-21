@@ -1,6 +1,6 @@
 # Review Cleanup Epic
 
-**Status**: 🚧 IN-PROGRESS (3/6)
+**Status**: 🚧 IN-PROGRESS (4/6)
 **Goal**: Close the five findings from the 2026-08-21 review, three of which are debt created that same day.
 
 ## Overview
@@ -98,7 +98,25 @@ Each is arguably correct behavior — the point is that a file-level ignore mean
 
 ---
 
-## 4. Replace Vacuous Test Assertions
+## 4. Replace Vacuous Test Assertions ✅
+
+**Done (2026-08-21) — and the finding was substantially overstated.** The review counted 17 broad assertions and inferred they were weak from their shape. Mutation testing each one says otherwise: **only one was genuinely vacuous.**
+
+| Mutation | Result |
+|---|---|
+| Type filter disabled in `discover_artifacts` | caught |
+| `auth status` subcommand renamed away | caught |
+| `--report` flag renamed | caught |
+| Scope dropped from the dry-run line | caught |
+| `--env` help text reworded | caught |
+| Colour injected into the `--format json` payload | caught |
+| **Desktop preflight message reworded** | **missed** |
+
+The real one: `test_cli_desktop_target_without_an_instance_exits_127` asserted `"Desktop" in stdout + stderr`, which held even when the failure message changed — the word also appears in the remediation line. It now asserts the diagnosis, the artifact name, and the way out, and the same mutation is caught.
+
+Also fixed a docstring that described a narrowing the code never received: it claimed to assert on the per-analyzer plans while the assertions still matched whole stdout. The assertions turned out to be sound, so the docstring was corrected rather than the test.
+
+**The lesson is not the one the review drew.** Shape is a poor proxy for weakness — a broad assertion over a small, controlled output is often fine, and the way to know is to break the behavior and watch. The three earlier vacuous tests were caught by reading; a mutation pass would have caught them faster and with less argument.
 
 Seventeen assertions across the new test files match a substring against an entire captured stdout. That shape produced **four tests that passed for the wrong reason** in one day: `Sales.Report` matching a stem, `*.Report` matching a glob text, and a bare `` `main` `` matching `deploy.py`'s function. Three of the four were only noticed by reading them.
 
