@@ -4,7 +4,7 @@ Guiding vision and constraints: [vision.md](vision.md)
 
 ## Active Epics
 
-None currently — see Standalone Tasks below for open follow-ups.
+- [Discover From CWD](tasks/discover-from-cwd-epic.md) — 📋 PLANNED. `fab-test` finds artifacts where you ran it, by folder suffix, without a `.fabric/artifacts` layout or a `.pbip`. Makes [`artifact-map.json`](.github/metadata/artifact-map.json) the single source of the nine artifact types, replacing three hardcoded copies that each knew two. **6 tasks**, 2 deferred. Not behavior-preserving by design — the backward-compatibility line is that every artifact found today is still found.
 
 ## Standalone Tasks
 
