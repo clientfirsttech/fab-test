@@ -30,6 +30,7 @@ from ._desktop import (
 from ._pbip_discovery import discover_pbip_projects
 from ._report_html import resolve_report
 from ._rule_overlay import apply_overlay, apply_pbir_overlay
+from ._scan import find_artifact_dirs
 from ._target import ResolvedTarget
 
 # Reuse the same repo-root logic as fab_test.py so paths stay consistent.
@@ -147,6 +148,44 @@ def unsupported_scope_error(name: str, target: ResolvedTarget | None) -> str | N
     return f"{name} {reason}. Use {alternatives}"
 
 
+def unsupported_type_error(name: str, target: ResolvedTarget | None) -> str | None:
+    """Return an error when ``name`` cannot read ``target``'s artifact type.
+
+    Accepting all nine declared Fabric types means a caller can now name
+    one no analyzer reads. Before this, `bpa Sales.Notebook` failed at the
+    parser as an "unknown artifact type" -- a type the repository's own map
+    declares. After, discovery simply matched nothing and the run reported
+    "no *.SemanticModel artifacts found", which is true and useless: it
+    describes the directory rather than the mistake.
+
+    Naming both halves -- what the analyzer reads, and what the target
+    actually is -- is the difference between a message a caller can act on
+    and one they have to reverse-engineer. Where another analyzer does
+    read that type, it is named, because the next question is always
+    "then what do I run?".
+    """
+    if target is None or target.type is None:
+        return None
+    glob, _description = ANALYZER_REGISTRY.get(name, ("", ""))
+    if not glob:
+        # Repository-scoped: it runs against the repo, so an artifact type
+        # is not a thing it could refuse.
+        return None
+    handled = glob.removeprefix("*.")
+    if target.type == handled:
+        return None
+
+    others = tuple(
+        analyzer
+        for analyzer in _suffix_to_analyzers().get(f".{target.type}", ())
+        if analyzer not in HIDDEN_ANALYZERS
+    )
+    opening = f"{name} reads {handled} artifacts; '{target.raw}' is a {target.type}"
+    if not others:
+        return f"{opening}, which no fab-test analyzer reads"
+    return f"{opening}. Analyzers that read {target.type}: {', '.join(others)}"
+
+
 # Analyzers that depend on an external binary/tool.
 _BOOTSTRAPPED_ANALYZERS = {"bpa", "pbir"}
 
@@ -223,13 +262,22 @@ def discover_artifacts(
     artifact_dir: Path,
     glob: str,
     target: ResolvedTarget | None,
+    *,
+    output_dir: Path | None = None,
 ) -> list[Path]:
     """Return sorted artifact paths matching ``glob``, narrowed by ``target``.
 
-    Includes artifacts found directly under ``artifact_dir`` and any
-    matching folder paired with a `.pbip` project discovered recursively
-    within ``artifact_dir`` — a developer's `.pbip` need not sit at the top
-    level of the directory being scanned.
+    A folder is an artifact because its name ends in a Fabric type suffix,
+    found at any depth under ``artifact_dir``. It used to need either a
+    top-level position or a `.pbip` beside it, which made a committed
+    ``deployed/Sales.SemanticModel`` invisible — the shape artifacts take
+    when they are checked in for CI rather than opened in Desktop. `.pbip`
+    pairing still enriches a result; it no longer decides whether one
+    exists. See `_scan` for what is pruned and why that matters.
+
+    ``output_dir`` is pruned when given: analyzer results are written to
+    folders named after the artifacts that produced them, so a run would
+    otherwise rediscover its own output as artifacts.
 
     A target naming a *location* short-circuits discovery entirely and is
     not confined to ``artifact_dir``: the caller pointed at a specific
@@ -245,11 +293,11 @@ def discover_artifacts(
     if not artifact_dir.exists():
         return []
     suffix = glob.lstrip("*")
-    matches = {path.resolve() for path in artifact_dir.glob(glob)}
-    matches.update(
-        path for path in discover_pbip_sources(artifact_dir) if path.name.endswith(suffix)
+    artifacts = find_artifact_dirs(
+        artifact_dir,
+        (suffix,),
+        excluded_paths=[output_dir] if output_dir is not None else (),
     )
-    artifacts = sorted(matches)
     if target is None:
         return artifacts
 

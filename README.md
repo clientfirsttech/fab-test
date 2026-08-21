@@ -63,7 +63,28 @@ Sales.Report/
     pages/pages.json
 ```
 
-The same layout applies under `.fabric/artifacts/` for artifacts committed to the repository.
+### Where fab-test looks
+
+Discovery starts at the directory you run the command in and walks down.
+A folder is an artifact because its name ends in a Fabric type suffix —
+`Sales.SemanticModel`, `Sales.Report` — at any depth, whether or not a
+`.pbip` sits beside it. That last part matters for artifacts committed for
+CI rather than opened in Desktop: `deployed/Sales.SemanticModel` on its own
+is found.
+
+The suffixes come from [`.github/metadata/artifact-map.json`](.github/metadata/artifact-map.json),
+with a copy packaged in the distribution so an install outside this
+repository behaves the same.
+
+Skipped while walking: nested git checkouts (worktrees, vendored clones),
+`.venv`, `node_modules`, `__pycache__`, `dist`, `build`, and the run's own
+`--output-dir`. Without those exclusions a scan of this repository returns
+eight artifacts where three are real.
+
+**If you already have a `.fabric/artifacts/` layout, nothing you do needs to
+change.** That directory sits inside your working directory, so everything
+found before is still found. `--artifact-dir` still narrows the search when
+you pass it, and still exits `2` if the path you name does not exist.
 
 Every analyzer is built on that assumption:
 
@@ -119,7 +140,7 @@ pytest -m analyzers
 
 ### Artifact validation with fab-test
 
-`fab-test` runs analyzers against your actual `.fabric/artifacts`, in the TMDL/PBIR layout described in [Assumed project format](#assumed-project-format). It requires the corresponding external tools for each analyzer.
+`fab-test` discovers artifacts under your working directory, in the TMDL/PBIR layout described in [Assumed project format](#assumed-project-format). It requires the corresponding external tools for each analyzer.
 
 ```bash
 # Discover which artifacts would be analyzed
@@ -147,7 +168,7 @@ Every analyzer subcommand takes an optional target. Omit it and `fab-test` disco
 
 | Target | Means |
 |--------|-------|
-| *(omitted)* | Discover every matching artifact under `--artifact-dir` |
+| *(omitted)* | Discover every matching artifact under `--artifact-dir` (default: the working directory) |
 | `Sales` | The artifact named `Sales`; the analyzer's own glob picks the type |
 | `Sales.SemanticModel` | That name **and** type — `Sales.Report` is not selected |
 | `./src/Sales.SemanticModel` | Exactly that folder, wherever it lives (not confined to `--artifact-dir`) |
@@ -250,7 +271,7 @@ Precedence, for every setting:
 
 ## Usage
 
-`fab-test` runs analyzers against your `.fabric/artifacts`. It is the local equivalent of the CI artifact validation gate. See the [Run manual tests locally](#run-manual-tests-locally) section above for common commands, and [`.github/skills/fab-test/SKILL.md`](.github/skills/fab-test/SKILL.md) for the full CLI reference.
+`fab-test` discovers and analyzes artifacts under your working directory. It is the local equivalent of the CI artifact validation gate. See the [Run manual tests locally](#run-manual-tests-locally) section above for common commands, and [`.github/skills/fab-test/SKILL.md`](.github/skills/fab-test/SKILL.md) for the full CLI reference.
 
 ## AI agent guidance
 

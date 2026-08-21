@@ -534,7 +534,10 @@ def build_all_summary_rows(
     rows: list[dict[str, Any]] = []
     for analyzer, code in zip(analyzers, codes):
         glob, _ = ANALYZER_REGISTRY[analyzer]
-        stems = [a.stem for a in discover_artifacts(artifact_dir, glob, target)]
+        stems = [
+            a.stem
+            for a in discover_artifacts(artifact_dir, glob, target, output_dir=output_dir)
+        ]
         if not stems:
             rows.append({
                 "analyzer": analyzer,

@@ -1,6 +1,6 @@
 # Discover From CWD Epic
 
-**Status**: 📋 PLANNED
+**Status**: ✅ COMPLETED (2026-08-21)
 **Goal**: `fab-test` finds your artifacts where you ran it, by folder suffix, without a `.fabric/artifacts` layout or a `.pbip` file.
 
 ## Overview
@@ -63,7 +63,7 @@ The same knowledge lives in four places and they disagree: `artifact-map.json` k
 - Given a nested git checkout (a worktree, a vendored clone), then everything inside it is skipped, reusing the guard `_pbip_discovery` already has.
 - Given `.venv`, `node_modules`, `__pycache__`, `dist`, `build`, `.git`, and the configured `--output-dir`, then they are not scanned.
 - Given this repository, then discovery finds the same 3 artifacts it finds today and not the 8 a naive scan returns.
-- Given a large repository, then the scan time is measured and recorded here; if it is not comfortably under a second, an exclusion is missing.
+- Given a large repository, then the scan time is measured and recorded here; if it is not comfortably under a second, an exclusion is missing. **Measured: 216 ms over this repository, returning the same 3 artifacts discovery found before the change.**
 - Given an artifact discovered twice by two routes, then it appears once.
 
 **Files**: `fab_test_registry.py`, `_pbip_discovery.py`
@@ -125,3 +125,31 @@ Running from a subdirectory finds only that subtree. Walking up to a `.git` boun
 ## Note — This Changes What a Bare Command Scans
 
 Unlike the last three epics, this one is not behavior-preserving: that is its point. The safeguard is the backward-compatibility requirement in task 4 — every artifact found today is still found — plus running all five discovery callers through the real CLI before each task is closed.
+
+---
+
+## Outcome (2026-08-21)
+
+| Measure | Before | After |
+|---------|--------|-------|
+| Artifacts found in this repository | 3 | 3 |
+| Artifacts a naive recursive scan finds | 8 | — (5 pruned as worktree copies) |
+| Scan time over this repository | — | 216 ms |
+| Places that know the Fabric type list | 4, disagreeing | 1 (`artifact-map.json`) |
+| Types accepted as targets | 2 | 9 |
+| `deployed/Sales.SemanticModel` with no `.pbip` | invisible | found |
+| Suite | 992 passed | 1049 passed, 3 skipped |
+| Coverage | 82.27% | 83% |
+
+**One defect found during execution, by the suite rather than the CLI.** Passing
+`output_dir` into `build_all_summary_rows`' discovery introduced a local
+binding that shadowed the function's existing `output_dir` *parameter*, so the
+aggregate summary read envelopes from `None`. Two tests caught it. Worth
+recording because the blast-radius constraint is aimed at the opposite
+failure — code the tests do not reach — and this was the case where they did.
+
+**What the real-CLI passes proved that the suite could not.** The five
+discovery callers were run after each task and produced byte-identical output
+for this repository: `list` counts, `explain` paths, `bpa`/`all`/`local`
+dry-run sets. The new capability was proved the same way, from a directory
+that is not this repository and holds no `.fabric/`.
