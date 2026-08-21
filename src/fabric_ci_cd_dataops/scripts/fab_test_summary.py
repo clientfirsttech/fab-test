@@ -692,6 +692,27 @@ def _print_all_summary(
     return 1 if any_failed else 0
 
 
+def _artifact_line(
+    name: str, stem: str, output_dir: Path | None
+) -> tuple[str, str | None]:
+    """Return one artifact's summary suffix and its report path, if any.
+
+    Split out of `_print_summary` so that reading an envelope and deciding
+    how to describe it is one job, and printing is another.
+    """
+    if output_dir is None:
+        return "", None
+    envelope = output_dir / name / stem / "envelope.json"
+    if not envelope.exists():
+        return "", None
+    try:
+        data = json.loads(envelope.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return "  — (could not parse envelope)", None
+    report = _report_path_for(data)
+    return f"  — {_artifact_summary_line(data)}", _display_path(report) if report else None
+
+
 def _print_summary(
     name: str,
     results: list[tuple[str, int]],
@@ -718,6 +739,9 @@ def _print_summary(
                 "output_path": str(output_dir / name / stem / "envelope.json")
                 if output_dir
                 else "",
+                # Same key as the `all` summary emits. A consumer should not
+                # have to branch on how many analyzers happened to run.
+                "report_path": _report_path_for(data),
             })
         print(json.dumps({"analyzer": name, "artifacts": rows}, indent=2))
         return 1 if any(code != 0 for _, code in results) else 0
@@ -728,20 +752,19 @@ def _print_summary(
     print(sep)
     any_failed = False
     verbose = verbosity in ("verbose", "debug")
+    reports: list[str] = []
     for stem, code in results:
-        icon = _artifact_summary_prefix(code)
-        summary = ""
-        if output_dir is not None:
-            envelope = output_dir / name / stem / "envelope.json"
-            if envelope.exists():
-                try:
-                    data = json.loads(envelope.read_text(encoding="utf-8"))
-                    summary = f"  — {_artifact_summary_line(data)}"
-                except (json.JSONDecodeError, OSError):
-                    summary = "  — (could not parse envelope)"
-        print(f"  {icon}  {stem}{summary}")
+        summary, report = _artifact_line(name, stem, output_dir)
+        if report:
+            reports.append(report)
+        print(f"  {_artifact_summary_prefix(code)}  {stem}{summary}")
         if code != 0:
             any_failed = True
             if verbose and output_dir is not None:
                 _print_findings_for_artifact(name, stem, output_dir)
+
+    # A report that is written but never named reads as a flag that did
+    # nothing -- which is exactly how `--report` was first reported as broken.
+    for report in reports:
+        print(f"  Report: {report}")
     return 1 if any_failed else 0

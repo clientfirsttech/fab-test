@@ -248,3 +248,69 @@ def test_summary_json_exposes_the_report_path_separately(tmp_path):
     for row in json.loads(result.stdout)["artifacts"]:
         assert "report_path" in row, "report_path must always be present, even as null"
         assert "output_path" in row
+
+
+# --------------------------------------------------------------------------- #
+# A single-analyzer run must surface its report too
+#
+# Regression: `fab-test pql-test <target> --report` wrote report.html and
+# never mentioned it. `fab-test all` lists paths under its table; one
+# analyzer listed nothing, so the flag was indistinguishable from a no-op.
+# --------------------------------------------------------------------------- #
+
+
+def _envelope_on_disk(output_dir, analyzer, stem, **extra):
+    from fabric_ci_cd_dataops.scripts._analyzer_envelope import build_envelope
+
+    path = output_dir / analyzer / stem
+    path.mkdir(parents=True, exist_ok=True)
+    (path / "envelope.json").write_text(
+        json.dumps(
+            build_envelope(analyzer=analyzer, artifact_path=stem, status="passed", **extra)
+        ),
+        encoding="utf-8",
+    )
+
+
+@pytest.mark.fab_test
+def test_single_analyzer_run_names_its_report(tmp_path, capsys):
+    """The flag has to be visibly doing something, or it reads as broken."""
+    from fabric_ci_cd_dataops.scripts.fab_test_summary import _print_summary
+
+    report = tmp_path / "pql_test" / "Sales" / "report.html"
+    _envelope_on_disk(
+        tmp_path, "pql_test", "Sales", native_html_output_path_str=str(report)
+    )
+
+    _print_summary("pql_test", [("Sales", 0)], output_dir=tmp_path, output_format="text")
+
+    assert "report.html" in capsys.readouterr().out
+
+
+@pytest.mark.fab_test
+def test_single_analyzer_run_without_a_report_invents_nothing(tmp_path, capsys):
+    """No --report means no report; the summary must not imply one exists."""
+    from fabric_ci_cd_dataops.scripts.fab_test_summary import _print_summary
+
+    _envelope_on_disk(tmp_path, "bpa", "Sales")
+
+    _print_summary("bpa", [("Sales", 0)], output_dir=tmp_path, output_format="text")
+
+    assert "report.html" not in capsys.readouterr().out
+
+
+@pytest.mark.fab_test
+def test_single_analyzer_json_carries_report_path_like_all_does(tmp_path, capsys):
+    """One analyzer and `all` must not disagree about the row shape."""
+    from fabric_ci_cd_dataops.scripts.fab_test_summary import _print_summary
+
+    report = tmp_path / "pql_test" / "Sales" / "report.html"
+    _envelope_on_disk(
+        tmp_path, "pql_test", "Sales", native_html_output_path_str=str(report)
+    )
+
+    _print_summary("pql_test", [("Sales", 0)], output_dir=tmp_path, output_format="json")
+
+    row = json.loads(capsys.readouterr().out)["artifacts"][0]
+    assert "report_path" in row, "report_path must be present, as it is under `all`"
+    assert row["report_path"] == str(report)
