@@ -1,6 +1,6 @@
 # Complexity and Coverage Epic
 
-**Status**: 🚧 IN-PROGRESS (5/8)
+**Status**: 🚧 IN-PROGRESS (6/8)
 **Goal**: Make the coverage floor real, then pay down the seven functions that have grown past every threshold.
 
 ## Overview
@@ -111,7 +111,27 @@ Complexity 17, **10 return statements**, 19 branches, 53 statements. Each early 
 
 ---
 
-## 6. Extract the Wrapper Pattern from `run_bpa` and `run_pql_test`
+## 6. Extract the Wrapper Pattern from `run_bpa` and `run_pql_test` ✅
+
+**Done (2026-08-21)**: new `_analyzer_process.run_tool` holds the three-way failure classification both wrappers had duplicated — timeout, executable missing, anything else — returning a frozen `ProcessOutcome`. Wording stays with each caller, because those messages are part of an analyzer's contract with its user and are asserted by tests; only the structure is shared.
+
+Alongside it, per-wrapper extractions: `_validate_bpa_inputs`, `_parse_bpa_native_output`, `_bpa_rules_map`, `_bpa_violating_objects`, `_bpa_findings` for BPA; `_resolve_pql_command`, `_summarize_results`, `_pql_status` for pql-test.
+
+| | Before | After |
+|---|---|---|
+| `run_bpa` complexity | 30 | under threshold |
+| `run_bpa` statements | 122 | 60 |
+| `run_pql_test` complexity | 23 | under threshold |
+| `run_pql_test` statements | 106 | 62 |
+| Report total | 45 | **31** |
+
+**Short of one requirement**: both wrappers are out of `C901` and `PLR0912` but still exceed the 50-statement budget, at 60 and 62. The remaining bulk is narration and the final write-and-log branches — mechanical, but each further split is another chance to change behavior, and the value was judged lower than the risk. Recorded rather than quietly dropped.
+
+**A regression the suite did not catch.** `run_tool` initially omitted `encoding="utf-8", errors="replace"`, which the pql-test call had and the BPA call did not. Output then decoded as cp1252 on Windows and crashed `subprocess`'s reader thread with a `UnicodeDecodeError` raised in a background thread — uncatchable by any caller. Every test passed; a real `fab-test all` surfaced it. `run_tool` now decodes UTF-8 with replacement for both callers, which is what the more careful of the two already did; BPA had only avoided the bug by having ASCII output. Two tests now cover it.
+
+**Verified against reality, twice**: 114 lines of real CLI output byte-identical to the pre-refactor baseline, and both envelopes identical key-for-key against real Tabular Editor and pql-test runs (only per-test `duration_ms` differs, which varies between runs).
+
+**A coupling the refactor exposed**: 23 tests patched `invoke_*.subprocess.run`. The call now lives in `_analyzer_process`, so the patch target moved with it — the tests were asserting on where the call was, not what it did.
 
 The two worst: 30 and 23 complexity, 122 and 106 statements. Both follow the same five phases, so the extraction is one shared shape applied twice rather than two rewrites.
 

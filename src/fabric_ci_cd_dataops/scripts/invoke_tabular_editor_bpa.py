@@ -19,7 +19,6 @@ import argparse
 import json
 import os
 import shutil
-import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -35,6 +34,7 @@ from ._analyzer_envelope import (
     native_output_path,
     write_envelope,
 )
+from ._analyzer_process import run_tool
 from ._report_html import attach_report
 from .fab_test_summary import _TABLE_FORMAT as TABLE_FORMAT
 from .fab_test_summary import table_padding
@@ -292,29 +292,152 @@ def _resolve_te2_model_path(path: Path) -> Path:
     return candidate if candidate.is_dir() else path
 
 
-def run_bpa(args: argparse.Namespace) -> int:
-    """Run the BPA analyzer and return an exit code."""
+def _bpa_rules_map(root: Any, ns: dict[str, str]) -> dict[str, dict[str, str]]:
+    """Map each TRX testId to its rule metadata (name, ID, severity, category).
+
+    TE2 splits a finding across two places: the rule's identity lives in
+    TestDefinitions, the outcome in Results. This is the join key.
+    """
+    rules_map: dict[str, dict[str, str]] = {}
+    for ut in root.findall(".//vs:TestDefinitions/vs:UnitTest", ns):
+        props: dict[str, str] = {"RuleName": ut.get("name", "")}
+        for prop in ut.findall(".//vs:Property", ns):
+            key_el = prop.find("vs:Key", ns)
+            val_el = prop.find("vs:Value", ns)
+            if key_el is not None and val_el is not None:
+                props[key_el.text or ""] = val_el.text or ""
+        rules_map[ut.get("id", "")] = props
+    return rules_map
+
+
+def _bpa_violating_objects(result: Any, ns: dict[str, str]) -> list[str]:
+    """Return the model objects a failed rule names, from its StackTrace.
+
+    TE2 puts them one per line in bracketed form; anything else on those
+    lines is narration, not an object.
+    """
+    stack_el = result.find(".//vs:ErrorInfo/vs:StackTrace", ns)
+    if stack_el is None or not stack_el.text:
+        return []
+    return [
+        line.strip()
+        for line in stack_el.text.strip().splitlines()
+        if line.strip().startswith("[")
+    ]
+
+
+def _bpa_findings(
+    root: Any, ns: dict[str, str], rules_map: dict[str, dict[str, str]]
+) -> list[dict[str, Any]]:
+    """Turn failed TRX results into findings, one per violating object.
+
+    A rule that names no object still produces one rule-level finding --
+    dropping it would under-report the violation entirely.
+    """
+    findings: list[dict[str, Any]] = []
+    for result in root.findall(".//vs:Results/vs:UnitTestResult", ns):
+        if result.get("outcome", "").lower() != "failed":
+            continue
+        meta = rules_map.get(result.get("testId", ""), {"RuleName": result.get("testName", "")})
+        base = {
+            "RuleName": meta.get("RuleName", ""),
+            "RuleID": meta.get("RuleID", ""),
+            "Severity": meta.get("Severity", ""),
+            "Category": meta.get("Category", ""),
+        }
+        objects = _bpa_violating_objects(result, ns)
+        findings.extend({**base, "ObjectName": obj} for obj in (objects or [""]))
+    return findings
+
+
+def _parse_bpa_native_output(
+    native_out: Path,
+) -> tuple[list[dict[str, Any]], dict[str, int] | None]:
+    """Return ``(findings, test_summary)`` parsed from TE2's native output.
+
+    TE2 writes VSTest XML (TRX). A bare JSON array is also accepted --
+    older builds emitted one, and silently reading nothing would look
+    like a clean model rather than a parse failure.
+
+    Returns empty results rather than raising: the caller falls back to
+    the process exit code, which an exception here would lose.
+    """
+    findings: list[dict[str, Any]] = []
+    test_summary: dict[str, int] | None = None
+    if native_out.exists():
+        try:
+            raw_text = native_out.read_text(encoding="utf-8-sig")
+            if raw_text.strip():
+                # Try XML first (TE2 native BPA output is VSTest XML format)
+                try:
+                    import xml.etree.ElementTree as ET
+
+                    # TE2 writes this XML locally from a rules file under source
+                    # control. Python's ElementTree does not resolve external
+                    # entities by default, so XXE risk is limited to trusted
+                    # local input. We keep the standard parser to avoid adding
+                    # a third-party dependency.
+                    root = ET.fromstring(raw_text)
+                    ns = {"vs": "http://microsoft.com/schemas/VisualStudio/TeamTest/2010"}
+
+                    # Build rule metadata map:
+                    #   testId → {RuleID, RuleName, Severity, Category}
+                    rules_map = _bpa_rules_map(root, ns)
+
+                    # Capture VSTest counters for richer reporting
+                    test_summary = _parse_vstest_counters(raw_text)
+
+                    # Parse results — only Failed outcomes produce findings
+                    findings = _bpa_findings(root, ns, rules_map)
+                except ET.ParseError:
+                    # Not XML — try JSON
+                    raw = json.loads(raw_text)
+                    if isinstance(raw, list):
+                        findings = raw
+                    elif isinstance(raw, dict):
+                        findings = raw.get("findings", [])
+        except (json.JSONDecodeError, OSError, UnicodeDecodeError):
+            pass
+    return findings, test_summary
+
+
+def _validate_bpa_inputs(
+    args: argparse.Namespace,
+) -> tuple[Path, Path, Path, Path]:
+    """Resolve and check every input path, exiting 1 on the first problem.
+
+    The rules-file guard is the one worth spelling out: pointing BPA at a
+    model or a .bim instead of a rules array produces a confusing failure
+    deep inside Tabular Editor, so it is rejected here with a message that
+    names what was expected.
+    """
     artifact_root = validate_path(args.tmdl_path, "TMDL path")
     tmdl_path = _resolve_te2_model_path(artifact_root)
     bpa_rules_path = validate_path(args.bpa_rules_path, "BPA rules file")
     tabular_editor_path = validate_path(args.tabular_editor_path, "Tabular Editor CLI")
 
-    # Guard: rules file must be a JSON array of rule objects, not a model/bim file.
     try:
         rules_content = json.loads(bpa_rules_path.read_text(encoding="utf-8"))
-        if not isinstance(rules_content, list):
-            print(
-                f"::error::BPA rules file is not a JSON array: {bpa_rules_path}. "
-                "Expected a list of rule objects, not a model or other JSON object.",
-                file=sys.stderr,
-            )
-            sys.exit(1)
     except (json.JSONDecodeError, OSError) as exc:
         print(
             f"::error::Cannot read BPA rules file {bpa_rules_path}: {exc}",
             file=sys.stderr,
         )
         sys.exit(1)
+    if not isinstance(rules_content, list):
+        print(
+            f"::error::BPA rules file is not a JSON array: {bpa_rules_path}. "
+            "Expected a list of rule objects, not a model or other JSON object.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    return artifact_root, tmdl_path, bpa_rules_path, tabular_editor_path
+
+
+def run_bpa(args: argparse.Namespace) -> int:
+    """Run the BPA analyzer and return an exit code."""
+    artifact_root, tmdl_path, bpa_rules_path, tabular_editor_path = _validate_bpa_inputs(args)
 
     # Stem comes from the .SemanticModel folder, not the definition/ path.
     artifact_stem = artifact_root.stem
@@ -353,57 +476,29 @@ def run_bpa(args: argparse.Namespace) -> int:
         log("")
 
     with Timer() as timer:
-        try:
-            proc = subprocess.run(
-                command,
-                capture_output=True,
-                text=True,
-                timeout=300,
-                stdin=subprocess.DEVNULL,
-                check=False,
-            )
-        except subprocess.TimeoutExpired:
-            message = "Tabular Editor BPA timed out after 5 minutes"
-            write_results(
-                output_path,
-                "timeout",
-                [],
-                tmdl_path,
-                bpa_rules_path,
-                message=message,
-                native_out=native_out,
-            )
-            print(f"::error::{message}", file=sys.stderr)
-            return 1
-        except FileNotFoundError:
-            message = (
+        outcome = run_tool(
+            command,
+            timeout=300,
+            label="Tabular Editor BPA",
+            timeout_message="Tabular Editor BPA timed out after 5 minutes",
+            missing_message=(
                 f"Tabular Editor executable not found: {tabular_editor_path}. "
                 "Download from https://tabulareditor.com/downloads"
-            )
-            write_results(
-                output_path,
-                "error",
-                [],
-                tmdl_path,
-                bpa_rules_path,
-                message=message,
-                native_out=native_out,
-            )
-            print(f"::error::{message}", file=sys.stderr)
-            return 1
-        except Exception as exc:  # noqa: BLE001 - catch-all for wrapper safety
-            message = f"Unexpected error running Tabular Editor BPA: {exc}"
-            write_results(
-                output_path,
-                "error",
-                [],
-                tmdl_path,
-                bpa_rules_path,
-                message=message,
-                native_out=native_out,
-            )
-            print(f"::error::{message}", file=sys.stderr)
-            return 1
+            ),
+        )
+    if outcome.failed:
+        write_results(
+            output_path,
+            outcome.status,
+            [],
+            tmdl_path,
+            bpa_rules_path,
+            message=outcome.message,
+            native_out=native_out,
+        )
+        print(f"::error::{outcome.message}", file=sys.stderr)
+        return 1
+    proc = outcome.proc
 
     if level >= _VERBOSITY_LEVELS["debug"] and (proc.stdout or proc.stderr):
         log("--- stdout ---")
@@ -412,87 +507,7 @@ def run_bpa(args: argparse.Namespace) -> int:
         log(proc.stderr or "(empty)")
         log("")
 
-    # Parse findings from native output file (XML), then fall back to stdout JSON.
-    findings: list[dict[str, Any]] = []
-    test_summary: dict[str, int] | None = None
-    if native_out.exists():
-        try:
-            raw_text = native_out.read_text(encoding="utf-8-sig")
-            if raw_text.strip():
-                # Try XML first (TE2 native BPA output is VSTest XML format)
-                try:
-                    import xml.etree.ElementTree as ET
-
-                    # TE2 writes this XML locally from a rules file under source
-                    # control. Python's ElementTree does not resolve external
-                    # entities by default, so XXE risk is limited to trusted
-                    # local input. We keep the standard parser to avoid adding
-                    # a third-party dependency.
-                    root = ET.fromstring(raw_text)
-                    ns = {"vs": "http://microsoft.com/schemas/VisualStudio/TeamTest/2010"}
-
-                    # Build rule metadata map:
-                    #   testId → {RuleID, RuleName, Severity, Category}
-                    rules_map: dict[str, dict[str, str]] = {}
-                    for ut in root.findall(".//vs:TestDefinitions/vs:UnitTest", ns):
-                        test_id = ut.get("id", "")
-                        rule_name = ut.get("name", "")
-                        props: dict[str, str] = {"RuleName": rule_name}
-                        for prop in ut.findall(".//vs:Property", ns):
-                            key_el = prop.find("vs:Key", ns)
-                            val_el = prop.find("vs:Value", ns)
-                            if key_el is not None and val_el is not None:
-                                props[key_el.text or ""] = val_el.text or ""
-                        rules_map[test_id] = props
-
-                    # Capture VSTest counters for richer reporting
-                    test_summary = _parse_vstest_counters(raw_text)
-
-                    # Parse results — only Failed outcomes produce findings
-                    for result in root.findall(".//vs:Results/vs:UnitTestResult", ns):
-                        if result.get("outcome", "").lower() != "failed":
-                            continue
-                        test_id = result.get("testId", "")
-                        rule_meta = rules_map.get(
-                            test_id, {"RuleName": result.get("testName", "")}
-                        )
-                        # Extract violating objects from StackTrace
-                        stack_el = result.find(".//vs:ErrorInfo/vs:StackTrace", ns)
-                        objects: list[str] = []
-                        if stack_el is not None and stack_el.text:
-                            for raw_line in stack_el.text.strip().splitlines():
-                                line = raw_line.strip()
-                                if line.startswith("["):
-                                    objects.append(line)
-                        if objects:
-                            findings.extend(
-                                {
-                                    "RuleName": rule_meta.get("RuleName", ""),
-                                    "RuleID": rule_meta.get("RuleID", ""),
-                                    "ObjectName": obj,
-                                    "Severity": rule_meta.get("Severity", ""),
-                                    "Category": rule_meta.get("Category", ""),
-                                }
-                                for obj in objects
-                            )
-                        else:
-                            # No specific objects listed — record rule-level finding
-                            findings.append({
-                                "RuleName": rule_meta.get("RuleName", ""),
-                                "RuleID": rule_meta.get("RuleID", ""),
-                                "ObjectName": "",
-                                "Severity": rule_meta.get("Severity", ""),
-                                "Category": rule_meta.get("Category", ""),
-                            })
-                except ET.ParseError:
-                    # Not XML — try JSON
-                    raw = json.loads(raw_text)
-                    if isinstance(raw, list):
-                        findings = raw
-                    elif isinstance(raw, dict):
-                        findings = raw.get("findings", [])
-        except (json.JSONDecodeError, OSError, UnicodeDecodeError):
-            pass
+    findings, test_summary = _parse_bpa_native_output(native_out)
 
     # TE2 BPA exit code equals violation count; use it when no file output was produced.
     # Without per-rule severity data, treat unknown violations as errors so the
