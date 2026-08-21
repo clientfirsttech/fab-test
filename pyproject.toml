@@ -75,6 +75,7 @@ include = ["fabric_ci_cd_dataops*"]
     "agents/*",
     "skills/*/*",
     "schemas/*.json",
+    "metadata/*.json",
 ]
 
 [tool.coverage.run]
