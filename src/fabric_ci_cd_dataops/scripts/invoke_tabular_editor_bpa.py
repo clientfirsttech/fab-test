@@ -434,6 +434,57 @@ def _validate_bpa_inputs(
     return artifact_root, tmdl_path, bpa_rules_path, tabular_editor_path
 
 
+def _narrate_header(
+    artifact_stem: str,
+    tmdl_path: Path,
+    bpa_rules_path: Path,
+    tabular_editor_path: Path,
+    output_path: Path,
+    native_out: Path,
+) -> None:
+    """Print the per-artifact banner, unless verbosity is set to summary."""
+    if _verbosity() < _VERBOSITY_LEVELS["default"]:
+        return
+    log("================================")
+    log(f"Tabular Editor BPA  →  {artifact_stem}")
+    log("================================")
+    log(f"📋 Model:   {tmdl_path}")
+    log(f"📏 Rules:   {bpa_rules_path}")
+    log(f"🔧 Tool:    {tabular_editor_path}")
+    log(f"📊 Envelope: {output_path}")
+    log(f"📄 Native:  {native_out}")
+    log("")
+
+
+def _narrate_outcome(
+    findings: list[dict[str, Any]],
+    test_summary: "dict[str, int] | None",
+    stderr: str,
+    message: str,
+    *,
+    has_errors: bool,
+) -> None:
+    """Print the counters, the findings table, and the CI annotation.
+
+    The annotation always goes to stderr regardless of verbosity: it is what
+    a CI system reads, not what a person is choosing to see.
+    """
+    level = _verbosity()
+    if level >= _VERBOSITY_LEVELS["default"] and test_summary:
+        error_count, warning_count = severity_counts(findings)
+        log(
+            f"📊 {test_summary.get('total', 0)} tests, "
+            f"{test_summary.get('passed', 0)} passed, "
+            f"{test_summary.get('failed', 0)} failed "
+            f"({error_count} error(s), {warning_count} warning(s))"
+        )
+    if level >= _VERBOSITY_LEVELS["verbose"]:
+        _print_findings_table(findings)
+    if stderr:
+        print(f"::error::{stderr}", file=sys.stderr)
+    print(f"{'::error::' if has_errors else '::warning::'}{message}", file=sys.stderr)
+
+
 def run_bpa(args: argparse.Namespace) -> int:
     """Run the BPA analyzer and return an exit code."""
     artifact_root, tmdl_path, bpa_rules_path, tabular_editor_path = _validate_bpa_inputs(args)
@@ -447,17 +498,9 @@ def run_bpa(args: argparse.Namespace) -> int:
     native_out = Path(args.native_output_path) if args.native_output_path else _nat_out
 
     level = _verbosity()
-
-    if level >= _VERBOSITY_LEVELS["default"]:
-        log("================================")
-        log(f"Tabular Editor BPA  →  {artifact_stem}")
-        log("================================")
-        log(f"📋 Model:   {tmdl_path}")
-        log(f"📏 Rules:   {bpa_rules_path}")
-        log(f"🔧 Tool:    {tabular_editor_path}")
-        log(f"📊 Envelope: {output_path}")
-        log(f"📄 Native:  {native_out}")
-        log("")
+    _narrate_header(
+        artifact_stem, tmdl_path, bpa_rules_path, tabular_editor_path, output_path, native_out
+    )
 
     # Ensure output directories exist (TE2 does not create them)
     native_out.parent.mkdir(parents=True, exist_ok=True)
@@ -557,27 +600,11 @@ def run_bpa(args: argparse.Namespace) -> int:
         message=message,
         native_out=native_out,
         duration_ms=timer.elapsed_ms,
-            started_at=timer.started_at,
+        started_at=timer.started_at,
         test_summary=test_summary,
     )
 
-    if level >= _VERBOSITY_LEVELS["default"] and test_summary:
-        error_count, warning_count = severity_counts(findings)
-        log(
-            f"📊 {test_summary.get('total', 0)} tests, "
-            f"{test_summary.get('passed', 0)} passed, "
-            f"{test_summary.get('failed', 0)} failed "
-            f"({error_count} error(s), {warning_count} warning(s))"
-        )
-
-    if level >= _VERBOSITY_LEVELS["verbose"]:
-        _print_findings_table(findings)
-
-    if proc.stderr:
-        print(f"::error::{proc.stderr}", file=sys.stderr)
-
-    annotation = "::error::" if has_errors else "::warning::"
-    print(f"{annotation}{message}", file=sys.stderr)
+    _narrate_outcome(findings, test_summary, proc.stderr, message, has_errors=has_errors)
     return 1 if has_errors else 0
 
 

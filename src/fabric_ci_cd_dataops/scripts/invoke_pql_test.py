@@ -264,6 +264,50 @@ def _pql_status(
     return "failed", f"pql-test failed: {counter_msg}"
 
 
+def _narrate_header(
+    artifact_name: str, artifact_path: Path, output_path: Path, nat_out: Path
+) -> None:
+    """Print the per-artifact banner, unless verbosity is set to summary."""
+    if _verbosity() < _VERBOSITY_LEVELS["default"]:
+        return
+    log("================================")
+    log(f"pql-test -> {artifact_name}")
+    log("================================")
+    log(f"📋 Artifact: {artifact_path}")
+    log(f"📊 Envelope: {output_path}")
+    log(f"📄 Native:   {nat_out}")
+    log("")
+
+
+def _narrate_outcome(
+    status: str,
+    message: str,
+    output_path: Path,
+    nat_out: Path,
+    findings: list[dict[str, Any]],
+    stderr: str,
+) -> None:
+    """Print the result lines, and the CI annotation when the run failed.
+
+    The annotation goes to stderr regardless of verbosity: it is what a CI
+    system reads, not what a person chose to see.
+    """
+    level = _verbosity()
+    if level >= _VERBOSITY_LEVELS["default"]:
+        if status in {"passed", "skipped"}:
+            log(f"{'✅' if status == 'passed' else '⏭️'} {message}")
+        log(f"📁 Envelope: {output_path}")
+        log(f"📄 Native:   {nat_out}")
+    if status in {"passed", "skipped"}:
+        return
+    if level >= _VERBOSITY_LEVELS["verbose"]:
+        for f in findings:
+            log(f"  • {f.get('suite_name') or '?'} :: {f.get('test_name') or '?'}")
+    if stderr:
+        print(f"::error::{stderr}", file=sys.stderr)
+    print(f"::error::{message}", file=sys.stderr)
+
+
 def run_pql_test(args: argparse.Namespace) -> int:
     """Run pql-test and return an exit code."""
     artifact_path = validate_path(args.artifact_path, "Artifact path")
@@ -279,14 +323,7 @@ def run_pql_test(args: argparse.Namespace) -> int:
     nat_out = _nat_out
 
     level = _verbosity()
-    if level >= _VERBOSITY_LEVELS["default"]:
-        log("================================")
-        log(f"pql-test -> {artifact_name}")
-        log("================================")
-        log(f"📋 Artifact: {artifact_path}")
-        log(f"📊 Envelope: {output_path}")
-        log(f"📄 Native:   {nat_out}")
-        log("")
+    _narrate_header(artifact_name, artifact_path, output_path, nat_out)
 
     command = build_command(
         artifact_path=artifact_path,
@@ -341,53 +378,26 @@ def run_pql_test(args: argparse.Namespace) -> int:
     test_summary = test_summary or _summarize_results(test_results)
     status, message = _pql_status(test_summary, findings, proc.returncode)
 
-    if status in {"passed", "skipped"}:
-        write_results(
-            output_path,
-            status,
-            findings if status == "failed" else [],
-            artifact_path,
-            test_results=test_results,
-            test_summary=test_summary,
-            message=message,
-            native_out=nat_out,
-            duration_ms=timer.elapsed_ms,
-            started_at=timer.started_at,
-            desktop_port=desktop_port,
-            desktop_model_name=desktop_model_name,
-        )
-        if level >= _VERBOSITY_LEVELS["default"]:
-            icon = "✅" if status == "passed" else "⏭️"
-            log(f"{icon} {message}")
-            log(f"📁 Envelope: {output_path}")
-            log(f"📄 Native:   {nat_out}")
-        return 0
-
+    # One call for every outcome: the branch below differs only in narration
+    # and exit code. `findings if status == "failed" else []` covers both --
+    # a passed or skipped run has nothing to report as a finding.
     write_results(
         output_path,
         status,
-        findings,
+        findings if status == "failed" else [],
         artifact_path,
         test_results=test_results,
         test_summary=test_summary,
         message=message,
         native_out=nat_out,
         duration_ms=timer.elapsed_ms,
-            started_at=timer.started_at,
+        started_at=timer.started_at,
         desktop_port=desktop_port,
         desktop_model_name=desktop_model_name,
     )
-    if level >= _VERBOSITY_LEVELS["default"]:
-        log(f"📁 Envelope: {output_path}")
-        log(f"📄 Native:   {nat_out}")
-    if level >= _VERBOSITY_LEVELS["verbose"]:
-        for f in findings:
-            suite = f.get("suite_name") or "?"
-            test = f.get("test_name") or "?"
-            log(f"  • {suite} :: {test}")
-    if proc.stderr:
-        print(f"::error::{proc.stderr}", file=sys.stderr)
-    print(f"::error::{message}", file=sys.stderr)
+    _narrate_outcome(status, message, output_path, nat_out, findings, proc.stderr)
+    if status in {"passed", "skipped"}:
+        return 0
     return 1
 
 

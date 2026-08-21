@@ -4,7 +4,7 @@ Guiding vision and constraints: [vision.md](vision.md)
 
 ## Active Epics
 
-- [Review Cleanup](tasks/review-cleanup-epic.md) — 📋 PLANNED. The five findings from the 2026-08-21 review: a duplicated pair of finding helpers, a wrapper importing the presentation layer (~59 ms per artifact spawn), a blanket lint exemption on `fab_test.py` masking four diagnostics, 17 whole-stdout test assertions of the shape that produced four vacuous tests in a day, and two wrappers still over the statement budget. **6 tasks**, 3 deferred. Three of the five are debt from that same day's epics.
+None currently — see Standalone Tasks below for open follow-ups.
 
 ## Standalone Tasks
 
@@ -12,6 +12,7 @@ Guiding vision and constraints: [vision.md](vision.md)
 
 ## Completed Epics
 
+- [Review Cleanup](tasks/archive/2026-08-21-review-cleanup.md) — Closed the five findings from the 2026-08-21 review. Deleted a duplicated pair of finding helpers, moved table styling to a leaf module so an analyzer wrapper no longer imports the CLI layer (**48 ms saved per artifact spawn**), retired a blanket lint exemption that had been masking three blind excepts in `fab_test.py`, and brought both wrappers under the statement budget (**report 31 → 29**). Mutation-tested the 17 "vacuous" assertions and found the review had overstated it — only one actually was. 6/6 tasks; 3 deferred (TRX parsed twice, three `_truncate` copies, `ET.fromstring` under `S314`).
 - [Complexity and Coverage](tasks/archive/2026-08-21-complexity-and-coverage.md) — The 80% coverage floor made real (measured **75%**, now **82%** and enforced in CI) and the complexity report cut from **45 findings to 31**. `main`, `_run_analyzer`, `_print_all_summary`, `run_bpa`, and `run_pql_test` all left the report; a shared `run_tool` holds the three-way failure classification every analyzer wrapper had duplicated. Both floors are now ratchets guarded by tests — the coverage omit list cannot go stale or swallow library code, and the complexity total cannot grow. 8/8 tasks; 3 deferred (`run_inspector`, `validate_environments_yaml`, and the long tail).
 - [Human-Readable Reports](tasks/archive/2026-08-21-human-readable-reports.md) — A readable HTML report per artifact behind `--report`, a per-run `index.html`, and `native_html_output_path`/`started_at` promoted to documented optional envelope keys. One renderer serves every analyzer because the envelope already normalizes findings; PBIR keeps its richer upstream `TestRun.html`. Also rebuilt the `all` summary — paths moved out of the table (a row was 210 chars in an 80-column terminal), emoji status replaced with text, and colour added for status and non-zero counts. 7/7 tasks; 3 deferred (a `pql-lint` report, Playwright report integration, trend/baseline views).
 - [CLI Global Options](tasks/cli-global-options-epic.md) — Added `--help` epilog and `--version`/`-V` to the `fab-test` CLI.
