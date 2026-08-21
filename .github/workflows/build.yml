@@ -76,11 +76,39 @@ jobs:
       - name: Build wheel and sdist
         run: python -m build
 
-      - name: Check wheel hygiene
+      # Both directions. The exclusion half was already here; the inclusion
+      # half is new, because the wheel shipped no metadata at all for months
+      # and nothing noticed -- `bpa` resolved its rules to a path that only
+      # exists in a checkout of this repository. A glob that matches nothing
+      # is not a build error, so the wheel is the only place to assert it.
+      - name: Check wheel contents
         run: |
           set -e
-          pip install unzip
-          unzip -l dist/*.whl | grep -E "(\.github|\.fabric|docs/|tests/|TabularEditor|PBIR-Inspector|analyzer-results|\.venv|\.env|bandit-report|bpa-results|coverage\.json)" && { echo "Excluded path found in wheel"; exit 1; } || true
+          python - <<'PY'
+          import glob, sys, zipfile
+
+          REQUIRED = [
+              "fabric_ci_cd_dataops/metadata/analyzers.json",
+              "fabric_ci_cd_dataops/metadata/artifact-map.json",
+              "fabric_ci_cd_dataops/metadata/rules/BPARules.json",
+              "fabric_ci_cd_dataops/metadata/rules/pbi-inspector-custom-rules.json",
+              "fabric_ci_cd_dataops/schemas/fab-test.schema.json",
+          ]
+          FORBIDDEN = (
+              ".github/", ".fabric/", "docs/", "tests/", "TabularEditor/",
+              "PBIR-Inspector/", "analyzer-results/", ".venv/", ".env",
+              "bandit-report", "bpa-results", "coverage.json",
+          )
+
+          names = set(zipfile.ZipFile(glob.glob("dist/*.whl")[0]).namelist())
+          missing = [r for r in REQUIRED if r not in names]
+          leaked = sorted(n for n in names if any(f in n for f in FORBIDDEN))
+
+          for label, items in (("missing from wheel", missing), ("must not ship", leaked)):
+              for item in items:
+                  print(f"{label}: {item}")
+          sys.exit(1 if missing or leaked else 0)
+          PY
 
       - name: Test install in clean venv
         run: |

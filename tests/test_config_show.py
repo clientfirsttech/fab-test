@@ -18,6 +18,12 @@ from fabric_ci_cd_dataops.scripts.fab_test_summary import _print_config_show
 
 _EXPECTED_KEYS = {"artifact_dir", "output_dir", "jobs", "format", "timeout", "environment"}
 
+# Resolved by metadata layer rather than by flag/env/config, so their origins
+# name a directory (`.fab-test/metadata`, `.github/metadata`, `packaged`)
+# instead of the flag/env vocabulary. Listed separately so the exact-equality
+# assertion below stays a real guard against an accidental extra row.
+_EXPECTED_RULESET_KEYS = {"rules.bpa", "rules.pbir"}
+
 
 @pytest.mark.fab_test
 def test_config_show_lists_every_setting_text_format():
@@ -30,7 +36,7 @@ def test_config_show_lists_every_setting_text_format():
         check=False,
     )
     assert result.returncode == 0, result.stderr
-    for key in _EXPECTED_KEYS:
+    for key in _EXPECTED_KEYS | _EXPECTED_RULESET_KEYS:
         assert key in result.stdout, f"missing '{key}' in:\n{result.stdout}"
 
 
@@ -47,7 +53,7 @@ def test_config_show_json_has_every_setting_with_origin():
     assert result.returncode == 0, result.stderr
     data = json.loads(result.stdout)
     keys_seen = {row["key"] for row in data["settings"]}
-    assert keys_seen == _EXPECTED_KEYS
+    assert keys_seen == _EXPECTED_KEYS | _EXPECTED_RULESET_KEYS
     for row in data["settings"]:
         assert "value" in row
         assert "origin" in row

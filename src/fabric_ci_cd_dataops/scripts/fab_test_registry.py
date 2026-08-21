@@ -27,6 +27,7 @@ from ._desktop import (
     detect_desktop_instances,
     match_instance_to_artifact,
 )
+from ._metadata import ANALYZERS, BPA_RULES, PBIR_RULES, metadata_path
 from ._pbip_discovery import discover_pbip_projects
 from ._report_html import resolve_report
 from ._rule_overlay import apply_overlay, apply_pbir_overlay
@@ -61,15 +62,13 @@ def _script_module(script_name: str) -> str:
 
 # Default tool locations (match analyzers.json registry)
 _DEFAULT_TE_PATH = str(REPO_ROOT / "TabularEditor" / "TabularEditor.exe")
-_DEFAULT_BPA_RULES = str(
-    REPO_ROOT / ".github" / "metadata" / "rules" / "BPARules.json"
-)
+# Resolved through metadata_path so an install outside a checkout falls back
+# to the copy in the wheel. The repository copy still wins where one exists.
+_DEFAULT_BPA_RULES = str(metadata_path(BPA_RULES, REPO_ROOT))
 _DEFAULT_INSPECTOR_PATH = str(REPO_ROOT / "PBIR-Inspector" / "PBIRInspectorCLI")
-_DEFAULT_PBIR_RULES = str(
-    REPO_ROOT / ".github" / "metadata" / "rules" / "pbi-inspector-custom-rules.json"
-)
+_DEFAULT_PBIR_RULES = str(metadata_path(PBIR_RULES, REPO_ROOT))
 
-ANALYZERS_JSON = REPO_ROOT / ".github" / "metadata" / "analyzers.json"
+ANALYZERS_JSON = metadata_path(ANALYZERS, REPO_ROOT)
 
 # Maps subcommand name -> (artifact glob, human description)
 ANALYZER_REGISTRY: dict[str, tuple[str, str]] = {

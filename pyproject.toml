@@ -4,7 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fab-test"
-version = "1.0.0"
+# Read from fabric_ci_cd_dataops.__version__ -- see [tool.setuptools.dynamic].
+dynamic = ["version"]
 requires-python = ">=3.12"
 description = "Metadata-driven CI/CD and validation framework for Microsoft Fabric artifacts"
 readme = "README.md"
@@ -65,17 +66,30 @@ smoke-test-pql-test = "fabric_ci_cd_dataops.scripts.smoke_test_pql_test:main"
 tabular-editor-bpa = "fabric_ci_cd_dataops.scripts.invoke_tabular_editor_bpa:main"
 validate-environments-yaml = "fabric_ci_cd_dataops.scripts.validate_environments_yaml:main"
 
+[tool.setuptools.dynamic]
+# One place writes the version: src/fabric_ci_cd_dataops/__init__.py. A static
+# version here would be the second, and a release bump reaches it first --
+# leaving the CLI's --version reporting a string that was never published.
+# TestPyPI refuses a repeat upload of a version, so bumps are frequent enough
+# for that drift to be a matter of when, not whether.
+version = { attr = "fabric_ci_cd_dataops.__version__" }
+
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["fabric_ci_cd_dataops*"]
 
 [tool.setuptools.package-data]
 "fabric_ci_cd_dataops.scripts" = ["**/*.py"]
+# The analyzers cannot run on what the wheel does not carry: `bpa` and
+# `pbir` are handed a rules path, and `doctor` reads analyzers.json for the
+# install URL of a missing tool. `metadata/*.json` alone left rules/ behind.
+# A glob matching nothing is not a build error, which is how "agents/*" and
+# "skills/*/*" were declared for months against directories that do not
+# exist here -- tests/test_packaged_metadata.py now fails on a dead pattern.
 "fabric_ci_cd_dataops" = [
-    "agents/*",
-    "skills/*/*",
     "schemas/*.json",
     "metadata/*.json",
+    "metadata/rules/*.json",
 ]
 
 [tool.coverage.run]
