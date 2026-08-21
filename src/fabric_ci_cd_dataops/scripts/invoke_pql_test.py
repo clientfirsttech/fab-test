@@ -12,7 +12,6 @@ import argparse
 import json
 import os
 import shutil
-import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -24,6 +23,7 @@ from ._analyzer_envelope import (
     native_output_path,
     write_envelope,
 )
+from ._analyzer_process import run_tool
 from ._report_html import attach_report
 
 _VERBOSITY_LEVELS = {"summary": 0, "default": 1, "verbose": 2, "debug": 3}
@@ -190,6 +190,80 @@ def write_results(
     write_envelope(output_path, env)
 
 
+def _resolve_pql_command(command: list[str]) -> list[str]:
+    """Return ``command`` with its executable resolved, or a module fallback.
+
+    Checks PATH first, then the repository's own ``.venv`` -- keyed off the
+    working directory rather than the installed package location, so the
+    fallback works whether fab-test runs from source or from a wheel. When
+    nothing is found, ``pql-test`` is reachable as ``python -m pql_test``.
+    """
+    executable = shutil.which(command[0])
+    if not executable:
+        repo_root = Path(os.getenv("GITHUB_WORKSPACE", ".")).resolve()
+        for venv_subdir in ("Scripts", "bin"):
+            candidate = repo_root / ".venv" / venv_subdir / command[0]
+            if sys.platform == "win32" and not candidate.suffix:
+                candidate = candidate.with_suffix(".exe")
+            if candidate.exists():
+                executable = str(candidate)
+                break
+    if executable:
+        return [executable, *command[1:]]
+    if command[0] == "pql-test":
+        return [sys.executable, "-m", "pql_test", *command[1:]]
+    return list(command)
+
+
+def _summarize_results(
+    test_results: "list[dict[str, Any]] | None",
+) -> "dict[str, int] | None":
+    """Count passed/failed/skipped when pql-test did not report its own counters."""
+    if not test_results:
+        return None
+    total = len(test_results)
+    passed = sum(1 for r in test_results if isinstance(r, dict) and r.get("passed"))
+    skipped = sum(
+        1 for r in test_results if isinstance(r, dict) and _is_pql_test_skipped(r)
+    )
+    return {
+        "passed": passed,
+        "failed": total - passed - skipped,
+        "skipped": skipped,
+        "total": total,
+    }
+
+
+def _pql_status(
+    test_summary: "dict[str, int] | None",
+    findings: list[dict[str, Any]],
+    returncode: int,
+) -> tuple[str, str]:
+    """Classify the run and build its message.
+
+    An all-skipped run is reported as skipped, not failed. Skips mean the
+    platform or workspace was unavailable, and vision.md is explicit that
+    platform gaps degrade to skips -- so CI does not go red for missing
+    credentials, while a real assertion failure still does.
+    """
+    counts = test_summary or {}
+    passed = counts.get("passed", 0)
+    failed = counts.get("failed", 0)
+    skipped = counts.get("skipped", 0)
+    total = counts.get("total", 0)
+    counter_msg = f"{total} tests, {passed} passed, {failed} failed, {skipped} skipped"
+
+    if returncode == 0 and not findings:
+        return "passed", f"pql-test passed: {counter_msg}"
+    all_skipped = (
+        test_summary is not None and total > 0 and passed == 0 and failed == 0
+        and skipped == total
+    )
+    if all_skipped:
+        return "skipped", f"pql-test skipped: {counter_msg}"
+    return "failed", f"pql-test failed: {counter_msg}"
+
+
 def run_pql_test(args: argparse.Namespace) -> int:
     """Run pql-test and return an exit code."""
     artifact_path = validate_path(args.artifact_path, "Artifact path")
@@ -227,65 +301,26 @@ def run_pql_test(args: argparse.Namespace) -> int:
         log(f"Executing: {' '.join(command)}")
         log("")
 
-    executable = shutil.which(command[0])
-    if not executable:
-        # Also check the repo's local .venv (Scripts on Windows, bin on Unix).
-        # Use cwd/repo root rather than the installed package location so the
-        # fallback works whether fab-test is run from source or a wheel.
-        _repo_root = Path(os.getenv("GITHUB_WORKSPACE", ".")).resolve()
-        for venv_subdir in ("Scripts", "bin"):
-            candidate = _repo_root / ".venv" / venv_subdir / command[0]
-            if sys.platform == "win32" and not candidate.suffix:
-                candidate = candidate.with_suffix(".exe")
-            if candidate.exists():
-                executable = str(candidate)
-                break
-    if executable:
-        command[0] = executable
-    elif command[0] == "pql-test":
-        command = [sys.executable, "-m", "pql_test", *command[1:]]
-    else:
-        command = [command[0], *command[1:]]
+    command = _resolve_pql_command(command)
 
     with Timer() as timer:
-        try:
-            proc = subprocess.run(
-                command,
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                timeout=300,
-                env=pql_env,
-                check=False,
-            )
-        except subprocess.TimeoutExpired:
-            message = "pql-test timed out after 5 minutes"
-            write_results(
-                output_path, "timeout", [], artifact_path,
-                message=message, native_out=nat_out,
-                desktop_port=desktop_port, desktop_model_name=desktop_model_name,
-            )
-            print(f"::error::{message}", file=sys.stderr)
-            return 1
-        except FileNotFoundError:
-            message = "pql-test executable not found"
-            write_results(
-                output_path, "error", [], artifact_path,
-                message=message, native_out=nat_out,
-                desktop_port=desktop_port, desktop_model_name=desktop_model_name,
-            )
-            print(f"::error::{message}", file=sys.stderr)
-            return 1
-        except Exception as exc:  # noqa: BLE001 - wrapper boundary: failures become an error envelope
-            message = f"Unexpected error running pql-test: {exc}"
-            write_results(
-                output_path, "error", [], artifact_path,
-                message=message, native_out=nat_out,
-                desktop_port=desktop_port, desktop_model_name=desktop_model_name,
-            )
-            print(f"::error::{message}", file=sys.stderr)
-            return 1
+        outcome = run_tool(
+            command,
+            timeout=300,
+            label="pql-test",
+            timeout_message="pql-test timed out after 5 minutes",
+            missing_message="pql-test executable not found",
+            env=pql_env,
+        )
+    if outcome.failed:
+        write_results(
+            output_path, outcome.status, [], artifact_path,
+            message=outcome.message, native_out=nat_out,
+            desktop_port=desktop_port, desktop_model_name=desktop_model_name,
+        )
+        print(f"::error::{outcome.message}", file=sys.stderr)
+        return 1
+    proc = outcome.proc
 
     if level >= _VERBOSITY_LEVELS["debug"] and (proc.stdout or proc.stderr):
         log("--- stdout ---")
@@ -303,52 +338,8 @@ def run_pql_test(args: argparse.Namespace) -> int:
 
     # Reconstruct counters from the result list when the native file does not
     # include a summary block (older pql-test versions or mocked stdout).
-    if test_summary is None and test_results:
-        total = len(test_results)
-        passed = sum(1 for r in test_results if isinstance(r, dict) and r.get("passed"))
-        skipped = sum(
-            1
-            for r in test_results
-            if isinstance(r, dict) and _is_pql_test_skipped(r)
-        )
-        failed = total - passed - skipped
-        test_summary = {
-            "passed": passed,
-            "failed": failed,
-            "skipped": skipped,
-            "total": total,
-        }
-
-    passed = test_summary.get("passed", 0) if test_summary else 0
-    failed = test_summary.get("failed", 0) if test_summary else 0
-    skipped = test_summary.get("skipped", 0) if test_summary else 0
-    total = test_summary.get("total", 0) if test_summary else 0
-
-    counter_msg = f"{total} tests, {passed} passed, {failed} failed, {skipped} skipped"
-
-    # Skipped tests are not failures when the underlying platform/workspace is
-    # unavailable (vision §2.7: "platform gaps degrade to skips"). Treat an
-    # all-skipped run as a skipped analyzer so CI does not fail for missing
-    # credentials, while still failing on actual assertion failures.
-    all_skipped = (
-        test_summary is not None
-        and total > 0
-        and passed == 0
-        and failed == 0
-        and skipped == total
-    )
-
-    success = proc.returncode == 0 and not findings
-
-    if success:
-        status = "passed"
-        message = f"pql-test passed: {counter_msg}"
-    elif all_skipped:
-        status = "skipped"
-        message = f"pql-test skipped: {counter_msg}"
-    else:
-        status = "failed"
-        message = f"pql-test failed: {counter_msg}"
+    test_summary = test_summary or _summarize_results(test_results)
+    status, message = _pql_status(test_summary, findings, proc.returncode)
 
     if status in {"passed", "skipped"}:
         write_results(
