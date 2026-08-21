@@ -20,6 +20,45 @@ from ._report_html import resolve_report, write_index
 from ._target import target_from_args
 from .fab_test_registry import ANALYZER_REGISTRY, discover_artifacts
 
+# Boxed borders make column boundaries unambiguous, which matters most where
+# a cell holds a long path. tabulate is already a dependency, so this costs
+# nothing; `rich` would look better still but is a runtime dependency for
+# presentation alone.
+_TABLE_FORMAT = "rounded_outline"
+
+
+def table_padding(col_count: int) -> int:
+    """Return the non-content characters a table of ``col_count`` costs.
+
+    Column widths are budgeted against the terminal, so this has to match
+    whatever `_TABLE_FORMAT` actually draws or wide cells overflow and wrap
+    — which looks worse than the truncation the budget exists to produce.
+
+    A boxed format spends ``"│ "`` on the left edge, ``" │ "`` between each
+    pair, and ``" │"`` on the right: ``3 * col_count + 1``. A borderless
+    one spends two spaces between columns and nothing at the edges.
+    """
+    if "outline" in _TABLE_FORMAT or "grid" in _TABLE_FORMAT:
+        return 3 * col_count + 1
+    return 2 * (col_count - 1)
+
+
+def _status_label(status: str) -> str:
+    """Return the status text for a summary table cell.
+
+    Plain text, deliberately. The emoji these replaced carry a variation
+    selector: `tabulate` measures them as one column while most terminals
+    draw them as two, so every row with a status pushed the columns after
+    it out of alignment by a character.
+    """
+    return {
+        "passed": "passed",
+        "warning": "warning",
+        "failed": "FAILED",
+        "dry-run": "dry-run",
+        "skipped": "skipped",
+    }.get(status, status)
+
 
 def _print_list(rows: list[dict[str, Any]], output_format: str = "text") -> int:
     """Print the `fab-test list` capability report. Always exits 0."""
@@ -41,7 +80,7 @@ def _print_list(rows: list[dict[str, Any]], output_format: str = "text") -> int:
     table = tabulate(
         display_rows,
         headers=("Analyzer", "Aliases", "Glob", "Matched", "Required Tool", "Scopes"),
-        tablefmt="simple",
+        tablefmt=_TABLE_FORMAT,
         stralign="left",
     )
     print(table)
@@ -79,7 +118,7 @@ def _print_auth_status(
     if workspace:
         rows.append(("workspace", workspace["id"]))
         rows.append(("reachable", "yes" if workspace["reachable"] else "no"))
-    print(tabulate(rows, headers=("Check", "Value"), tablefmt="simple", stralign="left"))
+    print(tabulate(rows, headers=("Check", "Value"), tablefmt=_TABLE_FORMAT, stralign="left"))
     if payload.get("detail"):
         print(f"\n  {payload['detail']}")
     if payload.get("remediation"):
@@ -212,7 +251,7 @@ def _build_findings_table(
 
     # Allocate column widths: keep severity compact, cap rule/object widths,
     # and guarantee the message column at least 20 characters.
-    padding = 2 * (4 - 1)  # 2 spaces between each of the 4 columns
+    padding = table_padding(4)
     sev_w = min(max((len("Severity"), *(len(r[1]) for r in rows))), 10)
     rule_w = min(max((len("Rule"), *(len(r[0]) for r in rows))), 25)
     obj_w = min(max((len("Object"), *(len(r[2]) for r in rows))), 20)
@@ -238,7 +277,7 @@ def _build_findings_table(
     return rows, tabulate(
         truncated,
         headers=("Rule", "Severity", "Object", "Message"),
-        tablefmt="simple",
+        tablefmt=_TABLE_FORMAT,
         stralign="left",
     )
 
@@ -275,7 +314,7 @@ def _build_pql_test_table(
     # Allocate column widths: cap suite/test, keep status compact,
     # and guarantee expected/actual at least 10 characters each.
     col_count = 5
-    padding = 2 * (col_count - 1)
+    padding = table_padding(col_count)
     suite_w = min(max((len("Test Suite"), *(len(str(r[0])) for r in rows))), 25)
     test_w = min(max((len("Test"), *(len(str(r[1])) for r in rows))), 40)
     status_w = min(max((len("Passed"), *(len(str(r[4])) for r in rows))), 10)
@@ -311,7 +350,7 @@ def _build_pql_test_table(
     return rows, tabulate(
         truncated,
         headers=("Test Suite", "Test", "Expected", "Actual", "Passed"),
-        tablefmt="simple",
+        tablefmt=_TABLE_FORMAT,
         stralign="left",
     )
 
@@ -533,19 +572,6 @@ def _print_all_summary(
         )
     )
 
-    def _status_label(status: str) -> str:
-        if status == "passed":
-            return "✅ passed"
-        if status == "warning":
-            return "⚠️ warning"
-        if status == "failed":
-            return "❌ failed"
-        if status == "dry-run":
-            return "💨 dry-run"
-        if status == "skipped":
-            return "⏭️ skipped"
-        return status
-
     # Only worth a column when something in this run actually produced a
     # report; otherwise it is a header over nothing but blanks.
     any_report = any(r.get("report_path") for r in rows)
@@ -573,7 +599,7 @@ def _print_all_summary(
     table = tabulate(
         [_cells(r) for r in rows],
         headers=headers,
-        tablefmt="simple",
+        tablefmt=_TABLE_FORMAT,
         stralign="left",
     )
     print("\n".join(f"  {line}" for line in table.splitlines()))

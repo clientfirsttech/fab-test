@@ -116,6 +116,16 @@ def render_report(envelope: dict[str, Any]) -> str:
         body = _table(_RULE_HEADERS, rows, class_index=1)
 
     meta = f"<code>{escape(artifact)}</code> — status: {escape(status)}"
+    # Run time comes from the envelope, never from render time: a report
+    # regenerated from a stored envelope must not claim a different moment
+    # than the original. Labelled UTC because a bare timestamp invites the
+    # reader to assume local.
+    started_at = str(envelope.get("started_at", ""))
+    if started_at:
+        meta += f" — run {escape(started_at)} UTC"
+    duration_ms = envelope.get("duration_ms")
+    if isinstance(duration_ms, (int, float)) and duration_ms:
+        meta += f" in {duration_ms / 1000:.1f}s"
     if message:
         meta += f" — {escape(message)}"
 

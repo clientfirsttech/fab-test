@@ -163,6 +163,7 @@ def write_results(
     message: str = "",
     native_out: "Path | None" = None,
     duration_ms: int = 0,
+    started_at: str = "",
     test_summary: "dict[str, int] | None" = None,
     desktop_port: "int | None" = None,
     desktop_model_name: str = "",
@@ -175,6 +176,7 @@ def write_results(
         message=message,
         findings=findings,
         native_output_path_str=str(native_out) if native_out else "",
+        started_at=started_at,
         duration_ms=duration_ms,
     )
     env["test_results"] = test_results or []
@@ -359,6 +361,7 @@ def run_pql_test(args: argparse.Namespace) -> int:
             message=message,
             native_out=nat_out,
             duration_ms=timer.elapsed_ms,
+            started_at=timer.started_at,
             desktop_port=desktop_port,
             desktop_model_name=desktop_model_name,
         )
@@ -379,6 +382,7 @@ def run_pql_test(args: argparse.Namespace) -> int:
         message=message,
         native_out=nat_out,
         duration_ms=timer.elapsed_ms,
+            started_at=timer.started_at,
         desktop_port=desktop_port,
         desktop_model_name=desktop_model_name,
     )
