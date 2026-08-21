@@ -4,7 +4,7 @@ Guiding vision and constraints: [vision.md](vision.md)
 
 ## Active Epics
 
-None currently — see Standalone Tasks below for open follow-ups.
+- [Review Cleanup](tasks/review-cleanup-epic.md) — 📋 PLANNED. The five findings from the 2026-08-21 review: a duplicated pair of finding helpers, a wrapper importing the presentation layer (~59 ms per artifact spawn), a blanket lint exemption on `fab_test.py` masking four diagnostics, 17 whole-stdout test assertions of the shape that produced four vacuous tests in a day, and two wrappers still over the statement budget. **6 tasks**, 3 deferred. Three of the five are debt from that same day's epics.
 
 ## Standalone Tasks
 
