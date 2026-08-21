@@ -140,7 +140,7 @@ Per-artifact `status` is one of `passed` / `failed` / `skipped` / `timeout` / `p
  fab-test playwright-impact — Build impacted-report manifest from changed artifacts [alias: playwright_impact]
  fab-test dependencies     — Discover reports that depend on a deployed semantic model
  fab-test all              — Run the analyzers listed in analyzers.json
- fab-test local            — Run pql-lint, BPA, PBIR Inspector, and Desktop-bound pql-test — no cloud required
+ fab-test local            — Run BPA, PBIR Inspector, and Desktop-bound pql-test — no cloud required
  fab-test doctor           — Check whether each analyzer's tool/credentials are ready
  fab-test doctor --local   — Check readiness for the local Desktop workflow specifically
  fab-test list             — List subcommands with artifact glob, matched count, and required tool
@@ -155,7 +155,7 @@ Per-artifact `status` is one of `passed` / `failed` / `skipped` / `timeout` / `p
 
 ### Hidden subcommands
 
-`pql-lint` is **hidden from the advertised surface**: it is absent from `--help`, `fab-test list`, and the default `doctor` report. It remains fully invocable — `fab-test pql-lint`, its `pql_lint` alias, `fab-test pql-lint --help`, `fab-test explain pql_lint`, and `fab-test doctor --analyzer pql_lint` all work exactly as before, and `fab-test local` still runs it. Hiding is a visibility state, never a removal: the backward-compatibility constraint in [vision.md](../../../vision.md) means existing commands keep working.
+`pql-lint` is **hidden from the advertised surface**: it is absent from `--help`, `fab-test list`, and the default `doctor` report. It remains fully invocable — `fab-test pql-lint`, its `pql_lint` alias, `fab-test pql-lint --help`, `fab-test explain pql_lint`, and `fab-test doctor --analyzer pql_lint` all work exactly as before. `fab-test local` no longer includes it, though: a bundle should not run what the CLI does not offer. Hiding is a visibility state, never a removal: the backward-compatibility constraint in [vision.md](../../../vision.md) means existing commands keep working.
 
 Underscore spellings (`pql_test`, `pql_lint`, `playwright_impact`) still work silently as aliases —
 existing scripts and muscle memory keep working. Result directories under `analyzer-results/`
@@ -346,7 +346,7 @@ rules:
     severity: {SOME_RULE_ID: warning}            # info | warning | error
     extend: path/to/extra-bpa-rules.json         # append rules from another file
   pbir:
-    disable: [REMOVE_UNUSED_CUSTOM_VISUALS]
+    disable: [REMOVE_CUSTOM_VISUALS_NOT_USED]
     severity: {SOME_RULE_ID: warning}            # warning | error (PBIR Inspector has no "info" level)
 ```
 
@@ -390,7 +390,7 @@ The older spelling still works: `fab-test bpa --artifact SampleModel-PQLAssert`.
 
 ### local
 
-Runs `pql-lint`, BPA, PBIR Inspector, and Desktop-bound `pql-test` against every `.pbip` project discovered under `--artifact-dir` — no `.fabric/artifacts` layout required, no Fabric workspace, no service principal. Its subparser doesn't expose `--workspace-id` or `--env` at all, so the remote XMLA path is unreachable from `local`.
+Runs BPA, PBIR Inspector, and Desktop-bound `pql-test` against every `.pbip` project discovered under `--artifact-dir` — no `.fabric/artifacts` layout required, no Fabric workspace, no service principal. Its subparser doesn't expose `--workspace-id` or `--env` at all, so the remote XMLA path is unreachable from `local`.
 
 | Flag | Default | Description |
 |------|---------|-------------|

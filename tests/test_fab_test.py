@@ -586,7 +586,7 @@ def test_build_pbir_command_writes_resolved_rules_when_overlay_configured(tmp_pa
     """An overlay writes a resolved ruleset under output_dir and points --rules-path at it."""
     artifact = tmp_path / "Model.Report"
     artifact.mkdir()
-    args = argparse.Namespace(file_config={"rules": {"pbir": {"disable": ["REMOVE_UNUSED_CUSTOM_VISUALS"]}}})
+    args = argparse.Namespace(file_config={"rules": {"pbir": {"disable": ["REMOVE_CUSTOM_VISUALS_NOT_USED"]}}})
     output_dir = tmp_path / "results"
 
     cmd = build_pbir_command(artifact, args, output_dir)
@@ -596,7 +596,7 @@ def test_build_pbir_command_writes_resolved_rules_when_overlay_configured(tmp_pa
     assert resolved_path == output_dir / "pbir" / "_resolved-rules.json"
     resolved_doc = json.loads(resolved_path.read_text(encoding="utf-8"))
     by_id = {r["id"]: r for r in resolved_doc["rules"]}
-    assert by_id["REMOVE_UNUSED_CUSTOM_VISUALS"]["disabled"] is True
+    assert by_id["REMOVE_CUSTOM_VISUALS_NOT_USED"]["disabled"] is True
 
 
 @pytest.mark.fab_test

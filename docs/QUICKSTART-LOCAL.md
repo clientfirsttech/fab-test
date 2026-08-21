@@ -28,7 +28,6 @@ Four commands. Step 2 tells you exactly what's missing and how to fix it before 
 
 | Analyzer | Needs |
 |----------|-------|
-| `pql-lint` (Power Query linter) | `pqlint` on `PATH` or importable — nothing else |
 | BPA (Tabular Editor Best Practice Analyzer) | Tabular Editor, downloaded automatically on first run |
 | PBIR Inspector | PBIR Inspector, downloaded automatically on first run |
 | `pql-test` (DAX/PQL tests) | Nothing extra — connects to your open Desktop instance automatically |
@@ -49,12 +48,11 @@ reports, in order: your Python version, whether a Power BI Desktop instance is r
    → Open a .pbip file in Power BI Desktop
 ❌ desktop-bridge: not found on PATH
    → npm install -g @microsoft/powerbi-desktop-bridge-cli (preview; report-render checks only)
-✅ pql_lint: pqlint available
 ✅ bpa: resolved via cached download
 ✅ pbir: resolved via cached download
 ✅ pql_test: pql-test is a fab-test dependency
 
-fab-test local would run: pql_lint, bpa, pbir, pql_test
+fab-test local would run: bpa, pbir, pql_test
 ```
 
 Add `--format json` for a single machine-readable document instead.
