@@ -215,6 +215,31 @@ Precedence, for every setting:
   run: fab-test pql-test --env PROD --workspace-id ${{ vars.FABRIC_WORKSPACE_ID }} --format json
 ```
 
+### Overriding metadata in a pipeline
+
+No path flags are needed: commit the files under `.fab-test/metadata/` and every analyzer
+picks them up. Only `environments.yml` has no packaged default, so a workflow that deploys or
+resolves a deployed item by name has to supply it.
+
+```yaml
+# committed alongside the workflow file, no secrets:
+#   .fab-test/metadata/rules/BPARules.json    <- overrides the packaged ruleset
+#   .fab-test/metadata/environments.yml       <- required; there is no packaged default
+
+- name: Confirm which ruleset is actually in force
+  run: fab-test config --show --format json    # reports each ruleset's origin layer
+
+- name: Fail early if environments.yml is missing or malformed
+  run: validate-environments-yaml              # exits 1 naming both candidate paths
+
+- name: Run Playwright against a named report
+  env:
+    FABRIC_TENANT_ID: ${{ secrets.FABRIC_TENANT_ID }}
+    FABRIC_CLIENT_ID: ${{ secrets.FABRIC_CLIENT_ID }}
+    FABRIC_CLIENT_SECRET: ${{ secrets.FABRIC_CLIENT_SECRET }}
+  run: fab-test playwright --artifact ThinReport --env PROD --format json
+```
+
 See the [Configuration section of the fab-test skill](../.github/skills/fab-test/SKILL.md#configuration) for the full settings list and rule-overlay keys.
 
 ### Pipeline snippet: a reviewable report as the build artifact

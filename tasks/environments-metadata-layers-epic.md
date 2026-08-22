@@ -1,6 +1,6 @@
 # Environments Metadata Layers Epic
 
-**Status**: 🚧 IN-PROGRESS (4/5)
+**Status**: ✅ COMPLETED (5/5 tasks, 1 found and recorded)
 **Goal**: `environments.yml` resolves through the same layers as every other metadata file, and a Playwright run with no environment says so instead of crashing.
 
 ## Overview
@@ -175,7 +175,7 @@ requirement changes is the requirement's problem, not the test's.
 
 ---
 
-## 5. Document for All Three Callers
+## 5. Document for All Three Callers ✅
 
 **Requirements**:
 - Given an agent reads a skill, should find `.fab-test/metadata/environments.yml` documented alongside the rulesets, and the new Playwright environment error with its remediation
@@ -183,7 +183,54 @@ requirement changes is the requirement's problem, not the test's.
 - Given a pipeline author needs YAML, should get a copy-pasteable snippet that does not hand-derive the metadata path
 - Given the docs land, should not collide with the TestPyPI Release epic's own tasks 4-8 in the shared checkout
 
-**Files**: `.github/skills/fab-test/SKILL.md`, `README.md`, `docs/`
+**Files**: `.github/skills/fab-test/SKILL.md`, `README.md`, `docs/QUICK-VALIDATION.md`
+
+**Done (2026-08-21)**: nothing documented `.fab-test/metadata/` before this -- the TestPyPI
+Release epic shipped the mechanism and its own docs task had not landed yet, so all three
+surfaces were describing a layout the code no longer had.
+
+- **Agent**: a *Metadata files and where they come from* section in the skill -- the layer
+  table, which files have a packaged fallback and which does not, and both new error messages
+  verbatim with their exit code.
+- **Human**: a *Where metadata lives* subsection in the README showing the directory to
+  create, and why `environments.yml` is the one file with no shipped default.
+- **Pipeline**: an *Overriding metadata in a pipeline* snippet -- no path flags, plus
+  `validate-environments-yaml` as an early gate and `config --show --format json` to prove
+  which ruleset is in force.
+
+Both doc claims were checked against the running CLI rather than the source: `config --show
+--format json` does report `rules.bpa`/`rules.pbir` with `origin`, and it covers rulesets
+only -- not `analyzers.json`, `artifact-map.json`, or `environments.yml` -- so the sentence
+says "ruleset", which is all it can honestly claim.
+
+---
+
+## Retrospective
+
+**A finding deferred by everyone is a finding lost.** Task 1 fixed a live crash that both
+sessions had already seen and both had correctly ruled out of their own epics -- once as
+unplanned scope, once as superseded. Neither was wrong, and the result was still that the only
+`AttributeError` on `dev` was recorded in no epic, no issue, and no test. It survived because a
+commit message mentioned it in passing. The habit worth keeping is the *Found, Not Fixed*
+section below: out of scope has to mean written down somewhere, not just not-here.
+
+**"Delegate to the module that already does this" was not enough.** Task 4 looked like
+replacing a duplicate loader with a one-line call. The module it delegated to, `_artifact_types`,
+predated the layer work and read `.github/metadata/` directly -- so the documented
+`.fab-test/` override had been silently doing nothing for the artifact map, in every caller.
+Reading the delegate rather than trusting its name turned a tidy-up into the fix the
+requirement actually asked for.
+
+**Blast radius earned its place in vision.md again.** Running all six callers for real, rather
+than only the Playwright one that prompted the change, is what surfaced the emoji crash below
+and the fact that `deploy` validates its artifact path before it ever loads config -- so the
+obvious way to test its missing-file path proves nothing.
+
+**Tooling can lie about test results.** `rtk`'s pytest summary reported `No tests collected`
+for runs that had actually collected and failed tests, and reported nothing collected for a
+`-m playwright` selection that collected eight. Every red/green claim here was read from the
+raw log or an unfiltered run. A wrapper that summarises test output is a wrapper that can
+report a pass that did not happen.
 
 ---
 
