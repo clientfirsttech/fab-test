@@ -242,7 +242,7 @@ fab-test bpa --format json             # 3. run it — stdout is exactly one JSO
 cat analyzer-results/run.json          # 4. read the manifest instead of globbing result dirs
 ```
 
-`--format json` guarantees stdout carries nothing but the payload — narration goes to stderr. See the [Agent Contract](https://github.com/kerski/fab-test/blob/main/.github/skills/fab-test/SKILL.md#agent-contract) for exit codes, the JSON stdout guarantee, and the `run.json` schema.
+`--format json` guarantees stdout carries nothing but the payload — narration goes to stderr. When a run fails, `run.json` says why without a second file: an artifact whose analyzer aborted before writing an envelope carries the remediation message in its `detail` field (`"Pass --env, set FABRIC_ENVIRONMENT, ..."`), so uploading the manifest alone is enough to diagnose a red build. See the [Agent Contract](https://github.com/kerski/fab-test/blob/main/.github/skills/fab-test/SKILL.md#agent-contract) for exit codes, the JSON stdout guarantee, and the `run.json` schema.
 
 Full CLI reference: [`.github/skills/fab-test/SKILL.md`](https://github.com/kerski/fab-test/blob/main/.github/skills/fab-test/SKILL.md).
 

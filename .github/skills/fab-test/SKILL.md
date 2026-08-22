@@ -124,7 +124,7 @@ Every analyzer invocation (a single subcommand or `all`) writes one `run.json` u
 }
 ```
 
-Per-artifact `status` is one of `passed` / `failed` / `skipped` / `timeout` / `preflight_failed` (the last two cover an aborted run). `detail` is `null` for a normal completion and carries the human-readable failure reason for the two abort statuses — the resolved remediation message for `preflight_failed`, the exceeded duration for `timeout` — so a caller never has to fall back to stderr to learn what to fix. `origin` is `"local"` when no CI environment variable is detected, or the detected CI system's name (`"github-actions"`, `"gitlab-ci"`, `"circleci"`, `"azure-devops"`) otherwise — the envelope schema, `status` values, and result layout are identical either way; this is the only field that differs between a local run and a CI run. The `command` field is sanitized: known credential flags (`--client-secret`, `--password`, `--token`, `--secret`, `--api-key`) and any `key=value`-shaped token have their value redacted before the file is written — no credential ever appears in the manifest.
+Per-artifact `status` is one of `passed` / `failed` / `skipped` / `timeout` / `preflight_failed` (the last two cover an aborted run). `detail` is `null` for a normal completion and carries the human-readable failure reason whenever the run ended without a result to report — the resolved remediation message for `preflight_failed`, the exceeded duration for `timeout`, and the analyzer's own error message when it exited non-zero before writing an envelope (`"status": "failed"` with `"envelope_path": null`). That last case is the one a pipeline meets most: `fab-test playwright --artifact ThinReport` with no `--env` aborts before authenticating, and `detail` carries `No environment given, so there is nothing to resolve 'ThinReport' against. Pass --env, ...`. So a caller never has to fall back to stderr to learn what to fix — `run.json` on its own is enough, which matters when it is the only file a pipeline uploads. `detail` stays `null` when the analyzer *did* write an envelope, however it failed: the findings are the reason, and `envelope_path` points at them. `origin` is `"local"` when no CI environment variable is detected, or the detected CI system's name (`"github-actions"`, `"gitlab-ci"`, `"circleci"`, `"azure-devops"`) otherwise — the envelope schema, `status` values, and result layout are identical either way; this is the only field that differs between a local run and a CI run. The `command` field is sanitized: known credential flags (`--client-secret`, `--password`, `--token`, `--secret`, `--api-key`) and any `key=value`-shaped token have their value redacted before the file is written — no credential ever appears in the manifest.
 
 `target` is the resolved target as a structured object, or `null` when the run discovered artifacts instead of being pointed at one. Branch on `scope` (`path` / `desktop` / `workspace`) rather than parsing `raw`. Where `origin` says local versus CI, `target` says whether the run read files on disk, a running Desktop instance, or a deployed workspace item — a distinction `origin` alone never answered. `workspace_id` is the GUID resolved from a workspace name; it names a workspace and grants access to nothing, so it is safe to record.
 
@@ -437,7 +437,9 @@ the missing flag rather than a credential problem:
 ::error::No environment given, so there is nothing to resolve 'ThinReport' against. Pass --env, set FABRIC_ENVIRONMENT, or set `environment:` in fab-test.yml.
 ```
 
-Exit code `1`, one `::error::` line, no traceback.
+Exit code `1`, one `::error::` line on stderr, no traceback. The same sentence reaches
+`run.json` as the artifact's `detail`, so an agent reading only the manifest gets the
+remediation without parsing the log.
 
 ### What belongs in `fab-test.yml` vs. repository secrets
 

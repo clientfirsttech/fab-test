@@ -422,3 +422,180 @@ def test_local_missing_prerequisite_skips_without_failing_under_ci(tmp_path, mon
     exit_code = fab_test_module._run_local(args)
 
     assert exit_code == 0
+
+
+# --------------------------------------------------------------------------
+# Abort without an envelope (Standalone: run.json failure detail)
+#
+# An analyzer that exits non-zero before it can write an envelope leaves
+# fab-test with nothing but the child's stderr. That message is the whole
+# remediation -- "pass --env" -- and of vision's three callers the agent was
+# the one left without it: a synthesized `failed` envelope carried no detail,
+# so `run.json` as a sole CI artifact said the run failed and not why.
+# --------------------------------------------------------------------------
+
+
+def _stub_analyzer_run(monkeypatch, fab_test_module, *, stderr: str, returncode: int = 1):
+    """Replace subprocess.run so the analyzer aborts without writing an envelope."""
+    seen: dict[str, object] = {}
+
+    def _fake_run(cmd, **kwargs):
+        seen["kwargs"] = kwargs
+        return subprocess.CompletedProcess(cmd, returncode, stdout="", stderr=stderr)
+
+    monkeypatch.setattr(fab_test_module.subprocess, "run", _fake_run)
+    return seen
+
+
+@pytest.mark.fab_test
+def test_manifest_records_stderr_detail_when_analyzer_writes_no_envelope(
+    tmp_path, monkeypatch
+):
+    """Given an analyzer that aborts with no envelope, detail carries its message."""
+    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+
+    artifact_dir = tmp_path / "artifacts"
+    (artifact_dir / "ThinReport.Report").mkdir(parents=True)
+    output_dir = tmp_path / "analyzer-results"
+
+    _stub_analyzer_run(
+        monkeypatch,
+        fab_test_module,
+        stderr=(
+            "::error::No environment given, so there is nothing to resolve "
+            "'ThinReport' against. Pass --env, set FABRIC_ENVIRONMENT, or set "
+            "`environment:` in fab-test.yml.\n"
+        ),
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "fab-test", "pbir",
+            "--artifact-dir", str(artifact_dir),
+            "--output-dir", str(output_dir),
+        ],
+    )
+
+    fab_test_module.main()
+
+    manifest = json.loads((output_dir / "run.json").read_text(encoding="utf-8"))
+    detail = manifest["artifacts"][0]["detail"]
+    assert manifest["artifacts"][0]["status"] == "failed"
+    assert detail is not None, "an abort with no envelope must say why"
+    # The annotation prefix is transport, not message: run.json is read by an
+    # agent, not by GitHub's log renderer.
+    assert not detail.startswith("::")
+    assert "Pass --env" in detail
+
+
+@pytest.mark.fab_test
+def test_manifest_records_detail_in_ci_where_run_json_is_the_only_artifact(
+    tmp_path, monkeypatch
+):
+    """Given a CI run, detail is still captured -- stderr is piped, not inherited.
+
+    This is the case the requirement is actually about. Inheriting stderr in
+    CI sends the message to the log and nowhere else, which leaves the one
+    file a pipeline uploads with `"detail": null`.
+    """
+    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+
+    artifact_dir = tmp_path / "artifacts"
+    (artifact_dir / "ThinReport.Report").mkdir(parents=True)
+    output_dir = tmp_path / "analyzer-results"
+
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")
+    seen = _stub_analyzer_run(
+        monkeypatch, fab_test_module, stderr="::error::Pass --env to resolve it.\n"
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "fab-test", "pbir",
+            "--artifact-dir", str(artifact_dir),
+            "--output-dir", str(output_dir),
+        ],
+    )
+
+    fab_test_module.main()
+
+    assert seen["kwargs"]["stderr"] is subprocess.PIPE, "CI must capture stderr too"
+    manifest = json.loads((output_dir / "run.json").read_text(encoding="utf-8"))
+    assert manifest["artifacts"][0]["detail"] == "Pass --env to resolve it."
+
+
+@pytest.mark.fab_test
+def test_ci_annotations_survive_stderr_capture(tmp_path, monkeypatch, capsys):
+    """Given a CI run, the child's `::error::` lines still reach the log verbatim.
+
+    Capturing stderr to fill `detail` must not cost the human the annotation
+    GitHub renders against the file. Both callers, one message.
+    """
+    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+
+    artifact_dir = tmp_path / "artifacts"
+    (artifact_dir / "ThinReport.Report").mkdir(parents=True)
+    output_dir = tmp_path / "analyzer-results"
+
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")
+    _stub_analyzer_run(
+        monkeypatch, fab_test_module, stderr="::error::Pass --env to resolve it.\n"
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "fab-test", "pbir",
+            "--artifact-dir", str(artifact_dir),
+            "--output-dir", str(output_dir),
+        ],
+    )
+
+    fab_test_module.main()
+
+    captured = capsys.readouterr()
+    assert "::error::Pass --env to resolve it." in captured.err
+
+
+@pytest.mark.fab_test
+def test_manifest_detail_stays_null_when_the_analyzer_wrote_an_envelope(
+    tmp_path, monkeypatch
+):
+    """Given a normal failing run, detail stays null -- the envelope holds the findings."""
+    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+
+    artifact_dir = tmp_path / "artifacts"
+    (artifact_dir / "ThinReport.Report").mkdir(parents=True)
+    output_dir = tmp_path / "analyzer-results"
+    envelope_dir = output_dir / "pbir" / "ThinReport"
+    envelope_dir.mkdir(parents=True)
+    (envelope_dir / "envelope.json").write_text(
+        json.dumps(
+            {
+                "status": "failed",
+                "analyzer": "pbir",
+                "artifact_path": str(artifact_dir / "ThinReport.Report"),
+                "findings": [{"severity": "error", "message": "a real finding"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    _stub_analyzer_run(monkeypatch, fab_test_module, stderr="noise on stderr\n")
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "fab-test", "pbir",
+            "--artifact-dir", str(artifact_dir),
+            "--output-dir", str(output_dir),
+        ],
+    )
+
+    fab_test_module.main()
+
+    manifest = json.loads((output_dir / "run.json").read_text(encoding="utf-8"))
+    assert manifest["artifacts"][0]["status"] == "failed"
+    assert manifest["artifacts"][0]["detail"] is None
