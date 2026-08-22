@@ -1,14 +1,18 @@
 """Which folder suffixes are Fabric artifacts (Discover From CWD §1).
 
-`.github/metadata/artifact-map.json` maps a folder suffix to a Fabric type
-and already existed before `fab-test` read it — three separate hardcoded
-lists each knew two of its nine types, and a `.Notebook` target was
-rejected as an unknown type the repository itself declared.
+`artifact-map.json` maps a folder suffix to a Fabric type and already
+existed before `fab-test` read it — three separate hardcoded lists each
+knew two of its nine types, and a `.Notebook` target was rejected as an
+unknown type the repository itself declared.
 
-The repository copy wins when present. A copy packaged with the
-distribution covers an install from PyPI, or any run outside a checkout.
-A test asserts the two agree: a fallback that has drifted is worse than
-none, because it answers confidently and wrongly.
+A repository copy wins over the copy packaged with the distribution, which
+covers an install from PyPI or any run outside a checkout. `_metadata` owns
+the layer order (Environments Metadata Layers §4); this module owns only
+what a usable map looks like. It read `.github/metadata/` directly until
+then, so the documented `.fab-test/metadata/` override reached the rulesets
+but not this file. A test asserts the repository and packaged copies agree:
+a fallback that has drifted is worse than none, because it answers
+confidently and wrongly.
 """
 
 from __future__ import annotations
@@ -17,9 +21,9 @@ import json
 import sys
 from pathlib import Path
 
-PACKAGED_ARTIFACT_MAP = Path(__file__).resolve().parent.parent / "metadata" / "artifact-map.json"
+from ._metadata import ARTIFACT_MAP, PACKAGED_METADATA, PACKAGED_ORIGIN, resolve_metadata
 
-_REPO_RELATIVE = Path(".github") / "metadata" / "artifact-map.json"
+PACKAGED_ARTIFACT_MAP = PACKAGED_METADATA / ARTIFACT_MAP
 
 
 def _packaged() -> dict[str, str]:
@@ -29,22 +33,22 @@ def _packaged() -> dict[str, str]:
 def load_artifact_map(repo_root: Path) -> dict[str, str]:
     """Return the suffix-to-type mapping for ``repo_root``.
 
-    Falls back to the packaged copy when the repository has no map, and
-    also when it has an unusable one. A malformed file is not worse than a
-    missing file: either way the caller needs a working answer, and the
-    warning says which file to fix.
+    Falls back to the packaged copy when no repository layer has a map, and
+    also when the one it finds is unusable. A malformed file is not worse
+    than a missing file: either way the caller needs a working answer, and
+    the warning says which file to fix.
     """
-    candidate = repo_root / _REPO_RELATIVE
-    if not candidate.exists():
+    found = resolve_metadata(ARTIFACT_MAP, repo_root)
+    if found.origin == PACKAGED_ORIGIN:
         return _packaged()
     try:
-        data = json.loads(candidate.read_text(encoding="utf-8"))
+        data = json.loads(found.path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError) as exc:
-        print(f"::warning::could not read {candidate}: {exc}", file=sys.stderr)
+        print(f"::warning::could not read {found.path}: {exc}", file=sys.stderr)
         return _packaged()
     if not isinstance(data, dict) or not data:
         print(
-            f"::warning::{candidate} is not a suffix-to-type mapping; using the "
+            f"::warning::{found.path} is not a suffix-to-type mapping; using the "
             "packaged artifact map",
             file=sys.stderr,
         )

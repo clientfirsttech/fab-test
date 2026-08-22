@@ -6,8 +6,6 @@ import sys
 from pathlib import Path
 from unittest import mock
 
-import pytest
-
 from fabric_ci_cd_dataops.scripts.detect_changes import (
     detect_artifact_type,
     group_changes_by_artifact,
@@ -29,11 +27,32 @@ class TestLoadArtifactMap:
         result = load_artifact_map(tmp_path)
         assert result[".SemanticModel"] == "SemanticModel"
 
-    def test_missing_map_exits(self, tmp_path: Path):
-        """Missing artifact-map.json causes sys.exit(1)."""
-        with pytest.raises(SystemExit) as exc_info:
-            load_artifact_map(tmp_path)
-        assert exc_info.value.code == 1
+    def test_a_fab_test_override_wins(self, tmp_path: Path):
+        """The documented override directory reaches this loader too.
+
+        It held a fourth private copy of the map loader, so `.fab-test/`
+        resolved for the rulesets and not here.
+        """
+        for layer, artifact_type in ((".github", "Legacy"), (".fab-test", "Override")):
+            metadata_dir = tmp_path / layer / "metadata"
+            metadata_dir.mkdir(parents=True)
+            (metadata_dir / "artifact-map.json").write_text(
+                json.dumps({".SemanticModel": artifact_type})
+            )
+
+        assert load_artifact_map(tmp_path)[".SemanticModel"] == "Override"
+
+    def test_missing_map_falls_back_to_the_packaged_copy(self, tmp_path: Path):
+        """It used to exit 1, which cannot be right for a pip install.
+
+        This loader runs from workflows inside a checkout today, so the exit
+        was survivable -- but it is the same map three other callers already
+        answer from the packaged copy, and disagreeing about that is the
+        defect.
+        """
+        result = load_artifact_map(tmp_path)
+
+        assert result[".SemanticModel"] == "SemanticModel"
 
 
 class TestDetectArtifactType:

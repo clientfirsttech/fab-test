@@ -24,19 +24,20 @@ import os
 import sys
 from pathlib import Path
 
+from ._artifact_types import load_artifact_map as _load_artifact_map
 from ._cli_utils import terse_print
 
 
 def load_artifact_map(repo_root: Path) -> dict[str, str]:
-    """Load artifact type mappings from metadata."""
-    artifact_map_path = repo_root / ".github" / "metadata" / "artifact-map.json"
+    """Load artifact type mappings from metadata.
 
-    if not artifact_map_path.exists():
-        print(f"Error: artifact-map.json not found at {artifact_map_path}", file=sys.stderr)
-        sys.exit(1)
-
-    with open(artifact_map_path) as f:
-        return json.load(f)
+    Delegates to `_artifact_types`, which searches the metadata layers and
+    falls back to the packaged copy. This module held its own loader that
+    read `.github/metadata/` directly and exited 1 when the file was absent
+    -- a fourth copy of a mapping Discover From CWD had already
+    centralized, and the only one that could not answer outside a checkout.
+    """
+    return _load_artifact_map(repo_root)
 
 
 def get_changed_files(repo_root: Path) -> list[str]:
