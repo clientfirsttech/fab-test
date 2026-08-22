@@ -18,7 +18,6 @@ This repository uses several local virtual environments. They are all ignored by
 | `.venv`     | General development environment with the package installed in editable mode (`pip install -e .`). |
 | `.venv-test`| Fresh, throwaway environment used to install and validate the locally built wheel exactly as a consumer would. |
 | `.venv-pkg` | Development/test environment with dev dependencies such as `pytest`, `coverage`, and `playwright`. |
-| `.venv-smoke`| Environment used by the GitHub Actions smoke-test helpers (`smoke-test-orchestrator`, `smoke-test-pql-test`). |
 
 All of these are optional. The only one the walkthrough below depends on is `.venv-test`.
 
@@ -171,7 +170,7 @@ pytest -q --cov                      # measure locally, no gate
 pytest -q --cov --cov-fail-under=80  # exactly what CI runs
 ```
 
-The 80% floor is scoped to `src/fabric_ci_cd_dataops` with tests excluded. Four modules are omitted by explicit path — `eventhouse_logger.py`, both `smoke_test_*` harnesses, and `validate_fabric_service_client.py` — because each needs a live service to execute, so a unit test could only assert that its argument parser accepts flags. `tests/test_coverage_config.py` fails if one of those entries goes stale or if a core CLI module is ever added to the list.
+The 80% floor is scoped to `src/fabric_ci_cd_dataops` with tests excluded. Two modules are omitted by explicit path — `eventhouse_logger.py` and `validate_fabric_service_client.py` — because each needs a live service to execute, so a unit test could only assert that its argument parser accepts flags. `tests/test_coverage_config.py` fails if one of those entries goes stale or if a core CLI module is ever added to the list.
 
 **Never put a coverage flag in `pytest.ini`.** A granular `pytest -m bpa` run covers a fraction of `src/` by design; gating it would fail every marker run and defeat the point of having them.
 

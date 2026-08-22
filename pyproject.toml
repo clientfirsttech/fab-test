@@ -68,8 +68,6 @@ Issues = "https://github.com/kerski/fab-test/issues"
 
 [project.scripts]
 fab-test = "fabric_ci_cd_dataops.scripts.fab_test:main"
-smoke-test-orchestrator = "fabric_ci_cd_dataops.scripts.smoke_test_orchestrator:main"
-smoke-test-pql-test = "fabric_ci_cd_dataops.scripts.smoke_test_pql_test:main"
 tabular-editor-bpa = "fabric_ci_cd_dataops.scripts.invoke_tabular_editor_bpa:main"
 validate-environments-yaml = "fabric_ci_cd_dataops.scripts.validate_environments_yaml:main"
 
@@ -120,10 +118,6 @@ branch = false
 omit = [
     # Needs a reachable Eventhouse cluster and a Kusto ingest endpoint.
     "src/fabric_ci_cd_dataops/scripts/eventhouse_logger.py",
-    # CI smoke harnesses: they orchestrate the installed console scripts
-    # end to end, which is what the smoke job itself does.
-    "src/fabric_ci_cd_dataops/scripts/smoke_test_orchestrator.py",
-    "src/fabric_ci_cd_dataops/scripts/smoke_test_pql_test.py",
     # Connects to Fabric to prove credentials work; there is nothing to
     # assert offline that build_fabric_service_client's tests do not.
     "src/fabric_ci_cd_dataops/scripts/validate_fabric_service_client.py",
