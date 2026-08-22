@@ -35,9 +35,9 @@ the crash fix that had no epic to live in.
 ## 1. Refuse a Playwright Run With No Environment ✅
 
 `fab-test playwright --artifact X` with no `--env` and no `FABRIC_ENVIRONMENT` prints a
-traceback. [`invoke_playwright.py:167`](../src/fabric_ci_cd_dataops/scripts/invoke_playwright.py#L167)
+traceback. [`invoke_playwright.py:167`](../../src/fabric_ci_cd_dataops/scripts/invoke_playwright.py#L167)
 resolves the environment as `args.environment or config.environment or "dev"`, and
-[`PlaywrightValidationConfig`](../src/fabric_ci_cd_dataops/scripts/playwright_validation/config.py#L74-L88)
+[`PlaywrightValidationConfig`](../../src/fabric_ci_cd_dataops/scripts/playwright_validation/config.py#L74-L88)
 has no `environment` field — so the middle term raises `AttributeError` and the `"dev"`
 fallback behind it is unreachable. Only a truthy `args.environment` short-circuits past
 it, which is why passing `--env` has always hidden this.
@@ -147,7 +147,7 @@ than this epic should make.
 ## 4. Close the Last Two Metadata Loaders ✅
 
 Recorded on `dev` as *Deferred From Metadata Packaging* in
-[the TestPyPI Release epic](testpypi-release-epic.md). Neither is in `[project.scripts]`
+[the TestPyPI Release epic](../testpypi-release-epic.md). Neither is in `[project.scripts]`
 — both are workflow-invoked and always run inside a checkout — so neither blocks a `pip`
 consumer. Worth fixing, not urgent, and cheap once task 2 lands.
 
