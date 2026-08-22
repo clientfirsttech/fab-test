@@ -27,25 +27,17 @@ from ._desktop import (
     detect_desktop_instances,
     match_instance_to_artifact,
 )
-from ._metadata import ANALYZERS, BPA_RULES, PBIR_RULES, metadata_path
+from ._metadata import ANALYZERS, BPA_RULES, PBIR_RULES, default_repo_root, metadata_path
 from ._pbip_discovery import discover_pbip_projects
 from ._report_html import resolve_report
 from ._rule_overlay import apply_overlay, apply_pbir_overlay
 from ._scan import find_artifact_dirs
 from ._target import ResolvedTarget
 
-# Reuse the same repo-root logic as fab_test.py so paths stay consistent.
-
-
-def _repo_root() -> Path:
-    """Return the repository root."""
-    workspace = os.getenv("GITHUB_WORKSPACE")
-    if workspace:
-        return Path(workspace).resolve()
-    return Path.cwd().resolve()
-
-
-REPO_ROOT = _repo_root()
+# Shares _metadata.default_repo_root with fab_test.py, so the two cannot
+# disagree about what the repository is. This comment used to claim the reuse
+# while a third copy of the rule sat underneath it.
+REPO_ROOT = default_repo_root()
 SCRIPTS_DIR = REPO_ROOT / "scripts"
 
 

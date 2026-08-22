@@ -1,15 +1,13 @@
 name: Detect Changes
 
+# Gated deliberately. This repository publishes the `fab-test` CLI; the Fabric
+# artifact pipeline needs a `.fabric/artifacts` layout, a workspace, and
+# service-principal credentials it has no reason to hold. Running on every
+# pull request to main produced a red check nobody could act on, which buried
+# the one result that mattered -- whether the package builds and its tests
+# pass. Still fully invocable below; nothing starts it on its own.
+# Asserted by tests/test_workflow_triggers.py.
 on:
-  push:
-    branches:
-      - develop
-      - 'feature/**'
-      - 'release/**'
-  pull_request:
-    branches:
-      - main
-      - develop
   workflow_dispatch:
   workflow_call:
     outputs:

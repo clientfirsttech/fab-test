@@ -1,0 +1,26 @@
+# fab-test.yml -- optional config-file front door for the fab-test CLI.
+#
+# Every key below is entirely optional and commented out: an absent key
+# falls back to its environment variable (where one exists) and then its
+# packaged default. Uncomment and edit only the settings you want to pin.
+#
+# Precedence for every setting: CLI flag > environment variable >
+# this file > packaged default. Run `fab-test config --show` to see the
+# effective value and origin of each setting right now.
+
+# artifact_dir: .fabric/artifacts   # root to discover artifacts (repo root for `fab-test local`)
+# output_dir: analyzer-results      # root for result envelopes and the run manifest
+# jobs: 1                          # artifacts to run in parallel for the same analyzer
+# format: text                     # text | json
+# timeout: 120                     # per-artifact subprocess timeout in seconds [env: ANALYZER_TIMEOUT]
+# environment: DEV                 # default environment label [env: FABRIC_ENVIRONMENT]
+
+# Rule overlays: deltas applied to a packaged ruleset instead of forking it.
+# rules:
+#   bpa:
+#     disable: [RULE_ID]                  # remove a rule from the effective ruleset
+#     severity: {RULE_ID: warning}        # info | warning | error
+#     extend: path/to/extra-rules.json    # append rules from another file
+#   pbir:
+#     disable: [RULE_ID]
+#     severity: {RULE_ID: warning}        # warning | error (PBIR Inspector has no "info" level)

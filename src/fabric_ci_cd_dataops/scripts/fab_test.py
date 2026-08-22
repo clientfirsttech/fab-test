@@ -58,7 +58,14 @@ from ._config import (
 )
 from ._credentials import probe_credentials
 from ._desktop import bridge_cli_path, detect_desktop_instances
-from ._metadata import ANALYZERS, BPA_RULES, PBIR_RULES, metadata_path, resolve_metadata
+from ._metadata import (
+    ANALYZERS,
+    BPA_RULES,
+    PBIR_RULES,
+    default_repo_root,
+    metadata_path,
+    resolve_metadata,
+)
 from ._pbip_discovery import discover_pbip_projects as _discover_pbip_projects
 from ._report_html import resolve_report
 from ._run_manifest import RunManifest
@@ -133,22 +140,11 @@ if hasattr(sys.stdout, "reconfigure"):
 if hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
-def _repo_root() -> Path:
-    """Return the repository root.
-
-    In CI the runner checks out the repo into ``GITHUB_WORKSPACE``. When the
-    package is installed as a wheel, ``__file__`` points into ``site-packages``,
-    so resolving paths from the script location is wrong. Use the current
-    working directory as the default root so ``fab-test`` operates on the repo
-    it is invoked from.
-    """
-    workspace = os.getenv("GITHUB_WORKSPACE")
-    if workspace:
-        return Path(workspace).resolve()
-    return Path.cwd().resolve()
-
-
-REPO_ROOT = _repo_root()
+# _metadata.default_repo_root is the one decider (see its docstring). When the
+# package is installed as a wheel, __file__ points into site-packages, so
+# resolving paths from the script location would be wrong -- the working
+# directory is what `fab-test` operates on.
+REPO_ROOT = default_repo_root()
 SCRIPTS_DIR = REPO_ROOT / "scripts"
 # Where discovery starts when nobody says otherwise. This was
 # `.fabric/artifacts` -- this repository's CI layout, not anything Power BI
