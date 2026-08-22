@@ -429,6 +429,16 @@ Resolution order for whether a run ships, highest first:
 | 5 | A complete `telemetry.eventhouse` | Ships |
 | 6 | Nothing | Does not ship, and says nothing about it |
 
+**Table setup (once, by hand).** `fab-test` never creates tables. Each telemetry table carries a single `Data: dynamic` column and an ingestion mapping that puts the whole payload object into it — downstream Eventhouse functions transform, so the wire is schema-independent and a new payload field never breaks ingest:
+
+```kusto
+.create-merge table fabric_static_analysis (Data: dynamic)
+.create-or-alter table fabric_static_analysis ingestion json mapping 'fab_test_payload'
+    '[{"column":"Data","path":"$","datatype":"dynamic"}]'
+```
+
+Repeat for `fabric_dynamic_analysis`. The mapping name `fab_test_payload` is fixed and the mapping is **not optional**: without it Kusto maps by column name, matches nothing, and stores empty rows while reporting success. Query the payload with `Data.analyzer`, `Data.status`, `todatetime(Data.timestamp)`, and so on.
+
 Prerequisites, all reported by `fab-test doctor`'s `telemetry` row:
 
 - `pip install 'fab-test[telemetry]'` — the Kusto ingest client is **not** in the base package.

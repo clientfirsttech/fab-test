@@ -199,6 +199,92 @@ def test_a_flush_never_raises_into_the_analyzer_run():
 # --------------------------------------------------------------------------
 
 
+# --------------------------------------------------------------------------
+# Schema independence
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.telemetry
+def test_ingest_references_the_payload_mapping():
+    """Given an ingest, should name the mapping that puts the payload in one column.
+
+    The tables have a single `Data: dynamic` column and downstream Eventhouse
+    functions do the transforming, so a new payload field never breaks
+    ingest. That only works if the ingestion mapping is referenced: without
+    it Kusto maps by column name and every field but `Data` is dropped on the
+    floor, silently.
+    """
+    from fabric_ci_cd_dataops.scripts.eventhouse_logger import (
+        PAYLOAD_MAPPING,
+        IngestDependencies,
+    )
+
+    captured = {}
+
+    class _Properties:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+    class _Client:
+        def __init__(self, _kcsb):
+            pass
+
+        def ingest_from_stream(self, _stream, ingestion_properties):
+            pass
+
+    class _Builder:
+        @staticmethod
+        def with_azure_token_credential(uri, _credential):
+            captured["uri"] = uri
+            return object()
+
+    class _Format:
+        JSON = "json"
+
+    sink = EventhouseSink(_config())
+    sink._dependencies = lambda: IngestDependencies(
+        connection_string_builder=_Builder,
+        ingest_client=_Client,
+        ingestion_properties=_Properties,
+        data_format=_Format,
+    )
+    sink._credential = object  # a credential stand-in; nothing authenticates here
+
+    sink.add("fabric_static_analysis", _payload("Sales"))
+    result = sink.flush()
+
+    assert result.ok is True
+    assert captured["ingestion_mapping_reference"] == PAYLOAD_MAPPING
+    assert captured["table"] == "fabric_static_analysis"
+    assert captured["database"] == "fabric_ops"
+
+
+@pytest.mark.telemetry
+def test_the_ingest_endpoint_carries_the_ingest_prefix():
+    """Given a query URI, should aim the client at the ingest endpoint.
+
+    Queued ingest against the query endpoint is refused by the cluster.
+    """
+    from fabric_ci_cd_dataops.scripts.eventhouse_logger import _ingest_uri
+
+    assert _ingest_uri("https://trd-abc.z2.kusto.fabric.microsoft.com").startswith(
+        "https://ingest-trd-abc"
+    )
+
+
+@pytest.mark.telemetry
+def test_an_ingest_uri_is_not_prefixed_twice():
+    """Given a URI that already names the ingest endpoint, should leave it alone.
+
+    Fabric shows people the `ingest-` URI, so it is what they paste into
+    `fab-test.yml`. Prefixing it again produces a host that does not exist.
+    """
+    from fabric_ci_cd_dataops.scripts.eventhouse_logger import _ingest_uri
+
+    already = "https://ingest-trd-abc.z2.kusto.fabric.microsoft.com"
+    assert _ingest_uri(already) == already
+
+
 @pytest.mark.telemetry
 def test_the_placeholder_banner_is_gone():
     """Given the module source, should contain no simulation output.

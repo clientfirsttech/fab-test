@@ -369,11 +369,35 @@ telemetry:
     database: fabric_ops
 ```
 
+**Create the tables once**, before the first run. `fab-test` never creates them. Each
+holds a single `Data` column, so downstream Eventhouse functions own the schema and a
+new payload field never breaks ingest:
+
+```kusto
+.create-merge table fabric_static_analysis (Data: dynamic)
+.create-or-alter table fabric_static_analysis ingestion json mapping 'fab_test_payload'
+    '[{"column":"Data","path":"$","datatype":"dynamic"}]'
+
+.create-merge table fabric_dynamic_analysis (Data: dynamic)
+.create-or-alter table fabric_dynamic_analysis ingestion json mapping 'fab_test_payload'
+    '[{"column":"Data","path":"$","datatype":"dynamic"}]'
+```
+
+The mapping name is fixed and the mapping is **not optional** — without it Kusto maps
+by column name, matches nothing, and stores empty rows while reporting success. Query
+the payload through the column: `fabric_static_analysis | project Data.analyzer,
+Data.status, todatetime(Data.timestamp)`.
+
 **Grant the credential the Database Ingestor role** on the KQL database (in Fabric:
 the Eventhouse item → Manage permissions). Without it the service principal
 authenticates perfectly and cannot ingest, which is indistinguishable from a bad
 secret unless something says so — `fab-test doctor` does, and so does the failure
 message.
+
+**Ingest is queued, not immediate.** A delivered record typically becomes queryable
+within a minute or two under the default batching policy, so a query straight after
+the run can legitimately return nothing yet. `telemetry delivered` means the cluster
+accepted the batch.
 
 The job's exit code is never affected by telemetry. A failed send prints one warning
 for the whole run and sets `telemetry_error` in `run.json`, so a pipeline that

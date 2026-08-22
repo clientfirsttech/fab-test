@@ -47,6 +47,18 @@ VALID_TABLES = [
 
 TELEMETRY_EXTRA_HINT = "pip install 'fab-test[telemetry]'"
 
+# The ingestion mapping each telemetry table must define. The tables carry a
+# single `Data: dynamic` column and downstream Eventhouse functions do the
+# transforming, so the wire stays schema-independent: a new payload field is
+# a new key inside `Data`, never a table alteration and never a broken
+# ingest. The KQL to create a table and this mapping is in the Telemetry
+# section of .github/skills/fab-test/SKILL.md; fab-test never creates them.
+#
+# Referencing it is not optional. Without a mapping the service maps by
+# column name, matches nothing, and stores empty rows while reporting
+# success -- which is the failure this whole module was rewritten to end.
+PAYLOAD_MAPPING = "fab_test_payload"
+
 
 class TelemetryDependencyError(Exception):
     """The Kusto ingest client is not installed.
@@ -357,21 +369,35 @@ class EventhouseSink:
 
     def _ingest(self, table: str, rows: list[dict]) -> None:
         """Ingest one table's rows. The seam tests replace with a stand-in."""
-        deps = load_ingest_dependencies()
+        deps = self._dependencies()
         client = self._client(deps)
         properties = deps.ingestion_properties(
             database=self.config.database,
             table=table,
             data_format=deps.data_format.JSON,
+            # Without this the service maps by column name, and a table whose
+            # only column is `Data` would silently keep nothing. The mapping
+            # puts the whole payload object in that one column, which is what
+            # makes the wire schema-independent: a new payload field is a new
+            # key inside `Data`, not a table alteration.
+            ingestion_mapping_reference=PAYLOAD_MAPPING,
         )
         client.ingest_from_stream(_json_lines(rows), ingestion_properties=properties)
+
+    def _dependencies(self) -> IngestDependencies:
+        """Load the Kusto symbols. A seam, so a test need not install the SDK."""
+        return load_ingest_dependencies()
+
+    def _credential(self) -> Any:
+        """Resolve the ingest credential. A seam, so a test need not authenticate."""
+        return build_ingest_credential(self.env_file)
 
     def _client(self, deps: IngestDependencies):
         """Build the queued-ingest client, once per flush that needs one."""
         # The ingest endpoint is the cluster URI with an `ingest-` prefix on
         # the host; Kusto rejects a queued ingest aimed at the query endpoint.
         kcsb = deps.connection_string_builder.with_azure_token_credential(
-            _ingest_uri(self.config.uri), build_ingest_credential(self.env_file)
+            _ingest_uri(self.config.uri), self._credential()
         )
         return deps.ingest_client(kcsb)
 

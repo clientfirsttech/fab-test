@@ -313,7 +313,25 @@ telemetry:
     database: fabric_ops
 ```
 
-Three things to know before the first run:
+**Create the tables once, before the first run.** Each carries a single `Data`
+column; downstream Eventhouse functions do the transforming, so adding a payload
+field later is a new key inside `Data` rather than a table alteration:
+
+```kusto
+.create-merge table fabric_static_analysis (Data: dynamic)
+.create-or-alter table fabric_static_analysis ingestion json mapping 'fab_test_payload'
+    '[{"column":"Data","path":"$","datatype":"dynamic"}]'
+
+.create-merge table fabric_dynamic_analysis (Data: dynamic)
+.create-or-alter table fabric_dynamic_analysis ingestion json mapping 'fab_test_payload'
+    '[{"column":"Data","path":"$","datatype":"dynamic"}]'
+```
+
+The mapping is not optional. Without it Kusto maps by column name, finds nothing
+called `analyzer` or `status`, and quietly stores empty rows. `fabric_dynamic_analysis`
+receives `pql-test` records; everything else goes to `fabric_static_analysis`.
+
+Three more things to know before the first run:
 
 - **Install the extra.** The Kusto ingest client is not in the base package —
   `pip install 'fab-test[telemetry]'`. Shipping an egress-capable client to
