@@ -1,0 +1,10 @@
+createOrReplace
+
+	function 'QuickChecks.PROD.Tests' =
+			() =>
+					UNION(
+						PQL.Assert.Tbl.ShouldHaveRows("AlignmentDim Should Have Rows",'AlignmentDim'),
+						PQL.Assert.Col.ShouldBeDistinct("There should be no duplicates in EyeColorDim", EyeColorDim[EyeID])
+					)
+		lineageTag: a7a6000a-5581-4f9e-a29e-092c0a93b939
+

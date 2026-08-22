@@ -1,0 +1,48 @@
+# Virtual environments
+.venv/
+.venv-*/
+env/
+venv/
+ENV/
+
+# Python build artifacts
+build/
+dist/
+*.egg-info/
+*.egg
+*.whl
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# IDE / editor settings
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment files
+.env
+.env.*
+
+# Local test / coverage output
+bandit-report.json
+bpa-results.json
+coverage.json
+.coverage
+.coverage.*
+htmlcov/
+apm.lock.yaml
+apm.yml
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.fab-test-tools/**
+# Local analyzer output
+analyzer-results/
+
+# Claude Code worktrees
+.claude/worktrees/

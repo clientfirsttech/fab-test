@@ -1,0 +1,111 @@
+name: Build package
+
+on:
+  pull_request:
+  push:
+    branches: [main, develop]
+
+jobs:
+  lint:
+    name: Lint (ruff)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install lint tools
+        run: pip install -e ".[dev]"
+
+      # The gate. Config lives in pyproject.toml; a finding here fails the build.
+      - name: Ruff
+        run: ruff check .
+
+      # Not a gate here: blocking a PR because a function grew one branch is
+      # the kind of gate people learn to route around. The *total* is
+      # ratcheted instead, by tests/test_complexity_budget.py in the test job
+      # — a report nobody reads is how this went from 36 findings to 45 over
+      # two epics before anyone noticed.
+      - name: Complexity report
+        if: always()
+        run: |
+          echo "### Complexity signals (non-gating)" >> "$GITHUB_STEP_SUMMARY"
+          echo "Ceiling is ratcheted in tests/test_complexity_budget.py." \
+            >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          ruff check src --select C901,PLR0911,PLR0912,PLR0913,PLR0915 --statistics \
+            >> "$GITHUB_STEP_SUMMARY" || true
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install package and test tools
+        run: pip install -e ".[dev]"
+
+      # The 80% floor lives here and nowhere else. pytest.ini must stay free
+      # of coverage flags: a granular `pytest -m <marker>` run covers a
+      # fraction of src/ by design, and gating it would defeat the
+      # token-saving constraint in vision.md that makes those runs useful.
+      # The floor is a ratchet — raise it as coverage improves, never lower
+      # it to accommodate a regression.
+      - name: Pytest
+        run: pytest -q --cov --cov-fail-under=80
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build tools
+        run: pip install build
+
+      - name: Build wheel and sdist
+        run: python -m build
+
+      # Both directions. The exclusion half was already here; the inclusion
+      # half is new, because the wheel shipped no metadata at all for months
+      # and nothing noticed -- `bpa` resolved its rules to a path that only
+      # exists in a checkout of this repository. A glob that matches nothing
+      # is not a build error, so the built artifact is the only honest place
+      # to assert it. Logic and lists live in the script, tested by
+      # tests/test_publish_workflows.py and shared with both publish
+      # workflows, so three places cannot disagree about what a wheel needs.
+      - name: Check wheel contents
+        run: python .github/scripts/check_wheel_contents.py
+
+      # Renders README as the index will render it and fails on anything
+      # PyPI would reject. --strict promotes warnings to errors: a warning
+      # here is discovered at upload, which is after the version is spent.
+      - name: Check distribution metadata renders
+        run: |
+          pip install twine
+          twine check --strict dist/*
+
+      - name: Test install in clean venv
+        run: |
+          set -e
+          python -m venv /tmp/venv
+          /tmp/venv/bin/pip install dist/*.whl
+          /tmp/venv/bin/fab-test --help
+          /tmp/venv/bin/smoke-test-orchestrator --help
+          /tmp/venv/bin/smoke-test-pql-test --help
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/*
