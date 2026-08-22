@@ -54,6 +54,7 @@ PACKAGED_ORIGIN = "packaged"
 BPA_RULES = Path("rules") / "BPARules.json"
 PBIR_RULES = Path("rules") / "pbi-inspector-custom-rules.json"
 ANALYZERS = Path("analyzers.json")
+ARTIFACT_MAP = Path("artifact-map.json")
 ENVIRONMENTS = Path("environments.yml")
 
 

@@ -28,18 +28,28 @@ from pathlib import Path
 from typing import Any
 
 from ._cli_utils import terse_print
+from ._metadata import ANALYZERS, default_repo_root, resolve_metadata
 
 
 class AnalyzerRunner:
     """Execute analyzers based on metadata configuration."""
 
-    def __init__(self, metadata_path: str):
-        """Initialize with metadata file path."""
-        self.metadata_path = Path(metadata_path)
+    def __init__(self, metadata_path: str | Path | None = None):
+        """Initialize with metadata file path.
+
+        An explicit ``metadata_path`` still wins -- every existing caller
+        passes one. Without it the metadata layers are searched
+        (Environments Metadata Layers §4), so an install outside a checkout
+        reaches the packaged `analyzers.json` instead of a relative path
+        that cannot exist there.
+        """
+        self.metadata_path = Path(metadata_path) if metadata_path else None
         self.metadata = self._load_metadata()
 
     def _load_metadata(self) -> dict[str, Any]:
         """Load analyzer metadata from JSON file."""
+        if self.metadata_path is None:
+            self.metadata_path = resolve_metadata(ANALYZERS, default_repo_root()).path
         if not self.metadata_path.exists():
             raise FileNotFoundError(f"Metadata file not found: {self.metadata_path}")
 
@@ -246,8 +256,11 @@ def main():
     )
     parser.add_argument(
         '--metadata-path',
-        default='.github/metadata/analyzers.json',
-        help='Path to analyzers.json metadata file'
+        default=None,
+        help=(
+            'Path to analyzers.json metadata file (default: the first of '
+            '.fab-test/metadata/, .github/metadata/, or the packaged copy)'
+        )
     )
     parser.add_argument(
         '--workspace-id',

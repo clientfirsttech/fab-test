@@ -1,6 +1,6 @@
 # Environments Metadata Layers Epic
 
-**Status**: 🚧 IN-PROGRESS (3/5)
+**Status**: 🚧 IN-PROGRESS (4/5)
 **Goal**: `environments.yml` resolves through the same layers as every other metadata file, and a Playwright run with no environment says so instead of crashing.
 
 ## Overview
@@ -144,7 +144,7 @@ than this epic should make.
 
 ---
 
-## 4. Close the Last Two Metadata Loaders
+## 4. Close the Last Two Metadata Loaders ✅
 
 Recorded on `dev` as *Deferred From Metadata Packaging* in
 [the TestPyPI Release epic](testpypi-release-epic.md). Neither is in `[project.scripts]`
@@ -155,7 +155,23 @@ consumer. Worth fixing, not urgent, and cheap once task 2 lands.
 - Given `detect_changes.py` holds a fourth copy of the artifact-map loader that exits 1 when the file is absent, should resolve through the shared metadata layers like the other three
 - Given `run_analyzer.py` defaults `--metadata-path` to a relative `.github/metadata/analyzers.json`, should resolve to a path that can exist in a wheel
 
-**Files**: `detect_changes.py`, `run_analyzer.py`
+**Files**: `_metadata.py`, `_artifact_types.py`, `detect_changes.py`, `run_analyzer.py`
+
+**Done (2026-08-21)**: wider than "delegate to `_artifact_types`", because delegating
+alone would not have satisfied the requirement. `_artifact_types` predates the layer work
+and read `.github/metadata/` directly, so `.fab-test/metadata/artifact-map.json` was
+ignored everywhere -- not just in `detect_changes`. It now resolves through `_metadata`
+like the other four files, which is the actual "shared metadata layers" the requirement
+asked for.
+
+Verified through real entry points. A temp directory whose override map declares
+`.KqlDatabase` parses `MyWs.Workspace/Thing.KqlDatabase`; the same target in a directory
+with no override is rejected against the nine packaged types. `detect_changes` with no map
+now falls back and proceeds, where `dev` exits 1 -- run side by side to confirm.
+
+`tests/test_detect_changes.py::test_missing_map_exits` asserted the exit this task
+removes, so it was rewritten rather than left: a test that pins the behaviour a
+requirement changes is the requirement's problem, not the test's.
 
 ---
 
