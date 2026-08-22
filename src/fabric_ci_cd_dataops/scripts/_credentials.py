@@ -140,6 +140,61 @@ def _missing_variable_remediation(
     )
 
 
+class IncompleteServicePrincipalError(Exception):
+    """Some service-principal variables are set and others are not.
+
+    Its own type because the caller must not treat it as "no principal": a
+    half-set principal is a mistake to report, not a cue to fall back to
+    ambient auth and answer a different question than the one asked.
+    """
+
+
+@dataclass(frozen=True)
+class ServicePrincipal:
+    """A complete service principal, and where its values came from."""
+
+    tenant_id: str
+    client_id: str
+    client_secret: str
+    source: str
+
+
+def resolve_service_principal(env_file: Path | str | None = None) -> ServicePrincipal | None:
+    """Return the configured service principal, or None to use ambient auth.
+
+    The same variables, aliases, and precedence `probe_credentials` reports
+    on -- environment first, then a `.env` file read without mutating
+    ``os.environ``. Returning None means nothing was set at all, which is
+    the documented cue for `DefaultAzureCredential`.
+
+    Raises `IncompleteServicePrincipalError` when *some* variables are set:
+    the rule `build_fabric_service_client` already applies, for the same
+    reason.
+    """
+    if env_file is None:
+        env_file = Path(os.getenv("PLAYWRIGHT_ENV_FILE", ".env"))
+    env_path = Path(env_file)
+    file_values = _parse_env_file(env_path) if env_path.exists() else {}
+
+    tenant, tenant_origin = _lookup(_TENANT_VAR, file_values)
+    client_id, client_origin = _lookup(_CLIENT_ID_VARS, file_values)
+    client_secret, secret_origin = _lookup(_CLIENT_SECRET_VARS, file_values)
+
+    if tenant and client_id and client_secret:
+        origins = {tenant_origin, client_origin, secret_origin}
+        return ServicePrincipal(
+            tenant_id=tenant,
+            client_id=client_id,
+            client_secret=client_secret,
+            source="environment" if origins == {"environment"} else ".env",
+        )
+    if tenant or client_id or client_secret:
+        raise IncompleteServicePrincipalError(
+            _missing_variable_remediation(tenant, client_id, client_secret)
+        )
+    return None
+
+
 def probe_credentials(env_file: Path | str | None = None) -> CredentialStatus:
     """Resolve the credential chain without acquiring a token.
 

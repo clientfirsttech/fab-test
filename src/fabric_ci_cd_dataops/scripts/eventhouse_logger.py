@@ -32,6 +32,7 @@ import argparse
 import json
 import os
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -43,6 +44,103 @@ VALID_TABLES = [
     "fabric_deployments",
     "fabric_testbed_runs"
 ]
+
+TELEMETRY_EXTRA_HINT = "pip install 'fab-test[telemetry]'"
+
+
+class TelemetryDependencyError(Exception):
+    """The Kusto ingest client is not installed.
+
+    Deliberately not an ``ImportError``: the caller turns this into a warning
+    rather than a crash, and catching a bare ImportError there would swallow
+    unrelated import bugs in the same handler.
+    """
+
+
+@dataclass(frozen=True)
+class IngestDependencies:
+    """The Kusto symbols ingest needs, loaded on demand."""
+
+    connection_string_builder: Any
+    ingest_client: Any
+    ingestion_properties: Any
+    data_format: Any
+
+
+# What Kusto says when the credential is valid and the grant is not. A
+# service principal without the Database Ingestor role fails the same way a
+# bad secret does, and sending a reader to rotate a working secret wastes
+# the one clue they had.
+_AUTHORIZATION_MARKERS = ("forbidden", "unauthorized", "not authorized", "403")
+
+_INGESTOR_ROLE_HINT = (
+    "The credential authenticated but is not permitted to ingest. Grant it the "
+    "Database Ingestor role on the KQL database (Fabric: the Eventhouse item -> "
+    "Manage permissions), then retry."
+)
+
+
+def describe_ingest_failure(exc: Exception) -> str:
+    """Return a reportable reason for an ingest failure.
+
+    Redacted before it is returned: Kusto errors can quote the connection
+    string that produced them, and the secrets constraint puts telemetry on
+    the same footing as stdout and the run manifest.
+    """
+    from ._credentials import redact_secrets
+
+    message = redact_secrets(f"{exc}")
+    if any(marker in message.lower() for marker in _AUTHORIZATION_MARKERS):
+        return f"{message} -- {_INGESTOR_ROLE_HINT}"
+    return message
+
+
+def build_ingest_credential(env_file: Path | str | None = None) -> Any:
+    """Return an Azure credential for Kusto ingest.
+
+    The service principal the CLI already resolves, or
+    `DefaultAzureCredential` when none is set -- the rule
+    `build_fabric_service_client` documents, applied to a different endpoint.
+    A partially configured principal raises rather than falling back.
+    """
+    from ._credentials import resolve_service_principal
+
+    principal = resolve_service_principal(env_file)
+    if principal is None:
+        from azure.identity import DefaultAzureCredential
+
+        return DefaultAzureCredential()
+
+    from azure.identity import ClientSecretCredential
+
+    return ClientSecretCredential(
+        tenant_id=principal.tenant_id,
+        client_id=principal.client_id,
+        client_secret=principal.client_secret,
+    )
+
+
+def load_ingest_dependencies() -> IngestDependencies:
+    """Import the Kusto ingest client, or say how to install it.
+
+    Imported here rather than at module scope so a run that never configures
+    a destination never pays for the SDK -- the same deferral `_credentials`
+    and `_target` already use.
+    """
+    try:
+        from azure.kusto.data import KustoConnectionStringBuilder
+        from azure.kusto.ingest import DataFormat, IngestionProperties, QueuedIngestClient
+    except ImportError as exc:
+        raise TelemetryDependencyError(
+            "telemetry is configured but the Kusto ingest client is not installed. "
+            f"Install it with: {TELEMETRY_EXTRA_HINT}"
+        ) from exc
+    return IngestDependencies(
+        connection_string_builder=KustoConnectionStringBuilder,
+        ingest_client=QueuedIngestClient,
+        ingestion_properties=IngestionProperties,
+        data_format=DataFormat,
+    )
 
 
 def publish_analyzer_telemetry(
