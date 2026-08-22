@@ -26,7 +26,9 @@ import pytest
 
 from fabric_ci_cd_dataops.scripts._metadata import (
     PACKAGED_METADATA,
+    MetadataNotFoundError,
     metadata_path,
+    resolve_environments_yml,
     resolve_metadata,
 )
 
@@ -144,3 +146,105 @@ def test_config_show_names_the_layer_each_ruleset_came_from():
         assert key in rows, f"missing '{key}' in {sorted(rows)}"
         assert rows[key]["origin"] in valid_origins, rows[key]["origin"]
         assert rows[key]["value"].endswith(".json"), rows[key]["value"]
+
+
+# ---------------------------------------------------------------------------
+# Files with no packaged default (Environments Metadata Layers §2)
+# ---------------------------------------------------------------------------
+
+_ENV = Path("environments.yml")
+
+
+@pytest.mark.fab_test
+def test_a_file_with_no_packaged_default_never_resolves_into_the_wheel(tmp_path):
+    """`environments.yml` carries workspace GUIDs, so a packaged copy is unsafe.
+
+    Falling back to one would aim a `prod` deployment at whatever workspace
+    happened to be baked into the distribution, and report success while
+    doing it. Absent is a hard error; wrong-and-confident is not an option.
+    """
+    with pytest.raises(MetadataNotFoundError):
+        resolve_metadata(_ENV, tmp_path, packaged=False)
+
+
+@pytest.mark.fab_test
+def test_a_missing_file_names_every_place_it_could_go(tmp_path):
+    """Naming only the last path tried tells the caller to fix the wrong file."""
+    with pytest.raises(MetadataNotFoundError) as exc_info:
+        resolve_metadata(_ENV, tmp_path, packaged=False)
+
+    message = str(exc_info.value)
+    assert ".fab-test/metadata" in message.replace("\\", "/")
+    assert ".github/metadata" in message.replace("\\", "/")
+    assert "packaged" not in message, "a packaged copy is not an option to offer"
+    assert exc_info.value.candidates, "the candidates must be inspectable, not only printed"
+
+
+@pytest.mark.fab_test
+def test_packaged_false_still_prefers_the_fab_test_layer(tmp_path):
+    """Dropping the packaged fallback must not change precedence above it."""
+    _write(tmp_path, ".github/metadata", _ENV, text="environments: {}")
+    preferred = _write(tmp_path, ".fab-test/metadata", _ENV, text="environments: {}")
+
+    resolved, origin = resolve_metadata(_ENV, tmp_path, packaged=False)
+
+    assert resolved == preferred
+    assert origin == ".fab-test/metadata"
+
+
+@pytest.mark.fab_test
+def test_packaged_false_accepts_the_legacy_github_layer(tmp_path):
+    """Every workflow in this repository still keeps its file there."""
+    existing = _write(tmp_path, ".github/metadata", _ENV, text="environments: {}")
+
+    resolved, origin = resolve_metadata(_ENV, tmp_path, packaged=False)
+
+    assert resolved == existing
+    assert origin == ".github/metadata"
+
+
+@pytest.mark.fab_test
+def test_environments_yml_fixes_the_no_packaged_rule_in_one_place(tmp_path):
+    """Six callers need this rule; none of them should spell it themselves."""
+    with pytest.raises(MetadataNotFoundError):
+        resolve_environments_yml(tmp_path)
+
+
+@pytest.mark.fab_test
+def test_environments_yml_resolves_from_either_repository_layer(tmp_path):
+    """The override chain reaches the file a consumer is most likely to tune."""
+    existing = _write(tmp_path, ".github/metadata", _ENV, text="environments: {}")
+    assert resolve_environments_yml(tmp_path).path == existing
+
+    preferred = _write(tmp_path, ".fab-test/metadata", _ENV, text="environments: {}")
+    assert resolve_environments_yml(tmp_path).path == preferred
+
+
+@pytest.mark.fab_test
+def test_a_resolved_file_opens_without_reaching_for_an_attribute(tmp_path):
+    """Six call sites held a plain path; the result must drop into `open()`."""
+    _write(tmp_path, ".fab-test/metadata", _ENV, text="environments: {}")
+
+    found = resolve_environments_yml(tmp_path)
+
+    with open(found, encoding="utf-8") as fh:
+        assert fh.read() == "environments: {}"
+    assert Path(found).is_file()
+
+
+@pytest.mark.fab_test
+def test_the_two_value_unpacking_existing_callers_use_keeps_working(tmp_path):
+    """Regression guard for widening the return type.
+
+    `config --show`, the registry, and `_all_analyzers` all unpack two
+    values. Naming the fields is only worth doing if it stays a strict
+    superset of the tuple they already destructure.
+    """
+    override = _write(tmp_path, ".fab-test/metadata", _RULES)
+
+    result = resolve_metadata(_RULES, tmp_path)
+    resolved, origin = result
+
+    assert (resolved, origin) == (override, ".fab-test/metadata")
+    assert result.path == override
+    assert result.origin == ".fab-test/metadata"

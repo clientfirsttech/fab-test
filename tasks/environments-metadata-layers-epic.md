@@ -1,6 +1,6 @@
 # Environments Metadata Layers Epic
 
-**Status**: 🚧 IN-PROGRESS (1/5)
+**Status**: 🚧 IN-PROGRESS (2/5)
 **Goal**: `environments.yml` resolves through the same layers as every other metadata file, and a Playwright run with no environment says so instead of crashing.
 
 ## Overview
@@ -63,7 +63,7 @@ Verified through the real entry point: one `::error::` line, exit 1, no tracebac
 
 ---
 
-## 2. Teach the Resolver the Safety It Cannot Express
+## 2. Teach the Resolver the Safety It Cannot Express ✅
 
 `dev`'s `resolve_metadata(relative, repo_root) -> tuple[Path, str]` has no way to say
 "this file has no packaged default". Add it additively, with the callers from task 3 that
@@ -81,6 +81,12 @@ indexing at the six new ones, and `__fspath__` lets it drop straight into `open(
 - Given the result is passed to `open()` or `Path()`, should work without an attribute access
 
 **Files**: `_metadata.py`, `tests/test_metadata_resolution.py`
+
+**Done (2026-08-21)**: fields named `path` / `origin`, not `path` / `layer` as the
+handoff suggested -- `origin` is the word dev's module, its tests, and `config --show`
+already use, and one word per concept beats matching the suggestion. Eight tests added
+to their file rather than a competing one, including a guard that the three existing
+callers' two-value unpacking still works.
 
 ---
 
