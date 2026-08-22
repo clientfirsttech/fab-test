@@ -1145,7 +1145,7 @@ def build_parser() -> argparse.ArgumentParser:
             "  126  Analyzer unsupported on this platform (see message for the supported OS)\n"
             "  127  Required external tool could not be resolved (see message for the fix)\n\n"
             f"Version: {_FAB_TEST_VERSION} | "
-            "Docs: https://github.com/kerski/fabric-ci-cd-dataops/blob/main/docs/QUICK-VALIDATION.md"
+            "Docs: https://github.com/kerski/fab-test/blob/main/docs/QUICK-VALIDATION.md"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
