@@ -80,35 +80,20 @@ jobs:
       # half is new, because the wheel shipped no metadata at all for months
       # and nothing noticed -- `bpa` resolved its rules to a path that only
       # exists in a checkout of this repository. A glob that matches nothing
-      # is not a build error, so the wheel is the only place to assert it.
+      # is not a build error, so the built artifact is the only honest place
+      # to assert it. Logic and lists live in the script, tested by
+      # tests/test_publish_workflows.py and shared with both publish
+      # workflows, so three places cannot disagree about what a wheel needs.
       - name: Check wheel contents
+        run: python .github/scripts/check_wheel_contents.py
+
+      # Renders README as the index will render it and fails on anything
+      # PyPI would reject. --strict promotes warnings to errors: a warning
+      # here is discovered at upload, which is after the version is spent.
+      - name: Check distribution metadata renders
         run: |
-          set -e
-          python - <<'PY'
-          import glob, sys, zipfile
-
-          REQUIRED = [
-              "fabric_ci_cd_dataops/metadata/analyzers.json",
-              "fabric_ci_cd_dataops/metadata/artifact-map.json",
-              "fabric_ci_cd_dataops/metadata/rules/BPARules.json",
-              "fabric_ci_cd_dataops/metadata/rules/pbi-inspector-custom-rules.json",
-              "fabric_ci_cd_dataops/schemas/fab-test.schema.json",
-          ]
-          FORBIDDEN = (
-              ".github/", ".fabric/", "docs/", "tests/", "TabularEditor/",
-              "PBIR-Inspector/", "analyzer-results/", ".venv/", ".env",
-              "bandit-report", "bpa-results", "coverage.json",
-          )
-
-          names = set(zipfile.ZipFile(glob.glob("dist/*.whl")[0]).namelist())
-          missing = [r for r in REQUIRED if r not in names]
-          leaked = sorted(n for n in names if any(f in n for f in FORBIDDEN))
-
-          for label, items in (("missing from wheel", missing), ("must not ship", leaked)):
-              for item in items:
-                  print(f"{label}: {item}")
-          sys.exit(1 if missing or leaked else 0)
-          PY
+          pip install twine
+          twine check --strict dist/*
 
       - name: Test install in clean venv
         run: |

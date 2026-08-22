@@ -2,7 +2,7 @@
 
 Metadata-driven CI/CD and validation framework for Microsoft Fabric artifacts.
 
-This package provides the `fab-test` CLI and supporting analyzer wrappers used by the [fabric-ci-cd-dataops](https://github.com/kerski/fabric-ci-cd-dataops) reference implementation.
+This package provides the `fab-test` CLI and supporting analyzer wrappers used by the [fab-test](https://github.com/kerski/fab-test) reference implementation.
 
 ## Install
 
@@ -17,8 +17,8 @@ pip install fab-test
 Editable mode links the package source into the active environment so code changes are reflected immediately.
 
 ```bash
-git clone https://github.com/kerski/fabric-ci-cd-dataops.git
-cd fabric-ci-cd-dataops
+git clone https://github.com/kerski/fab-test.git
+cd fab-test
 python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -e .
@@ -72,7 +72,7 @@ A folder is an artifact because its name ends in a Fabric type suffix —
 CI rather than opened in Desktop: `deployed/Sales.SemanticModel` on its own
 is found.
 
-The suffixes come from [`.github/metadata/artifact-map.json`](.github/metadata/artifact-map.json),
+The suffixes come from [`.github/metadata/artifact-map.json`](https://github.com/kerski/fab-test/blob/main/.github/metadata/artifact-map.json),
 with a copy packaged in the distribution so an install outside this
 repository behaves the same.
 
@@ -113,7 +113,7 @@ fab-test local --dry-run    # see the plan first
 fab-test local              # BPA, PBIR Inspector, and Desktop-bound pql-test
 ```
 
-A missing prerequisite (e.g. `pqlint` not installed) is reported as skipped with a remediation hint, not a failure. See [`docs/QUICKSTART-LOCAL.md`](docs/QUICKSTART-LOCAL.md) for the full walkthrough.
+A missing prerequisite (e.g. `pqlint` not installed) is reported as skipped with a remediation hint, not a failure. See [`docs/QUICKSTART-LOCAL.md`](https://github.com/kerski/fab-test/blob/main/docs/QUICKSTART-LOCAL.md) for the full walkthrough.
 
 ### Wrapper contract tests with pytest
 
@@ -182,7 +182,7 @@ fab-test pql-test "Sales Dev.Workspace/Sales.SemanticModel"   # a deployed model
 fab-test all local/Sales                                  # everything that can run locally
 ```
 
-Not every analyzer accepts every form — `bpa` reads files on disk and cannot fetch a deployed item. Run `fab-test list` for the Scopes column, and see the [targeting reference](.github/skills/fab-test/SKILL.md#targeting) for the rules. `--artifact STEM` still works as a deprecated alias.
+Not every analyzer accepts every form — `bpa` reads files on disk and cannot fetch a deployed item. Run `fab-test list` for the Scopes column, and see the [targeting reference](https://github.com/kerski/fab-test/blob/main/.github/skills/fab-test/SKILL.md#targeting) for the rules. `--artifact STEM` still works as a deprecated alias.
 
 ### Credentials
 
@@ -242,11 +242,11 @@ fab-test bpa --format json             # 3. run it — stdout is exactly one JSO
 cat analyzer-results/run.json          # 4. read the manifest instead of globbing result dirs
 ```
 
-`--format json` guarantees stdout carries nothing but the payload — narration goes to stderr. See the [Agent Contract](.github/skills/fab-test/SKILL.md#agent-contract) for exit codes, the JSON stdout guarantee, and the `run.json` schema.
+`--format json` guarantees stdout carries nothing but the payload — narration goes to stderr. See the [Agent Contract](https://github.com/kerski/fab-test/blob/main/.github/skills/fab-test/SKILL.md#agent-contract) for exit codes, the JSON stdout guarantee, and the `run.json` schema.
 
-Full CLI reference: [`.github/skills/fab-test/SKILL.md`](.github/skills/fab-test/SKILL.md).
+Full CLI reference: [`.github/skills/fab-test/SKILL.md`](https://github.com/kerski/fab-test/blob/main/.github/skills/fab-test/SKILL.md).
 
-See [`docs/QUICK-VALIDATION.md`](docs/QUICK-VALIDATION.md) for a complete local build-and-test workflow.
+See [`docs/QUICK-VALIDATION.md`](https://github.com/kerski/fab-test/blob/main/docs/QUICK-VALIDATION.md) for a complete local build-and-test workflow.
 
 ## Configuration
 
@@ -267,15 +267,15 @@ Precedence, for every setting:
 | 3 | `fab-test.yml` (or `[tool.fab-test]` in `pyproject.toml`) | `jobs: 4` |
 | 4 (lowest) | Packaged default | `120` seconds |
 
-`fab-test.yml` is meant to be committed — it holds no credentials, only settings and rule overlays (tune one BPA/PBIR Inspector rule without forking the packaged rules file). Credentials belong in a `.env` file (auto-discovered, gitignored) or a pipeline's own secrets store. See the [Configuration section of the fab-test skill](.github/skills/fab-test/SKILL.md#configuration) for the full settings list and rule-overlay keys.
+`fab-test.yml` is meant to be committed — it holds no credentials, only settings and rule overlays (tune one BPA/PBIR Inspector rule without forking the packaged rules file). Credentials belong in a `.env` file (auto-discovered, gitignored) or a pipeline's own secrets store. See the [Configuration section of the fab-test skill](https://github.com/kerski/fab-test/blob/main/.github/skills/fab-test/SKILL.md#configuration) for the full settings list and rule-overlay keys.
 
 ## Usage
 
-`fab-test` discovers and analyzes artifacts under your working directory. It is the local equivalent of the CI artifact validation gate. See the [Run manual tests locally](#run-manual-tests-locally) section above for common commands, and [`.github/skills/fab-test/SKILL.md`](.github/skills/fab-test/SKILL.md) for the full CLI reference.
+`fab-test` discovers and analyzes artifacts under your working directory. It is the local equivalent of the CI artifact validation gate. See the [Run manual tests locally](#run-manual-tests-locally) section above for common commands, and [`.github/skills/fab-test/SKILL.md`](https://github.com/kerski/fab-test/blob/main/.github/skills/fab-test/SKILL.md) for the full CLI reference.
 
 ## AI agent guidance
 
-The AIDD agent instructions and skills live in the repository, not in the wheel: [`.github/agents/`](.github/agents/) and [`.github/skills/`](.github/skills/). Clone the repository to get them. The `fab-test` CLI reference an agent needs is [`.github/skills/fab-test/SKILL.md`](.github/skills/fab-test/SKILL.md).
+The AIDD agent instructions and skills live in the repository, not in the wheel: [`.github/agents/`](https://github.com/kerski/fab-test/tree/main/.github/agents/) and [`.github/skills/`](https://github.com/kerski/fab-test/tree/main/.github/skills/). Clone the repository to get them. The `fab-test` CLI reference an agent needs is [`.github/skills/fab-test/SKILL.md`](https://github.com/kerski/fab-test/blob/main/.github/skills/fab-test/SKILL.md).
 
 What the distribution *does* carry is the metadata the analyzers need, so `bpa`, `pbir`, and `doctor` work from a plain `pip install` with no checkout:
 
@@ -289,4 +289,4 @@ print(metadata.joinpath("analyzers.json"))       # tool install URLs doctor read
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT. See [LICENSE](https://github.com/kerski/fab-test/blob/main/LICENSE).
