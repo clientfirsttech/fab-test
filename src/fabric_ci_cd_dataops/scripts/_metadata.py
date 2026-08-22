@@ -90,17 +90,31 @@ class MetadataNotFoundError(Exception):
 
 
 def default_repo_root() -> Path:
-    """Return the repository root: ``GITHUB_WORKSPACE`` in CI, else the CWD.
+    """Return the repository root for the directory the CLI was invoked from.
 
-    For the callers that had no root to pass -- the two `environments.yml`
-    validators and the promotion-safety checker resolve their own. Discover
-    From CWD made the working directory meaningful, so this deliberately
-    does not walk up looking for a `.git` directory.
+    The single decider for the whole CLI: `fab_test` and `fab_test_registry`
+    both call this rather than keeping copies, because three copies of one
+    rule is three places for it to stop agreeing -- and it did.
+
+    ``GITHUB_WORKSPACE`` wins only when the working directory is inside it.
+    That preserves what the variable is for, so `cd src && fab-test bpa` in a
+    workflow still resolves to the checkout root instead of depending on
+    which directory a step happened to be standing in. It used to win
+    unconditionally, which meant that inside GitHub Actions the CLI ignored
+    where it was invoked from entirely: `cd elsewhere && fab-test init` wrote
+    its config to the workspace root, silently.
+
+    Discover From CWD made the working directory meaningful, so this
+    deliberately does not walk up looking for a `.git` directory.
     """
+    cwd = Path.cwd().resolve()
     workspace = os.getenv("GITHUB_WORKSPACE")
-    if workspace:
-        return Path(workspace).resolve()
-    return Path.cwd().resolve()
+    if not workspace:
+        return cwd
+    root = Path(workspace).resolve()
+    # is_relative_to, not a prefix comparison: `/work/repo-2` must not count
+    # as being inside `/work/repo`.
+    return root if cwd.is_relative_to(root) else cwd
 
 
 def candidates(relative: Path | str, repo_root: Path, *, packaged: bool = True) -> list[Path]:
