@@ -1710,8 +1710,28 @@ def test_format_invalid_choice_lists_allowed_formats():
 
 
 class _TelemetryArgs:
-    def __init__(self, telemetry=None):
+    """Args carrying a configured destination unless a test says otherwise.
+
+    Since Eventhouse Shipping §2, being enabled means having somewhere to
+    send: a configured destination is what turns telemetry on, and the flags
+    and ENABLE_EVENTHOUSE_LOGGING decide whether to use it. These tests are
+    about that second half, so they supply the first.
+    """
+
+    def __init__(self, telemetry=None, configured=True):
         self.telemetry = telemetry
+        self.file_config = (
+            {
+                "telemetry": {
+                    "eventhouse": {
+                        "uri": "https://trd-abc123.z9.kusto.fabric.microsoft.com",
+                        "database": "fabric_ops",
+                    }
+                }
+            }
+            if configured
+            else {}
+        )
 
 
 @pytest.mark.fab_test
@@ -1739,6 +1759,18 @@ def test_telemetry_enabled_defaults_to_env(monkeypatch):
 
     monkeypatch.setenv("ENABLE_EVENTHOUSE_LOGGING", "false")
     assert _telemetry_enabled(args) is False
+
+
+@pytest.mark.fab_test
+def test_telemetry_needs_somewhere_to_send(monkeypatch):
+    """Given no configured destination, should not be enabled however it was asked for.
+
+    The legacy variable still *asks* for telemetry — it simply has nowhere to
+    put it, which §6 reports rather than shipping into the void as the
+    placeholder used to.
+    """
+    monkeypatch.setenv("ENABLE_EVENTHOUSE_LOGGING", "true")
+    assert _telemetry_enabled(_TelemetryArgs(telemetry=None, configured=False)) is False
 
 
 # --------------------------------------------------------------------------- #
@@ -2223,13 +2255,20 @@ def test_dry_run_with_telemetry_prints_payload_preview_not_sent(tmp_path, monkey
 
 @pytest.mark.fab_test
 def test_dry_run_without_telemetry_flag_shows_no_preview(tmp_path, monkeypatch, capsys):
-    """Plain --dry-run (no --telemetry) prints no telemetry preview."""
+    """Plain --dry-run with telemetry unconfigured prints no telemetry preview.
+
+    `configured_telemetry=False` is load-bearing since §2: a configured
+    destination is itself the enablement, so "no --telemetry flag" alone no
+    longer means telemetry is off.
+    """
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
     output_dir = tmp_path / "analyzer-results"
 
     monkeypatch.delenv("ENABLE_EVENTHOUSE_LOGGING", raising=False)
-    args = _RunAnalyzerArgs(artifact_dir, output_dir, telemetry=None, dry_run=True)
+    args = _RunAnalyzerArgs(
+        artifact_dir, output_dir, telemetry=None, dry_run=True, configured_telemetry=False
+    )
     code = _run_analyzer("pql_lint", args, output_dir)
     captured = capsys.readouterr()
 
@@ -3977,6 +4016,7 @@ class _RunAnalyzerArgs:
         timeout: int | None = None,
         jobs: int = 1,
         dry_run: bool = False,
+        configured_telemetry: bool = True,
     ):
         self.artifact_dir = str(artifact_dir)
         self.output_dir = str(output_dir)
@@ -3990,6 +4030,22 @@ class _RunAnalyzerArgs:
         self.impact_manifest = impact_manifest
         self.timeout = timeout
         self.jobs = jobs
+        # A destination, so telemetry tests that opt in reach the send path.
+        # Since Eventhouse Shipping §2 there is no enablement without one --
+        # and, conversely, a configured destination is itself the enablement,
+        # so a test about telemetry being *off* must pass configured=False.
+        self.file_config = (
+            {
+                "telemetry": {
+                    "eventhouse": {
+                        "uri": "https://trd-abc123.z9.kusto.fabric.microsoft.com",
+                        "database": "fabric_ops",
+                    }
+                }
+            }
+            if configured_telemetry
+            else {}
+        )
 
 
 def _make_warning_envelope(output_dir: Path, analyzer: str, stem: str) -> None:

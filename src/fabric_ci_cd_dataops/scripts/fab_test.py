@@ -70,6 +70,7 @@ from ._pbip_discovery import discover_pbip_projects as _discover_pbip_projects
 from ._report_html import resolve_report
 from ._run_manifest import RunManifest
 from ._target import TargetError, select_target, target_from_args, workspace_conflict
+from ._telemetry import TelemetryDecision, eventhouse_rows, telemetry_decision
 from .eventhouse_logger import publish_analyzer_telemetry
 from .fab_test_registry import (
     _DEFAULT_BPA_RULES,
@@ -280,13 +281,40 @@ def _apply_environment_default(
     args.environment = value
 
 
+def _telemetry_table(analyzer: str) -> str:
+    """Return the Eventhouse table an analyzer's records land in.
+
+    Derived, never configured: a config key would only let the file and the
+    derivation disagree about where a record went.
+    """
+    return "fabric_dynamic_analysis" if analyzer == "pql_test" else "fabric_static_analysis"
+
+
+def _telemetry_destination(decision: TelemetryDecision, analyzer: str) -> str:
+    """Describe where telemetry would go, for the --dry-run preview."""
+    if not decision.eventhouse.configured:
+        return "not configured (set `telemetry.eventhouse` in fab-test.yml)"
+    return (
+        f"{decision.eventhouse.uri} / {decision.eventhouse.database} "
+        f"/ {_telemetry_table(analyzer)}"
+    )
+
+
+def _telemetry_decision(args: argparse.Namespace) -> TelemetryDecision:
+    """Resolve this run's telemetry decision from the flags and the config file."""
+    return telemetry_decision(
+        cli_telemetry=getattr(args, "telemetry", None),
+        file_config=getattr(args, "file_config", None) or {},
+    )
+
+
 def _telemetry_enabled(args: argparse.Namespace) -> bool:
-    """Return True when telemetry should be streamed for this invocation."""
-    if args.telemetry is False:
-        return False
-    if args.telemetry is True:
-        return True
-    return os.getenv("ENABLE_EVENTHOUSE_LOGGING", "").lower() == "true"
+    """Return True when telemetry should be streamed for this invocation.
+
+    The rule itself lives in `_telemetry`, which `eventhouse_logger` also
+    reads; this stays because two call sites and their tests name it.
+    """
+    return _telemetry_decision(args).enabled
 
 
 def _git_command_output(cmd: list[str]) -> str:
@@ -445,11 +473,7 @@ def _send_telemetry(
         return
 
     output_format = getattr(args, "output_format", "text")
-    table = (
-        "fabric_dynamic_analysis"
-        if analyzer == "pql_test"
-        else "fabric_static_analysis"
-    )
+    table = _telemetry_table(analyzer)
     payload = _build_telemetry_payload(
         analyzer,
         artifact,
@@ -753,7 +777,15 @@ def _report_dry_run(
             f"  • {a.name}  (analyzers: {analyzers}){source_note}",
             output_format=output_format,
         )
-    if _telemetry_enabled(args):
+    # Keyed off "the caller asked", not "we could send". A preview whose job
+    # is to show what would happen has to survive an unset destination and
+    # say that the destination is what is unset.
+    decision = _telemetry_decision(args)
+    if decision.requested:
+        narrate(
+            f"\n  Telemetry destination: {_telemetry_destination(decision, name)}",
+            output_format=output_format,
+        )
         environment = getattr(args, "environment", "") or os.getenv("FABRIC_ENVIRONMENT", "")
         for a in artifacts:
             preview = _build_telemetry_payload(
@@ -1827,6 +1859,7 @@ def _config_show(args: argparse.Namespace) -> int:
         display_value = "<redacted>" if _is_secret_key(key) else value
         rows.append({"key": key, "value": display_value, "origin": origin})
     rows.extend(_ruleset_rows())
+    rows.extend(eventhouse_rows(file_config))
     return _print_config_show(rows, output_format)
 
 
@@ -2438,6 +2471,15 @@ def _prepare_config(args: argparse.Namespace) -> int | None:
         return 2
     for warning in warnings:
         narrate(f"  ⚠ fab-test: {warning}", output_format=getattr(args, "output_format", "text"))
+
+    # An explicit --telemetry with no destination is a configuration problem,
+    # reported here so it costs one message per run rather than one per
+    # artifact -- and before any analyzer starts, so nothing runs only to
+    # discover its telemetry had nowhere to go.
+    refusal = _telemetry_decision(args).refusal
+    if refusal:
+        print(f"  ✗ fab-test: {refusal}", file=sys.stderr)
+        return 2
     return None
 
 

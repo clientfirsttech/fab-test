@@ -51,6 +51,14 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# The Kusto ingest client, for shipping analyzer telemetry to a Fabric
+# Eventhouse. An extra rather than a dependency: this is an egress-capable
+# client, and a tool whose main job is reading files on a laptop should not
+# install one for every user who never configures a destination.
+telemetry = [
+    "azure-kusto-data",
+    "azure-kusto-ingest",
+]
 dev = [
     "ruff>=0.15",
     "pytest",

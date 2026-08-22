@@ -20,7 +20,10 @@
     },
     "format": {
       "type": "string",
-      "enum": ["text", "json"],
+      "enum": [
+        "text",
+        "json"
+      ],
       "description": "Output format for aggregate summaries (default: text)."
     },
     "timeout": {
@@ -45,8 +48,34 @@
       "description": "Rule overlays: deltas applied to a packaged ruleset instead of forking it.",
       "additionalProperties": false,
       "properties": {
-        "bpa": { "$ref": "#/$defs/ruleOverlay" },
-        "pbir": { "$ref": "#/$defs/ruleOverlay" }
+        "bpa": {
+          "$ref": "#/$defs/ruleOverlay"
+        },
+        "pbir": {
+          "$ref": "#/$defs/ruleOverlay"
+        }
+      }
+    },
+    "telemetry": {
+      "type": "object",
+      "description": "Where analyzer telemetry is sent. Configuring a complete destination is what enables shipping -- there is no separate on switch. --no-telemetry still refuses, --telemetry still forces, and ENABLE_EVENTHOUSE_LOGGING still applies.",
+      "additionalProperties": false,
+      "properties": {
+        "eventhouse": {
+          "type": "object",
+          "description": "Fabric Eventhouse ingest destination. Requires the [telemetry] extra (pip install fab-test[telemetry]) and a service principal granted the Database Ingestor role on the KQL database.",
+          "additionalProperties": false,
+          "properties": {
+            "uri": {
+              "type": "string",
+              "description": "Eventhouse query URI, e.g. https://<cluster>.kusto.fabric.microsoft.com [env: EVENTHOUSE_URI]."
+            },
+            "database": {
+              "type": "string",
+              "description": "KQL database holding the telemetry tables [env: EVENTHOUSE_DATABASE]. The table itself is derived from the analyzer and is not configurable."
+            }
+          }
+        }
       }
     }
   },
@@ -57,12 +86,21 @@
       "properties": {
         "disable": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "description": "Rule IDs to remove from the effective ruleset."
         },
         "severity": {
           "type": "object",
-          "additionalProperties": { "type": "string", "enum": ["info", "warning", "error"] },
+          "additionalProperties": {
+            "type": "string",
+            "enum": [
+              "info",
+              "warning",
+              "error"
+            ]
+          },
           "description": "Rule ID -> severity label overrides."
         },
         "extend": {
