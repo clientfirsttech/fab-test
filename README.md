@@ -269,6 +269,30 @@ Precedence, for every setting:
 
 `fab-test.yml` is meant to be committed — it holds no credentials, only settings and rule overlays (tune one BPA/PBIR Inspector rule without forking the packaged rules file). Credentials belong in a `.env` file (auto-discovered, gitignored) or a pipeline's own secrets store. See the [Configuration section of the fab-test skill](https://github.com/kerski/fab-test/blob/main/.github/skills/fab-test/SKILL.md#configuration) for the full settings list and rule-overlay keys.
 
+### Where metadata lives
+
+Rulesets, the analyzer registry, the artifact map, and `environments.yml` all resolve the
+same way — `.fab-test/metadata/` first, then `.github/metadata/`, then the copy packaged in
+the wheel:
+
+```
+.fab-test/metadata/
+  rules/BPARules.json                      <- your tuned BPA ruleset
+  rules/pbi-inspector-custom-rules.json    <- your tuned PBIR ruleset
+  analyzers.json                           <- analyzer definitions and tool install URLs
+  artifact-map.json                        <- which folder suffixes are Fabric artifacts
+  environments.yml                         <- workspaces and promotion chain
+```
+
+`.fab-test/metadata/` is the directory to create. `.github/metadata/` still resolves and is
+kept only so existing repositories keep working — `.github/` belongs to GitHub, not to this
+tool. Anything you don't override comes from the wheel, so a `pip install` works with no
+metadata of your own at all.
+
+`environments.yml` is the one exception: it has no packaged default, because a workspace GUID
+baked into a release would aim a deployment at somewhere you never chose. If no layer supplies
+it, the command fails and names both places you could put it.
+
 ## Usage
 
 `fab-test` discovers and analyzes artifacts under your working directory. It is the local equivalent of the CI artifact validation gate. See the [Run manual tests locally](#run-manual-tests-locally) section above for common commands, and [`.github/skills/fab-test/SKILL.md`](https://github.com/kerski/fab-test/blob/main/.github/skills/fab-test/SKILL.md) for the full CLI reference.

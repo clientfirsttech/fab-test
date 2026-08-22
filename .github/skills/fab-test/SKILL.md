@@ -398,6 +398,47 @@ An overlay naming a rule ID that doesn't exist upstream exits `2` listing every 
 
 The full schema ships with the package at `schemas/fab-test.schema.json` (draft 2020-12) for editor completion.
 
+### Metadata files and where they come from
+
+Five files drive the CLI. Each resolves through the same three layers, first match wins:
+
+| Layer | Path | Create it? |
+|-------|------|------------|
+| 1 (highest) | `.fab-test/metadata/` | Yes — the documented place for your own copies |
+| 2 | `.github/metadata/` | No — legacy; still searched so existing repositories keep working |
+| 3 (lowest) | packaged with the distribution | n/a — ships inside the wheel |
+
+| File | Packaged fallback |
+|------|-------------------|
+| `rules/BPARules.json` | Yes |
+| `rules/pbi-inspector-custom-rules.json` | Yes |
+| `analyzers.json` | Yes |
+| `artifact-map.json` | Yes |
+| `environments.yml` | **No** |
+
+An absent override is a default, not a problem: nothing warns when a file falls through to
+the packaged copy. `fab-test config --show` reports which layer each ruleset came from, so an
+override is distinguishable from the packaged copy without guessing from the path.
+
+`environments.yml` is the deliberate exception. It carries workspace GUIDs and branch policy,
+so a copy shipped in the wheel would aim a `prod` deployment at whatever workspace happened to
+be packaged — and report success doing it. With no repository copy, the command fails naming
+both places the file could go:
+
+```
+environments.yml not found. Create it at /repo/.fab-test/metadata/environments.yml or /repo/.github/metadata/environments.yml.
+```
+
+`playwright` needs an environment as well as the file, because it resolves an artifact name
+against a deployed item. With none set it fails *before* authenticating, so the message names
+the missing flag rather than a credential problem:
+
+```
+::error::No environment given, so there is nothing to resolve 'ThinReport' against. Pass --env, set FABRIC_ENVIRONMENT, or set `environment:` in fab-test.yml.
+```
+
+Exit code `1`, one `::error::` line, no traceback.
+
 ### What belongs in `fab-test.yml` vs. repository secrets
 
 `fab-test.yml` is meant to be committed — it holds no credentials. Service-principal credentials (`FABRIC_TENANT_ID`, `FABRIC_CLIENT_ID`, `FABRIC_CLIENT_SECRET`) belong in a `.env` file (auto-discovered at the repository root, gitignored) or, in a pipeline, in the CI system's own secrets store — never in `fab-test.yml`. With no service-principal variables set at all, Fabric REST calls fall back to `DefaultAzureCredential` (`az login`, a managed identity, VS Code sign-in, ...).
