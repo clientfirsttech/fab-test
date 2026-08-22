@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "fab-test.yml",
+  "description": "Configuration schema for fab-test.yml, the optional config-file front door for the fab-test CLI. Every setting is optional; an absent key falls back to its environment variable (where one exists) and then its packaged default.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "artifact_dir": {
+      "type": "string",
+      "description": "Root directory to discover artifacts (default: .fabric/artifacts, or the repository root for `fab-test local`)."
+    },
+    "output_dir": {
+      "type": "string",
+      "description": "Root directory for result envelopes and the run manifest (default: analyzer-results)."
+    },
+    "jobs": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Number of artifacts to run in parallel for the same analyzer (default: 1)."
+    },
+    "format": {
+      "type": "string",
+      "enum": ["text", "json"],
+      "description": "Output format for aggregate summaries (default: text)."
+    },
+    "timeout": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Per-artifact subprocess timeout in seconds [env: ANALYZER_TIMEOUT] (default: 120)."
+    },
+    "environment": {
+      "type": "string",
+      "description": "Default environment label, e.g. DEV/PROD/ANY [env: FABRIC_ENVIRONMENT]."
+    },
+    "report": {
+      "type": "boolean",
+      "description": "Write a readable HTML report beside each result envelope. Opt-in; false unless set. PBIR Inspector's own TestRun.html is unaffected and appears regardless."
+    },
+    "workspace": {
+      "type": "string",
+      "description": "Default Fabric workspace for targets that name an artifact but not a workspace. A display name or a GUID [env: FABRIC_WORKSPACE_ID]; a positional WORKSPACE.Workspace/NAME.Type target overrides it."
+    },
+    "rules": {
+      "type": "object",
+      "description": "Rule overlays: deltas applied to a packaged ruleset instead of forking it.",
+      "additionalProperties": false,
+      "properties": {
+        "bpa": { "$ref": "#/$defs/ruleOverlay" },
+        "pbir": { "$ref": "#/$defs/ruleOverlay" }
+      }
+    }
+  },
+  "$defs": {
+    "ruleOverlay": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "disable": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Rule IDs to remove from the effective ruleset."
+        },
+        "severity": {
+          "type": "object",
+          "additionalProperties": { "type": "string", "enum": ["info", "warning", "error"] },
+          "description": "Rule ID -> severity label overrides."
+        },
+        "extend": {
+          "type": "string",
+          "description": "Path to a JSON file of additional rules to append."
+        }
+      }
+    }
+  }
+}

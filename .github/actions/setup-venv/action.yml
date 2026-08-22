@@ -1,0 +1,68 @@
+name: Setup Python Virtual Environment
+
+description: |
+  Creates a local Python virtual environment and installs project dependencies
+  from requirements.txt. Exports VENV_PYTHON for downstream steps and adds the
+  venv bin/Scripts directory to $GITHUB_PATH so console scripts (e.g. fab-test)
+  are callable by name in subsequent workflow steps.
+
+inputs:
+  python-version:
+    description: Python version to set up
+    required: false
+    default: '3.12'
+  install-requirements:
+    description: Whether to install requirements.txt into the virtual environment
+    required: false
+    default: 'true'
+  cache-dependency-path:
+    description: Path to a dependency file used for actions/setup-python caching
+    required: false
+    default: 'requirements.txt'
+
+runs:
+  using: composite
+
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+        cache: pip
+        cache-dependency-path: ${{ inputs.cache-dependency-path }}
+
+    - name: Install Python dependencies into virtual environment
+      shell: bash
+      run: |
+        python -m venv .venv
+        if [ "$RUNNER_OS" == "Windows" ]; then
+          source .venv/Scripts/activate
+        else
+          source .venv/bin/activate
+        fi
+        # Use `python -m pip` so pip can upgrade itself on Windows (the pip shim cannot replace itself).
+        python -m pip install --upgrade pip
+        if [ "${{ inputs.install-requirements }}" == "true" ]; then
+          python -m pip install -r requirements.txt
+        fi
+        
+        # Set VENV_PYTHON for the environment
+        if [ "$RUNNER_OS" == "Windows" ]; then
+          VENV_PYTHON=".venv/Scripts/python.exe"
+        else
+          VENV_PYTHON="$(which python)"
+        fi
+        echo "VENV_PYTHON=$VENV_PYTHON" >> $GITHUB_ENV
+        echo "VENV_BIN=$(dirname $VENV_PYTHON)" >> $GITHUB_ENV
+
+        # Expose the venv bin/Scripts directory on PATH so console scripts
+        # installed by the local package (e.g. fab-test) are callable by name
+        # in downstream workflow steps.
+        # On Windows runners $GITHUB_PATH must contain a Windows-style absolute
+        # path; bash-style relative paths are ignored by the Actions runner.
+        if [ "$RUNNER_OS" == "Windows" ]; then
+          VENV_BIN_WINDOWS="$(pwd -W)/$VENV_BIN"
+          echo "$VENV_BIN_WINDOWS" >> $GITHUB_PATH
+        else
+          echo "$VENV_BIN" >> $GITHUB_PATH
+        fi

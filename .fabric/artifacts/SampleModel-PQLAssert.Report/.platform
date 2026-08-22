@@ -1,0 +1,11 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "Report",
+    "displayName": "SampleModel-PQLAssert"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "d203f461-915a-4315-9462-0bb1c52e9702"
+  }
+}

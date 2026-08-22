@@ -1,0 +1,210 @@
+[build-system]
+# >=77 for the SPDX `license` expression (PEP 639). On an older
+# setuptools the expression is a build error, not a warning.
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fab-test"
+# Read from fabric_ci_cd_dataops.__version__ -- see [tool.setuptools.dynamic].
+dynamic = ["version"]
+requires-python = ">=3.12"
+description = "Metadata-driven CI/CD and validation framework for Microsoft Fabric artifacts"
+readme = "README.md"
+# SPDX expression, not the `{ text = ... }` table: setuptools>=77
+# deprecates the table form, and declaring a `License ::` classifier
+# alongside it is what makes the build warn. LICENSE ships either way.
+license = "MIT"
+authors = [
+    { name = "John Kerski" },
+]
+keywords = [
+    "microsoft-fabric",
+    "fabric",
+    "powerbi",
+    "cicd",
+    "dataops",
+    "devops",
+    "tabular-editor",
+    "pbir",
+    "playwright",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Information Technology",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Build Tools",
+    "Topic :: Software Development :: Quality Assurance",
+    "Topic :: Utilities",
+]
+dependencies = [
+    "tabulate",
+    "pql-test==0.1.12",
+    "playwright",
+    "pyyaml",
+    "fabric-cicd",
+    "azure-identity",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.15",
+    "pytest",
+    "pytest-cov",
+]
+
+[project.urls]
+Repository = "https://github.com/kerski/fab-test"
+Documentation = "https://github.com/kerski/fab-test/blob/main/docs/QUICK-VALIDATION.md"
+# The releases page, not a file: it is populated automatically by
+# publish.yml's generate_release_notes, so it cannot go stale, and
+# activity-log.md -- what this pointed at -- does not exist.
+Changelog = "https://github.com/kerski/fab-test/releases"
+Issues = "https://github.com/kerski/fab-test/issues"
+
+[project.scripts]
+fab-test = "fabric_ci_cd_dataops.scripts.fab_test:main"
+smoke-test-orchestrator = "fabric_ci_cd_dataops.scripts.smoke_test_orchestrator:main"
+smoke-test-pql-test = "fabric_ci_cd_dataops.scripts.smoke_test_pql_test:main"
+tabular-editor-bpa = "fabric_ci_cd_dataops.scripts.invoke_tabular_editor_bpa:main"
+validate-environments-yaml = "fabric_ci_cd_dataops.scripts.validate_environments_yaml:main"
+
+[tool.setuptools.dynamic]
+# One place writes the version: src/fabric_ci_cd_dataops/__init__.py. A static
+# version here would be the second, and a release bump reaches it first --
+# leaving the CLI's --version reporting a string that was never published.
+# TestPyPI refuses a repeat upload of a version, so bumps are frequent enough
+# for that drift to be a matter of when, not whether.
+version = { attr = "fabric_ci_cd_dataops.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["fabric_ci_cd_dataops*"]
+
+[tool.setuptools.package-data]
+"fabric_ci_cd_dataops.scripts" = ["**/*.py"]
+# The analyzers cannot run on what the wheel does not carry: `bpa` and
+# `pbir` are handed a rules path, and `doctor` reads analyzers.json for the
+# install URL of a missing tool. `metadata/*.json` alone left rules/ behind.
+# A glob matching nothing is not a build error, which is how "agents/*" and
+# "skills/*/*" were declared for months against directories that do not
+# exist here -- tests/test_packaged_metadata.py now fails on a dead pattern.
+"fabric_ci_cd_dataops" = [
+    "schemas/*.json",
+    "metadata/*.json",
+    "metadata/rules/*.json",
+]
+
+[tool.coverage.run]
+# Scoped to the package: tests are excluded from the denominator, per the
+# "How Coverage Is Measured" table in vision.md. The 80% floor lives in the
+# CI invocation (--cov-fail-under=80), never here and never in pytest.ini,
+# where it would fail every granular `pytest -m <marker>` run.
+source = ["src/fabric_ci_cd_dataops"]
+branch = false
+
+# Operational scripts, not library code. Each needs a live service to
+# execute at all, so a unit test can only assert that its argument parser
+# accepts flags -- which measures nothing worth measuring and would inflate
+# the figure rather than improve it. Excluded by explicit path so library
+# code added later can never fall into the gap; a test asserts every entry
+# still matches a real file and that no core CLI module appears here.
+#
+# To bring one back: give it a seam that can be driven without the live
+# service (as playwright_validation's client protocol already does), then
+# delete its line.
+omit = [
+    # Needs a reachable Eventhouse cluster and a Kusto ingest endpoint.
+    "src/fabric_ci_cd_dataops/scripts/eventhouse_logger.py",
+    # CI smoke harnesses: they orchestrate the installed console scripts
+    # end to end, which is what the smoke job itself does.
+    "src/fabric_ci_cd_dataops/scripts/smoke_test_orchestrator.py",
+    "src/fabric_ci_cd_dataops/scripts/smoke_test_pql_test.py",
+    # Connects to Fabric to prove credentials work; there is nothing to
+    # assert offline that build_fabric_service_client's tests do not.
+    "src/fabric_ci_cd_dataops/scripts/validate_fabric_service_client.py",
+]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    'if __name__ == "__main__":',
+]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+# Vendored reference code shipped inside skills is not ours to restyle.
+extend-exclude = [".github/skills"]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes (unused imports, undefined names)
+    "I",    # isort
+    "UP",   # pyupgrade (modernise Python 3.12 syntax)
+    "BLE",  # blind exception catches
+    "PLW",  # pylint warnings
+    "S",    # security (bandit-compatible)
+    "SIM",  # simplify
+    "PERF", # performance
+    "RUF",  # ruff-specific rules
+    "ARG",  # unused arguments — parameters no caller needs
+    "RET",  # needless returns and intermediate assignments
+    "C4",   # comprehension rewrites
+    "PIE",  # miscellaneous unnecessary code
+    "ISC",  # implicit string concatenation
+    "ERA",  # commented-out code
+    "DTZ",  # timezone-naive datetimes
+    "LOG",  # logging misuse
+    "G",    # logging format strings
+    "TRY",  # exception antipatterns
+]
+ignore = [
+    "S603",   # subprocess without shell=True is the safe form, which is what we use
+    "S607",   # partial executable paths resolve from PATH on purpose (fab, pbi-tools)
+    "TRY003", # a message at the raise site beats an exception subclass per failure mode
+]
+
+# The info glyph is deliberate in CLI output, not a typo for the letter i.
+allowed-confusables = ["ℹ"]
+
+# Thresholds for the non-gating complexity report (see the lint workflow).
+# Raising either of these is a decision, not a formality — say why in the commit.
+[tool.ruff.lint.mccabe]
+max-complexity = 15
+
+[tool.ruff.lint.pylint]
+max-args = 8
+
+[tool.ruff.lint.per-file-ignores]
+# Scanners deliberately swallow per-file errors so one bad file cannot abort
+# a scan. fab_test.py was once listed here too, which was wrong: it is the CLI
+# orchestrator, not a scanner, and the exemption meant each new blind except
+# landed unexamined. Its three are now justified individually.
+"src/fabric_ci_cd_dataops/scripts/scan_credentials.py" = ["BLE001", "S110"]
+"src/fabric_ci_cd_dataops/scripts/scan_entropy.py" = ["BLE001", "S110"]
+"src/fabric_ci_cd_dataops/scripts/invoke_tabular_editor_bpa.py" = ["S314"]
+# Tests: asserts are the point, stub callables ignore their arguments, fake
+# credentials are not secrets, and sys.path setup runs before imports.
+"tests/**" = [
+    "S101",   # assert
+    "S105",   # hardcoded password string
+    "S106",   # hardcoded password argument
+    "S314",   # xml parsing of fixture data
+    "ARG001", # stub function arguments
+    "ARG002", # stub method arguments
+    "ARG005", # stub lambda arguments
+    "BLE001", # broad except in failure-path tests
+    "E402",   # imports after sys.path setup
+    "S108",   # fake /tmp paths in fixtures
+]

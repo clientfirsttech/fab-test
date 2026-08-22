@@ -1,0 +1,23 @@
+/// Table for organizing measures that don't belong to a specific data table
+table _Measures
+	lineageTag: f2da0dee-02de-4066-8c5a-b7c5a433c6b8
+
+	/// Returns the current date and time adjusted for the selected timezone
+	measure 'Current Date Time' =
+			VAR SelectedTimezoneOffset = SELECTEDVALUE(Timezone[UTC_Offset_Hours], 0)
+			VAR CurrentUTC = UTCNOW()
+			VAR AdjustedDateTime = CurrentUTC + (SelectedTimezoneOffset / 24)
+			RETURN AdjustedDateTime
+		formatString: m/d/yyyy h:mm:ss AM/PM
+		lineageTag: ad8ce6d7-f16c-4545-9ce5-29bda29e305e
+
+	column 'Measure Group'
+		isHidden
+		lineageTag: 44fff03e-a594-49a4-ad57-20aa566fcebc
+		isNameInferred
+		sourceColumn: [Measure Group]
+
+	partition _Measures = calculated
+		mode: import
+		source = ROW("Measure Group", "Measures")
+

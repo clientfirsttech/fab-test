@@ -1,0 +1,15 @@
+{
+  "version": "1.0.0",
+  "tabOrder": [
+    "DataQuality.ANY.Tests",
+    "QuickChecks.PROD.Tests",
+    "DataContent.PROD.Tests",
+    "DataQuality.PROD.Tests",
+    "BestPractices.DEV.Tests",
+    "Example.DEV.Tests",
+    "Schema.DEV.Tests",
+    "Measures.DEV.Tests",
+    "Retrieve Tests"
+  ],
+  "defaultTab": "BestPractices.DEV.Tests"
+}

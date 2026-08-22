@@ -1,0 +1,13 @@
+DEFINE
+
+	FUNCTION DataContent.PROD.Tests = () =>
+	UNION (
+		PQL.Assert.Tbl.ShouldHaveRows("DataContent: MarvelFact has data", 'MarvelFact'),
+		PQL.Assert.Tbl.ShouldHaveRows("DataContent: DateDim has data", 'DateDim'),
+		PQL.Assert.Tbl.ShouldHaveRows("DataContent: EyeColorDim has data", 'EyeColorDim'),
+		PQL.Assert.Tbl.ShouldHaveRows("DataContent: AlignmentDim has data", 'AlignmentDim'),
+		PQL.Assert.Tbl.ShouldHaveRows("DataContent: Timezone has data", 'Timezone'),
+		PQL.Assert.Tbl.ShouldHaveMoreRowsThan("DataContent: MarvelFact has more than 10000 characters", 10000, 'MarvelFact')
+	)
+
+EVALUATE DataContent.PROD.Tests()

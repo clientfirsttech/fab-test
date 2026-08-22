@@ -1,0 +1,1 @@
+C:\Users\jkers\Git\fab-test\.fab-test-tools\pbir_inspector\extracted\linux-x64\FabInspCLI\fab-inspector

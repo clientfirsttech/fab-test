@@ -1,0 +1,49 @@
+DEFINE
+	FUNCTION Schema.DEV.Tests = () =>
+	UNION (
+		// Table existence checks
+		PQL.Assert.Tbl.ShouldExist("Schema: MarvelFact table exists", "MarvelFact"),
+		PQL.Assert.Tbl.ShouldExist("Schema: DateDim table exists", "DateDim"),
+		PQL.Assert.Tbl.ShouldExist("Schema: EyeColorDim table exists", "EyeColorDim"),
+		PQL.Assert.Tbl.ShouldExist("Schema: AlignmentDim table exists", "AlignmentDim"),
+		PQL.Assert.Tbl.ShouldExist("Schema: MarvelSource table exists", "MarvelSource"),
+		PQL.Assert.Tbl.ShouldExist("Schema: DataTypes table exists", "DataTypes"),
+		PQL.Assert.Tbl.ShouldExist("Schema: Timezone table exists", "Timezone"),
+
+		// Column existence checks - MarvelFact
+		PQL.Assert.Col.ShouldExist("Schema: MarvelFact[ID] column exists", "MarvelFact", "ID"),
+		PQL.Assert.Col.ShouldExist("Schema: MarvelFact[Name] column exists", "MarvelFact", "Name"),
+		PQL.Assert.Col.ShouldExist("Schema: MarvelFact[Appearances] column exists", "MarvelFact", "Appearances"),
+		PQL.Assert.Col.ShouldExist("Schema: MarvelFact[DateID] column exists", "MarvelFact", "DateID"),
+		PQL.Assert.Col.ShouldExist("Schema: MarvelFact[EyeID] column exists", "MarvelFact", "EyeID"),
+		PQL.Assert.Col.ShouldExist("Schema: MarvelFact[AlignmentID] column exists", "MarvelFact", "AlignmentID"),
+
+		// Column existence checks - DateDim
+		PQL.Assert.Col.ShouldExist("Schema: DateDim[DateID] column exists", "DateDim", "DateID"),
+		PQL.Assert.Col.ShouldExist("Schema: DateDim[Date] column exists", "DateDim", "Date"),
+		PQL.Assert.Col.ShouldExist("Schema: DateDim[Year] column exists", "DateDim", "Year"),
+
+		// Column existence checks - EyeColorDim
+		PQL.Assert.Col.ShouldExist("Schema: EyeColorDim[EyeID] column exists", "EyeColorDim", "EyeID"),
+		PQL.Assert.Col.ShouldExist("Schema: EyeColorDim[Eye Color] column exists", "EyeColorDim", "Eye Color"),
+
+		// Column existence checks - AlignmentDim
+		PQL.Assert.Col.ShouldExist("Schema: AlignmentDim[AlignmentID] column exists", "AlignmentDim", "AlignmentID"),
+		PQL.Assert.Col.ShouldExist("Schema: AlignmentDim[Alignment] column exists", "AlignmentDim", "Alignment"),
+
+		// Relationship existence checks
+		PQL.Assert.Relationship.ShouldExist(
+			"Schema: MarvelFact to DateDim relationship exists",
+			"MarvelFact", "DateID", "DateDim", "DateID"
+		),
+		PQL.Assert.Relationship.ShouldExist(
+			"Schema: MarvelFact to EyeColorDim relationship exists",
+			"MarvelFact", "EyeID", "EyeColorDim", "EyeID"
+		),
+		PQL.Assert.Relationship.ShouldExist(
+			"Schema: MarvelFact to AlignmentDim relationship exists",
+			"MarvelFact", "AlignmentID", "AlignmentDim", "AlignmentID"
+		)
+	)
+
+EVALUATE Schema.DEV.Tests()

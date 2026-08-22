@@ -1,0 +1,157 @@
+DEFINE
+	FUNCTION DataQuality.ANY.Tests = () =>
+	UNION (
+		// Table row count validations
+		PQL.Assert.Tbl.ShouldHaveRows(
+			"MarvelFact table should contain data",
+			'MarvelFact'
+		),
+		
+		PQL.Assert.Tbl.ShouldHaveRows(
+			"DateDim table should contain data",
+			'DateDim'
+		),
+		
+		PQL.Assert.Tbl.ShouldHaveRows(
+			"EyeColorDim table should contain data",
+			'EyeColorDim'
+		),
+		
+		PQL.Assert.Tbl.ShouldHaveRows(
+			"AlignmentDim table should contain data",
+			'AlignmentDim'
+		),
+		
+		PQL.Assert.Tbl.ShouldHaveRows(
+			"MarvelSource table should contain data",
+			'MarvelSource'
+		),
+		
+		// Row count thresholds
+		PQL.Assert.ShouldBeGreaterThan(
+			"MarvelFact should have more than 100 rows",
+			100,
+			COUNTROWS('MarvelFact')
+		),
+		
+		PQL.Assert.ShouldBeGreaterThan(
+			"DateDim should have at least 365 days",
+			365,
+			COUNTROWS('DateDim')
+		),
+		
+		PQL.Assert.ShouldBeGreaterThan(
+			"EyeColorDim should have multiple eye colors",
+			1,
+			COUNTROWS('EyeColorDim')
+		),
+		
+		// Primary key null checks
+		PQL.Assert.Col.ShouldNotBeNull(
+			"MarvelFact ID should not contain nulls",
+			'MarvelFact'[ID]
+		),
+		
+		PQL.Assert.Col.ShouldNotBeNull(
+			"DateDim DateID should not contain nulls",
+			'DateDim'[DateID]
+		),
+		
+		PQL.Assert.Col.ShouldNotBeNull(
+			"DateDim Date should not contain nulls",
+			'DateDim'[Date]
+		),
+		
+		PQL.Assert.Col.ShouldNotBeNull(
+			"EyeColorDim EyeID should not contain nulls",
+			'EyeColorDim'[EyeID]
+		),
+		
+		PQL.Assert.Col.ShouldNotBeNull(
+			"AlignmentDim AlignmentID should not contain nulls",
+			'AlignmentDim'[AlignmentID]
+		),
+		
+		// Foreign key null checks
+		PQL.Assert.Col.ShouldNotBeNull(
+			"MarvelFact DateID should not contain nulls",
+			'MarvelFact'[DateID]
+		),
+		
+		PQL.Assert.Col.ShouldNotBeNull(
+			"MarvelFact EyeID should not contain nulls",
+			'MarvelFact'[EyeID]
+		),
+		
+		PQL.Assert.Col.ShouldNotBeNull(
+			"MarvelFact AlignmentID should not contain nulls",
+			'MarvelFact'[AlignmentID]
+		),
+		
+		// Uniqueness checks for primary keys
+		PQL.Assert.Col.ShouldBeDistinct(
+			"MarvelFact ID should be unique",
+			'MarvelFact'[ID]
+		),
+		
+		PQL.Assert.Col.ShouldBeDistinct(
+			"DateDim DateID should be unique",
+			'DateDim'[DateID]
+		),
+		
+		PQL.Assert.Col.ShouldBeDistinct(
+			"DateDim Date should be unique",
+			'DateDim'[Date]
+		),
+		
+		PQL.Assert.Col.ShouldBeDistinct(
+			"EyeColorDim EyeID should be unique",
+			'EyeColorDim'[EyeID]
+		),
+		
+		PQL.Assert.Col.ShouldBeDistinct(
+			"AlignmentDim AlignmentID should be unique",
+			'AlignmentDim'[AlignmentID]
+		),
+		
+		// Business key blank checks
+		PQL.Assert.Col.ShouldNotBeBlank(
+			"MarvelFact Name should not be blank",
+			'MarvelFact'[Name]
+		),
+		
+		PQL.Assert.Col.ShouldNotBeBlank(
+			"EyeColorDim Eye Color should not be blank",
+			'EyeColorDim'[Eye Color]
+		),
+		
+		PQL.Assert.Col.ShouldNotBeBlank(
+			"AlignmentDim Alignment should not be blank",
+			'AlignmentDim'[Alignment]
+		),
+		
+		// Numeric range validations
+		PQL.Assert.ShouldBeTrue(
+			"MarvelFact Appearances should be non-negative",
+			MINX('MarvelFact', 'MarvelFact'[Appearances]) >= 0
+		),
+		
+		PQL.Assert.ShouldBeTrue(
+			"DateDim Year should be reasonable range (excluding 1 N/A record)",
+			VAR ValidYears = FILTER('DateDim', 'DateDim'[DateID] <> 0)
+			RETURN MINX(ValidYears, 'DateDim'[Year]) >= 1900 && MAXX(ValidYears, 'DateDim'[Year]) <= 2100
+		),
+		
+		// Date validations
+		PQL.Assert.ShouldBeTrue(
+			"DateDim dates should be valid",
+			NOT(ISBLANK(MINX('DateDim', 'DateDim'[Date])))
+		),
+		
+		PQL.Assert.ShouldBeTrue(
+			"DateDim should have chronological dates",
+			MINX('DateDim', 'DateDim'[Date]) < MAXX('DateDim', 'DateDim'[Date])
+		)
+	)
+
+EVALUATE DataQuality.ANY.Tests()

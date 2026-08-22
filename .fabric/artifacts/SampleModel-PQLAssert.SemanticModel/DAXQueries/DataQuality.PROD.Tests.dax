@@ -1,0 +1,15 @@
+DEFINE
+
+	FUNCTION DataQuality.PROD.Tests = () =>
+	UNION (
+		PQL.Assert.Col.ShouldNotBeNull("Data Quality: MarvelFact[ID] has no null values", 'MarvelFact'[ID]),
+		PQL.Assert.Col.ShouldNotBeNullOrBlank("Data Quality: MarvelFact[Name] has no null or blank values", 'MarvelFact'[Name]),
+		PQL.Assert.Col.ShouldNotBeNull("Data Quality: MarvelFact[DateID] has no null values", 'MarvelFact'[DateID]),
+		PQL.Assert.Col.ShouldNotBeNull("Data Quality: MarvelFact[EyeID] has no null values", 'MarvelFact'[EyeID]),
+		PQL.Assert.Col.ShouldNotBeNull("Data Quality: MarvelFact[AlignmentID] has no null values", 'MarvelFact'[AlignmentID]),
+		PQL.Assert.Col.ShouldBeDistinct("Data Quality: DateDim[DateID] has no duplicates", 'DateDim'[DateID]),
+		PQL.Assert.Col.ShouldBeDistinct("Data Quality: EyeColorDim[EyeID] has no duplicates", 'EyeColorDim'[EyeID]),
+		PQL.Assert.Col.ShouldBeDistinct("Data Quality: AlignmentDim[AlignmentID] has no duplicates", 'AlignmentDim'[AlignmentID])
+	)
+
+EVALUATE DataQuality.PROD.Tests()
