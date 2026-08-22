@@ -12,7 +12,8 @@ Usage:
         [--workspace-id <workspace_id>] \
         [--terse]
 
-The script reads `.github/metadata/environments.yml` to resolve the
+The script reads `environments.yml` -- from `.fab-test/metadata/` or
+`.github/metadata/`, per Environments Metadata Layers -- to resolve the
 environment-specific workspace, generates a fabric-cicd YAML config, and
 invokes `fabric_cicd.deploy_with_config` with a service-principal credential.
 
@@ -50,16 +51,17 @@ except ImportError as exc:
     sys.exit(1)
 
 from ._cli_utils import terse_print
+from ._metadata import MetadataNotFoundError, resolve_environments_yml
 
 
 def load_environments_config(repo_root: Path, terse: bool = False) -> dict[str, Any]:
     """Load the unified environment configuration file."""
-    config_path = repo_root / ".github" / "metadata" / "environments.yml"
-    if not config_path.exists():
-        msg = f"environments.yml not found at {config_path}"
-        terse_print(terse, "ERROR", "config_load", msg)
+    try:
+        config_path = resolve_environments_yml(repo_root).path
+    except MetadataNotFoundError as exc:
+        terse_print(terse, "ERROR", "config_load", str(exc))
         if not terse:
-            print(f"Error: {msg}", file=sys.stderr)
+            print(f"Error: {exc}", file=sys.stderr)
         sys.exit(1)
 
     with open(config_path) as f:

@@ -2,7 +2,8 @@
 """
 Generate a fabric-cicd deployment config for a specific environment.
 
-Reads `.github/metadata/environments.yml`, resolves the workspace ID
+Reads `environments.yml` -- from `.fab-test/metadata/` or
+`.github/metadata/` -- resolves the workspace ID
 from the environment block, and writes a minimal config that `fabric-cicd`
 can consume directly.
 
@@ -29,12 +30,14 @@ except ImportError:
     sys.exit(1)
 
 from ._cli_utils import terse_print
+from ._metadata import MetadataNotFoundError, resolve_environments_yml
 
 
 def load_config(repo_root: Path) -> dict:
-    config_path = repo_root / ".github" / "metadata" / "environments.yml"
-    if not config_path.exists():
-        print(f"Error: environments.yml not found at {config_path}", file=sys.stderr)
+    try:
+        config_path = resolve_environments_yml(repo_root).path
+    except MetadataNotFoundError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
         sys.exit(1)
     with open(config_path) as f:
         return yaml.safe_load(f) or {}

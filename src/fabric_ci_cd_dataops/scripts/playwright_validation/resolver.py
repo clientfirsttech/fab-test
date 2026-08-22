@@ -1,7 +1,8 @@
 """Metadata-driven resolution of Fabric environments and service items.
 
 Resolves canonical environment labels and workspace IDs from
-``.github/metadata/environments.yml`` and normalizes artifact names to deployed
+``environments.yml`` -- from `.fab-test/metadata/` or `.github/metadata/` --
+and normalizes artifact names to deployed
 item identities. Resolution is intentionally offline: callers that need service
 lookups supply a client implementing the small ``ServiceClient`` protocol.
 """
@@ -14,6 +15,8 @@ from pathlib import Path
 from typing import Any, Protocol
 
 import yaml
+
+from .._metadata import MetadataNotFoundError, resolve_environments_yml
 
 
 class ServiceResolutionError(Exception):
@@ -93,18 +96,19 @@ class ResolvedReport:
     environment: str
 
 
-def _repo_root() -> Path:
-    """Return the repository root."""
-    workspace = __import__("os").getenv("GITHUB_WORKSPACE")
-    if workspace:
-        return Path(workspace).resolve()
-    return Path.cwd().resolve()
-
-
 def _load_environments(path: Path | None = None) -> dict[str, Any]:
-    """Load and return the parsed environments.yml mapping."""
+    """Load and return the parsed environments.yml mapping.
+
+    An explicit ``path`` still wins -- ``--env-path`` and the impact
+    manifest both supply one. Without it the metadata layers are searched
+    (Environments Metadata Layers §3); this module used to hold its own
+    copy of the repo-root rule and the hardcoded `.github/metadata/` path.
+    """
     if path is None:
-        path = _repo_root() / ".github" / "metadata" / "environments.yml"
+        try:
+            path = resolve_environments_yml().path
+        except MetadataNotFoundError as exc:
+            raise ServiceResolutionError(str(exc)) from exc
     try:
         with open(path, encoding="utf-8") as fh:
             data = yaml.safe_load(fh) or {}
