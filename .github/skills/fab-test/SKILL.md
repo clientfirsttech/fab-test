@@ -33,11 +33,33 @@ Discovery matches on folder suffix (`*.SemanticModel`, `*.Report`), never on con
 
 ## Installation
 
+From a checkout:
+
 ```bash
 pip install -e .
 ```
 
-This registers the `fab-test` console script. The `.venv` is searched automatically for tool binaries (e.g. `pql-test`) even when not on `PATH`.
+From an index — **`pip install fab-test` does not work yet.** The name is
+unregistered on PyPI. The pre-release lives on TestPyPI, and both flags below are
+required: TestPyPI carries `pql-test` 0.1.11 and `fabric-cicd` 0.1.7 where this
+project needs `pql-test==0.1.12` and a current `fabric-cicd`, so without the
+extra index the install fails to resolve; and pip skips PEP 440 dev releases
+unless the version is named exactly.
+
+```bash
+pip install \
+  --index-url https://test.pypi.org/simple/ \
+  --extra-index-url https://pypi.org/simple \
+  "fab-test==1.0.0.0.dev1"
+```
+
+Either way this registers the `fab-test` console script. The `.venv` is searched automatically for tool binaries (e.g. `pql-test`) even when not on `PATH`.
+
+Rules and metadata resolve in the same layer order however `fab-test` was
+installed: `.fab-test/metadata/` first, then `.github/metadata/`, then the copy
+packaged in the wheel — except `environments.yml`, which has no packaged
+fallback by design. `fab-test config --show` names the layer each file came from.
+Release and publishing procedure: [`docs/RELEASE.md`](../../../docs/RELEASE.md).
 
 ## Agent Contract
 
