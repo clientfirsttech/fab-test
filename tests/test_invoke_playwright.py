@@ -17,10 +17,15 @@ from fabric_ci_cd_dataops.scripts.invoke_playwright import (
     _write_findings,
     main,
     parse_args,
+    run_playwright_validation,
 )
 from fabric_ci_cd_dataops.scripts.playwright_validation.config import PlaywrightValidationConfig
 from fabric_ci_cd_dataops.scripts.playwright_validation.power_bi_api import EmbedContext, PowerBiApiError
-from fabric_ci_cd_dataops.scripts.playwright_validation.resolver import ResolvedEnvironment, ResolvedReport
+from fabric_ci_cd_dataops.scripts.playwright_validation.resolver import (
+    ResolvedEnvironment,
+    ResolvedReport,
+    ServiceResolutionError,
+)
 
 
 @pytest.fixture
@@ -328,3 +333,67 @@ def test_build_config_loads_config_without_required_ids_for_artifact() -> None:
         _build_config_from_args(args)
 
     mock_load.assert_called_once_with(None, required=False)
+
+
+@pytest.mark.playwright
+def test_build_config_refuses_an_artifact_with_no_environment(config) -> None:
+    """`fab-test playwright` from a bare CWD used to crash with a traceback.
+
+    The environment came from ``args.environment or config.environment or
+    "dev"``, and `PlaywrightValidationConfig` has no ``environment`` field
+    -- so the middle term raised AttributeError and the `"dev"` fallback
+    behind it was unreachable. Only a truthy ``args.environment``
+    short-circuited past it, which is why passing --env hid this.
+    """
+    with patch(
+        "fabric_ci_cd_dataops.scripts.invoke_playwright.load_config", return_value=config
+    ):
+        args = parse_args(["--artifact", "ThinReport"])
+
+        with pytest.raises(ServiceResolutionError) as exc_info:
+            _build_config_from_args(args)
+
+    message = str(exc_info.value)
+    assert "--env" in message, f"the error must say how to fix it: {message}"
+    assert "ThinReport" in message
+
+
+@pytest.mark.playwright
+def test_no_environment_is_reported_before_a_credential_is_built(config) -> None:
+    """Fail on the missing flag, not on the authentication it would need.
+
+    Building the service client first reports a credential problem when
+    the real problem is an absent --env, and spends a network round trip
+    against the tenant to do it.
+    """
+    with (
+        patch(
+            "fabric_ci_cd_dataops.scripts.invoke_playwright.load_config", return_value=config
+        ),
+        patch(
+            "fabric_ci_cd_dataops.scripts.invoke_playwright.build_fabric_service_client"
+        ) as mock_client,
+    ):
+        args = parse_args(["--artifact", "ThinReport"])
+
+        with pytest.raises(ServiceResolutionError):
+            _build_config_from_args(args)
+
+    mock_client.assert_not_called()
+
+
+@pytest.mark.playwright
+def test_a_missing_environment_exits_one_without_a_traceback(config, capsys) -> None:
+    """The wrapper already catches ServiceResolutionError; keep it that way.
+
+    A traceback across two artifacts is what the user saw. One
+    ``::error::`` line and exit 1 is what a CI log and an agent can read.
+    """
+    with patch(
+        "fabric_ci_cd_dataops.scripts.invoke_playwright.load_config", return_value=config
+    ):
+        args = parse_args(["--artifact", "ThinReport"])
+
+        assert run_playwright_validation(args) == 1
+
+    assert "Traceback" not in capsys.readouterr().err

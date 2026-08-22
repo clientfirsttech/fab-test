@@ -1,6 +1,6 @@
 # Environments Metadata Layers Epic
 
-**Status**: 📋 PLANNED
+**Status**: 🚧 IN-PROGRESS (1/5)
 **Goal**: `environments.yml` resolves through the same layers as every other metadata file, and a Playwright run with no environment says so instead of crashing.
 
 ## Overview
@@ -32,7 +32,7 @@ the crash fix that had no epic to live in.
 
 ---
 
-## 1. Refuse a Playwright Run With No Environment
+## 1. Refuse a Playwright Run With No Environment ✅
 
 `fab-test playwright --artifact X` with no `--env` and no `FABRIC_ENVIRONMENT` prints a
 traceback. [`invoke_playwright.py:167`](../src/fabric_ci_cd_dataops/scripts/invoke_playwright.py#L167)
@@ -52,6 +52,14 @@ crash in the set.
 - Given `--env` or `FABRIC_ENVIRONMENT` is set, should behave exactly as before
 
 **Files**: `invoke_playwright.py`, `tests/test_invoke_playwright.py`
+
+**Done (2026-08-21)**: the guard raises before `build_fabric_service_client`, so the
+missing flag is reported instead of a credential. Proven both ways against both trees:
+the three tests fail on `dev` -- one with `AttributeError: 'PlaywrightValidationConfig'
+object has no attribute 'environment'`, the other two with a live
+`ClientAuthenticationError` from a real call to `login.microsoftonline.com`, which is
+the wrong problem reported at the cost of a network round trip -- and pass here.
+Verified through the real entry point: one `::error::` line, exit 1, no traceback.
 
 ---
 
