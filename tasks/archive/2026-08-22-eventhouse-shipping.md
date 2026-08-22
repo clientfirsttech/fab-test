@@ -2,14 +2,21 @@
 
 **Status**: ✅ COMPLETED (2026-08-22) — 9/9 tasks.
 
-> **One requirement is not met and was not waived.** §5 asks that a record be
-> confirmed queryable against a real Eventhouse. No cluster is reachable from the
-> environment this was built in, so the delivered path is proven only to the point
-> of the network call: a run against a deliberately wrong hostname now reaches the
-> ingest endpoint and reports the endpoint it could not reach. Everything above the
-> wire — batching, flushing, credentials, redaction, failure classification — is
-> covered by tests. **Before trusting this in production, run one analyzer against a
-> real Eventhouse and confirm the row lands.** See the standalone task in plan.md.
+> **Verified against a real Eventhouse (2026-08-22).** §5's requirement — that a
+> record be confirmed *queryable*, not merely accepted — is met. A `fab-test bpa`
+> run against `trd-2r5mk6nt03ycj37zre.z2` delivered one record that became
+> queryable with all 19 payload keys and the results envelope nested intact, and a
+> `fab-test all` run delivered four more, routed correctly: `pql_test` to
+> `fabric_dynamic_analysis`, the rest to `fabric_static_analysis`. Authenticated
+> through the `DefaultAzureCredential` fallback with no service principal set, so
+> that path is exercised too. `actor` arrived hashed, never as a raw email.
+>
+> The tables carry a single `Data: dynamic` column with a fixed `fab_test_payload`
+> ingestion mapping, so downstream Eventhouse functions own the schema and a new
+> payload field is a new key rather than a table alteration. That mapping is what
+> the live test added to the implementation: without it Kusto maps by column name,
+> matches nothing, and stores empty rows while reporting success — a defect no
+> amount of mocking would have surfaced.
 
 **Goal**: Actually ship telemetry to Eventhouse, addressed from `fab-test.yml` and authenticated with the credentials the CLI already has.
 
@@ -104,7 +111,7 @@ same ambient fallback.
 
 ---
 
-## The Placeholder Goes  ✅ (live ingest unverified — see the status note)
+## The Placeholder Goes  ✅ (live ingest verified 2026-08-22)
 
 Replace the simulation with a real ingest, batched per run.
 
