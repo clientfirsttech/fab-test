@@ -71,7 +71,7 @@ from ._report_html import resolve_report
 from ._run_manifest import RunManifest
 from ._target import TargetError, select_target, target_from_args, workspace_conflict
 from ._telemetry import TelemetryDecision, eventhouse_rows, telemetry_decision
-from .eventhouse_logger import publish_analyzer_telemetry
+from .eventhouse_logger import EventhouseSink, publish_analyzer_telemetry
 from .fab_test_registry import (
     _DEFAULT_BPA_RULES,
     _DEFAULT_INSPECTOR_PATH,
@@ -300,6 +300,51 @@ def _telemetry_destination(decision: TelemetryDecision, analyzer: str) -> str:
     )
 
 
+def _open_telemetry(args: argparse.Namespace) -> Any:
+    """Open this run's telemetry sink, or None when nothing asked for one.
+
+    Keyed off `requested` rather than `enabled` so a run that asked but has
+    nowhere to send still reaches `_close_telemetry`, which is what makes a
+    silently-discarded record impossible.
+    """
+    decision = _telemetry_decision(args)
+    if not decision.requested:
+        return None
+    return EventhouseSink(
+        decision.eventhouse, env_file=getattr(args, "playwright_env_file", None)
+    )
+
+
+def _close_telemetry(sink: Any, args: argparse.Namespace) -> str | None:
+    """Deliver the run's telemetry and report once. Returns the failure, if any.
+
+    Once per run, not once per artifact: N identical warnings for one
+    unreachable cluster is noise that hides the next problem.
+    """
+    if sink is None:
+        return None
+    output_format = getattr(args, "output_format", "text")
+    decision = _telemetry_decision(args)
+    if not decision.eventhouse.configured:
+        message = (
+            "telemetry was requested but no Eventhouse destination is configured; "
+            "set `telemetry.eventhouse` in fab-test.yml or EVENTHOUSE_URI/EVENTHOUSE_DATABASE"
+        )
+        narrate(f"::warning::{message}", output_format=output_format)
+        return message
+
+    result = sink.flush()
+    if result.ok:
+        if result.sent:
+            narrate(
+                f"  ✓ fab-test: telemetry delivered ({result.sent} record(s))",
+                output_format=output_format,
+            )
+        return None
+    narrate(f"::warning::Telemetry not delivered: {result.error}", output_format=output_format)
+    return result.error
+
+
 def _telemetry_decision(args: argparse.Namespace) -> TelemetryDecision:
     """Resolve this run's telemetry decision from the flags and the config file."""
     return telemetry_decision(
@@ -467,8 +512,16 @@ def _send_telemetry(
     artifact: Path,
     envelope: dict[str, Any],
     args: argparse.Namespace,
+    sink: Any = None,
 ) -> None:
-    """Send a telemetry record if enabled. Telemetry failure is non-blocking."""
+    """Queue a telemetry record if enabled. Telemetry failure is non-blocking.
+
+    Queued rather than sent: one run's records go out in as few ingests as
+    the tables allow, because this is called once per artifact and a client
+    per artifact would pay connection setup N times. `sink` is None only for
+    a caller that has not opened one, which then falls back to the immediate
+    single-record path.
+    """
     if not _telemetry_enabled(args):
         return
 
@@ -482,6 +535,9 @@ def _send_telemetry(
     )
     validated = _validate_telemetry_payload(payload, output_format)
     if validated is None:
+        return
+    if sink is not None:
+        sink.add(table, validated)
         return
     try:
         publish_analyzer_telemetry(table, validated, force=True)
@@ -519,6 +575,9 @@ class _RunContext:
     sub_env: dict[str, str]
     timeout: int
     manifest: RunManifest | None = None
+    # One sink per run, drained once at the end. Ingesting inline would open
+    # a queued-ingest client per artifact for one logical run.
+    telemetry: Any = None
 
 
 def _run_one_artifact(
@@ -630,7 +689,7 @@ def _run_one_artifact(
         emit_workflow_annotations(envelope)
     if warnings > 0:
         emit_pr_review_comments(envelope, str(artifact))
-    _send_telemetry(name, artifact, envelope, args)
+    _send_telemetry(name, artifact, envelope, args, ctx.telemetry)
 
     if ctx.manifest is not None:
         envelope_path = output_dir / name / artifact.stem / "envelope.json"
@@ -875,6 +934,7 @@ def _run_analyzer(
     args: argparse.Namespace,
     output_dir: Path,
     manifest: RunManifest | None = None,
+    telemetry: Any = None,
 ) -> int:
     """Run one analyzer against all matching artifacts.
 
@@ -908,6 +968,7 @@ def _run_analyzer(
         sub_env=_analyzer_sub_env(args, output_format),
         timeout=_resolve_timeout(args),
         manifest=manifest,
+        telemetry=telemetry,
     )
     total = len(artifacts)
 
@@ -2432,6 +2493,7 @@ def _run_local(args: argparse.Namespace) -> int:
     manifest = RunManifest(
         _FAB_TEST_VERSION, sys.argv, origin=_detect_origin(), target=_manifest_target(args)
     )
+    telemetry = _open_telemetry(args)
 
     results: list[dict[str, Any]] = []
     for name in _LOCAL_ANALYZERS:
@@ -2444,10 +2506,13 @@ def _run_local(args: argparse.Namespace) -> int:
             )
             results.append({"analyzer": name, "status": "skipped", "reason": readiness["reason"]})
             continue
-        code = _run_analyzer(name, args, output_dir, manifest)
+        code = _run_analyzer(name, args, output_dir, manifest, telemetry)
         results.append({"analyzer": name, "status": "ran", "exit_code": code})
 
     exit_code = 1 if any(r.get("exit_code", 0) != 0 for r in results) else 0
+    # Flushed before the manifest is written so run.json can record whether
+    # this run's telemetry landed.
+    manifest.telemetry_error = _close_telemetry(telemetry, args)
     manifest.write(output_dir, exit_code)
     if output_format == "json":
         print(json.dumps({"analyzer": "local", "results": results, "exit_code": exit_code}, indent=2))
@@ -2552,6 +2617,7 @@ def _dispatch_run(args: argparse.Namespace) -> int:
     manifest = RunManifest(
         _FAB_TEST_VERSION, sys.argv, origin=_detect_origin(), target=_manifest_target(args)
     )
+    telemetry = _open_telemetry(args)
 
     target = args.resolved_target
 
@@ -2574,7 +2640,9 @@ def _dispatch_run(args: argparse.Namespace) -> int:
             else:
                 runnable.append(name)
         if runnable:
-            codes = [_run_analyzer(name, args, output_dir, manifest) for name in runnable]
+            codes = [
+                _run_analyzer(name, args, output_dir, manifest, telemetry) for name in runnable
+            ]
             exit_code = _print_all_summary(output_dir, runnable, codes, args)
         elif analyzers:
             narrate(
@@ -2591,8 +2659,11 @@ def _dispatch_run(args: argparse.Namespace) -> int:
     else:
         # The scope refusal for a single analyzer already ran above, before
         # any network call.
-        exit_code = _run_analyzer(args.analyzer, args, output_dir, manifest)
+        exit_code = _run_analyzer(args.analyzer, args, output_dir, manifest, telemetry)
 
+    # One flush for the whole run, `all` included: a sink per analyzer would
+    # reopen the ingest client for each of them.
+    manifest.telemetry_error = _close_telemetry(telemetry, args)
     manifest.write(output_dir, exit_code)
     return exit_code
 

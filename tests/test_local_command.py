@@ -65,7 +65,7 @@ def test_local_runs_every_analyzer_when_all_are_ready(tmp_path, monkeypatch):
     monkeypatch.setattr(
         fab_test_module,
         "_run_analyzer",
-        lambda name, args, output_dir, manifest: called.append(name) or 0,
+        lambda name, args, output_dir, manifest, telemetry=None: called.append(name) or 0,
     )
 
     output_dir = tmp_path / "results"
@@ -90,7 +90,7 @@ def test_local_skips_analyzer_with_missing_prerequisite_without_failing(tmp_path
     monkeypatch.setattr(
         fab_test_module,
         "_run_analyzer",
-        lambda name, args, output_dir, manifest: called.append(name) or 0,
+        lambda name, args, output_dir, manifest, telemetry=None: called.append(name) or 0,
     )
 
     output_dir = tmp_path / "results"
@@ -114,7 +114,7 @@ def test_local_exit_code_is_one_when_any_analyzer_fails(tmp_path, monkeypatch):
     monkeypatch.setattr(
         fab_test_module,
         "_run_analyzer",
-        lambda name, args, output_dir, manifest: 1 if name == "pql_test" else 0,
+        lambda name, args, output_dir, manifest, telemetry=None: 1 if name == "pql_test" else 0,
     )
 
     output_dir = tmp_path / "results"
@@ -155,7 +155,7 @@ def test_local_writes_run_manifest(tmp_path, monkeypatch):
         "_local_readiness",
         lambda name, args: {"ready": True, "reason": "", "remediation": None},
     )
-    monkeypatch.setattr(fab_test_module, "_run_analyzer", lambda name, args, output_dir, manifest: 0)
+    monkeypatch.setattr(fab_test_module, "_run_analyzer", lambda name, args, output_dir, manifest, telemetry=None: 0)
 
     output_dir = tmp_path / "results"
     _run_local(_local_args(tmp_path, output_dir))
