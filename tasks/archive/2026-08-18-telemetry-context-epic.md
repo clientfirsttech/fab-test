@@ -1,6 +1,13 @@
 # Telemetry Context Epic
 
 **Status**: ✅ COMPLETED (2026-08-18)
+
+> **Correction (2026-08-22).** This epic built the telemetry *payload* and never the
+> wire. `publish_to_eventhouse` was a placeholder that printed a banner and returned
+> `True`, so "the payload is sent as it is today" below was literally true and
+> concealed that nothing was ever transmitted. Read every requirement here as being
+> about what a record contains, not whether it arrives. Delivery starts with
+> [Eventhouse Shipping](../eventhouse-shipping-epic.md).
 **Goal**: Ensure analyzer telemetry always carries repository, branch, actor, and run context.
 
 ## Overview

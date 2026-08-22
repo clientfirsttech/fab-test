@@ -297,6 +297,52 @@ Precedence, for every setting:
 
 `fab-test.yml` is meant to be committed — it holds no credentials, only settings and rule overlays (tune one BPA/PBIR Inspector rule without forking the packaged rules file). Credentials belong in a `.env` file (auto-discovered, gitignored) or a pipeline's own secrets store. See the [Configuration section of the fab-test skill](https://github.com/kerski/fab-test/blob/main/.github/skills/fab-test/SKILL.md#configuration) for the full settings list and rule-overlay keys.
 
+### Telemetry (optional)
+
+`fab-test` can ship each analyzer result to a Fabric Eventhouse, so findings across
+runs, branches, and people land somewhere queryable. It is off until you give it an
+address, and it never fails a build.
+
+**Configuring a destination is what turns it on** — there is no separate switch:
+
+```yaml
+# fab-test.yml
+telemetry:
+  eventhouse:
+    uri: https://<cluster>.kusto.fabric.microsoft.com
+    database: fabric_ops
+```
+
+Three things to know before the first run:
+
+- **Install the extra.** The Kusto ingest client is not in the base package —
+  `pip install 'fab-test[telemetry]'`. Shipping an egress-capable client to
+  everyone who only reads files on a laptop is not a default worth having.
+- **It reuses your existing credentials.** The same `FABRIC_TENANT_ID`,
+  `FABRIC_SERVICE_PRINCIPAL_ID`, and `FABRIC_SERVICE_PRINCIPAL_SECRET` the
+  analyzers use, falling back to `DefaultAzureCredential` (`az login`, a managed
+  identity) when none are set. There are no `EVENTHOUSE_*` credential variables.
+- **Grant the ingest role.** The credential needs **Database Ingestor** on the KQL
+  database. This is the most likely first-run failure and it looks exactly like a
+  bad secret, so `fab-test doctor` names it rather than letting you go rotate a
+  working credential.
+
+| You want | Do this |
+|---|---|
+| See where it would go, and what it would send | `fab-test bpa --dry-run` |
+| Turn it off for one run | `fab-test bpa --no-telemetry` |
+| Turn it off everywhere | `ENABLE_EVENTHOUSE_LOGGING=false` |
+| Check readiness | `fab-test doctor` — the `telemetry` row |
+| Override the address per environment | `EVENTHOUSE_URI` / `EVENTHOUSE_DATABASE` |
+
+`--telemetry` with no destination configured is an error (exit `2`) naming the config
+key and the environment variable, rather than a run that quietly sends nothing. When
+a send fails, the run's own exit code is unchanged, one warning is printed for the
+whole run, and `run.json` records the reason in `telemetry_error` — so a pipeline
+that uploads only the manifest can still tell a run whose telemetry landed from one
+whose records were dropped. Credential values never reach the payload, the log, or
+the manifest.
+
 ### Where metadata lives
 
 Rulesets, the analyzer registry, the artifact map, and `environments.yml` all resolve the

@@ -300,6 +300,75 @@ def _telemetry_destination(decision: TelemetryDecision, analyzer: str) -> str:
     )
 
 
+def _telemetry_readiness(args: argparse.Namespace) -> dict[str, Any]:
+    """Return a `doctor` row for telemetry.
+
+    ``ready`` is tri-state. False is a problem the caller can fix; None means
+    "not applicable or not verifiable here" and never counts toward whether
+    `doctor` passes -- telemetry is optional, and a run that never wanted it
+    must not be reported as broken.
+
+    A configured destination with resolvable credentials still returns None
+    rather than True. Ingest permission is a grant on the KQL database, and
+    a service principal without the Database Ingestor role authenticates
+    perfectly and cannot ingest. `doctor` once reported four cloud analyzers
+    ready with no credentials at all; claiming ready on the strength of a
+    resolvable credential would be the same false green.
+    """
+    from ._credentials import (
+        IncompleteServicePrincipalError,
+        ambient_credential_available,
+        resolve_service_principal,
+    )
+    from .eventhouse_logger import (
+        TelemetryDependencyError,
+        load_ingest_dependencies,
+    )
+
+    def _row(ready, reason, remediation=None, resolved_path=None):
+        return {
+            "analyzer": "telemetry",
+            "ready": ready,
+            "reason": reason,
+            "remediation": remediation,
+            "resolved_path": resolved_path,
+        }
+
+    eventhouse = _telemetry_decision(args).eventhouse
+    if not eventhouse.configured:
+        return _row(None, "not configured (optional; set `telemetry.eventhouse` to enable)")
+
+    destination = f"{eventhouse.uri} / {eventhouse.database}"
+
+    try:
+        load_ingest_dependencies()
+    except TelemetryDependencyError as exc:
+        return _row(False, "ingest client not installed", str(exc), destination)
+
+    env_file = getattr(args, "playwright_env_file", None)
+    try:
+        principal = resolve_service_principal(env_file)
+    except IncompleteServicePrincipalError as exc:
+        return _row(False, "service principal is incomplete", str(exc), destination)
+
+    if principal is None and not ambient_credential_available():
+        return _row(
+            False,
+            "no credentials resolved",
+            "Set FABRIC_TENANT_ID, FABRIC_SERVICE_PRINCIPAL_ID, and "
+            "FABRIC_SERVICE_PRINCIPAL_SECRET, or sign in with `az login`",
+            destination,
+        )
+
+    return _row(
+        None,
+        "configured; ingest permission unverified",
+        "If ingest fails, grant the credential the Database Ingestor role on the "
+        "KQL database (Fabric: the Eventhouse item -> Manage permissions)",
+        destination,
+    )
+
+
 def _open_telemetry(args: argparse.Namespace) -> Any:
     """Open this run's telemetry sink, or None when nothing asked for one.
 
@@ -2085,6 +2154,12 @@ def _doctor(args: argparse.Namespace) -> int:
     # the menu should not refuse to answer a direct question about it.
     names = [only] if only else list(_visible_analyzers())
     rows = [{"analyzer": name, **_check_readiness(name, args)} for name in names]
+    if not only:
+        # Reported alongside the analyzers because it fails the same ways --
+        # a missing tool, a missing credential -- but never counted toward
+        # whether doctor passes: telemetry is optional, and a run that never
+        # wanted it is not a broken installation.
+        rows.append(_telemetry_readiness(args))
     return _print_doctor(rows, output_format)
 
 

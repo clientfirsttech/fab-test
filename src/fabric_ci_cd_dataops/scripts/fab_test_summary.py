@@ -160,24 +160,32 @@ def _print_doctor(rows: list[dict[str, Any]], output_format: str = "text") -> in
     """Print the `fab-test doctor` readiness report.
 
     Returns 0 if at least one analyzer is ready, else 1.
+
+    ``ready`` is tri-state. None means "not applicable, or not verifiable
+    from here" and is neither a pass nor a failure: it neither satisfies the
+    at-least-one-ready condition nor prevents it. Telemetry uses it, because
+    an optional feature nobody configured must not report a broken install,
+    and a credential that resolves is not proof it may ingest.
     """
-    any_ready = any(r["ready"] for r in rows)
+    any_ready = any(r["ready"] is True for r in rows)
+    blocking = [r for r in rows if r["ready"] is False]
 
     if output_format == "json":
         print(json.dumps({"analyzers": rows}, indent=2))
-        return 0 if any_ready else 1
+        return 0 if any_ready or not blocking else 1
 
     paint = color_enabled()
     for r in rows:
-        icon = "✅" if r["ready"] else "❌"
+        icon = {True: "✅", False: "❌", None: "ℹ"}[r["ready"]]
         location = f" — {r['resolved_path']}" if r["resolved_path"] else ""
-        reason = _paint(r["reason"], "green" if r["ready"] else "red", enabled=paint)
+        colour = {True: "green", False: "red", None: "yellow"}[r["ready"]]
+        reason = _paint(r["reason"], colour, enabled=paint)
         print(f"{icon} {r['analyzer']}: {reason}{location}")
-        if not r["ready"] and r["remediation"]:
+        if r["ready"] is not True and r["remediation"]:
             # Yellow, not red: this is the actionable half, and colouring it
             # the same as the failure would flatten the distinction.
             print(_paint(f"   → {r['remediation']}", "yellow", enabled=paint))
-    return 0 if any_ready else 1
+    return 0 if any_ready or not blocking else 1
 
 
 def _print_config_show(rows: list[dict[str, Any]], output_format: str = "text") -> int:

@@ -331,6 +331,63 @@ fails loudly instead of quietly analyzing nothing.
 
 This is the case where uploading `run.json` alone still tells you what to fix. It stays `null` when the analyzer *did* write an envelope — then `envelope_path` points at the findings, and those are the reason. Credential values are redacted out of `detail` on the way in, as they are from `command`.
 
+### Pipeline snippet: shipping telemetry to an Eventhouse
+
+Optional. Configuring a destination is what enables it — there is no separate flag —
+so this snippet is the whole setup: install the extra, supply the credentials the
+analyzers already use, and commit the address in `fab-test.yml`.
+
+```yaml
+- name: Install fab-test with the telemetry extra
+  run: pip install 'fab-test[telemetry]'
+
+- name: Run analyzers
+  env:
+    # The same service principal the analyzers use. There are no
+    # EVENTHOUSE_* credential variables.
+    FABRIC_TENANT_ID: ${{ secrets.FABRIC_TENANT_ID }}
+    FABRIC_SERVICE_PRINCIPAL_ID: ${{ secrets.FABRIC_SERVICE_PRINCIPAL_ID }}
+    FABRIC_SERVICE_PRINCIPAL_SECRET: ${{ secrets.FABRIC_SERVICE_PRINCIPAL_SECRET }}
+    # Optional: override the committed fab-test.yml address per environment.
+    EVENTHOUSE_URI: ${{ vars.EVENTHOUSE_URI }}
+    EVENTHOUSE_DATABASE: ${{ vars.EVENTHOUSE_DATABASE }}
+  run: fab-test all --format json --artifact-dir .fabric/artifacts
+
+- name: Upload run manifest
+  uses: actions/upload-artifact@v4
+  if: always()
+  with:
+    name: fab-test-run-manifest
+    path: analyzer-results/run.json
+```
+
+```yaml
+# fab-test.yml — committed; holds the address, never the credential
+telemetry:
+  eventhouse:
+    uri: https://<cluster>.kusto.fabric.microsoft.com
+    database: fabric_ops
+```
+
+**Grant the credential the Database Ingestor role** on the KQL database (in Fabric:
+the Eventhouse item → Manage permissions). Without it the service principal
+authenticates perfectly and cannot ingest, which is indistinguishable from a bad
+secret unless something says so — `fab-test doctor` does, and so does the failure
+message.
+
+The job's exit code is never affected by telemetry. A failed send prints one warning
+for the whole run and sets `telemetry_error` in `run.json`, so a pipeline that
+uploads only the manifest can still tell that records were dropped:
+
+```json
+{ "telemetry_error": "Forbidden (403): ... -- The credential authenticated but is not permitted to ingest. Grant it the Database Ingestor role ..." }
+```
+
+To turn it off for a job without touching the config file, set
+`ENABLE_EVENTHOUSE_LOGGING=false` or pass `--no-telemetry`. To see what would be sent
+without sending it, add `--dry-run` — it prints the resolved cluster, database, and
+table alongside each payload.
+
 ### Running the local-Desktop analyzer set in CI
 
 `fab-test local` (see [QUICKSTART-LOCAL.md](QUICKSTART-LOCAL.md)) isn't only for a laptop — it runs the same in a pipeline, since it never requires a workspace ID or service principal:
