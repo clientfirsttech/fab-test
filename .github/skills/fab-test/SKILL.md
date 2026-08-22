@@ -142,6 +142,7 @@ Every analyzer invocation (a single subcommand or `all`) writes one `run.json` u
     }
   ],
   "totals": {"errors": 0, "warnings": 21},
+  "telemetry_error": null,
   "exit_code": 0
 }
 ```
@@ -149,6 +150,8 @@ Every analyzer invocation (a single subcommand or `all`) writes one `run.json` u
 Per-artifact `status` is one of `passed` / `failed` / `skipped` / `timeout` / `preflight_failed` (the last two cover an aborted run). `detail` is `null` for a normal completion and carries the human-readable failure reason whenever the run ended without a result to report — the resolved remediation message for `preflight_failed`, the exceeded duration for `timeout`, and the analyzer's own error message when it exited non-zero before writing an envelope (`"status": "failed"` with `"envelope_path": null`). That last case is the one a pipeline meets most: `fab-test playwright --artifact ThinReport` with no `--env` aborts before authenticating, and `detail` carries `No environment given, so there is nothing to resolve 'ThinReport' against. Pass --env, ...`. So a caller never has to fall back to stderr to learn what to fix — `run.json` on its own is enough, which matters when it is the only file a pipeline uploads. `detail` stays `null` when the analyzer *did* write an envelope, however it failed: the findings are the reason, and `envelope_path` points at them. `origin` is `"local"` when no CI environment variable is detected, or the detected CI system's name (`"github-actions"`, `"gitlab-ci"`, `"circleci"`, `"azure-devops"`) otherwise — the envelope schema, `status` values, and result layout are identical either way; this is the only field that differs between a local run and a CI run. The `command` field is sanitized: known credential flags (`--client-secret`, `--password`, `--token`, `--secret`, `--api-key`) and any `key=value`-shaped token have their value redacted before the file is written — no credential ever appears in the manifest.
 
 `target` is the resolved target as a structured object, or `null` when the run discovered artifacts instead of being pointed at one. Branch on `scope` (`path` / `desktop` / `workspace`) rather than parsing `raw`. Where `origin` says local versus CI, `target` says whether the run read files on disk, a running Desktop instance, or a deployed workspace item — a distinction `origin` alone never answered. `workspace_id` is the GUID resolved from a workspace name; it names a workspace and grants access to nothing, so it is safe to record.
+
+`telemetry_error` is `null` when this run's telemetry was delivered, or when none was asked for; otherwise it carries why the records were dropped — an unreachable cluster, a missing `[telemetry]` extra, a missing Database Ingestor grant. It never changes `exit_code`: telemetry is diagnostic and must not fail a build. See [Telemetry](#telemetry).
 
 `doctor`, `list`, `explain`, `auth`, and `clean-tools` never write a manifest — they don't run an analyzer.
 
@@ -398,8 +401,51 @@ If both `fab-test.yml` and `[tool.fab-test]` are present, `fab-test.yml` wins pe
 | `workspace` | string | `FABRIC_WORKSPACE_ID` | (none) — display name or GUID |
 | `report` | boolean | `ANALYZER_REPORT` | `false` — see Reports below |
 | `rules` | object | — | (none) — see Rule Overlays below |
+| `telemetry` | object | — | (none) — see Telemetry below |
 
 An unknown key exits `2` naming the key and the closest valid key (e.g. `artifac_dir` → "did you mean 'artifact_dir'?"); a key with the wrong type exits `2` naming the expected type.
+
+### Telemetry
+
+Optional. `fab-test` ships one record per analyzer/artifact to a Fabric Eventhouse.
+
+```yaml
+telemetry:
+  eventhouse:
+    uri: https://<cluster>.kusto.fabric.microsoft.com   # env: EVENTHOUSE_URI
+    database: fabric_ops                                 # env: EVENTHOUSE_DATABASE
+```
+
+**Configuring a complete destination is what enables shipping.** There is no separate on switch. `eventhouse.table` is not a key — the table is derived from the analyzer (`pql-test` → `fabric_dynamic_analysis`, everything else → `fabric_static_analysis`).
+
+Resolution order for whether a run ships, highest first:
+
+| Precedence | Signal | Effect |
+|---|---|---|
+| 1 | `--no-telemetry` | Never ships; no payload is built |
+| 2 | `--telemetry` | Ships — or exits `2` if no destination is configured |
+| 3 | `ENABLE_EVENTHOUSE_LOGGING=false` | Never ships, even with a destination configured |
+| 4 | `ENABLE_EVENTHOUSE_LOGGING=true` | Ships if a destination is configured; warns if not |
+| 5 | A complete `telemetry.eventhouse` | Ships |
+| 6 | Nothing | Does not ship, and says nothing about it |
+
+Prerequisites, all reported by `fab-test doctor`'s `telemetry` row:
+
+- `pip install 'fab-test[telemetry]'` — the Kusto ingest client is **not** in the base package.
+- Credentials: the same `FABRIC_TENANT_ID` / `FABRIC_SERVICE_PRINCIPAL_ID` / `FABRIC_SERVICE_PRINCIPAL_SECRET` the analyzers use, falling back to `DefaultAzureCredential` when none are set. A *partially* set principal is refused rather than silently falling back. There are no `EVENTHOUSE_*` credential variables.
+- The **Database Ingestor** role on the KQL database. `doctor` never reports telemetry as ✅ ready — a resolvable credential is not proof it may ingest, so the row shows `ℹ` with `configured; ingest permission unverified`.
+
+Failure modes an agent should expect:
+
+| Situation | What happens |
+|---|---|
+| `--telemetry`, nothing configured | Exit `2` before any analyzer runs, naming the config key and the env var |
+| Requested, nothing configured (via `ENABLE_EVENTHOUSE_LOGGING=true`) | Runs normally; one `::warning::`; `run.json` `telemetry_error` set |
+| Extra not installed | One warning naming `pip install 'fab-test[telemetry]'`; exit code unchanged |
+| Ingest rejected (403) | One warning naming the Database Ingestor role; exit code unchanged |
+| Cluster unreachable | One warning per **run**, not per artifact; exit code unchanged |
+
+Telemetry never changes a run's exit code, never writes to stdout under `--format json`, and never carries a credential value into the payload, the log, or `run.json` — failure text is redacted before it is reported. `--dry-run` prints the resolved cluster, database, and table alongside each payload without sending anything.
 
 ### Rule Overlays
 
@@ -476,7 +522,7 @@ remediation without parsing the log.
 | `--artifact-dir DIR` | the working directory | Root to discover artifacts under, recursively |
 | `--output-dir DIR` | `analyzer-results` | Root directory for result envelopes |
 | `--dry-run` | off | List matching artifacts without running any analyzer |
-| `--telemetry` / `--no-telemetry` | env-driven | Stream/suppress Eventhouse telemetry when configured |
+| `--telemetry` / `--no-telemetry` | config-driven | Force/suppress Eventhouse telemetry. A configured destination already enables it; `--telemetry` with none configured exits `2` — see [Telemetry](#telemetry) |
 | `--report` / `--no-report` | off | Write a readable HTML report beside each envelope [env: `ANALYZER_REPORT`] |
 | `--format {text,json}` | `text` | Aggregate summary output format (see Agent Contract above for the stdout guarantee) |
 | `-v`, `--verbose` | off | Increase output verbosity (one `-v` = per-finding detail, two `-v` = command + stdout/stderr) |
