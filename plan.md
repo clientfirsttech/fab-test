@@ -4,7 +4,7 @@ Guiding vision and constraints: [vision.md](vision.md)
 
 ## Active Epics
 
-- [TestPyPI Release](tasks/testpypi-release-epic.md) — 📋 PLANNED. Publish `fab-test` `1.0.0.0.dev1` to TestPyPI as an installable package. Blocker found while planning: the wheel ships no rulesets, so `bpa`/`pbir` resolve `BPARules.json` under the caller's own `.github/metadata/` and fail validation outside this checkout. Packages the metadata, adds `.fab-test/metadata/` as the consumer override (`.github/metadata/` keeps working), and fixes the tag glob that would send a `dev` rehearsal to production PyPI. TestPyPI also lacks `pql-test==0.1.12` and current `fabric-cicd`, so installs need `--extra-index-url https://pypi.org/simple`. **8 tasks**.
+- [TestPyPI Release](tasks/testpypi-release-epic.md) — 🚧 IN-PROGRESS, **8 of 9 tasks done**. The wheel now ships the rulesets and `analyzers.json` the analyzers need, `.fab-test/metadata/` overrides them (`.github/metadata/` still resolves), the version is written in one place, the project URLs point at `kerski/fab-test`, and a pre-release tag can no longer reach production PyPI. The docs stopped claiming `pip install fab-test` works and now carry the TestPyPI command with its `--extra-index-url` and exact pin, plus [docs/RELEASE.md](docs/RELEASE.md) for all three callers. **The one task left is human-gated**: the TestPyPI pending trusted publisher must be registered under the `jkerski` account (owner `kerski`, repo `fab-test`, workflow `publish-testpypi.yml`, environment `testpypi`) before anything can upload — until then the install cannot be verified, and verifying it is the requirement.
 
 ## Standalone Tasks
 

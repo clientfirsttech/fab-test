@@ -6,11 +6,39 @@ This package provides the `fab-test` CLI and supporting analyzer wrappers used b
 
 ## Install
 
-### From PyPI
+### From PyPI — not yet
+
+`pip install fab-test` does not work today. The name is unregistered on PyPI, so
+that command finds nothing. Until the first final release, use TestPyPI below, a
+locally built wheel, or an editable checkout.
+
+### From TestPyPI (pre-release)
+
+The current pre-release is `1.0.0.0.dev1`. Two things about the command below are
+not optional:
+
+- **`--extra-index-url https://pypi.org/simple`.** TestPyPI does not carry
+  `pql-test==0.1.12` or a current `fabric-cicd` — it has 0.1.11 and 0.1.7. Without
+  the production index alongside it, the install fails to resolve dependencies,
+  not because anything is wrong with `fab-test`.
+- **The exact pin.** `1.0.0.0.dev1` is a PEP 440 dev release, and pip skips
+  pre-releases unless you name one or pass `--pre`. A bare `pip install fab-test`
+  against TestPyPI finds no acceptable version.
 
 ```bash
-pip install fab-test
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+
+pip install \
+  --index-url https://test.pypi.org/simple/ \
+  --extra-index-url https://pypi.org/simple \
+  "fab-test==1.0.0.0.dev1"
+
+fab-test --version
 ```
+
+TestPyPI is a rehearsal index, not a distribution channel — treat anything
+installed from it as disposable.
 
 ### From source in editable mode (developers)
 
@@ -246,7 +274,7 @@ cat analyzer-results/run.json          # 4. read the manifest instead of globbin
 
 Full CLI reference: [`.github/skills/fab-test/SKILL.md`](https://github.com/kerski/fab-test/blob/main/.github/skills/fab-test/SKILL.md).
 
-See [`docs/QUICK-VALIDATION.md`](https://github.com/kerski/fab-test/blob/main/docs/QUICK-VALIDATION.md) for a complete local build-and-test workflow.
+See [`docs/QUICK-VALIDATION.md`](https://github.com/kerski/fab-test/blob/main/docs/QUICK-VALIDATION.md) for a complete local build-and-test workflow, and [`docs/RELEASE.md`](https://github.com/kerski/fab-test/blob/main/docs/RELEASE.md) for how `fab-test` itself is published.
 
 ## Configuration
 
