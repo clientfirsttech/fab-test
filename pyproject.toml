@@ -124,8 +124,6 @@ branch = false
 # service (as playwright_validation's client protocol already does), then
 # delete its line.
 omit = [
-    # Needs a reachable Eventhouse cluster and a Kusto ingest endpoint.
-    "src/fabric_ci_cd_dataops/scripts/eventhouse_logger.py",
     # Connects to Fabric to prove credentials work; there is nothing to
     # assert offline that build_fabric_service_client's tests do not.
     "src/fabric_ci_cd_dataops/scripts/validate_fabric_service_client.py",

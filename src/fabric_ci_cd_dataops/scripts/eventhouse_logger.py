@@ -128,8 +128,11 @@ def load_ingest_dependencies() -> IngestDependencies:
     and `_target` already use.
     """
     try:
-        from azure.kusto.data import KustoConnectionStringBuilder
-        from azure.kusto.ingest import DataFormat, IngestionProperties, QueuedIngestClient
+        # DataFormat is exported by azure.kusto.data, not azure.kusto.ingest --
+        # importing it from the latter raises ImportError even with both
+        # packages installed, which reads as a missing extra and is not one.
+        from azure.kusto.data import DataFormat, KustoConnectionStringBuilder
+        from azure.kusto.ingest import IngestionProperties, QueuedIngestClient
     except ImportError as exc:
         raise TelemetryDependencyError(
             "telemetry is configured but the Kusto ingest client is not installed. "
@@ -285,78 +288,133 @@ def validate_payload_schema(payload: dict, table_name: str, terse: bool = False)
     return True
 
 
+@dataclass(frozen=True)
+class FlushResult:
+    """What a flush actually did.
+
+    ``ok`` is False for a flush that did not deliver, which is the whole
+    point of this task: the placeholder returned True for a send that never
+    happened, so every caller -- including the handler that would have
+    warned -- was told it worked.
+    """
+
+    ok: bool
+    sent: int
+    error: str | None = None
+
+
+class EventhouseSink:
+    """Collects telemetry for one run and ingests it in as few calls as possible.
+
+    A run-scoped batch rather than a send per artifact: `_send_telemetry` is
+    called from `_run_one_artifact`, so ingesting inline would pay
+    connection setup once per artifact and open a queued-ingest client N
+    times for one logical run.
+
+    Nothing is imported, authenticated, or connected until `flush` has
+    something to deliver.
+    """
+
+    def __init__(self, config, env_file: Path | str | None = None):
+        self.config = config
+        self.env_file = env_file
+        self._batches: dict[str, list[dict]] = {}
+
+    def add(self, table: str, payload: dict) -> None:
+        """Queue one record for ``table``."""
+        self._batches.setdefault(table, []).append(payload)
+
+    @property
+    def pending(self) -> int:
+        """How many records are waiting to be delivered."""
+        return sum(len(rows) for rows in self._batches.values())
+
+    def flush(self) -> FlushResult:
+        """Deliver everything queued, and report what happened.
+
+        Never raises. Telemetry is non-blocking by contract, and a raise
+        here would let a diagnostic feature fail a build.
+        """
+        batches, self._batches = self._batches, {}
+        queued = sum(len(rows) for rows in batches.values())
+        if not queued:
+            return FlushResult(ok=True, sent=0)
+        if not self.config.configured:
+            return FlushResult(
+                ok=False,
+                sent=0,
+                error=(
+                    "telemetry has records to send but no Eventhouse destination is "
+                    "configured; set `telemetry.eventhouse` in fab-test.yml"
+                ),
+            )
+        try:
+            for table, rows in batches.items():
+                self._ingest(table, rows)
+        except Exception as exc:  # noqa: BLE001 - boundary: telemetry never fails a run
+            return FlushResult(ok=False, sent=0, error=describe_ingest_failure(exc))
+        return FlushResult(ok=True, sent=queued)
+
+    def _ingest(self, table: str, rows: list[dict]) -> None:
+        """Ingest one table's rows. The seam tests replace with a stand-in."""
+        deps = load_ingest_dependencies()
+        client = self._client(deps)
+        properties = deps.ingestion_properties(
+            database=self.config.database,
+            table=table,
+            data_format=deps.data_format.JSON,
+        )
+        client.ingest_from_stream(_json_lines(rows), ingestion_properties=properties)
+
+    def _client(self, deps: IngestDependencies):
+        """Build the queued-ingest client, once per flush that needs one."""
+        # The ingest endpoint is the cluster URI with an `ingest-` prefix on
+        # the host; Kusto rejects a queued ingest aimed at the query endpoint.
+        kcsb = deps.connection_string_builder.with_azure_token_credential(
+            _ingest_uri(self.config.uri), build_ingest_credential(self.env_file)
+        )
+        return deps.ingest_client(kcsb)
+
+
+def _ingest_uri(query_uri: str) -> str:
+    """Return the ingest endpoint for a cluster's query URI."""
+    scheme, _, rest = query_uri.partition("://")
+    if not rest:
+        return query_uri
+    if rest.startswith("ingest-"):
+        return query_uri
+    return f"{scheme}://ingest-{rest}"
+
+
+def _json_lines(rows: list[dict]):
+    """Return the rows as a newline-delimited JSON stream for ingest."""
+    import io
+
+    body = "\n".join(json.dumps(row, default=str) for row in rows)
+    return io.BytesIO(body.encode("utf-8"))
+
+
 def publish_to_eventhouse(table_name: str, payload: dict, terse: bool = False) -> bool:
+    """Publish one telemetry payload immediately.
+
+    The single-record path, used by this module's own CLI. `fab-test`
+    batches instead -- see `EventhouseSink`.
     """
-    Publish telemetry payload to Eventhouse table.
+    from ._config import merged_file_config
+    from ._metadata import default_repo_root
+    from ._telemetry import resolve_eventhouse_config
 
-    This is a placeholder implementation. The actual implementation will use:
-    - Kusto Python SDK (azure-kusto-data, azure-kusto-ingest)
-    - Azure Identity for authentication
-    - Eventhouse connection string from secrets
-
-    Example implementation:
-
-        from azure.kusto.data import KustoClient, KustoConnectionStringBuilder
-        from azure.kusto.ingest import QueuedIngestClient, IngestionProperties
-        from azure.identity import DefaultAzureCredential
-
-        # Build connection
-        kcsb = KustoConnectionStringBuilder.with_aad_managed_service_identity_authentication(
-            eventhouse_uri
-        )
-
-        # Create ingest client
-        ingest_client = QueuedIngestClient(kcsb)
-
-        # Ingest data
-        ingestion_props = IngestionProperties(
-            database=database_name,
-            table=table_name,
-            data_format="json"
-        )
-
-        ingest_client.ingest_from_dict([payload], ingestion_properties=ingestion_props)
-    """
-    if not terse:
-        print("\n" + "="*80)
-        print("EVENTHOUSE TELEMETRY LOGGER")
-        print("="*80)
-        print(f"\n📊 Table:       {table_name}")
-        print(f"📦 Artifact:    {payload.get('artifact_name', 'N/A')}")
-        print(f"🏷️  Type:       {payload.get('artifact_type', 'N/A')}")
-        print(f"🔖 Commit:      {payload.get('commit_sha', 'N/A')}")
-        print(f"⏰ Timestamp:   {payload.get('timestamp', 'N/A')}")
-        print("\n" + "-"*80)
-        print("CONSTRAINT C9: Telemetry is optional and never mandatory")
-        print("-"*80)
-
-        print("\n📋 Payload Preview:")
-        print(json.dumps(payload, indent=2))
-
-        print("\n🔧 Eventhouse Publishing (to be implemented):")
-        print("""
-    Required Dependencies:
-        pip install azure-kusto-data azure-kusto-ingest azure-identity
-
-    Expected Configuration:
-        EVENTHOUSE_URI: from GitHub Secrets or Environment Variables
-        DATABASE_NAME: from metadata configuration
-        TABLE_NAME: derived from analysis type
-
-    Schema Source:
-        https://github.com/kerski/pbi-teams-more-analytic-support (Eventhouse branch)
-        Eventhouse schema is the system of record per Constraint C9
-    """)
-
-        print("\n⚠️  STATUS: Placeholder Implementation")
-        print("\nThis script will publish telemetry to Eventhouse once:")
-        print("  1. Eventhouse connection is configured")
-        print("  2. Kusto Python SDK dependencies are installed")
-        print("  3. Eventhouse tables are created per reference schema")
-        print("\n" + "="*80)
-        print("✅ TELEMETRY LOGGING SIMULATION COMPLETED")
-        print("="*80 + "\n")
-
+    repo_root = default_repo_root()
+    file_config, _ = merged_file_config(repo_root, repo_root / "pyproject.toml")
+    sink = EventhouseSink(resolve_eventhouse_config(file_config))
+    sink.add(table_name, payload)
+    result = sink.flush()
+    if not result.ok:
+        terse_print(terse, "ERROR", "eventhouse_logger", result.error or "ingest failed")
+        if not terse:
+            print(f"Error: telemetry was not delivered: {result.error}", file=sys.stderr)
+        return False
+    terse_print(terse, "OK", "eventhouse_logger", f"ingested 1 record into {table_name}")
     return True
 
 

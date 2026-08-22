@@ -29,6 +29,12 @@ _REQUIRED_KEYS = {
     "command",
     "artifacts",
     "totals",
+    # Why this run's telemetry was not delivered, or null when it was or
+    # none was asked for (Eventhouse Shipping §6). Additive and always
+    # present, the same shape `target` established: a pipeline reading only
+    # the manifest could otherwise not tell a run whose telemetry landed
+    # from one whose records were dropped.
+    "telemetry_error",
     "exit_code",
 }
 
