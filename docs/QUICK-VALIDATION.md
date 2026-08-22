@@ -319,6 +319,18 @@ fails loudly instead of quietly analyzing nothing.
 
 `run.json` records `schema_version`, `fab_test_version`, `origin` (`"local"` locally, the detected CI system in a pipeline), `target` (the resolved target, or `null` for a discovery run), the invoked command (credentials redacted), per-artifact status, envelope paths, totals, and the final exit code — see the [Agent Contract](../.github/skills/fab-test/SKILL.md#agent-contract) for the full schema.
 
+**A failed artifact says why, in the manifest.** When an analyzer aborts before it can write an envelope — a missing `--env`, a missing prerequisite, a timeout — that artifact's `detail` carries the remediation message, so the uploaded manifest is self-contained:
+
+```json
+{
+  "analyzer": "playwright", "artifact": "ThinReport", "status": "failed",
+  "envelope_path": null, "errors": 0, "warnings": 0,
+  "detail": "No environment given, so there is nothing to resolve 'ThinReport' against. Pass --env, set FABRIC_ENVIRONMENT, or set `environment:` in fab-test.yml."
+}
+```
+
+This is the case where uploading `run.json` alone still tells you what to fix. It stays `null` when the analyzer *did* write an envelope — then `envelope_path` points at the findings, and those are the reason. Credential values are redacted out of `detail` on the way in, as they are from `command`.
+
 ### Running the local-Desktop analyzer set in CI
 
 `fab-test local` (see [QUICKSTART-LOCAL.md](QUICKSTART-LOCAL.md)) isn't only for a laptop — it runs the same in a pipeline, since it never requires a workspace ID or service principal:

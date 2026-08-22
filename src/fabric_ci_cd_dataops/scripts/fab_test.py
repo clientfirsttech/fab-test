@@ -56,7 +56,7 @@ from ._config import (
     resolve_setting,
     validate_config,
 )
-from ._credentials import probe_credentials
+from ._credentials import probe_credentials, redact_secrets
 from ._desktop import bridge_cli_path, detect_desktop_instances
 from ._metadata import (
     ANALYZERS,
@@ -191,6 +191,34 @@ def _clean_annotation(line: str) -> str:
         if line.startswith(prefix):
             return line[len(prefix):]
     return line
+
+
+# Long enough for the full remediation sentences the analyzers actually emit,
+# which name every flag and environment variable that would resolve the
+# failure, and short enough that a stack trace cannot turn run.json into a
+# log file.
+_DETAIL_MAX_CHARS = 500
+
+
+def _stderr_detail(stderr: str | None) -> str | None:
+    """Return the analyzer's failure message for `run.json`, or None.
+
+    Called only when the analyzer exited non-zero *without* writing an
+    envelope, so its stderr is the only account of what went wrong. An
+    `::error::` line is the message the analyzer chose to surface, so it wins
+    over whatever noise trails it; failing that, the last non-empty line does.
+
+    Redacted on the way in: the secrets constraint puts the run manifest on
+    the same footing as stdout and telemetry, and a child that interpolates a
+    client secret into its own error text would otherwise write it to a file
+    a pipeline uploads.
+    """
+    lines = [line.strip() for line in (stderr or "").splitlines() if line.strip()]
+    if not lines:
+        return None
+    annotated = [line for line in lines if line.startswith("::error::")]
+    chosen = _clean_annotation(annotated[-1] if annotated else lines[-1])
+    return redact_secrets(chosen)[:_DETAIL_MAX_CHARS]
 
 
 def _verbosity_env(args: argparse.Namespace) -> str:
@@ -509,7 +537,11 @@ def _run_one_artifact(
         proc = subprocess.run(
             cmd,
             stdout=subprocess.PIPE if capture_stdout else None,
-            stderr=None if ctx.in_ci else subprocess.PIPE,
+            # Piped in every mode, CI included. Inheriting it there sent the
+            # analyzer's remediation to the log and nowhere else, leaving
+            # run.json -- often the only artifact a pipeline uploads -- saying
+            # the run failed and not why. Re-emitted below either way.
+            stderr=subprocess.PIPE,
             text=True,
             encoding="utf-8",
             errors="replace",
@@ -534,15 +566,21 @@ def _run_one_artifact(
     if capture_stdout:
         _reemit(proc.stdout)
 
-    if not ctx.in_ci and proc.stderr:
-        for line in proc.stderr.splitlines():
-            clean = _clean_annotation(line)
-            if clean.strip():
-                narrate(f"  {clean}", output_format=output_format)
+    if proc.stderr:
+        if ctx.in_ci:
+            # Verbatim: GitHub renders `::error::` against the file, and a
+            # stripped prefix is a lost annotation.
+            print(proc.stderr, end="", file=sys.stderr)
+        else:
+            for line in proc.stderr.splitlines():
+                clean = _clean_annotation(line)
+                if clean.strip():
+                    narrate(f"  {clean}", output_format=output_format)
 
     # Read the envelope and apply the error/warning threshold ourselves so
     # warnings never fail the build.
     envelope = _read_artifact_envelope(output_dir, name, artifact.stem)
+    aborted = False
     if envelope is None and proc.returncode == 0:
         envelope = {
             "status": "passed",
@@ -551,6 +589,9 @@ def _run_one_artifact(
             "analyzer": name,
         }
     elif envelope is None:
+        # Nothing to read: the analyzer aborted before it could write one, so
+        # its stderr is the only record of the reason. `detail` below carries it.
+        aborted = True
         envelope = {
             "status": "failed",
             "findings": [],
@@ -576,6 +617,7 @@ def _run_one_artifact(
             str(envelope_path) if envelope_path.exists() else None,
             errors,
             warnings,
+            detail=_stderr_detail(proc.stderr) if aborted else None,
         )
 
     return (artifact.stem, artifact_code)

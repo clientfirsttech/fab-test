@@ -397,3 +397,25 @@ def test_a_missing_environment_exits_one_without_a_traceback(config, capsys) -> 
         assert run_playwright_validation(args) == 1
 
     assert "Traceback" not in capsys.readouterr().err
+
+
+@pytest.mark.playwright
+def test_missing_environment_abort_writes_its_message_to_stderr(capsys):
+    """Given no --env, the abort message goes to stderr, not stdout.
+
+    The abort happens before any envelope is written, so this message is the
+    only record of the reason. fab-test inherits a child's stdout under
+    `--format text` and pipes its stderr in every format, so the stream is
+    what decides whether `run.json` can carry the remediation or reports
+    `"detail": null` -- see tests/test_run_manifest.py. Every other analyzer
+    wrapper already sends `::error::` here.
+    """
+    args = parse_args(["--artifact", "ThinReport", "--output-path", "unused.json"])
+
+    exit_code = run_playwright_validation(args)
+
+    captured = capsys.readouterr()
+    assert exit_code == 1
+    assert "::error::" in captured.err
+    assert "Pass --env" in captured.err
+    assert "::error::" not in captured.out

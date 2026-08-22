@@ -57,6 +57,20 @@ def log(message: str) -> None:
     print(message)
 
 
+def log_error(message: str) -> None:
+    """Print an error annotation to stderr.
+
+    Every other analyzer wrapper already sends `::error::` to stderr; this
+    one sent it to stdout, and the difference was not cosmetic. fab-test
+    inherits a child's stdout under `--format text`, so an abort that wrote
+    no envelope left `run.json` reporting `"status": "failed"` with
+    `"detail": null` -- of vision's three callers, the agent was the one
+    told that the run failed and not why. stderr is piped in every format,
+    so the message reaches the manifest from here.
+    """
+    print(f"::error::{message}", file=sys.stderr)
+
+
 def _repo_root() -> Path:
     """Return the repository root."""
     workspace = os.getenv("GITHUB_WORKSPACE")
@@ -322,7 +336,7 @@ def _run_single_report(
             duration_ms=0,
         )
         write_envelope(output_path, env)
-        log(f"::error::{message}")
+        log_error(message)
         return 1
 
     base_embed_config = build_embed_config(
@@ -403,7 +417,7 @@ def run_playwright_validation(args: argparse.Namespace) -> int:
     try:
         base_config = _build_config_from_args(args)
     except (ValueError, ServiceResolutionError, PowerBiApiError) as exc:
-        log(f"::error::{exc}")
+        log_error(str(exc))
         return 1
 
     if args.impact_manifest:
