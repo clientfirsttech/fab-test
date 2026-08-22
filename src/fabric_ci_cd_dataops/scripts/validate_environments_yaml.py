@@ -18,6 +18,8 @@ import argparse
 import sys
 from pathlib import Path
 
+from ._metadata import MetadataNotFoundError, resolve_environments_yml
+
 # Ensure UTF-8 output on Windows where the default pipe encoding is cp1252.
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -160,24 +162,35 @@ def validate_environments_yaml(path: Path) -> list[str]:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Validate .github/metadata/environments.yml schema"
+        description="Validate environments.yml schema"
     )
     parser.add_argument(
         "--path",
         type=Path,
-        default=Path(".github/metadata/environments.yml"),
-        help="Path to environments.yml (default: .github/metadata/environments.yml)",
+        default=None,
+        help=(
+            "Path to environments.yml (default: the first of .fab-test/metadata/ "
+            "or .github/metadata/)"
+        ),
     )
     args = parser.parse_args(argv)
 
-    errors = validate_environments_yaml(args.path)
+    path = args.path
+    if path is None:
+        try:
+            path = resolve_environments_yml().path
+        except MetadataNotFoundError as exc:
+            _error(str(exc))
+            return 1
+
+    errors = validate_environments_yaml(path)
     if errors:
-        _error(f"Validation failed for {args.path}")
+        _error(f"Validation failed for {path}")
         for error in errors:
             _error(error)
         return 1
 
-    _info(f"{args.path} is valid")
+    _info(f"{path} is valid")
     return 0
 
 

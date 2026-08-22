@@ -2,7 +2,8 @@
 """
 Validate the environments.yml schema.
 
-Performs structural validation of `.github/metadata/environments.yml` to catch
+Performs structural validation of `environments.yml` -- from
+`.fab-test/metadata/` or `.github/metadata/` -- to catch
 configuration errors early — before they surface as cryptic deployment failures.
 
 Checks:
@@ -33,6 +34,7 @@ except ImportError:
     sys.exit(1)
 
 from ._cli_utils import terse_print
+from ._metadata import MetadataNotFoundError, resolve_environments_yml
 
 # ---------------------------------------------------------------------------
 # Schema definition
@@ -180,6 +182,31 @@ def validate(config: dict[str, Any]) -> list[ValidationError]:
 # Entry point
 # ---------------------------------------------------------------------------
 
+def _resolve_config_path(explicit: str | None, terse: bool) -> Path:
+    """Return the environments.yml to validate, or exit 1 saying where it looked.
+
+    Extracted from `main` rather than inlined: `main` was already one branch
+    under the complexity ceiling that `tests/test_complexity_budget.py`
+    ratchets, and the layer search adds two.
+    """
+    if explicit:
+        path = Path(explicit)
+        if path.exists():
+            return path
+        msg = f"File not found: {path}"
+        terse_print(terse, "ERROR", "file_not_found", msg)
+        if not terse:
+            print(f"❌  {msg}", file=sys.stderr)
+        sys.exit(1)
+    try:
+        return resolve_environments_yml().path
+    except MetadataNotFoundError as exc:
+        terse_print(terse, "ERROR", "file_not_found", str(exc))
+        if not terse:
+            print(f"❌  {exc}", file=sys.stderr)
+        sys.exit(1)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Validate environments.yml schema",
@@ -188,8 +215,11 @@ def main() -> None:
     )
     parser.add_argument(
         "--file",
-        default=".github/metadata/environments.yml",
-        help="Path to environments.yml (default: .github/metadata/environments.yml)",
+        default=None,
+        help=(
+            "Path to environments.yml (default: the first of .fab-test/metadata/ "
+            "or .github/metadata/)"
+        ),
     )
     parser.add_argument(
         "--terse",
@@ -201,14 +231,7 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    config_path = Path(args.file)
-
-    if not config_path.exists():
-        msg = f"File not found: {config_path}"
-        terse_print(args.terse, "ERROR", "file_not_found", msg)
-        if not args.terse:
-            print(f"❌  {msg}", file=sys.stderr)
-        sys.exit(1)
+    config_path = _resolve_config_path(args.file, args.terse)
 
     with open(config_path) as f:
         try:

@@ -1,6 +1,6 @@
 # Environments Metadata Layers Epic
 
-**Status**: 🚧 IN-PROGRESS (2/5)
+**Status**: 🚧 IN-PROGRESS (3/5)
 **Goal**: `environments.yml` resolves through the same layers as every other metadata file, and a Playwright run with no environment says so instead of crashing.
 
 ## Overview
@@ -90,7 +90,7 @@ callers' two-value unpacking still works.
 
 ---
 
-## 3. Resolve `environments.yml` Through the Repository Layers
+## 3. Resolve `environments.yml` Through the Repository Layers ✅
 
 Six sites hardcode `.github/metadata/environments.yml`. All six move to
 `resolve_environments_yml()`. An explicit path argument still wins everywhere it exists
@@ -105,8 +105,42 @@ today — callers and tests pass one.
 
 **Files**: `deploy.py`, `check_promotion_safety.py`, `generate_fabric_cicd_config.py`, `validate_environments_schema.py`, `validate_environments_yaml.py`, `playwright_validation/resolver.py`
 
-**Blast radius** (vision.md): six callers, three of them console scripts. Each runs through
-the real CLI before this task is done, not only the Playwright one that prompted it.
+**Blast radius** (vision.md): six callers. Each was run through its real entry point in a
+temp directory, both with `.fab-test/metadata/environments.yml` present and with neither
+layer, rather than only the Playwright one that prompted the change:
+
+| Caller | Override honoured | Absent names both places |
+|--------|-------------------|--------------------------|
+| `validate-environments-yaml` (console script) | exit 0, path printed | exit 1 |
+| `validate_environments_schema` | resolved and validated | exit 1 |
+| `generate_fabric_cicd_config` | `workspace_id: ws-from-fab-test-layer` written | exit 1 |
+| `deploy` | config read, bogus env rejected before deploying | exit 1 |
+| `check_promotion_safety` | config read, chain evaluated | `FileNotFoundError` |
+| `playwright_validation/resolver` | workspace resolved | `ServiceResolutionError` |
+
+**Done (2026-08-21)**: `deploy` needed a real artifact directory before it reaches config
+loading at all, so the first attempt at its absent-file path proved nothing -- artifact
+validation runs first and exits on its own message. Worth knowing for the next person who
+verifies that path.
+
+---
+
+## Found, Not Fixed -- Emoji Output Crashes a Windows Console
+
+`validate_environments_schema` prints `
+🔍 Validating: {path}
+` on the success path.
+On a default Windows console (cp1252) that raises `UnicodeEncodeError` and exits with a
+traceback, so the validator cannot report a *valid* file -- only an invalid one, whose
+output happens to avoid the glyph. Confirmed identical on `dev`, so it is pre-existing
+and not a regression from task 3; found only because the blast-radius rule sent every
+caller through its real entry point.
+
+Recorded rather than fixed: it is unrelated to metadata resolution, and unplanned scope
+entering a planned epic is what left task 1's crash fix homeless in the first place. It
+needs its own decision -- most likely `PYTHONIOENCODING`/`reconfigure` at the entry
+points, or dropping decorative glyphs from machine-facing output, which is a wider call
+than this epic should make.
 
 ---
 

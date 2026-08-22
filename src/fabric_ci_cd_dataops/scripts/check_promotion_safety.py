@@ -40,19 +40,32 @@ except ImportError:
     sys.exit(1)
 
 from ._cli_utils import terse_print
+from ._metadata import MetadataNotFoundError, resolve_environments_yml
 
 
 class PromotionSafetyChecker:
     """Validate artifact promotion safety."""
 
-    def __init__(self, environments_file: str = ".github/metadata/environments.yml"):
-        """Initialize with environments configuration."""
-        self.environments_file = Path(environments_file)
+    def __init__(self, environments_file: str | Path | None = None):
+        """Initialize with environments configuration.
+
+        ``environments_file`` still wins when given -- callers and tests
+        pass an explicit path. Without one the metadata layers are searched
+        (Environments Metadata Layers §3). Resolved in the body rather than
+        the signature so a checker built in one directory cannot carry
+        another directory's file.
+        """
+        self.environments_file = Path(environments_file) if environments_file else None
         self.config = self._load_config()
 
     def _load_config(self) -> dict[str, Any]:
         """Load environments configuration."""
-        if not self.environments_file.exists():
+        if self.environments_file is None:
+            try:
+                self.environments_file = resolve_environments_yml().path
+            except MetadataNotFoundError as exc:
+                raise FileNotFoundError(str(exc)) from exc
+        elif not self.environments_file.exists():
             raise FileNotFoundError(f"Environments config not found: {self.environments_file}")
 
         with open(self.environments_file) as f:
