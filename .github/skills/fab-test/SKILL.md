@@ -479,6 +479,10 @@ The mapping name is fixed and the mapping is **not optional**: without it Kusto 
 
 A destination that cannot be reached or built is a **failed** flush, never a delivered one: queued ingest accepts a batch aimed at a missing table and drops it later, so `fab-test` refuses to send rather than report a delivery that cannot land.
 
+**What a record identifies.** `Data.actor` carries the identity as given — `GITHUB_ACTOR` in CI, otherwise `git config user.email` — so a row can be grouped by who produced it. It is not hashed: the repository already stores that address in plaintext on every commit, and an opaque digest answered "was this the same person as last time" and nothing else.
+
+Filesystem paths in the payload, including those inside the embedded `results` envelope, are rewritten **repository-relative** (`.fabric\artifacts\Sales.SemanticModel`, not `C:\Users\<name>\...`). A path outside the repository is reduced to its final component rather than a `../../..` traversal. This is deliberate and worth knowing when querying: `Data.results.artifact_path` is relative, while the same field in the envelope on disk stays absolute, because a human clicking a result wants the full path and an Eventhouse row does not.
+
 Prerequisites, all reported by `fab-test doctor`'s `telemetry` row:
 
 - `pip install 'fab-test[telemetry]'` — the Kusto ingest client is **not** in the base package.
@@ -494,6 +498,9 @@ Failure modes an agent should expect:
 | Extra not installed | One warning naming `pip install 'fab-test[telemetry]'`; exit code unchanged |
 | Ingest rejected (403) | One warning naming the Database Ingestor role; exit code unchanged |
 | Cluster unreachable | One warning per **run**, not per artifact; exit code unchanged |
+| Table or mapping missing and uncreatable | Flush reported **failed**, nothing sent, error carries the KQL; exit code unchanged |
+
+**What a record identifies.** `actor` is the git email (`git config user.email`, or `GITHUB_ACTOR` in a pipeline), recorded as given — the same address the repository stores on every commit — or an empty string when nothing resolves. Every filesystem path in the payload, including those inside the embedded `results` envelope, is rewritten relative to the repository root; a path outside the repository is reduced to its final component. Neither is cosmetic: an absolute path on a laptop is `C:\Users\<name>\…`, so before this the operating-system username shipped in plaintext in every record while `actor` was hashed into something nobody could resolve — identifying people by accident and failing to identify them on purpose.
 
 Telemetry never changes a run's exit code, never writes to stdout under `--format json`, and never carries a credential value into the payload, the log, or `run.json` — failure text is redacted before it is reported. `--dry-run` prints the resolved cluster, database, and table alongside each payload without sending anything.
 

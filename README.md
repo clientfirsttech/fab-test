@@ -379,6 +379,15 @@ that uploads only the manifest can still tell a run whose telemetry landed from 
 whose records were dropped. Credential values never reach the payload, the log, or
 the manifest.
 
+**What each record identifies.** `actor` carries the git email (`git config
+user.email`, or `GITHUB_ACTOR` in a pipeline) as-is, so you can ask who ran what —
+the same address the repository already stores on every commit. File paths are
+recorded relative to the repository root, never absolute: an absolute path on a
+laptop is `C:\Users\<name>\…`, which shipped the operating-system username in every
+record until it was found by reading rows in a real Eventhouse. If you would rather
+not record a person at all, unset `user.email` for the repository — an unresolvable
+actor is stored as an empty string, not as a placeholder.
+
 ### Where metadata lives
 
 Rulesets, the analyzer registry, the artifact map, and `environments.yml` all resolve the

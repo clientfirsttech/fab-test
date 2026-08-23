@@ -41,7 +41,6 @@ from fabric_ci_cd_dataops.scripts.fab_test import (
     _machine_context,
     _print_all_summary,
     _print_summary,
-    _redact_pii,
     _resolve_timeout,
     _run_analyzer,
     _send_telemetry,
@@ -807,8 +806,14 @@ def test_bpa_dry_run_lists_applicable_analyzers():
 
 
 @pytest.mark.fab_test
-def test_bpa_dry_run_empty_artifact_dir_names_directory_and_pbip_search(tmp_path):
-    """The 'nothing found' message names the directory and that .pbip was searched."""
+def test_bpa_dry_run_empty_artifact_dir_names_directory_and_suffix(tmp_path):
+    """The 'nothing found' message names the directory it searched and the
+    folder suffix it searched for.
+
+    It used to also claim `.pbip` projects were searched, which offered a
+    caller a second route to being found that has not existed since
+    discovery went suffix-based (Empty Discovery Diagnostics §2).
+    """
     result = subprocess.run(
         ["fab-test", "bpa", "--dry-run", "--artifact-dir", str(tmp_path)],
         capture_output=True,
@@ -816,9 +821,10 @@ def test_bpa_dry_run_empty_artifact_dir_names_directory_and_pbip_search(tmp_path
         check=False,
     )
     assert result.returncode == 0, result.stderr
-    assert str(tmp_path) in result.stdout or str(tmp_path) in result.stderr
     combined = result.stdout + result.stderr
-    assert ".pbip" in combined
+    assert str(tmp_path) in combined
+    assert "*.SemanticModel" in combined
+    assert ".pbip" not in combined
 
 
 # --------------------------------------------------------------------------- #
@@ -2033,20 +2039,14 @@ def test_machine_context_omits_platform_when_undetectable(monkeypatch):
     assert context["fab_test_version"] == fab_test_version
 
 
-@pytest.mark.fab_test
-def test_redact_pii_hashes_email_like_values():
-    """An email-shaped value is redacted to a stable, non-reversible hash."""
-    redacted = _redact_pii("dev@example.com")
-    assert "@" not in redacted
-    assert redacted.startswith("sha256:")
-    assert redacted == _redact_pii("dev@example.com")  # stable/deterministic
-
-
-@pytest.mark.fab_test
-def test_redact_pii_leaves_non_email_values_unchanged():
-    """A non-email value (e.g. a CI bot username) passes through unchanged."""
-    assert _redact_pii("ci-bot") == "ci-bot"
-    assert _redact_pii("") == ""
+# `_redact_pii` and its two tests were deleted deliberately. It hashed the
+# git email to `sha256:...`, which answered "was this the same person as last
+# time" and nothing else -- while the operating-system username shipped in
+# plaintext through the absolute paths inside the embedded `results`
+# envelope, which it never touched. It bought no privacy and cost the
+# attribution the field exists for. `actor` is now recorded as given and
+# payload paths are made repository-relative; see
+# tests/test_telemetry_identity.py.
 
 
 @pytest.mark.fab_test
@@ -2063,8 +2063,16 @@ def test_build_telemetry_payload_includes_machine_context():
 
 
 @pytest.mark.fab_test
-def test_build_telemetry_payload_redacts_email_actor(monkeypatch):
-    """An actor that looks like an email address is redacted in the payload."""
+def test_build_telemetry_payload_records_the_actor_as_given(monkeypatch):
+    """An email-shaped actor reaches the payload unchanged.
+
+    This test previously asserted the opposite. Inspecting real ingested
+    rows showed the hash achieved neither goal: it made `actor`
+    unresolvable, losing the attribution the field exists for, while the
+    operating-system username shipped in plaintext through the absolute
+    paths inside the embedded `results` envelope, which the redaction never
+    touched. See tests/test_telemetry_identity.py.
+    """
     from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
 
     monkeypatch.setattr(
@@ -2076,8 +2084,7 @@ def test_build_telemetry_payload_redacts_email_actor(monkeypatch):
         {"status": "passed", "findings": []},
         "DEV",
     )
-    assert "@" not in payload["actor"]
-    assert payload["actor"].startswith("sha256:")
+    assert payload["actor"] == "dev@example.com"
 
 
 @pytest.mark.fab_test
@@ -3596,8 +3603,142 @@ def test_missing_artifacts_warning_narrated_by_format(tmp_path, capsys):
 
     assert code == 0
     summary = json.loads(captured.out)
-    assert summary == {"analyzer": "bpa", "artifacts": []}
-    assert "no *.SemanticModel artifacts or .pbip projects found" in captured.err
+    assert summary == {"analyzer": "bpa", "artifacts": [], "skipped_checkouts": []}
+    assert "no *.SemanticModel artifacts found" in captured.err
+
+
+# --------------------------------------------------------------------------- #
+# Empty discovery explains itself (Empty Discovery Diagnostics §2)
+# --------------------------------------------------------------------------- #
+
+
+def _sibling_checkout(parent: Path, name: str) -> Path:
+    """A directory the scan will refuse to walk into, as a real repo would be."""
+    checkout = parent / name
+    (checkout / ".git").mkdir(parents=True)
+    return checkout
+
+
+@pytest.mark.fab_test
+def test_empty_result_does_not_claim_a_pbip_would_have_helped(tmp_path, capsys):
+    """Given an empty scan, the message should name the folder suffix it
+    searched for and not offer a .pbip as an alternative route to being
+    found -- it stopped being one when discovery went suffix-based.
+    """
+    artifact_dir = tmp_path / "empty"
+    artifact_dir.mkdir()
+
+    args = _RunAnalyzerArgs(artifact_dir, tmp_path / "out", output_format="text")
+    _run_analyzer("bpa", args, tmp_path / "out")
+
+    assert ".pbip" not in capsys.readouterr().out
+
+
+@pytest.mark.fab_test
+def test_empty_result_reports_the_checkouts_it_skipped(tmp_path, capsys):
+    """Given a root holding only git checkouts, the scan finds nothing by
+    design, so the message should say how many it skipped rather than
+    report an absence the caller can neither see nor act on.
+    """
+    _sibling_checkout(tmp_path, "project-a")
+    _sibling_checkout(tmp_path, "project-b")
+
+    args = _RunAnalyzerArgs(tmp_path, tmp_path / "out", output_format="text")
+    _run_analyzer("bpa", args, tmp_path / "out")
+    out = capsys.readouterr().out
+
+    assert "2 git checkouts" in out
+    assert "--artifact-dir" in out
+
+
+@pytest.mark.fab_test
+def test_the_skipped_checkouts_are_named_so_the_remedy_is_pasteable(tmp_path, capsys):
+    """Given skipped checkouts, naming them turns the hint into a command."""
+    checkout = _sibling_checkout(tmp_path, "project-a")
+
+    args = _RunAnalyzerArgs(tmp_path, tmp_path / "out", output_format="text")
+    _run_analyzer("bpa", args, tmp_path / "out")
+
+    assert str(checkout) in capsys.readouterr().out
+
+
+@pytest.mark.fab_test
+def test_only_the_first_few_skipped_checkouts_are_named(tmp_path, capsys):
+    """Given many skipped checkouts, a warning should stay a warning --
+    listing every repository on a developer's machine is not a remedy.
+    """
+    for index in range(9):
+        _sibling_checkout(tmp_path, f"project-{index}")
+
+    args = _RunAnalyzerArgs(tmp_path, tmp_path / "out", output_format="text")
+    _run_analyzer("bpa", args, tmp_path / "out")
+    out = capsys.readouterr().out
+
+    assert "9 git checkouts" in out
+    assert sum(f"project-{i}" in out for i in range(9)) == 3
+
+
+@pytest.mark.fab_test
+def test_an_empty_repository_gains_no_checkout_note(tmp_path, capsys):
+    """Given nothing was pruned, the in-repo case must not get noisier to
+    serve the out-of-repo one.
+    """
+    artifact_dir = tmp_path / "empty"
+    artifact_dir.mkdir()
+
+    args = _RunAnalyzerArgs(artifact_dir, tmp_path / "out", output_format="text")
+    _run_analyzer("bpa", args, tmp_path / "out")
+    out = capsys.readouterr().out
+
+    assert "checkout" not in out
+    assert "--artifact-dir" not in out
+
+
+@pytest.mark.fab_test
+def test_a_path_target_gains_no_checkout_note(tmp_path, capsys):
+    """Given the caller named a location, reporting what a scan elsewhere
+    pruned answers a question they did not ask.
+    """
+    _sibling_checkout(tmp_path, "project-a")
+    missing = tmp_path / "Nowhere.SemanticModel"
+
+    args = _RunAnalyzerArgs(
+        tmp_path, tmp_path / "out", artifact=str(missing), output_format="text"
+    )
+    _run_analyzer("bpa", args, tmp_path / "out")
+
+    assert "checkout" not in capsys.readouterr().out
+
+
+@pytest.mark.fab_test
+def test_skipped_checkouts_reach_the_json_payload(tmp_path, capsys):
+    """Given an agent caller, an empty `artifacts` list reads the same
+    whether the repository was empty or every candidate was pruned, so the
+    payload should carry the distinction and a remediation it can act on.
+    """
+    checkout = _sibling_checkout(tmp_path, "project-a")
+
+    args = _RunAnalyzerArgs(tmp_path, tmp_path / "out", output_format="json")
+    _run_analyzer("bpa", args, tmp_path / "out")
+    summary = json.loads(capsys.readouterr().out)
+
+    assert summary["artifacts"] == []
+    assert summary["skipped_checkouts"] == [str(checkout)]
+    assert "--artifact-dir" in summary["remediation"]
+
+
+@pytest.mark.fab_test
+def test_an_empty_payload_carries_no_remediation_key(tmp_path, capsys):
+    """Given nothing was pruned, there is nothing to remediate."""
+    artifact_dir = tmp_path / "empty"
+    artifact_dir.mkdir()
+
+    args = _RunAnalyzerArgs(artifact_dir, tmp_path / "out", output_format="json")
+    _run_analyzer("bpa", args, tmp_path / "out")
+    summary = json.loads(capsys.readouterr().out)
+
+    assert summary["skipped_checkouts"] == []
+    assert "remediation" not in summary
 
 
 @pytest.mark.fab_test
