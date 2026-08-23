@@ -1,6 +1,6 @@
 # Test Module Split Epic
 
-**Status**: 📋 PLANNED
+**Status**: ✅ COMPLETED (2026-08-23)
 **Goal**: No test module over 900 lines; every module named after the behavior it covers, with a ratchet that stops the next one growing.
 
 ## Overview

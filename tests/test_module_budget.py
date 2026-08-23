@@ -38,10 +38,11 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
     "src/fabric_ci_cd_dataops/scripts/fab_test.py": (
         2867,
         "2026-08-23: the CLI entry point outgrew the hard budget years before "
-        "this ratchet existed. Its tests were split first (this epic) because "
-        "a source split is only reviewable once its tests aren't one 4,383-"
-        "line file too -- see tasks/archive/2026-08-23-test-module-split.md "
-        "for the follow-up epic filed to split it.",
+        "this ratchet existed. Its tests were split first (Test Module Split "
+        "epic) because a source split is only reviewable once its tests "
+        "aren't one 4,383-line file too -- see "
+        "tasks/fab-test-module-split-epic.md for the follow-up epic filed "
+        "to split it.",
     ),
     "src/fabric_ci_cd_dataops/scripts/fab_test_summary.py": (
         812,
