@@ -156,7 +156,7 @@ fab-test auth login                       # delegates to `pql-test auth login`
 fab-test all
 ```
 
-The default set is configured in `.github/metadata/analyzers.json`.
+The default set is configured in `analyzers.json` (resolved via the metadata layers: `.fab-test/metadata/` > `.github/metadata/` > packaged).
 
 ### Check readiness before running (doctor)
 
@@ -224,7 +224,11 @@ Precedence, for every setting:
 
 No path flags are needed: commit the files under `.fab-test/metadata/` and every analyzer
 picks them up. Only `environments.yml` has no packaged default, so a workflow that deploys or
-resolves a deployed item by name has to supply it.
+resolves a deployed item by name has to supply it -- unless a workspace is already resolved
+from `--workspace-id`, `FABRIC_WORKSPACE_ID`, or `workspace:` in `fab-test.yml`, in which case
+`environments.yml` is never opened at all. The service-principal path below is still the CI
+recommendation regardless: it is what actually generates Playwright's embed token, which an
+ambient sign-in cannot do.
 
 ```yaml
 # committed alongside the workflow file, no secrets:

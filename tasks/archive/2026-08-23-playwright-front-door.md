@@ -1,7 +1,16 @@
 # Playwright Through The Front Door Epic
 
-**Status**: 📋 PLANNED
+**Status**: ✅ COMPLETED (2026-08-23)
 **Goal**: `fab-test playwright` says what it needs before it needs it, and takes it from `fab-test.yml` and `.fab-test/` — no traceback, no metadata scavenger hunt.
+
+**Result**: 8/8 tasks; 1317 passed, coverage 84%. Task 6's first bullet ("document that
+`playwright` needs no service principal") was stale against task 1's own scope decision —
+playwright always needs one, ambient auth is explicitly insufficient — so the shipped docs
+state the actual (correct) behavior rather than the bullet's literal wording; recorded here,
+not silently rewritten in the requirement text above. Two stale test/doc references surfaced
+by task 7's deletions and fixed in the same pass: `test_artifact_types.py` still compared
+against a `.github/metadata/artifact-map.json` that no longer exists, and
+`test_environments_yaml.py` pointed `DEFAULT_ENV_PATH` at the pre-move location.
 
 ## Overview
 

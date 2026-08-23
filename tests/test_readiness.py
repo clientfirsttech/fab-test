@@ -344,6 +344,29 @@ def test_playwright_does_not_fall_back_to_desktop(monkeypatch):
 
 
 @pytest.mark.fab_test
+def test_playwright_ambient_credential_is_not_ready(monkeypatch):
+    """Playwright needs a real service principal; ambient auth is not enough.
+
+    Unlike pql_test, which can authenticate interactively,
+    ``get_embed_context`` always calls MSAL with a service-principal secret.
+    Reporting ready here would be the false green task 1 exists to remove --
+    an az-logged-in developer would see green and then hit an MSAL
+    traceback on the one command that cannot use their sign-in.
+    """
+    from fabric_ci_cd_dataops.scripts import _credentials
+    from fabric_ci_cd_dataops.scripts import fab_test_registry as registry
+
+    _clear_cloud_env(monkeypatch)
+    monkeypatch.setenv("FABRIC_WORKSPACE_ID", "33333333-3333-3333-3333-333333333333")
+    monkeypatch.setattr(_credentials, "ambient_credential_available", lambda: True)
+
+    result = registry.check_readiness("playwright", None)
+
+    assert result["ready"] is False
+    assert result["remediation"] is not None
+
+
+@pytest.mark.fab_test
 def test_explicit_workspace_id_argument_is_honored(monkeypatch):
     """--workspace-id counts as a resolved workspace even with no env var set."""
     from fabric_ci_cd_dataops.scripts import fab_test_registry as registry

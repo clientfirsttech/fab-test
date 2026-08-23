@@ -108,10 +108,35 @@ def _parse_env_file(env_file: Path) -> dict[str, str]:
     return _parse(env_file)
 
 
-def _lookup(names: tuple[str, ...] | str, file_values: dict[str, str]) -> tuple[str, str | None]:
+def _resolve_env_path(env_file: Path | str | None) -> Path:
+    """Return the ``.env`` file this probe would read.
+
+    Delegates to `playwright_validation.config.resolve_env_file`, the one
+    place the search order -- ``--env-file`` > ``PLAYWRIGHT_ENV_FILE`` >
+    ``.fab-test/.env`` > ``./.env`` -- is defined, so this module and the
+    Playwright config loader cannot disagree about which file supplied a
+    credential.
+    """
+    from .playwright_validation.config import resolve_env_file
+
+    return resolve_env_file(env_file)
+
+
+def _env_file_label(env_path: Path) -> str:
+    """Return the short label `auth status` and `probe_credentials` report.
+
+    Distinguishes fab-test's own ``.fab-test/.env`` from a repository-root
+    ``.env`` so a caller can see which one actually supplied a credential.
+    """
+    return ".fab-test/.env" if env_path.parent.name == ".fab-test" else ".env"
+
+
+def _lookup(
+    names: tuple[str, ...] | str, file_values: dict[str, str], file_label: str = ".env"
+) -> tuple[str, str | None]:
     """Return ``(value, origin)`` for the first of ``names`` that is set.
 
-    Origin is ``"environment"`` or ``".env"``, or None when nothing
+    Origin is ``"environment"`` or ``file_label``, or None when nothing
     supplies it. Environment variables win, matching the real chain.
     """
     candidates = (names,) if isinstance(names, str) else names
@@ -120,7 +145,7 @@ def _lookup(names: tuple[str, ...] | str, file_values: dict[str, str]) -> tuple[
             return os.environ[name], "environment"
     for name in candidates:
         if file_values.get(name, ""):
-            return file_values[name], ".env"
+            return file_values[name], file_label
     return "", None
 
 
@@ -171,14 +196,13 @@ def resolve_service_principal(env_file: Path | str | None = None) -> ServicePrin
     the rule `build_fabric_service_client` already applies, for the same
     reason.
     """
-    if env_file is None:
-        env_file = Path(os.getenv("PLAYWRIGHT_ENV_FILE", ".env"))
-    env_path = Path(env_file)
+    env_path = _resolve_env_path(env_file)
+    file_label = _env_file_label(env_path)
     file_values = _parse_env_file(env_path) if env_path.exists() else {}
 
-    tenant, tenant_origin = _lookup(_TENANT_VAR, file_values)
-    client_id, client_origin = _lookup(_CLIENT_ID_VARS, file_values)
-    client_secret, secret_origin = _lookup(_CLIENT_SECRET_VARS, file_values)
+    tenant, tenant_origin = _lookup(_TENANT_VAR, file_values, file_label)
+    client_id, client_origin = _lookup(_CLIENT_ID_VARS, file_values, file_label)
+    client_secret, secret_origin = _lookup(_CLIENT_SECRET_VARS, file_values, file_label)
 
     if tenant and client_id and client_secret:
         origins = {tenant_origin, client_origin, secret_origin}
@@ -186,7 +210,7 @@ def resolve_service_principal(env_file: Path | str | None = None) -> ServicePrin
             tenant_id=tenant,
             client_id=client_id,
             client_secret=client_secret,
-            source="environment" if origins == {"environment"} else ".env",
+            source="environment" if origins == {"environment"} else file_label,
         )
     if tenant or client_id or client_secret:
         raise IncompleteServicePrincipalError(
@@ -203,18 +227,17 @@ def probe_credentials(env_file: Path | str | None = None) -> CredentialStatus:
     path that does not exist is not an error: it simply contributes
     nothing, the same as an absent file.
     """
-    if env_file is None:
-        env_file = Path(os.getenv("PLAYWRIGHT_ENV_FILE", ".env"))
-    env_path = Path(env_file)
+    env_path = _resolve_env_path(env_file)
+    file_label = _env_file_label(env_path)
     file_values = _parse_env_file(env_path) if env_path.exists() else {}
 
-    tenant, tenant_origin = _lookup(_TENANT_VAR, file_values)
-    client_id, client_origin = _lookup(_CLIENT_ID_VARS, file_values)
-    client_secret, secret_origin = _lookup(_CLIENT_SECRET_VARS, file_values)
+    tenant, tenant_origin = _lookup(_TENANT_VAR, file_values, file_label)
+    client_id, client_origin = _lookup(_CLIENT_ID_VARS, file_values, file_label)
+    client_secret, secret_origin = _lookup(_CLIENT_SECRET_VARS, file_values, file_label)
 
     if tenant and client_id and client_secret:
         origins = {tenant_origin, client_origin, secret_origin}
-        source = "environment" if origins == {"environment"} else ".env"
+        source = "environment" if origins == {"environment"} else file_label
         return CredentialStatus(
             source=source,
             tenant_id=tenant,

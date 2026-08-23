@@ -36,11 +36,13 @@ PACKAGED_METADATA = Path(__file__).resolve().parent.parent / "metadata"
 
 # Searched in order; the first readable file wins. `.fab-test/metadata` is
 # what a consumer is told to create -- fab-test's own directory, alongside
-# `.fab-test-tools/`. `.github/metadata` is this repository's own layout and
-# stays searched only so existing repositories and every workflow under
-# `.github/workflows/` keep working, per the backward-compatibility
-# constraint in vision.md. A consumer is never told to create it: `.github/`
-# belongs to GitHub, not to us.
+# `.fab-test-tools/`. `.github/metadata` is searched only for consumer
+# repositories already on that legacy layout, per the backward-compatibility
+# constraint in vision.md -- not because any workflow in this repository
+# reads it: this repository itself moved onto `.fab-test/metadata/`
+# (Playwright Through The Front Door §7), and none of its four remaining
+# workflows ever referenced `.github/metadata`. A consumer is never told to
+# create it: `.github/` belongs to GitHub, not to us.
 _OVERRIDE_LAYERS: tuple[tuple[Path, str], ...] = (
     (Path(".fab-test") / "metadata", ".fab-test/metadata"),
     (Path(".github") / "metadata", ".github/metadata"),
