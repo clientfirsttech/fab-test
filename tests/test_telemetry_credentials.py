@@ -12,6 +12,9 @@ network: this file is about which credential is built and why.
 
 from __future__ import annotations
 
+import tempfile
+from pathlib import Path
+
 import pytest
 
 from fabric_ci_cd_dataops.scripts._credentials import (
@@ -28,12 +31,18 @@ _ALL_VARS = (
     "FABRIC_SERVICE_PRINCIPAL_SECRET",
 )
 
+# A path guaranteed not to exist, so `.env` discovery in this module never
+# picks up a real `.fab-test/.env` or `.env` a developer keeps in their own
+# checkout -- these tests must always pass on any machine.
+_NO_SUCH_ENV_FILE = str(Path(tempfile.gettempdir()) / "fab-test-test-isolation" / ".env")
+
 
 @pytest.fixture(autouse=True)
 def _clean_environment(monkeypatch):
     """No test inherits the developer's own credentials."""
     for var in _ALL_VARS:
         monkeypatch.delenv(var, raising=False)
+    monkeypatch.setenv("PLAYWRIGHT_ENV_FILE", _NO_SUCH_ENV_FILE)
 
 
 # --------------------------------------------------------------------------

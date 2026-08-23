@@ -11,6 +11,9 @@ green it once reported for four cloud analyzers with no credentials at all.
 
 from __future__ import annotations
 
+import tempfile
+from pathlib import Path
+
 import pytest
 
 from fabric_ci_cd_dataops.scripts._telemetry import (
@@ -31,6 +34,11 @@ _CREDENTIAL_VARS = (
     "FABRIC_SERVICE_PRINCIPAL_SECRET",
 )
 
+# A path guaranteed not to exist, so `.env` discovery in this module never
+# picks up a real `.fab-test/.env` or `.env` a developer keeps in their own
+# checkout -- these tests must always pass on any machine.
+_NO_SUCH_ENV_FILE = str(Path(tempfile.gettempdir()) / "fab-test-test-isolation" / ".env")
+
 
 class _Args:
     """A doctor invocation, with telemetry configured unless a test says not."""
@@ -46,6 +54,7 @@ class _Args:
 def _clean_environment(monkeypatch):
     for var in (EVENTHOUSE_URI_VAR, EVENTHOUSE_DATABASE_VAR, ENABLE_VAR, *_CREDENTIAL_VARS):
         monkeypatch.delenv(var, raising=False)
+    monkeypatch.setenv("PLAYWRIGHT_ENV_FILE", _NO_SUCH_ENV_FILE)
 
 
 def _with_credentials(monkeypatch):

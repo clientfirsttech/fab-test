@@ -17,11 +17,18 @@ any machine.
 """
 
 import json
+import tempfile
+from pathlib import Path
 
 import pytest
 
 from fabric_ci_cd_dataops.scripts import _credentials
 from fabric_ci_cd_dataops.scripts._credentials import probe_credentials
+
+# A path guaranteed not to exist, so `.env` discovery in this module never
+# picks up a real `.fab-test/.env` or `.env` a developer keeps in their own
+# checkout -- these tests must always pass on any machine.
+_NO_SUCH_ENV_FILE = str(Path(tempfile.gettempdir()) / "fab-test-test-isolation" / ".env")
 
 _ALL_VARS = (
     "FABRIC_TENANT_ID",
@@ -39,9 +46,16 @@ _SECRET = "s3cr3t-do-not-print"
 
 @pytest.fixture
 def clean_env(monkeypatch):
-    """No credential variables, and ambient off unless a test turns it on."""
+    """No credential variables, and ambient off unless a test turns it on.
+
+    `PLAYWRIGHT_ENV_FILE` is pinned to a nonexistent path rather than
+    deleted: deleting it would fall through to `.fab-test/.env` / `.env`
+    discovery, which would leak in a real credential file this checkout
+    happens to have.
+    """
     for var in _ALL_VARS:
         monkeypatch.delenv(var, raising=False)
+    monkeypatch.setenv("PLAYWRIGHT_ENV_FILE", _NO_SUCH_ENV_FILE)
     monkeypatch.setattr(_credentials, "ambient_credential_available", lambda: False)
     return monkeypatch
 
