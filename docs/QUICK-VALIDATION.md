@@ -92,6 +92,12 @@ without a `.pbip` beside it. Nested git checkouts, `.venv`, `node_modules`,
 An existing `.fabric/artifacts/` layout is found exactly as before, since it
 sits inside the working directory.
 
+If you run it one directory too high — in the folder that *holds* your
+repositories — everything below is a nested checkout, so nothing is found.
+The warning says how many checkouts it skipped and gives you the
+`--artifact-dir` to paste; `--format json` carries the same as
+`skipped_checkouts`.
+
 ### Discover artifacts without running anything
 
 ```bash
@@ -369,9 +375,14 @@ telemetry:
     database: fabric_ops
 ```
 
-**Create the tables once**, before the first run. `fab-test` never creates them. Each
-holds a single `Data` column, so downstream Eventhouse functions own the schema and a
-new payload field never breaks ingest:
+**No setup step is required.** The job above works against an empty KQL database:
+before its first send, `fab-test` checks that the table and its `fab_test_payload`
+ingestion mapping exist and creates whatever is missing. A run against a healthy
+cluster issues no schema commands. Query the payload through the one column:
+`fabric_static_analysis | project Data.analyzer, Data.status, todatetime(Data.timestamp)`.
+
+For a governed cluster where CI may ingest but not alter schema, create them once
+by hand — the run prints exactly this when it cannot:
 
 ```kusto
 .create-merge table fabric_static_analysis (Data: dynamic)
@@ -384,9 +395,11 @@ new payload field never breaks ingest:
 ```
 
 The mapping name is fixed and the mapping is **not optional** — without it Kusto maps
-by column name, matches nothing, and stores empty rows while reporting success. Query
-the payload through the column: `fabric_static_analysis | project Data.analyzer,
-Data.status, todatetime(Data.timestamp)`.
+by column name, matches nothing, and stores empty rows while reporting success. That
+is why `fab-test` verifies the mapping and not just the table.
+
+**`fab-test` creates tables, never databases or Eventhouses.** A missing database is
+reported as such rather than built.
 
 **Grant the credential the Database Ingestor role** on the KQL database (in Fabric:
 the Eventhouse item → Manage permissions). Without it the service principal

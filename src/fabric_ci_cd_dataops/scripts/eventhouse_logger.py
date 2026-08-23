@@ -59,6 +59,49 @@ TELEMETRY_EXTRA_HINT = "pip install 'fab-test[telemetry]'"
 # success -- which is the failure this whole module was rewritten to end.
 PAYLOAD_MAPPING = "fab_test_payload"
 
+# path "$" puts the whole JSON object into the one column.
+_MAPPING_BODY = '[{"column":"Data","path":"$","datatype":"dynamic"}]'
+
+
+class DestinationError(Exception):
+    """The telemetry table or its mapping is missing and could not be created.
+
+    Carries its own message through `describe_ingest_failure` unchanged: it
+    already names the table, the database, and the KQL, and appending an
+    ingest-permission hint to a table-creation failure would send the reader
+    to the wrong grant.
+    """
+
+
+def create_statements(table: str) -> str:
+    """Return the KQL that creates ``table`` and its ingestion mapping.
+
+    One definition, used both to build the destination and to tell a reader
+    how to build it by hand, so the documented statements cannot drift from
+    the ones that actually run.
+    """
+    return (
+        f"  .create-merge table {table} (Data: dynamic)\n"
+        f"  .create-or-alter table {table} ingestion json mapping '{PAYLOAD_MAPPING}' "
+        f"'{_MAPPING_BODY}'"
+    )
+
+
+def _unreachable_message(database: str, exc: Exception) -> str:
+    """Explain why the destination could not be inspected.
+
+    A missing database and an unreachable cluster look similar in a stack
+    trace and need opposite responses, so they are separated here rather
+    than left to the reader.
+    """
+    detail = f"{exc}"
+    if "not found" in detail.lower() and database.lower() in detail.lower():
+        return (
+            f"telemetry database {database} was not found. fab-test creates tables, "
+            f"never databases -- create the KQL database in Fabric first, then rerun."
+        )
+    return f"telemetry destination could not be inspected on database {database}: {detail}"
+
 
 class TelemetryDependencyError(Exception):
     """The Kusto ingest client is not installed.
@@ -102,6 +145,11 @@ def describe_ingest_failure(exc: Exception) -> str:
     from ._credentials import redact_secrets
 
     message = redact_secrets(f"{exc}")
+    if isinstance(exc, DestinationError):
+        # Already names the table, the database, and the KQL. Appending an
+        # ingest-permission hint would point at the wrong grant: creating a
+        # table needs more than Database Ingestor, not the same thing.
+        return message
     if any(marker in message.lower() for marker in _AUTHORIZATION_MARKERS):
         return f"{message} -- {_INGESTOR_ROLE_HINT}"
     return message
@@ -331,6 +379,9 @@ class EventhouseSink:
         self.config = config
         self.env_file = env_file
         self._batches: dict[str, list[dict]] = {}
+        # Tables whose destination this run has already confirmed, so a
+        # second flush does not re-check what it just built.
+        self._ensured: set[str] = set()
 
     def add(self, table: str, payload: dict) -> None:
         """Queue one record for ``table``."""
@@ -361,11 +412,65 @@ class EventhouseSink:
                 ),
             )
         try:
+            # Ensured before anything is sent, and never after. Queued ingest
+            # accepts a batch aimed at a table that does not exist -- the
+            # request is valid and the failure happens later, in a pipeline
+            # nobody is watching -- so a send that cannot land would
+            # otherwise be reported as delivered.
+            for table in batches:
+                self._ensure_destination(table)
             for table, rows in batches.items():
                 self._ingest(table, rows)
         except Exception as exc:  # noqa: BLE001 - boundary: telemetry never fails a run
             return FlushResult(ok=False, sent=0, error=describe_ingest_failure(exc))
         return FlushResult(ok=True, sent=queued)
+
+    def _ensure_destination(self, table: str) -> None:
+        """Create ``table`` and its ingestion mapping if either is missing.
+
+        Checked once per table per flush: this is a management round trip
+        against the query endpoint, and paying it per record would repeat
+        the mistake batching was introduced to fix.
+
+        `fab-test` creates tables, never databases or Eventhouses. A missing
+        database is reported rather than built, and that boundary is visible
+        in the message.
+        """
+        if table in self._ensured:
+            return
+        cluster = self._cluster()
+        try:
+            existing = cluster.show_tables(self.config.database)
+        except Exception as exc:
+            raise DestinationError(_unreachable_message(self.config.database, exc)) from exc
+
+        if table not in existing:
+            self._create(cluster.create_table, table, "table")
+        elif PAYLOAD_MAPPING in cluster.show_mappings(self.config.database, table):
+            # Both halves present: nothing to build.
+            self._ensured.add(table)
+            return
+
+        # A table this run just created has no mapping either, and a
+        # pre-existing one without a mapping ingests *successfully* into
+        # empty rows -- the quietest failure of the three.
+        self._create(cluster.create_mapping, table, "ingestion mapping")
+        self._ensured.add(table)
+
+    def _create(self, action, table: str, what: str) -> None:
+        """Run one creation step, or explain why the destination is unusable."""
+        try:
+            if what == "table":
+                action(self.config.database, table)
+            else:
+                action(self.config.database, table, PAYLOAD_MAPPING)
+        except Exception as exc:
+            raise DestinationError(
+                f"telemetry {what} is missing and could not be created: "
+                f"{table} in database {self.config.database} ({exc}). "
+                f"Either grant the credential permission to create tables, or run:\n"
+                f"{create_statements(table)}"
+            ) from exc
 
     def _ingest(self, table: str, rows: list[dict]) -> None:
         """Ingest one table's rows. The seam tests replace with a stand-in."""
@@ -384,6 +489,14 @@ class EventhouseSink:
         )
         client.ingest_from_stream(_json_lines(rows), ingestion_properties=properties)
 
+    def _cluster(self) -> Any:
+        """Return the cluster's management endpoint. A seam for tests.
+
+        Built against the *query* URI, not the ingest one: management
+        commands are refused by the ingest endpoint.
+        """
+        return _ClusterAdmin(_query_uri(self.config.uri), self._credential())
+
     def _dependencies(self) -> IngestDependencies:
         """Load the Kusto symbols. A seam, so a test need not install the SDK."""
         return load_ingest_dependencies()
@@ -400,6 +513,58 @@ class EventhouseSink:
             _ingest_uri(self.config.uri), self._credential()
         )
         return deps.ingest_client(kcsb)
+
+
+class _ClusterAdmin:
+    """The cluster's management endpoint: inspect and create telemetry tables.
+
+    Thin on purpose. Everything it does is a `.show` or a `.create`, and the
+    decisions about *when* belong to `EventhouseSink`, which is what makes
+    them testable without a cluster.
+    """
+
+    def __init__(self, query_uri: str, credential: Any):
+        from azure.kusto.data import KustoClient, KustoConnectionStringBuilder
+
+        self._client = KustoClient(
+            KustoConnectionStringBuilder.with_azure_token_credential(query_uri, credential)
+        )
+
+    def show_tables(self, database: str) -> list[str]:
+        """Return the table names in ``database``."""
+        response = self._client.execute_mgmt(database, ".show tables")
+        return [row["TableName"] for row in response.primary_results[0]]
+
+    def show_mappings(self, database: str, table: str) -> list[str]:
+        """Return the JSON ingestion mapping names defined on ``table``."""
+        response = self._client.execute_mgmt(
+            database, f".show table {table} ingestion json mappings"
+        )
+        return [row["Name"] for row in response.primary_results[0]]
+
+    def create_table(self, database: str, table: str) -> None:
+        """Create ``table`` with the single dynamic column, if absent."""
+        self._client.execute_mgmt(database, f".create-merge table {table} (Data: dynamic)")
+
+    def create_mapping(self, database: str, table: str, mapping: str) -> None:
+        """Create or replace ``table``'s payload ingestion mapping."""
+        self._client.execute_mgmt(
+            database,
+            f".create-or-alter table {table} ingestion json mapping "
+            f"'{mapping}' '{_MAPPING_BODY}'",
+        )
+
+
+def _query_uri(uri: str) -> str:
+    """Return the query endpoint for a cluster URI.
+
+    The inverse of `_ingest_uri`: a caller may configure either form, and
+    management commands are refused by the ingest endpoint.
+    """
+    scheme, separator, rest = uri.partition("://")
+    if not separator:
+        return uri
+    return f"{scheme}://{rest[len('ingest-'):]}" if rest.startswith("ingest-") else uri
 
 
 def _ingest_uri(query_uri: str) -> str:

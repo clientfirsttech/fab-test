@@ -56,6 +56,9 @@ def test_no_credential_value_reaches_the_payload(tmp_path, monkeypatch):
 
     queued: list[dict] = []
     monkeypatch.setattr(
+        eventhouse_logger.EventhouseSink, "_ensure_destination", lambda self, table: None
+    )
+    monkeypatch.setattr(
         eventhouse_logger.EventhouseSink,
         "_ingest",
         lambda self, table, rows: queued.extend(rows),
@@ -116,6 +119,9 @@ def test_the_redacted_failure_reaches_the_manifest_and_the_log_already_redacted(
     def _boom(self, table, rows):
         raise RuntimeError(f"connection refused for AppKey={_SECRET}")
 
+    monkeypatch.setattr(
+        eventhouse_logger.EventhouseSink, "_ensure_destination", lambda self, table: None
+    )
     monkeypatch.setattr(eventhouse_logger.EventhouseSink, "_ingest", _boom)
 
     artifact_dir = tmp_path / "artifacts"

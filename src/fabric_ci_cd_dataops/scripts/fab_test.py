@@ -25,7 +25,6 @@ Global flags (all subcommands):
 import argparse
 import contextlib
 import difflib
-import hashlib
 import importlib.util
 import json
 import os
@@ -48,7 +47,7 @@ from ._analyzer_annotations import (
     emit_workflow_annotations,
 )
 from ._analyzer_envelope import severity_counts
-from ._cli_utils import narrate
+from ._cli_utils import CHECKOUT_REMEDIATION, narrate, skipped_checkout_lines
 from ._config import (
     CONFIG_FILENAME,
     ConfigError,
@@ -69,6 +68,7 @@ from ._metadata import (
 from ._pbip_discovery import discover_pbip_projects as _discover_pbip_projects
 from ._report_html import resolve_report
 from ._run_manifest import RunManifest
+from ._scan import find_skipped_checkouts as _find_skipped_checkouts
 from ._target import TargetError, select_target, target_from_args, workspace_conflict
 from ._telemetry import TelemetryDecision, eventhouse_rows, telemetry_decision
 from .eventhouse_logger import EventhouseSink, publish_analyzer_telemetry
@@ -363,8 +363,10 @@ def _telemetry_readiness(args: argparse.Namespace) -> dict[str, Any]:
     return _row(
         None,
         "configured; ingest permission unverified",
-        "If ingest fails, grant the credential the Database Ingestor role on the "
-        "KQL database (Fabric: the Eventhouse item -> Manage permissions)",
+        "Tables are created on first use. If that fails, the credential needs rights "
+        "to create tables as well as the Database Ingestor role on the KQL database "
+        "(Fabric: the Eventhouse item -> Manage permissions); the failure message "
+        "carries the KQL to run by hand instead",
         destination,
     )
 
@@ -503,16 +505,53 @@ def _machine_context() -> dict[str, str]:
     return context
 
 
-def _redact_pii(value: str) -> str:
-    """Redact a value that looks like PII (e.g. an email address).
+def _relativize_paths(value: Any, repo_root: Path) -> Any:
+    """Rewrite absolute paths under ``repo_root`` to repository-relative ones.
 
-    Hashes rather than drops the value so it stays usable for correlating
-    runs by the same actor without exposing the raw email in telemetry.
+    Applied to the telemetry payload only, never to the envelope on disk: a
+    human clicking a result wants the absolute path, and an Eventhouse row
+    does not.
+
+    The leak this closes is not obvious from the payload's own fields. Every
+    analyzer envelope carries `artifact_path` and `rules_file`, and the whole
+    envelope is embedded as `results`, so `C:\\Users\\<name>\\...` shipped the
+    operating-system username in plaintext on every local run -- while
+    `actor`, the field meant to identify the run, was hashed into something
+    nobody could resolve.
+
+    A path *outside* the repository is dropped to its final component rather
+    than rewritten as `../../..`, which would leak the depth of the home
+    directory and mean nothing to a reader of the table.
     """
-    if "@" in value:
-        digest = hashlib.sha256(value.encode("utf-8")).hexdigest()[:16]
-        return f"sha256:{digest}"
+    if isinstance(value, dict):
+        return {key: _relativize_paths(item, repo_root) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_relativize_paths(item, repo_root) for item in value]
+    if not isinstance(value, str) or not value:
+        return value
+    return _relative_to_root(value, repo_root)
+
+
+def _relative_to_root(value: str, repo_root: Path) -> str:
+    """Return one string with any absolute path in it made repository-relative."""
+    root = f"{repo_root}"
+    if root and root in value:
+        # Both separators: an envelope written on Windows carries backslashes
+        # while the JSON that quotes it may not.
+        return value.replace(f"{root}\\", "").replace(f"{root}/", "").replace(root, ".")
+    if _looks_absolute(value):
+        return Path(value).name
     return value
+
+
+def _looks_absolute(value: str) -> str | bool:
+    """Whether a string looks like an absolute filesystem path.
+
+    Deliberately narrow: a false positive would rewrite an ordinary message
+    into its last path-like component, which is worse than leaving a path
+    that names nothing sensitive.
+    """
+    return value.startswith(("/", "\\")) or (len(value) > 2 and value[1:3] in (":\\", ":/"))
 
 
 def _build_telemetry_payload(
@@ -524,14 +563,19 @@ def _build_telemetry_payload(
     """Build a telemetry payload for an analyzer/artifact run."""
     errors, warnings = severity_counts(envelope.get("findings", []))
     ctx = _git_context()
-    return {
+    payload = {
         "timestamp": datetime.now(UTC).isoformat(),
         "artifact_name": artifact.stem,
         "artifact_type": artifact.suffix.lstrip("."),
         "commit_sha": ctx.get("commit", ""),
         "workflow_run_id": ctx.get("workflow_run_id", ""),
         "repository": ctx.get("repository", ""),
-        "actor": _redact_pii(ctx.get("actor", "")),
+        # Recorded as given. Hashing this answered "was this the same person
+        # as last time" and nothing else, while the username leaked anyway
+        # through the paths below -- so it bought no privacy and cost the
+        # attribution the field exists for. The repository already stores
+        # this address in plaintext on every commit.
+        "actor": ctx.get("actor", ""),
         "branch": ctx.get("branch", ""),
         "origin": _detect_origin(),
         "environment": environment,
@@ -543,6 +587,11 @@ def _build_telemetry_payload(
         "results": envelope,
         **_machine_context(),
     }
+    # Last, over the whole payload including the embedded envelope: the
+    # username leaked through `results.artifact_path`, not through any field
+    # named above, so relativizing only the fields we thought about is how
+    # this was missed the first time.
+    return _relativize_paths(payload, REPO_ROOT)
 
 
 _REQUIRED_TELEMETRY_FIELDS = ("analyzer", "artifact_name", "status", "timestamp")
@@ -851,9 +900,17 @@ def _discover_for(name: str, args: argparse.Namespace, glob: str) -> list[Path]:
 def _report_no_artifacts(
     name: str, glob: str, args: argparse.Namespace, *, emit_own_json: bool
 ) -> int:
-    """Narrate an empty discovery. Always exits 0 -- nothing matched is not a failure."""
+    """Narrate an empty discovery. Always exits 0 -- nothing matched is not a failure.
+
+    An empty result has two very different causes that used to read
+    identically: the root holds no artifacts, or every candidate below it
+    was pruned as a nested checkout. The second is what a developer sees
+    running `fab-test` from a folder of sibling repositories, and it is
+    the one with a fix worth naming.
+    """
     output_format = getattr(args, "output_format", "text")
     target = _target_of(args)
+    checkouts: list[Path] = []
     if target is not None and target.path is not None:
         # A path target named a specific location, so reporting what the
         # scan of --artifact-dir turned up would answer a question the
@@ -863,13 +920,25 @@ def _report_no_artifacts(
             output_format=output_format,
         )
     else:
+        artifact_dir = Path(args.artifact_dir)
+        checkouts = _find_skipped_checkouts(artifact_dir)
+        # No `.pbip` clause: pairing enriches a result, and has not decided
+        # whether an artifact exists since discovery went suffix-based.
         narrate(
-            f"  ⚠ fab-test {name}: no {glob} artifacts or .pbip projects found under "
-            f"{Path(args.artifact_dir)}",
+            f"  ⚠ fab-test {name}: no {glob} artifacts found under {artifact_dir}",
             output_format=output_format,
         )
+        for line in skipped_checkout_lines(checkouts):
+            narrate(line, output_format=output_format)
     if emit_own_json:
-        print(json.dumps({"analyzer": name, "artifacts": []}, indent=2))
+        payload: dict[str, Any] = {
+            "analyzer": name,
+            "artifacts": [],
+            "skipped_checkouts": [str(path) for path in checkouts],
+        }
+        if checkouts:
+            payload["remediation"] = CHECKOUT_REMEDIATION
+        print(json.dumps(payload, indent=2))
     return 0
 
 
@@ -2195,7 +2264,15 @@ def _list_analyzers(args: argparse.Namespace) -> int:
                 "scopes": sorted(_ANALYZER_SCOPES.get(name, frozenset())),
             }
         )
-    return _print_list(rows, output_format)
+    # A repository-scoped analyzer always reports 1 and never discovers, so
+    # "everything matched nothing" is a question about the discovering rows
+    # alone. Only then is the scan worth explaining -- a partial result is
+    # not a problem, and the walk is not free.
+    discovered = [row["matched_artifacts"] for row in rows if row["glob"]]
+    checkouts = (
+        _find_skipped_checkouts(artifact_dir) if discovered and not any(discovered) else []
+    )
+    return _print_list(rows, output_format, skipped_checkouts=checkouts)
 
 
 def _explain_analyzer(args: argparse.Namespace) -> int:

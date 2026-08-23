@@ -109,6 +109,19 @@ Skipped while walking: nested git checkouts (worktrees, vendored clones),
 `--output-dir`. Without those exclusions a scan of this repository returns
 eight artifacts where three are real.
 
+One consequence is worth knowing: run `fab-test` from a folder that holds
+*repositories* rather than artifacts and it finds nothing, because every
+candidate below it is a nested checkout. It tells you so and names the fix —
+`cd` into a repository, or point at one:
+
+```console
+$ fab-test pbir
+  ⚠ fab-test pbir: no *.Report artifacts found under C:\Users\jkers\Git
+    9 git checkouts below this root were skipped — a scan does not
+    descend into a nested repository. cd into one, or name it directly:
+      --artifact-dir C:\Users\jkers\Git\fab-test
+```
+
 **If you already have a `.fabric/artifacts/` layout, nothing you do needs to
 change.** That directory sits inside your working directory, so everything
 found before is still found. `--artifact-dir` still narrows the search when
@@ -313,23 +326,28 @@ telemetry:
     database: fabric_ops
 ```
 
-**Create the tables once, before the first run.** Each carries a single `Data`
-column; downstream Eventhouse functions do the transforming, so adding a payload
-field later is a new key inside `Data` rather than a table alteration:
+**The tables create themselves on first use.** You need an Eventhouse and a KQL
+database; `fab-test` builds the rest. Before each run's first send it checks that
+its table and ingestion mapping exist, creates whatever is missing, and only then
+ingests. A run against a healthy cluster issues no schema commands at all.
+
+Each table holds a single `Data: dynamic` column, so downstream Eventhouse
+functions own the transform and a new payload field is a new key rather than a
+table alteration. `fabric_dynamic_analysis` receives `pql-test` records;
+everything else goes to `fabric_static_analysis`.
+
+If your credential may ingest but not create tables — a normal arrangement for a
+governed cluster — the run says so and hands you the KQL to run yourself:
 
 ```kusto
 .create-merge table fabric_static_analysis (Data: dynamic)
 .create-or-alter table fabric_static_analysis ingestion json mapping 'fab_test_payload'
     '[{"column":"Data","path":"$","datatype":"dynamic"}]'
-
-.create-merge table fabric_dynamic_analysis (Data: dynamic)
-.create-or-alter table fabric_dynamic_analysis ingestion json mapping 'fab_test_payload'
-    '[{"column":"Data","path":"$","datatype":"dynamic"}]'
 ```
 
-The mapping is not optional. Without it Kusto maps by column name, finds nothing
-called `analyzer` or `status`, and quietly stores empty rows. `fabric_dynamic_analysis`
-receives `pql-test` records; everything else goes to `fabric_static_analysis`.
+That mapping is not decoration. Without it Kusto maps by column name, finds
+nothing called `analyzer` or `status`, and stores empty rows *successfully* — which
+is why `fab-test` checks for it rather than assuming a table that exists is usable.
 
 Three more things to know before the first run:
 

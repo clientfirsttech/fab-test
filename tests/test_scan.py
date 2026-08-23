@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts._scan import EXCLUDED_DIR_NAMES, find_artifact_dirs
+from fabric_ci_cd_dataops.scripts._scan import EXCLUDED_DIR_NAMES, find_artifact_dirs, scan
 
 SUFFIXES = (".SemanticModel", ".Report")
 
@@ -151,3 +151,71 @@ def test_scanning_this_repository_stays_fast():
     elapsed = time.perf_counter() - start
 
     assert elapsed < 2.0, f"{elapsed:.2f}s to scan {len(found)} artifacts"
+
+
+# --------------------------------------------------------------------------- #
+# What the scan pruned (Empty Discovery Diagnostics §1)
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.fab_test
+def test_scan_reports_the_nested_checkouts_it_pruned(tmp_path):
+    """An empty result is otherwise indistinguishable from an empty repository."""
+    checkout = tmp_path / "sibling-project"
+    (checkout / ".git").mkdir(parents=True)
+    _artifact(checkout, "Sales.SemanticModel")
+
+    result = scan(tmp_path, SUFFIXES)
+
+    assert result.artifacts == []
+    assert result.skipped_checkouts == [checkout]
+
+
+@pytest.mark.fab_test
+def test_scan_reports_checkouts_even_when_artifacts_were_found(tmp_path):
+    """`list` and `--dry-run` narrate a partial scan, not only an empty one."""
+    visible = _artifact(tmp_path, "Visible.Report")
+    checkout = tmp_path / "vendored"
+    (checkout / ".git").mkdir(parents=True)
+
+    result = scan(tmp_path, SUFFIXES)
+
+    assert result.artifacts == [visible]
+    assert result.skipped_checkouts == [checkout]
+
+
+@pytest.mark.fab_test
+def test_the_roots_own_git_directory_is_not_a_pruned_checkout(tmp_path):
+    """Otherwise every in-repo scan would claim it skipped something."""
+    (tmp_path / ".git").mkdir()
+    _artifact(tmp_path, "Sales.SemanticModel")
+
+    assert scan(tmp_path, SUFFIXES).skipped_checkouts == []
+
+
+@pytest.mark.fab_test
+@pytest.mark.parametrize("excluded", sorted(EXCLUDED_DIR_NAMES - {".git"}))
+def test_excluded_directories_are_not_reported_as_checkouts(tmp_path, excluded):
+    """A caller can act on a skipped repository; it cannot act on .venv."""
+    (tmp_path / excluded).mkdir()
+
+    assert scan(tmp_path, SUFFIXES).skipped_checkouts == []
+
+
+@pytest.mark.fab_test
+def test_pruned_checkouts_are_sorted_and_deduplicated(tmp_path):
+    """The paths are shown to a human, so their order must be stable."""
+    for name in ("zeta", "alpha"):
+        (tmp_path / name / ".git").mkdir(parents=True)
+
+    result = scan(tmp_path, SUFFIXES)
+
+    assert result.skipped_checkouts == [tmp_path / "alpha", tmp_path / "zeta"]
+
+
+@pytest.mark.fab_test
+def test_find_artifact_dirs_still_returns_a_plain_list(tmp_path):
+    """Two modules call it; this epic changes what is said, not what is found."""
+    folder = _artifact(tmp_path, "Sales.SemanticModel")
+
+    assert find_artifact_dirs(tmp_path, SUFFIXES) == [folder]
