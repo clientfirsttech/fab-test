@@ -39,6 +39,28 @@ jobs:
             >> "$GITHUB_STEP_SUMMARY" || true
           echo '```' >> "$GITHUB_STEP_SUMMARY"
 
+      # Also not a gate: the hard budget (src 800 / tests 900) is enforced by
+      # tests/test_module_budget.py instead, with named exemptions for the
+      # files already over it. This just surfaces the soft budget (src 400 /
+      # tests 500) so a file crossing it is visible before it reaches the
+      # hard one the way tests/test_fab_test.py did.
+      - name: Module size report
+        if: always()
+        run: |
+          echo "### Module size signals (non-gating)" >> "$GITHUB_STEP_SUMMARY"
+          echo "Hard budget is ratcheted in tests/test_module_budget.py." \
+            >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          for tree_budget in "src:400" "tests:500"; do
+            tree="${tree_budget%%:*}"
+            budget="${tree_budget##*:}"
+            find "$tree" -name '*.py' -exec wc -l {} + \
+              | sort -rn \
+              | awk -v b="$budget" -v t="$tree" \
+                '$1 > b && $2 != "total" {print $2": "$1" lines (soft budget "b" for "t"/)"}'
+          done >> "$GITHUB_STEP_SUMMARY" || true
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
   test:
     name: Tests
     runs-on: ubuntu-latest
