@@ -1,6 +1,6 @@
 # Telemetry Table Bootstrap Epic
 
-**Status**: 📋 PLANNED
+**Status**: ✅ COMPLETED (2026-08-23) — 5/5 tasks, verified against a real Eventhouse.
 **Goal**: Create the telemetry tables and their ingestion mapping when they are absent, and never report a send that cannot land.
 
 ## Overview
@@ -91,3 +91,27 @@ must not be reported as one.
 - Given the agent, should read what `fab-test` creates, what it never creates (the Eventhouse, the database), and which permission each needs
 - Given the Eventhouse Shipping epic's non-goal, should record that this epic reverses it and why, rather than leaving two documents that disagree
 - Given a reader of the schema, should find that `Data` is deliberately the only column and downstream functions own the transform
+
+---
+
+## Found While Verifying: Who And Where  ✅
+
+Inspecting the rows that actually reached the cluster turned up a second
+defect, unrelated to the tables and worse than them.
+
+`actor` was a sha256 of the git email — unresolvable, so the attribution the
+[Telemetry Context](archive/2026-08-18-telemetry-context-epic.md) epic
+introduced it for was lost. Meanwhile the operating-system username shipped in
+plaintext in every record, through the absolute paths inside the embedded
+`results` envelope (`C:\Users\<name>\...`), which the redaction never touched.
+Telemetry was identifying people by accident and failing to identify them on
+purpose.
+
+That epic's PII requirement is reversed there rather than silently dropped.
+
+**Requirements**:
+- Given a git email, should record it as given — the repository already stores that address on every commit, and the Eventhouse belongs to the same organisation
+- Given no resolvable identity, should record an empty string rather than a hash of nothing, which was stable and identical for everyone with no git config
+- Given any filesystem path in the payload, including inside `results`, should record it relative to the repository root
+- Given a path outside the repository, should reduce it to its final component rather than emit `../../..`, which leaks the depth of the home directory
+- Given the envelope on disk, should keep absolute paths — a human clicking a result wants them; an Eventhouse row does not
