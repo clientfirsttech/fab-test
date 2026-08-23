@@ -8,11 +8,18 @@ touching artifacts, or spawning a subprocess — it is the engine behind
 """
 
 import json
+import tempfile
+from pathlib import Path
 
 import pytest
 
 from fabric_ci_cd_dataops.scripts._analyzer_tool_bootstrap import probe_executable
 from fabric_ci_cd_dataops.scripts.fab_test_registry import check_readiness
+
+# A path guaranteed not to exist, so credential/env-file resolution in this
+# module never picks up a real `.fab-test/.env` or `.env` a developer keeps
+# in their own checkout -- these tests must always pass on any machine.
+_NO_SUCH_ENV_FILE = str(Path(tempfile.gettempdir()) / "fab-test-test-isolation" / ".env")
 
 
 def _write_metadata(metadata_path, analyzer_name, tool_install):
@@ -219,9 +226,16 @@ _CLOUD_ENV_VARS = (
 
 
 def _clear_cloud_env(monkeypatch):
-    """Remove every workspace and credential variable the probe consults."""
+    """Remove every workspace and credential variable the probe consults.
+
+    Also pins `PLAYWRIGHT_ENV_FILE` to a nonexistent path -- the highest
+    priority source in `resolve_env_file`'s search order -- so a real
+    `.fab-test/.env` or `.env` in this checkout can never leak into these
+    tests via ambient discovery.
+    """
     for var in _CLOUD_ENV_VARS:
         monkeypatch.delenv(var, raising=False)
+    monkeypatch.setenv("PLAYWRIGHT_ENV_FILE", _NO_SUCH_ENV_FILE)
 
 
 def _set_service_principal(monkeypatch):
