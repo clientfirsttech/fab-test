@@ -1,43 +1,25 @@
-"""Contract tests for the fab-test CLI (vision §2.7).
+"""Empty discovery diagnostics: naming what an empty scan pruned.
 
 Scope
 -----
-These tests validate the *fab-test command surface*:
-subcommand structure, help output, and dry-run artifact discovery.
-No external tools (Tabular Editor, PBIR Inspector, etc.) required.
-Always passes on any machine.
+An empty artifact scan distinguishing "nothing here" from "checkouts were
+pruned on purpose" -- naming and capping the skipped checkouts, carrying
+them (and a remediation hint) in the JSON payload, and leaving the
+in-repository and explicit-path cases unchanged and quiet.
 
-    pytest -m fab_test       # all fab-test CLI contract tests
-
-Real artifact execution is done via fab-test directly:
-    python scripts/fab_test.py bpa
+    pytest -m fab_test
 """
-
 import json
 import subprocess
 from pathlib import Path
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts.fab_test import (
-    _run_analyzer,
-)
-from tests.conftest import (
-    _RunAnalyzerArgs,
-)
-
-REPO_ROOT = Path(__file__).resolve().parents[1]
-FAB_TEST = "fab-test"
-ARTIFACT_ROOT = REPO_ROOT / ".fabric" / "artifacts"
-
-# pql_lint is deliberately absent: it is hidden from the advertised surface
-# (see HIDDEN_ANALYZERS and tests/test_hidden_analyzers.py) while remaining
-# fully invocable.
-_ALL_SUBCOMMANDS = ("bpa", "pbir", "pql_test", "all")
-
+from fabric_ci_cd_dataops.scripts.fab_test import _run_analyzer
+from tests.conftest import _RunAnalyzerArgs
 
 # --------------------------------------------------------------------------- #
-# Empty discovery explains itself (Empty Discovery Diagnostics §2)
+# Empty discovery explains itself
 # --------------------------------------------------------------------------- #
 
 
