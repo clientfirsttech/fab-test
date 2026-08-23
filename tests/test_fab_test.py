@@ -64,6 +64,13 @@ from fabric_ci_cd_dataops.scripts.fab_test_summary import (
     _is_pql_test_finding,
     _pql_test_status,
 )
+from tests.conftest import (
+    _clear_github_env,
+    _fake_git_run,
+    _RunAnalyzerArgs,
+    _stub_subprocess_run,
+    _TimeoutArgs,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 FAB_TEST = "fab-test"
@@ -1784,31 +1791,6 @@ def test_telemetry_needs_somewhere_to_send(monkeypatch):
 # --------------------------------------------------------------------------- #
 
 
-def _clear_github_env(monkeypatch):
-    for name in (
-        "GITHUB_REPOSITORY",
-        "GITHUB_REF_NAME",
-        "GITHUB_SHA",
-        "GITHUB_ACTOR",
-        "GITHUB_RUN_ID",
-    ):
-        monkeypatch.delenv(name, raising=False)
-
-
-def _fake_git_run(responses: dict[str, str]):
-    """Build a subprocess.run stand-in keyed by the git subcommand args."""
-
-    def _run(cmd, **_kwargs):
-        key = " ".join(cmd[1:])  # drop the leading "git"
-        if key in responses:
-            return subprocess.CompletedProcess(
-                args=cmd, returncode=0, stdout=responses[key], stderr=""
-            )
-        return subprocess.CompletedProcess(args=cmd, returncode=1, stdout="", stderr="")
-
-    return _run
-
-
 @pytest.mark.fab_test
 def test_git_context_prefers_github_env_vars(monkeypatch):
     """GitHub Actions env vars are used as-is when present."""
@@ -2876,11 +2858,6 @@ def test_resolve_executable_no_install_sha256_skips_verification(tmp_path, monke
 # --------------------------------------------------------------------------- #
 # Configurable subprocess timeout
 # --------------------------------------------------------------------------- #
-
-
-class _TimeoutArgs:
-    def __init__(self, timeout=None):
-        self.timeout = timeout
 
 
 @pytest.mark.fab_test
@@ -4040,10 +4017,6 @@ def test_stdout_is_pure_json_for_every_subcommand(subcommand):
 # --------------------------------------------------------------------------- #
 
 
-def _stub_subprocess_run(*_args, **_kwargs):
-    return subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
-
-
 @pytest.mark.fab_test
 def test_progress_shown_non_ci_multiple_artifacts(tmp_path, monkeypatch, capsys):
     """A non-CI run with multiple artifacts shows 'artifact N of M'."""
@@ -4141,52 +4114,6 @@ def test_artifact_start_line_still_printed_alongside_progress(tmp_path, monkeypa
 # --------------------------------------------------------------------------- #
 # Regression: per-artifact warning handling
 # --------------------------------------------------------------------------- #
-
-
-class _RunAnalyzerArgs:
-    """Minimal argparse.Namespace stand-in for _run_analyzer tests."""
-
-    def __init__(
-        self,
-        artifact_dir: Path,
-        output_dir: Path,
-        artifact: str | None = None,
-        telemetry: bool | None = False,
-        output_format: str = "json",
-        impact_manifest: str | None = None,
-        timeout: int | None = None,
-        jobs: int = 1,
-        dry_run: bool = False,
-        configured_telemetry: bool = True,
-    ):
-        self.artifact_dir = str(artifact_dir)
-        self.output_dir = str(output_dir)
-        self.artifact = artifact
-        self.dry_run = dry_run
-        self.verbose = 0
-        self.telemetry = telemetry
-        self.output_format = output_format
-        self.environment = ""
-        self.workspace_id = ""
-        self.impact_manifest = impact_manifest
-        self.timeout = timeout
-        self.jobs = jobs
-        # A destination, so telemetry tests that opt in reach the send path.
-        # Since Eventhouse Shipping §2 there is no enablement without one --
-        # and, conversely, a configured destination is itself the enablement,
-        # so a test about telemetry being *off* must pass configured=False.
-        self.file_config = (
-            {
-                "telemetry": {
-                    "eventhouse": {
-                        "uri": "https://trd-abc123.z9.kusto.fabric.microsoft.com",
-                        "database": "fabric_ops",
-                    }
-                }
-            }
-            if configured_telemetry
-            else {}
-        )
 
 
 def _make_warning_envelope(output_dir: Path, analyzer: str, stem: str) -> None:

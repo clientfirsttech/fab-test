@@ -2,6 +2,7 @@
 
 import json
 import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -180,3 +181,97 @@ def sample_analyzers_metadata(tmp_path: Path) -> Path:
     metadata_path = tmp_path / "analyzers.json"
     metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
     return metadata_path
+
+
+# --------------------------------------------------------------------------- #
+# Shared helpers for the fab-test CLI contract tests (test_fab_test_*.py)
+# --------------------------------------------------------------------------- #
+# Test Module Split epic: each of these is constructed directly in test
+# bodies rather than injected as a pytest fixture, and each is used by more
+# than one of the 13 split modules -- duplicating it per module would let
+# the copies drift the first time one of them needed a new field. A helper
+# used by only one module moves with that module instead (see the epic).
+
+
+class _RunAnalyzerArgs:
+    """Minimal argparse.Namespace stand-in for _run_analyzer tests."""
+
+    def __init__(
+        self,
+        artifact_dir: Path,
+        output_dir: Path,
+        artifact: str | None = None,
+        telemetry: bool | None = False,
+        output_format: str = "json",
+        impact_manifest: str | None = None,
+        timeout: int | None = None,
+        jobs: int = 1,
+        dry_run: bool = False,
+        configured_telemetry: bool = True,
+    ):
+        self.artifact_dir = str(artifact_dir)
+        self.output_dir = str(output_dir)
+        self.artifact = artifact
+        self.dry_run = dry_run
+        self.verbose = 0
+        self.telemetry = telemetry
+        self.output_format = output_format
+        self.environment = ""
+        self.workspace_id = ""
+        self.impact_manifest = impact_manifest
+        self.timeout = timeout
+        self.jobs = jobs
+        # A destination, so telemetry tests that opt in reach the send path.
+        # Since Eventhouse Shipping §2 there is no enablement without one --
+        # and, conversely, a configured destination is itself the enablement,
+        # so a test about telemetry being *off* must pass configured=False.
+        self.file_config = (
+            {
+                "telemetry": {
+                    "eventhouse": {
+                        "uri": "https://trd-abc123.z9.kusto.fabric.microsoft.com",
+                        "database": "fabric_ops",
+                    }
+                }
+            }
+            if configured_telemetry
+            else {}
+        )
+
+
+class _TimeoutArgs:
+    """Minimal argparse.Namespace stand-in for _resolve_timeout tests."""
+
+    def __init__(self, timeout=None):
+        self.timeout = timeout
+
+
+def _clear_github_env(monkeypatch):
+    """Remove every GitHub-Actions env var a git-context test might inherit."""
+    for name in (
+        "GITHUB_REPOSITORY",
+        "GITHUB_REF_NAME",
+        "GITHUB_SHA",
+        "GITHUB_ACTOR",
+        "GITHUB_RUN_ID",
+    ):
+        monkeypatch.delenv(name, raising=False)
+
+
+def _fake_git_run(responses: dict[str, str]):
+    """Build a subprocess.run stand-in keyed by the git subcommand args."""
+
+    def _run(cmd, **_kwargs):
+        key = " ".join(cmd[1:])  # drop the leading "git"
+        if key in responses:
+            return subprocess.CompletedProcess(
+                args=cmd, returncode=0, stdout=responses[key], stderr=""
+            )
+        return subprocess.CompletedProcess(args=cmd, returncode=1, stdout="", stderr="")
+
+    return _run
+
+
+def _stub_subprocess_run(*_args, **_kwargs):
+    """A subprocess.run stand-in that always reports a clean, silent success."""
+    return subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
