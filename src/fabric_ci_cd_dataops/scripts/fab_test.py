@@ -1992,6 +1992,7 @@ _SETTING_SPECS: list[tuple[str, str | None, Any, type | None]] = [
     ("format", None, "text", None),
     ("timeout", "ANALYZER_TIMEOUT", _DEFAULT_SUBPROCESS_TIMEOUT, int),
     ("environment", "FABRIC_ENVIRONMENT", "", None),
+    ("workspace", "FABRIC_WORKSPACE_ID", "", None),
 ]
 
 _SECRET_KEY_MARKERS = ("secret", "password", "token", "api_key")
@@ -2079,6 +2080,7 @@ _FAB_TEST_YML_TEMPLATE = """\
 # format: text                     # text | json
 # timeout: 120                     # per-artifact subprocess timeout in seconds [env: ANALYZER_TIMEOUT]
 # environment: DEV                 # default environment label [env: FABRIC_ENVIRONMENT]
+# workspace: Sales Dev             # default workspace name or GUID [env: FABRIC_WORKSPACE_ID]
 
 # Rule overlays: deltas applied to a packaged ruleset instead of forking it.
 # rules:
@@ -2092,37 +2094,53 @@ _FAB_TEST_YML_TEMPLATE = """\
 """
 
 _ENV_EXAMPLE_TEMPLATE = """\
-# .env.example -- copy to .env and fill in the values you need.
-# .env is auto-discovered at the repository root; --env-file overrides it.
-# Never commit the real .env -- it holds credentials.
+# .env.example -- copy to .fab-test/.env and fill in the values you need.
+# Search order: --env-file > PLAYWRIGHT_ENV_FILE > .fab-test/.env > ./.env.
+# Never commit the real .env -- .fab-test/.gitignore keeps this directory's
+# copy untracked even though .fab-test/metadata/ is meant to be checked in.
 
 # Service principal for Fabric/Power BI REST API access.
-# Leave all three unset to fall back to DefaultAzureCredential (az login,
-# a managed identity, VS Code sign-in, ...).
+# All three are optional for local use: leave them unset to fall back to
+# DefaultAzureCredential (az login, a managed identity, VS Code sign-in,
+# ...) for every command except `fab-test playwright`, which always needs
+# a full service principal to generate an embed token.
 FABRIC_TENANT_ID=
 FABRIC_CLIENT_ID=
 FABRIC_CLIENT_SECRET=
 
-# Playwright visual/error validation target.
+# Playwright visual/error validation target. Only needed when not using
+# --artifact to resolve a report from a deployed workspace.
 PLAYWRIGHT_WORKSPACE_ID=
 PLAYWRIGHT_REPORT_ID=
 PLAYWRIGHT_REPORT_NAME=
 PLAYWRIGHT_DATASET_ID=
 """
 
+_FAB_TEST_GITIGNORE_TEMPLATE = """\
+# fab-test's own guard: .fab-test/metadata/ is meant to be checked in,
+# but a .env in this directory holds credentials and never should be.
+.env
+"""
+
 
 def _init(args: argparse.Namespace) -> int:
-    """Scaffold a commented fab-test.yml and .env.example.
+    """Scaffold a commented fab-test.yml, .fab-test/.gitignore, and
+    .fab-test/.env.example.
 
     Never overwrites an existing file -- each is reported and left
     untouched instead. --dry-run reports what would be created without
-    writing anything.
+    writing anything. `.fab-test/.env.example` replaces the root
+    `.env.example` for new repositories: it lives beside the `.gitignore`
+    that makes a real `.env` in the same directory safe to keep, rather
+    than depending on a consumer's root `.gitignore` already covering it.
     """
     output_format = getattr(args, "output_format", "text")
     dry_run = getattr(args, "dry_run", False)
+    fab_test_dir = REPO_ROOT / ".fab-test"
     templates = {
         REPO_ROOT / CONFIG_FILENAME: _FAB_TEST_YML_TEMPLATE,
-        REPO_ROOT / ".env.example": _ENV_EXAMPLE_TEMPLATE,
+        fab_test_dir / ".gitignore": _FAB_TEST_GITIGNORE_TEMPLATE,
+        fab_test_dir / ".env.example": _ENV_EXAMPLE_TEMPLATE,
     }
 
     created = []
@@ -2139,6 +2157,7 @@ def _init(args: argparse.Namespace) -> int:
             would_create.append(str(path))
             narrate(f"  fab-test init: would create {path}", output_format=output_format)
         else:
+            path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(template, encoding="utf-8")
             created.append(str(path))
             narrate(f"  ✓ fab-test init: created {path}", output_format=output_format)

@@ -112,7 +112,7 @@ Constraints {
 | `tests/test_invoke_pql_test.py` | Contract test suite (marker: pql_test) |
 | `analyzer-results/pql_test/<stem>/envelope.json` | Shared envelope written on every run |
 | `analyzer-results/pql_test/<stem>/native.json` | Raw pql-test JSON output |
-| `.github/metadata/analyzers.json` | Registry entry for `pql_test` analyzer |
+| `analyzers.json` (resolved via metadata layers: `.fab-test/metadata/` > `.github/metadata/` > packaged) | Registry entry for `pql_test` analyzer |
 
 ## analyzers.json Registry Pattern
 

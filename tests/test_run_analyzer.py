@@ -42,6 +42,51 @@ class TestAnalyzerRunner:
             "print('SalesModel .fabric/artifacts/SalesModel.SemanticModel')",
         ]
 
+    def test_build_command_resolves_rules_path_through_metadata_layers(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        """`{rules_path}` resolves through `resolve_metadata`, not a hardcoded
+        `.github/metadata/...` string (task 7).
+
+        `analyzers.json`'s args used to hardcode the path directly -- even in
+        the packaged copy, which pointed a fresh install at a directory it is
+        told never to create. This proves `tabular_editor_bpa` and
+        `pbir_inspector` get a real, resolved path instead.
+        """
+        monkeypatch.chdir(tmp_path)
+        metadata_path = tmp_path / "analyzers.json"
+        metadata_path.write_text(
+            json.dumps(
+                {
+                    "analyzer_registry": {
+                        "tabular_editor_bpa": {
+                            "type": "static",
+                            "command": "python",
+                            "args": ["-c", "print('{rules_path}')", "--bpa-rules-path", "{rules_path}"],
+                            "exit_code_success": 0,
+                        }
+                    }
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        runner = AnalyzerRunner(str(metadata_path))
+        config = runner.get_analyzer_config("tabular_editor_bpa")
+        command = runner.build_command(
+            config,
+            artifact_name="SalesModel",
+            artifact_path=".fabric/artifacts/SalesModel.SemanticModel",
+            analyzer_name="tabular_editor_bpa",
+        )
+
+        from fabric_ci_cd_dataops.scripts._metadata import BPA_RULES
+
+        # The resolved path must not be the literal placeholder, and must
+        # name a real rules file under some metadata layer.
+        assert "{rules_path}" not in command
+        assert any(BPA_RULES.name in part for part in command)
+
     def test_run_analyzer_success(self, sample_analyzers_metadata: Path, tmp_path: Path):
         """Successful analyzer execution returns success."""
         runner = AnalyzerRunner(str(sample_analyzers_metadata))

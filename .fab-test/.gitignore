@@ -1,0 +1,3 @@
+# fab-test's own guard: .fab-test/metadata/ is meant to be checked in,
+# but a .env in this directory holds credentials and never should be.
+.env

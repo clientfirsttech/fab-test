@@ -156,12 +156,43 @@ def _run_pytest(
     )
 
 
+def _require_service_principal(config: PlaywrightValidationConfig) -> None:
+    """Refuse before any client or network call when the service principal
+    is incomplete.
+
+    Embed-token generation always calls MSAL with a client secret --
+    unlike `pql-test`, which can authenticate interactively -- so this
+    check runs unconditionally, before discovery decides whether
+    `--artifact` even needs a service client. Naming every missing
+    variable and every place to set it is what turns a msal `ValueError`
+    two API calls deep into a refusal on line one.
+    """
+    missing = [
+        name
+        for name, value in {
+            "FABRIC_TENANT_ID": config.tenant_id,
+            "FABRIC_CLIENT_ID (or FABRIC_SERVICE_PRINCIPAL_ID)": config.client_id,
+            "FABRIC_CLIENT_SECRET (or FABRIC_SERVICE_PRINCIPAL_SECRET)": (
+                config.client_secret
+            ),
+        }.items()
+        if not value
+    ]
+    if missing:
+        raise ValueError(
+            "Playwright needs a full service principal to generate an "
+            f"embed token; missing: {', '.join(missing)}. Set them in the "
+            "environment, in a .env file, or pass --env-file."
+        )
+
+
 def _build_config_from_args(
     args: argparse.Namespace,
 ) -> PlaywrightValidationConfig:
     """Load base config and overlay service-resolved report identity."""
     service_resolved = bool(args.artifact or args.impact_manifest)
     config = load_config(args.env_file, required=not service_resolved)
+    _require_service_principal(config)
 
     if not args.artifact and not args.impact_manifest:
         return config
@@ -293,6 +324,33 @@ def _split_comma(value: str | None) -> list[str]:
     return [item.strip() for item in value.split(",") if item.strip()]
 
 
+def _write_embed_error_envelope(
+    output_path: Path,
+    report_name: str,
+    cases: list[TestCase],
+    message: str,
+) -> int:
+    """Write an error envelope for an embed-context failure and return 1.
+
+    The shared tail of both branches in `_run_single_report`'s embed-context
+    try block: a `PowerBiApiError` and any other exception both end here so
+    an agent caller always finds a reason in `run.json`, never a null
+    ``detail`` from an exception that ran clean off the top of `main()`.
+    """
+    findings = _write_findings(cases, success=False, message=message)
+    env = build_envelope(
+        analyzer="playwright",
+        artifact_path=str(report_name),
+        status="error",
+        message=message,
+        findings=findings,
+        duration_ms=0,
+    )
+    write_envelope(output_path, env)
+    log_error(message)
+    return 1
+
+
 def _run_single_report(
     config: PlaywrightValidationConfig,
     args: argparse.Namespace,
@@ -326,18 +384,10 @@ def _run_single_report(
         message = f"Power BI API error: {exc}"
         if exc.status_code:
             message += f" (HTTP {exc.status_code})"
-        findings = _write_findings(cases, success=False, message=message)
-        env = build_envelope(
-            analyzer="playwright",
-            artifact_path=str(report_name),
-            status="error",
-            message=message,
-            findings=findings,
-            duration_ms=0,
-        )
-        write_envelope(output_path, env)
-        log_error(message)
-        return 1
+        return _write_embed_error_envelope(output_path, report_name, cases, message)
+    except Exception as exc:  # noqa: BLE001 - process boundary: never a bare traceback
+        message = f"Failed to acquire embed context: {exc}"
+        return _write_embed_error_envelope(output_path, report_name, cases, message)
 
     base_embed_config = build_embed_config(
         report_id=embed_context.report_id,
@@ -416,9 +466,28 @@ def run_playwright_validation(args: argparse.Namespace) -> int:
     """Orchestrate the Playwright validation and write the result envelope."""
     try:
         base_config = _build_config_from_args(args)
-    except (ValueError, ServiceResolutionError, PowerBiApiError) as exc:
+    except ValueError as exc:
+        # A missing prerequisite (readiness-probe contract), not a run
+        # failure -- `_require_service_principal` and `load_config`'s
+        # required-field check are the only raisers.
+        log_error(str(exc))
+        return 127
+    except (ServiceResolutionError, PowerBiApiError) as exc:
         log_error(str(exc))
         return 1
+    except Exception as exc:  # noqa: BLE001 - process boundary: resolving
+        # config or the discovery service client must never reach the
+        # console as a traceback either -- the wrapper's "no traceback"
+        # goal does not stop at the embed-token step `_run_single_report`
+        # already guards.
+        message = f"Failed to resolve Playwright configuration: {exc}"
+        report_name = args.artifact or "playwright"
+        output_path = (
+            Path(args.output_path).resolve()
+            if args.output_path
+            else envelope_path("playwright", report_name)
+        )
+        return _write_embed_error_envelope(output_path, report_name, [], message)
 
     if args.impact_manifest:
         reports = _load_impact_manifest(Path(args.impact_manifest).resolve())

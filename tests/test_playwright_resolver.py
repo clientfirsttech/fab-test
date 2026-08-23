@@ -164,6 +164,77 @@ def test_resolve_item_no_match(env_file: Path) -> None:
     assert exc_info.value.candidates == ["Other Report"]
 
 
+def test_resolve_item_no_match_names_candidates_in_the_message(env_file: Path) -> None:
+    """The message itself names the items the workspace actually has.
+
+    `resolve_item` used to attach `candidates=all_names` to the exception
+    and then format a message that mentioned none of them -- a dead end
+    while the CLI was holding the answer.
+    """
+    client = FakeClient()
+    client.add_item("ws-dev", "Report", "rpt-1", "Sales Report")
+    client.add_item("ws-dev", "Report", "rpt-2", "Marketing Report")
+    resolved_env = resolve_environment("dev", env_path=env_file)
+
+    with pytest.raises(ServiceResolutionError) as exc_info:
+        resolve_item("ThinReport", "Report", resolved_env, client)
+
+    message = str(exc_info.value)
+    assert "Sales Report" in message
+    assert "Marketing Report" in message
+
+
+def test_resolve_item_no_match_says_so_when_workspace_has_no_items_of_that_type(
+    env_file: Path,
+) -> None:
+    """An empty candidate list says so plainly rather than printing nothing."""
+    client = FakeClient()
+    resolved_env = resolve_environment("dev", env_path=env_file)
+
+    with pytest.raises(ServiceResolutionError) as exc_info:
+        resolve_item("ThinReport", "Report", resolved_env, client)
+
+    message = str(exc_info.value)
+    assert "no report items" in message.lower()
+
+
+def test_resolve_item_no_match_caps_the_listed_candidates(env_file: Path) -> None:
+    """Many items stay readable in an 80-column terminal -- the list is capped."""
+    client = FakeClient()
+    for i in range(20):
+        client.add_item("ws-dev", "Report", f"rpt-{i}", f"Report {i}")
+    resolved_env = resolve_environment("dev", env_path=env_file)
+
+    with pytest.raises(ServiceResolutionError) as exc_info:
+        resolve_item("Missing", "Report", resolved_env, client)
+
+    message = str(exc_info.value)
+    assert len(exc_info.value.candidates) == 20  # the exception still carries all of them
+    listed_line = next(line for line in message.splitlines() if "Report 0" in line)
+    assert len(listed_line) <= 80 or "more" in message.lower()
+
+
+def test_resolve_item_no_match_lists_the_workspace_only_once(env_file: Path) -> None:
+    """`list_items` is called once on the no-match path, not twice."""
+    client = FakeClient()
+    client.add_item("ws-dev", "Report", "rpt-1", "Other Report")
+    resolved_env = resolve_environment("dev", env_path=env_file)
+
+    calls = []
+    real_list_items = client.list_items
+
+    def counting_list_items(workspace_id, item_type):
+        calls.append((workspace_id, item_type))
+        return real_list_items(workspace_id, item_type)
+
+    client.list_items = counting_list_items
+
+    with pytest.raises(ServiceResolutionError):
+        resolve_item("Missing", "Report", resolved_env, client)
+
+    assert len(calls) == 1
+
+
 def test_resolve_item_multiple_matches(env_file: Path) -> None:
     """Multiple matching items raise with candidate names."""
     client = FakeClient()
@@ -205,6 +276,64 @@ def test_resolve_semantic_model_dependents(env_file: Path) -> None:
     assert len(reports) == 1
     assert reports[0].report_id == "rpt-1"
     assert reports[0].report_name == "Sales Report"
+
+
+def test_resolve_environment_with_workspace_override_never_opens_environments_yml(
+    tmp_path: Path,
+) -> None:
+    """A resolved workspace makes environments.yml optional (task 3).
+
+    Passing a path to a file that does not exist proves the file is never
+    opened: if it were, this would raise before the assertions run.
+    """
+    missing_env_path = tmp_path / "does-not-exist" / "environments.yml"
+
+    resolved = resolve_environment(
+        "dev", env_path=missing_env_path, workspace_id_override="ws-known"
+    )
+
+    assert resolved.workspace_id == "ws-known"
+    assert resolved.environment == "dev"
+
+
+def test_resolve_environment_without_override_still_reads_environments_yml(
+    env_file: Path,
+) -> None:
+    """A repository that pins its workspace in environments.yml today is
+    unaffected (backward-compat constraint)."""
+    resolved = resolve_environment("dev", env_path=env_file)
+
+    assert resolved.workspace_id == "ws-dev"
+
+
+def test_resolve_environment_names_both_routes_when_neither_is_available(
+    monkeypatch,
+) -> None:
+    """No workspace and no environments.yml names both ways to fix it."""
+    from fabric_ci_cd_dataops.scripts import _metadata
+
+    monkeypatch.setattr(
+        _metadata,
+        "resolve_environments_yml",
+        lambda *a, **k: (_ for _ in ()).throw(
+            _metadata.MetadataNotFoundError(
+                Path("environments.yml"),
+                [Path(".fab-test/metadata/environments.yml"), Path(".github/metadata/environments.yml")],
+            )
+        ),
+    )
+    import fabric_ci_cd_dataops.scripts.playwright_validation.resolver as resolver_module
+
+    monkeypatch.setattr(
+        resolver_module, "resolve_environments_yml", _metadata.resolve_environments_yml
+    )
+
+    with pytest.raises(ServiceResolutionError) as exc_info:
+        resolve_environment("dev")
+
+    message = str(exc_info.value)
+    assert "workspace:" in message
+    assert "environments.yml" in message
 
 
 def test_resolve_semantic_model_dependents_excludes_out_of_scope(

@@ -56,9 +56,12 @@ pip install \
 Either way this registers the `fab-test` console script. The `.venv` is searched automatically for tool binaries (e.g. `pql-test`) even when not on `PATH`.
 
 Rules and metadata resolve in the same layer order however `fab-test` was
-installed: `.fab-test/metadata/` first, then `.github/metadata/`, then the copy
-packaged in the wheel — except `environments.yml`, which has no packaged
-fallback by design. `fab-test config --show` names the layer each file came from.
+installed: `.fab-test/metadata/` first, then `.github/metadata/` (legacy,
+for consumer repositories already on that layout — this repository no
+longer keeps a copy there), then the copy packaged in the wheel — except
+`environments.yml`, which has no packaged fallback by design and lives at
+`.fab-test/metadata/environments.yml` in this repository. `fab-test config
+--show` names the layer each file came from.
 Release and publishing procedure: [`docs/RELEASE.md`](../../../docs/RELEASE.md).
 
 ## Agent Contract
@@ -172,7 +175,7 @@ Per-artifact `status` is one of `passed` / `failed` / `skipped` / `timeout` / `p
  fab-test explain ANALYZER — Show the resolved command for one analyzer without running it
  fab-test config --show    — Print every effective setting with its value and origin
  fab-test config --validate — Confirm fab-test.yml's keys and types are valid
- fab-test init             — Scaffold a commented fab-test.yml and .env.example
+ fab-test init             — Scaffold fab-test.yml, .fab-test/.gitignore, and .fab-test/.env.example
  fab-test auth status      — Show which identity fab-test would use, verified for real
  fab-test auth login       — Delegate sign-in to the tool that owns the credential
  fab-test clean-tools      — Remove or inspect the .fab-test-tools downloaded-binary cache
@@ -241,9 +244,10 @@ suffix, at any depth, with or without a `.pbip` beside it. A committed
 note and the Desktop binding — it no longer decides whether an artifact
 exists.
 
-**Where the suffixes come from.** `.github/metadata/artifact-map.json`, which
-maps nine suffixes to Fabric types. A copy ships in the distribution as a
-fallback, so an install from PyPI or a run outside a checkout behaves
+**Where the suffixes come from.** `artifact-map.json`, resolved via the metadata
+layers (`.fab-test/metadata/` > `.github/metadata/` > packaged with the
+distribution), maps nine suffixes to Fabric types. The packaged copy is the
+fallback so an install from PyPI or a run outside a checkout behaves
 identically; a malformed map takes the same path as a missing one and warns.
 Adding a type means editing the map, not the code.
 
@@ -400,7 +404,7 @@ Status and non-zero error/warning counts are coloured in text output. Colour is 
 
 ```bash
 fab-test --config custom.yml bpa   # --config must come before the subcommand: it's a top-level flag
-fab-test init                      # scaffold a commented fab-test.yml and .env.example
+fab-test init                      # scaffold fab-test.yml, .fab-test/.gitignore, .fab-test/.env.example
 fab-test init --dry-run            # see what init would create without writing anything
 fab-test config --show             # every effective setting, its value, and where it came from
 fab-test config --validate         # confirm the config file's keys and types are valid
@@ -547,11 +551,13 @@ override is distinguishable from the packaged copy without guessing from the pat
 
 `environments.yml` is the deliberate exception. It carries workspace GUIDs and branch policy,
 so a copy shipped in the wheel would aim a `prod` deployment at whatever workspace happened to
-be packaged — and report success doing it. With no repository copy, the command fails naming
-both places the file could go:
+be packaged — and report success doing it. It is also only consulted once no workspace has
+already resolved from `--workspace-id`, `FABRIC_WORKSPACE_ID`, or `workspace:` in
+`fab-test.yml` — with none of those set either, the command fails naming every route, not
+only the metadata file:
 
 ```
-environments.yml not found. Create it at /repo/.fab-test/metadata/environments.yml or /repo/.github/metadata/environments.yml.
+environments.yml not found. Create it at /repo/.fab-test/metadata/environments.yml or /repo/.github/metadata/environments.yml. Alternatively, set `workspace:` in fab-test.yml, FABRIC_WORKSPACE_ID, or pass --workspace-id -- any of those resolves a workspace without environments.yml.
 ```
 
 `playwright` needs an environment as well as the file, because it resolves an artifact name
@@ -568,7 +574,9 @@ remediation without parsing the log.
 
 ### What belongs in `fab-test.yml` vs. repository secrets
 
-`fab-test.yml` is meant to be committed — it holds no credentials. Service-principal credentials (`FABRIC_TENANT_ID`, `FABRIC_CLIENT_ID`, `FABRIC_CLIENT_SECRET`) belong in a `.env` file (auto-discovered at the repository root, gitignored) or, in a pipeline, in the CI system's own secrets store — never in `fab-test.yml`. With no service-principal variables set at all, Fabric REST calls fall back to `DefaultAzureCredential` (`az login`, a managed identity, VS Code sign-in, ...).
+`fab-test.yml` is meant to be committed — it holds no credentials. Service-principal credentials (`FABRIC_TENANT_ID`, `FABRIC_CLIENT_ID`, `FABRIC_CLIENT_SECRET`) belong in a `.env` file or, in a pipeline, in the CI system's own secrets store — never in `fab-test.yml`. With no service-principal variables set at all, Fabric REST calls fall back to `DefaultAzureCredential` (`az login`, a managed identity, VS Code sign-in, ...) for every command except `fab-test playwright`, which always needs the full service principal (see the `playwright` subcommand section below).
+
+**`.env` discovery order**, defined once and shared by `_credentials.py` and the Playwright config loader so they cannot disagree: `--env-file` > `PLAYWRIGHT_ENV_FILE` > `.fab-test/.env` > `./.env`. `.fab-test/.env` is preferred when both exist. `fab-test init` scaffolds `.fab-test/.gitignore` (containing `.env`) and `.fab-test/.env.example` alongside it, so a real `.env` in the same directory as the committed `.fab-test/metadata/` is protected by fab-test's own scaffolding rather than depending on a consumer's root `.gitignore` already covering it. A root `.env` keeps working unchanged when no `.fab-test/.env` exists. `fab-test auth status` reports which one actually supplied a credential (`.fab-test/.env`, `.env`, or `environment`).
 
 ## Global Flags (all subcommands)
 
@@ -624,7 +632,7 @@ Discovery walks `--artifact-dir` recursively — see [Discovery](#discovery) for
 | Flag | Env var | Default |
 |------|---------|---------|
 | `--tabular-editor-path PATH` | `TABULAR_EDITOR_PATH` | `TabularEditor/TabularEditor.exe` |
-| `--bpa-rules-path PATH` | — | `.github/metadata/rules/BPARules.json` |
+| `--bpa-rules-path PATH` | — | resolved via the metadata layers (`.fab-test/metadata/rules/BPARules.json` > `.github/metadata/...` > packaged) |
 
 ```bash
 fab-test bpa --tabular-editor-path "C:\Program Files (x86)\Tabular Editor\TabularEditor.exe"
@@ -638,7 +646,7 @@ fab-test bpa
 | Flag | Env var | Default |
 |------|---------|---------|
 | `--inspector-path PATH` | `PBIR_INSPECTOR_PATH` | `PBIR-Inspector/PBIRInspectorCLI` |
-| `--rules-path PATH` | — | `.github/metadata/rules/pbi-inspector-custom-rules.json` |
+| `--rules-path PATH` | — | resolved via the metadata layers (`.fab-test/metadata/rules/pbi-inspector-custom-rules.json` > `.github/metadata/...` > packaged) |
 
 ### pql-test
 
@@ -679,6 +687,42 @@ Playwright validation can run in three modes: static `.env` mode, service-resolv
 | `--dataset-id ID` | Explicit dataset / semantic-model ID override |
 | `--impact-manifest PATH` | Validate every report listed in the impacted-report manifest once, regardless of local `.Report` artifacts |
 
+**`playwright` always needs a full service principal — unlike every other analyzer.**
+`get_embed_context` calls MSAL with a client secret to generate the embed token; an
+ambient `az login` (which `pql-test` and workspace discovery both accept) cannot do
+that. With `FABRIC_TENANT_ID`, `FABRIC_CLIENT_ID`/`FABRIC_SERVICE_PRINCIPAL_ID`, or
+`FABRIC_CLIENT_SECRET`/`FABRIC_SERVICE_PRINCIPAL_SECRET` incomplete, the command
+refuses **before** building a client or making any network call, exits `127` (a
+missing prerequisite, not a run failure), and names every missing variable and where
+to set it:
+
+```
+::error::Playwright needs a full service principal to generate an embed token;
+missing: FABRIC_TENANT_ID, FABRIC_CLIENT_ID (or FABRIC_SERVICE_PRINCIPAL_ID),
+FABRIC_CLIENT_SECRET (or FABRIC_SERVICE_PRINCIPAL_SECRET). Set them in the
+environment, in a .env file, or pass --env-file.
+```
+
+`fab-test doctor` reports `playwright` as not ready for the same reason rather than
+a false green when only an ambient credential is available — `playwright-impact` and
+`dependencies`, which never call the embed-token API, are unaffected and accept
+ambient auth like every other cloud-backed analyzer.
+
+Any other exception while acquiring the embed context (a malformed tenant, an
+unreachable API) is also caught: it never reaches the console as a traceback. It
+writes an error envelope, emits `::error::` to stderr, and returns `1` — and in a
+`--impact-manifest` run, one report's failure does not stop the others.
+
+**`environments.yml` is optional once a workspace is already resolved.** When
+`--workspace-id`, `FABRIC_WORKSPACE_ID`, or `workspace:` in `fab-test.yml` already
+supplies a workspace, `environments.yml` is never opened — a missing file or an
+absent `dev:` entry no longer fails a run whose workspace was never in question. It
+is read exactly as before only when no workspace resolves from any of those sources;
+a repository that already pins its workspace there is unaffected. `workspace:` is
+discoverable: `fab-test init` scaffolds a commented line for it, and
+`fab-test config --show` lists its effective value and origin (`fab-test.yml:workspace`,
+`env:FABRIC_WORKSPACE_ID`, etc.) alongside every other setting.
+
 Static `.env` mode uses workspace, report, dataset IDs directly from the env file:
 
 ```bash
@@ -686,11 +730,24 @@ fab-test playwright --env-file .env
 fab-test playwright --env-file .env --dry-run
 ```
 
-Service-resolved mode resolves the deployed report from the artifact name and environment metadata in `.github/metadata/environments.yml`, so the env file is only needed for credentials:
+Service-resolved mode resolves the deployed report from the artifact name and an
+already-known workspace (`workspace:` in `fab-test.yml`, `FABRIC_WORKSPACE_ID`, or
+`--workspace-id`), falling back to `environments.yml` only when none of those
+resolve one:
 
 ```bash
 fab-test playwright --artifact "Not Working Visuals" --env dev --env-file .env
 fab-test playwright --artifact SalesReport --env test --env-file .env
+```
+
+When [`resolve_item`](../../../src/fabric_ci_cd_dataops/scripts/playwright_validation/resolver.py)
+finds no match, the message names the closest candidates the workspace actually has
+(capped for an 80-column terminal), says plainly when the workspace has no items of
+that type at all, and lists the workspace once rather than twice:
+
+```
+No Report matching 'ThinReport' in workspace 33333333-3333-3333-3333-333333333333.
+Closest candidates: Sales Report, Marketing Report, and 3 more.
 ```
 
 Impact-manifest mode validates every report impacted by changed artifacts. It is repository-scoped and runs once:
@@ -742,7 +799,7 @@ fab-test dependencies --semantic-model "Working Visuals" --env dev --env-file .e
 
 ### all
 
-Runs the analyzer names listed in `.github/metadata/analyzers.json` under the `fab_test_all` key. This keeps the local command aligned with the same metadata that drives CI.
+Runs the analyzer names listed in `analyzers.json` (resolved via the metadata layers) under the `fab_test_all` key. This keeps the local command aligned with the same metadata that drives CI.
 
 Current default list:
 

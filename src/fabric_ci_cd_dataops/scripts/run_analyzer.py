@@ -28,7 +28,18 @@ from pathlib import Path
 from typing import Any
 
 from ._cli_utils import terse_print
-from ._metadata import ANALYZERS, default_repo_root, resolve_metadata
+from ._metadata import ANALYZERS, BPA_RULES, PBIR_RULES, default_repo_root, resolve_metadata
+
+# Which metadata-layer rules file each analyzer's `{rules_path}` placeholder
+# resolves to. `analyzers.json`'s args used to hardcode
+# `.github/metadata/rules/...` directly -- including in the packaged copy,
+# which pointed a fresh install at a directory it is told never to create.
+# Resolving through `resolve_metadata` keeps this one substitution honest
+# for `.fab-test/metadata`, `.github/metadata`, and the packaged fallback.
+_ANALYZER_RULES_FILE: dict[str, Path] = {
+    "tabular_editor_bpa": BPA_RULES,
+    "pbir_inspector": PBIR_RULES,
+}
 
 
 class AnalyzerRunner:
@@ -76,9 +87,16 @@ class AnalyzerRunner:
         workspace_id: str = "",
         environment: str = "",
         output_path: str = "",
+        *,
+        analyzer_name: str = "",
     ) -> list[str]:
         """Build analyzer command with parameter substitution."""
         command = [analyzer_config['command']]
+
+        rules_path = ""
+        rules_relative = _ANALYZER_RULES_FILE.get(analyzer_name)
+        if rules_relative is not None:
+            rules_path = str(resolve_metadata(rules_relative, default_repo_root()).path)
 
         # Substitute placeholders in arguments
         substitutions = {
@@ -87,6 +105,7 @@ class AnalyzerRunner:
             '{workspace_id}': workspace_id,
             '{environment}': environment,
             '{output_path}': output_path,
+            '{rules_path}': rules_path,
         }
         for arg in analyzer_config.get('args', []):
             substituted = arg
@@ -119,7 +138,8 @@ class AnalyzerRunner:
             artifact_name,
             artifact_path,
             workspace_id,
-            environment
+            environment,
+            analyzer_name=analyzer_name,
         )
 
         result = {

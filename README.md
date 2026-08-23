@@ -100,9 +100,10 @@ A folder is an artifact because its name ends in a Fabric type suffix —
 CI rather than opened in Desktop: `deployed/Sales.SemanticModel` on its own
 is found.
 
-The suffixes come from [`.github/metadata/artifact-map.json`](https://github.com/kerski/fab-test/blob/main/.github/metadata/artifact-map.json),
-with a copy packaged in the distribution so an install outside this
-repository behaves the same.
+The suffixes come from [`artifact-map.json`](https://github.com/kerski/fab-test/blob/main/src/fabric_ci_cd_dataops/metadata/artifact-map.json),
+packaged with the distribution so an install outside this repository knows
+what an artifact looks like. A `.fab-test/metadata/artifact-map.json` (or
+the legacy `.github/metadata/artifact-map.json`) overrides it when present.
 
 Skipped while walking: nested git checkouts (worktrees, vendored clones),
 `.venv`, `node_modules`, `__pycache__`, `dist`, `build`, and the run's own
@@ -196,12 +197,39 @@ fab-test pbir --inspector-path "/path/to/PBIRInspectorCLI"
 # Run pql-test DAX tests
 fab-test pql-test --env DEV
 
-# Run Playwright visual validation (requires service-principal credentials)
+# Run Playwright visual validation (always needs a service principal --
+# see "Playwright: the minimal working config" below)
 fab-test playwright --artifact "Not Working Visuals" --env dev --env-file .env
 
 # Discover reports that depend on a deployed semantic model
 fab-test dependencies --semantic-model SalesModel --env dev --env-file .env
 ```
+
+### Playwright: the minimal working config
+
+Every other analyzer can fall back to `az login`; `playwright` cannot --
+generating an embed token always calls MSAL with a service-principal secret,
+so it refuses immediately (exit `127`) and names every missing variable
+rather than authenticating partway and failing on the embed-token call.
+`fab-test doctor` reports it as not ready for the same reason, so it never
+shows a false green for a developer who is only signed in with `az login`.
+
+With a service principal set, the minimal config is `workspace:` and
+`environment:` in `fab-test.yml` -- `environments.yml` is not required at all:
+
+```yaml
+# fab-test.yml
+workspace: Sales Dev      # name or GUID -- also discoverable via `fab-test config --show`
+environment: dev
+```
+
+```bash
+fab-test playwright --artifact "Not Working Visuals"
+```
+
+`environments.yml` is only consulted when no workspace resolves from
+`--workspace-id`, `FABRIC_WORKSPACE_ID`, or `workspace:` in `fab-test.yml` --
+a repository that already pins its workspace there keeps working unchanged.
 
 ### Naming what to test
 

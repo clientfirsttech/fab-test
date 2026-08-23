@@ -27,6 +27,10 @@ __pycache__/
 # Environment files
 .env
 .env.*
+# .fab-test/.env.example is a committed template, not a secret -- fab-test
+# init scaffolds it beside .fab-test/.gitignore, which is what actually
+# keeps a real .fab-test/.env out of git.
+!.fab-test/.env.example
 
 # Local test / coverage output
 bandit-report.json

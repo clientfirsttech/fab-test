@@ -11,7 +11,7 @@ All deployment logic flows through `scripts/deploy.py` → `python -m fabric_cic
 ## Architecture
 
 ```
-.github/metadata/environments.yml          ← single source of truth
+.fab-test/metadata/environments.yml        ← single source of truth
         │
         ├─ scripts/deploy.py               ← reads yml, generates temp config, invokes fabric-cicd
         ├─ scripts/check_promotion_safety.py ← validates promotion eligibility

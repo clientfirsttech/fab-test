@@ -682,6 +682,24 @@ def _cloud_readiness(name: str, args: argparse.Namespace | None) -> dict[str, An
 
     if workspace_id:
         status = probe_credentials()
+        # Playwright always calls MSAL with a service-principal secret to
+        # generate an embed token -- unlike pql_test, an ambient credential
+        # (az login, managed identity) cannot stand in. Reporting ready off
+        # `status.resolved` alone would be the false green task 1 exists to
+        # remove: green from `doctor`, then an MSAL error on the one
+        # command that cannot use an ambient sign-in.
+        if name == "playwright" and not status.verified:
+            return {
+                "ready": False,
+                "resolved_path": None,
+                "reason": f"workspace configured; playwright needs a full service principal ({status.detail})",
+                "remediation": status.remediation or (
+                    "set FABRIC_TENANT_ID, FABRIC_CLIENT_ID (or "
+                    "FABRIC_SERVICE_PRINCIPAL_ID), and FABRIC_CLIENT_SECRET "
+                    "(or FABRIC_SERVICE_PRINCIPAL_SECRET) in the environment "
+                    "or a .env file"
+                ),
+            }
         if status.resolved:
             reason = (
                 f"workspace configured, credentials from {status.source}"

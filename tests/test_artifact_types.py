@@ -2,15 +2,16 @@
 
 Scope
 -----
-`.github/metadata/artifact-map.json` declares which folder suffixes are
-Fabric artifacts. It already existed and `fab-test` never read it, keeping
-three hardcoded copies that each knew two of its nine types.
+`artifact-map.json` declares which folder suffixes are Fabric artifacts. A
+repository layer (`.fab-test/metadata` or `.github/metadata`) wins when
+present; otherwise resolution falls back to the copy packaged with the
+distribution, so an install from PyPI -- or a run from any directory that
+is not a fab-test repository -- still knows what an artifact looks like.
 
-The repository copy wins when present. A packaged copy ships with the
-distribution so an install from PyPI — or a run from any directory that is
-not this repository — still knows what an artifact looks like. A test
-asserts the two agree, because a fallback that has drifted is worse than
-no fallback: it would answer confidently and wrongly.
+Playwright Through The Front Door §7 deleted this repository's own copy of
+`artifact-map.json` from `.github/metadata/`: it was byte-identical to the
+packaged copy, so keeping both was a drift risk with nothing to show for
+it. There is now exactly one copy to test, not two to compare.
 
 Always passes on any machine.
 """
@@ -28,7 +29,6 @@ from fabric_ci_cd_dataops.scripts._artifact_types import (
 )
 
 _ROOT = Path(__file__).resolve().parent.parent
-_REPO_MAP = _ROOT / ".github" / "metadata" / "artifact-map.json"
 
 
 # --------------------------------------------------------------------------- #
@@ -37,11 +37,16 @@ _REPO_MAP = _ROOT / ".github" / "metadata" / "artifact-map.json"
 
 
 @pytest.mark.fab_test
-def test_the_repository_map_is_used_when_present():
-    """The repo's own declaration wins; that is the point of reading it."""
-    expected = json.loads(_REPO_MAP.read_text(encoding="utf-8"))
+def test_this_repository_no_longer_keeps_a_redundant_github_metadata_copy():
+    """The byte-identical copy is gone from `.github/metadata/`.
 
-    assert load_artifact_map(_ROOT) == expected
+    Resolution for this repository now falls through to the packaged copy,
+    the same as any other install; this guards against a stale copy
+    quietly coming back.
+    """
+    stale_path = _ROOT / ".github" / "metadata" / "artifact-map.json"
+
+    assert not stale_path.exists(), f"{stale_path} should not exist -- resolve from the packaged copy"
 
 
 @pytest.mark.fab_test
@@ -54,13 +59,12 @@ def test_a_directory_without_the_map_falls_back(tmp_path):
 
 
 @pytest.mark.fab_test
-def test_the_packaged_copy_matches_the_repository_copy():
-    """A drifted fallback answers confidently and wrongly, which is worse
-    than having none at all."""
-    packaged = json.loads(PACKAGED_ARTIFACT_MAP.read_text(encoding="utf-8"))
-    repository = json.loads(_REPO_MAP.read_text(encoding="utf-8"))
-
-    assert packaged == repository
+def test_this_repository_resolves_the_map_from_the_packaged_copy():
+    """With no repository-layer copy left, this repository reads the same
+    packaged map every other install falls back to."""
+    assert load_artifact_map(_ROOT) == json.loads(
+        PACKAGED_ARTIFACT_MAP.read_text(encoding="utf-8")
+    )
 
 
 @pytest.mark.fab_test
