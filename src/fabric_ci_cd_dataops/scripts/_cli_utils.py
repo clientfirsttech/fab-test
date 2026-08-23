@@ -6,6 +6,14 @@ script in this repository enforces the same format when --terse is active.
 """
 
 import sys
+from collections.abc import Sequence
+from pathlib import Path
+
+# A warning stays a warning: on a developer's machine the full list is
+# every repository they have ever cloned, and three is enough to make the
+# remedy pasteable.
+CHECKOUTS_NAMED = 3
+CHECKOUT_REMEDIATION = "cd into a checkout, or point at one with --artifact-dir <path>"
 
 
 def terse_print(terse: bool, status: str, scope: str, message: str) -> None:
@@ -52,3 +60,29 @@ def narrate(message: str, *, output_format: str = "text", quiet: bool = False) -
         print(message, file=sys.stderr)
     else:
         print(message)
+
+
+def skipped_checkout_lines(checkouts: Sequence[Path]) -> list[str]:
+    """Explain a scan that pruned repositories, or say nothing at all.
+
+    An empty scan has two very different causes that used to read
+    identically: the root holds no artifacts, or every candidate below it
+    was pruned as a nested checkout. The second is what a developer sees
+    running `fab-test` from a folder of sibling repositories, and it is
+    the one with a fix worth naming.
+
+    Empty when nothing was pruned -- the in-repo case is the common one
+    and must not get noisier to serve the caller who ran `fab-test` one
+    directory too high. Lives in this leaf module so `fab_test` and
+    `fab_test_summary` can share it without a cycle.
+    """
+    if not checkouts:
+        return []
+    verb = "was" if len(checkouts) == 1 else "were"
+    plural = "" if len(checkouts) == 1 else "s"
+    return [
+        f"    {len(checkouts)} git checkout{plural} below this root {verb} skipped — "
+        "a scan does not",
+        "    descend into a nested repository. cd into one, or name it directly:",
+        *(f"      --artifact-dir {path}" for path in checkouts[:CHECKOUTS_NAMED]),
+    ]

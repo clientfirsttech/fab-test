@@ -259,6 +259,27 @@ otherwise rediscover as artifacts.
 A matched folder is not descended into: Fabric artifacts do not nest, and
 `Sales.SemanticModel/definition` is a matched artifact's contents.
 
+**When pruning empties the result.** Run from a directory that holds
+repositories rather than artifacts — `~/Git`, a projects folder — and every
+candidate below it is a nested checkout, so discovery returns nothing by
+design. It is not silent about it: the warning names how many checkouts it
+skipped and up to three of them as a pasteable `--artifact-dir`, and
+`--format json` carries the same in `skipped_checkouts` plus a
+`remediation` string.
+
+```
+  ⚠ fab-test pbir: no *.Report artifacts found under C:\Users\jkers\Git
+    9 git checkouts below this root were skipped — a scan does not
+    descend into a nested repository. cd into one, or name it directly:
+      --artifact-dir C:\Users\jkers\Git\fab-test
+```
+
+`fab-test list` says the same below its table when every discovering
+analyzer matched `0` and checkouts were pruned. Both stay silent when
+nothing was pruned, so `skipped_checkouts: []` with an empty `artifacts`
+means the root genuinely holds no artifacts — that is the distinction the
+key exists to make.
+
 **Unhandled types.** All nine types parse, so a target can name one no
 analyzer reads. `fab-test bpa Sales.Notebook` exits `2` with
 `bpa reads SemanticModel artifacts; 'Sales.Notebook' is a Notebook, which no
@@ -271,7 +292,15 @@ suffix each analyzer handles.
 the working directory is right at a prompt and wrong in a build: pinning the
 root means the job scans the same tree whichever directory the runner starts
 in. An explicit path that does not exist still exits `2`; an absent default
-does not.
+does not. It also settles the pruning question before it arises — a job that
+checks out submodules or vendors a second repository has nested checkouts by
+construction, and naming the root says which tree to scan instead of relying
+on where the runner landed:
+
+```yaml
+- name: Validate artifacts
+  run: fab-test all --artifact-dir "${{ github.workspace }}/artifacts" --format json
+```
 
 ## Credentials
 
@@ -429,7 +458,16 @@ Resolution order for whether a run ships, highest first:
 | 5 | A complete `telemetry.eventhouse` | Ships |
 | 6 | Nothing | Does not ship, and says nothing about it |
 
-**Table setup (once, by hand).** `fab-test` never creates tables. Each telemetry table carries a single `Data: dynamic` column and an ingestion mapping that puts the whole payload object into it — downstream Eventhouse functions transform, so the wire is schema-independent and a new payload field never breaks ingest:
+**Table setup is automatic.** Before each run's first send, `fab-test` checks that the target table and its `fab_test_payload` ingestion mapping exist and creates whatever is missing — once per table per run, against the *query* endpoint. A run against a healthy destination issues no schema commands.
+
+| Object | Created by `fab-test`? |
+|---|---|
+| Eventhouse | No — create it in Fabric |
+| KQL database | No — a missing one is reported, not built |
+| `fabric_static_analysis` / `fabric_dynamic_analysis` | Yes, as `(Data: dynamic)` |
+| `fab_test_payload` ingestion mapping | Yes, `[{"column":"Data","path":"$","datatype":"dynamic"}]` |
+
+Ingesting needs **Database Ingestor**; creating a table needs more than that. When the credential may ingest but not create, the run reports it and prints the KQL to run by hand:
 
 ```kusto
 .create-merge table fabric_static_analysis (Data: dynamic)
@@ -437,7 +475,9 @@ Resolution order for whether a run ships, highest first:
     '[{"column":"Data","path":"$","datatype":"dynamic"}]'
 ```
 
-Repeat for `fabric_dynamic_analysis`. The mapping name `fab_test_payload` is fixed and the mapping is **not optional**: without it Kusto maps by column name, matches nothing, and stores empty rows while reporting success. Query the payload with `Data.analyzer`, `Data.status`, `todatetime(Data.timestamp)`, and so on.
+The mapping name is fixed and the mapping is **not optional**: without it Kusto maps by column name, matches nothing, and stores empty rows while reporting success — which is why an existing table is not assumed usable until its mapping is confirmed. Query the payload with `Data.analyzer`, `Data.status`, `todatetime(Data.timestamp)`, and so on.
+
+A destination that cannot be reached or built is a **failed** flush, never a delivered one: queued ingest accepts a batch aimed at a missing table and drops it later, so `fab-test` refuses to send rather than report a delivery that cannot land.
 
 Prerequisites, all reported by `fab-test doctor`'s `telemetry` row:
 

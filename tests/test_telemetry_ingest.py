@@ -53,7 +53,11 @@ class _FakeIngestClient:
 def _sink(client: _FakeIngestClient) -> EventhouseSink:
     """A sink wired to a stand-in client rather than a cluster."""
     sink = EventhouseSink(_config())
-    sink._ingest = client.ingest  # the one seam: everything above it is real
+    # The destination check is stubbed out: this file is about batching and
+    # what a flush reports, and whether the table exists has its own tests in
+    # `test_telemetry_bootstrap.py`.
+    sink._ensure_destination = lambda table: None
+    sink._ingest = client.ingest
     return sink
 
 
@@ -242,6 +246,7 @@ def test_ingest_references_the_payload_mapping():
         JSON = "json"
 
     sink = EventhouseSink(_config())
+    sink._ensure_destination = lambda table: None
     sink._dependencies = lambda: IngestDependencies(
         connection_string_builder=_Builder,
         ingest_client=_Client,

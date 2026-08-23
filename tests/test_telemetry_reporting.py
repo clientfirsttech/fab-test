@@ -69,6 +69,11 @@ def _fail_ingest(monkeypatch, message="cluster unreachable"):
     def _boom(self, table, rows):
         raise RuntimeError(message)
 
+    # The destination check needs a cluster; whether the table exists has
+    # its own tests in test_telemetry_bootstrap.py.
+    monkeypatch.setattr(
+        eventhouse_logger.EventhouseSink, "_ensure_destination", lambda self, table: None
+    )
     monkeypatch.setattr(eventhouse_logger.EventhouseSink, "_ingest", _boom)
 
 
