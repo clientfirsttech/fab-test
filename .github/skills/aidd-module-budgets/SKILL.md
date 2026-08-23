@@ -6,10 +6,14 @@ description: File-level size budgets for Python modules and test modules in this
 # Module budgets
 
 The ruff budgets in `pyproject.toml` are all *function*-level: complexity,
-arguments, branches, statements. Nothing in this repo has ever measured a
-*file*. That is how `tests/test_fab_test.py` reached 4,383 lines and 215 tests
-without a single review objecting: every diff that grew it was small, and the
-only thing wrong with it was the total.
+arguments, branches, statements. For a long time nothing in this repo measured
+a *file*, which is how `tests/test_fab_test.py` reached 4,383 lines and 229
+tests without a single review objecting: every diff that grew it was small,
+and the only thing wrong with it was the total. It has since been split into
+13 behavior-named modules (Test Module Split epic), and
+`tests/test_module_budget.py` now ratchets file size the same way
+`tests/test_complexity_budget.py` ratchets complexity findings, so the same
+thing cannot happen silently again.
 
 A file nobody can hold in their head costs on every read — human or agent. An
 agent asked to change one behavior loads the whole module.
@@ -25,9 +29,10 @@ agent asked to change one behavior loads the whole module.
 Soft means: say in the commit message why this file earns the extra length.
 Hard means: the split is part of the task that crossed it, not a follow-up.
 
-A test module tracks its subject. If `fab_test.py` is 2,848 lines, its tests do
-not belong in one file *because* the source is one file — the source is over
-budget too, and the tests are the cheaper half to split first.
+A test module tracks its subject. `fab_test.py` is 2,867 lines and still over
+budget; its tests didn't belong in one file *because* the source was one file,
+and the tests were the cheaper half to split first (done). Splitting the
+source itself is tracked as its own follow-up epic.
 
 ## Where to split a test module
 
@@ -69,6 +74,10 @@ When reviewing a diff, check the file the diff lands in, not only the diff:
    bottom because that is where the cursor was are a file-shape smell.
 
 ## Check
+
+`tests/test_module_budget.py` fails the suite if any file crosses its hard
+budget without a named, dated exemption there, and `build.yml`'s "Module size
+report" step surfaces soft-budget crossings non-gating. To check by hand:
 
 ```bash
 # Anything over its hard budget

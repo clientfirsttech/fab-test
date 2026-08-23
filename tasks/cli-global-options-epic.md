@@ -11,7 +11,7 @@ Users and CI pipelines need a quick way to discover what `fab-test` can do and w
 
 ## Enhance `--help` output
 
-> **Overcome by events**: argparse already provides `-h`/`--help` for the top-level parser and every subcommand, and [tests/test_fab_test.py](tests/test_fab_test.py) already covers exit codes, subcommand listing, and the pytest distinction.
+> **Overcome by events**: argparse already provides `-h`/`--help` for the top-level parser and every subcommand, and [tests/test_fab_test_help.py](tests/test_fab_test_help.py) and [tests/test_fab_test_exit_codes.py](tests/test_fab_test_exit_codes.py) already cover exit codes, subcommand listing, and the pytest distinction.
 >
 > Remaining work is a small polish task, not a full implementation.
 
@@ -37,7 +37,7 @@ Add a top-level `--version` flag that prints the current `fab-test` version and 
 
 ## Add tests for `--version`
 
-Write tests that exercise the new `--version` option and guard against regressions. `--help` tests already exist in [tests/test_fab_test.py](tests/test_fab_test.py).
+Write tests that exercise the new `--version` option and guard against regressions. `--help` tests already exist in [tests/test_fab_test_help.py](tests/test_fab_test_help.py).
 
 **Requirements**:
 - Given `fab-test --version` is executed, then a test should assert the exit code is `0` and the output contains the expected version.
