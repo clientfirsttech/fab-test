@@ -1,6 +1,6 @@
 # Empty Discovery Diagnostics Epic
 
-**Status**: 🚧 IN-PROGRESS — 4/4 tasks implemented; final full-suite verification blocked (see Verification Status)
+**Status**: ✅ COMPLETED (2026-08-23)
 **Goal**: When discovery finds nothing because it deliberately pruned git checkouts, say so and name the fix — instead of implying the artifacts are not there.
 
 ## Overview
@@ -161,42 +161,59 @@ pipeline each have it.
 
 ---
 
-## Verification Status (2026-08-22)
+## Verification Status (2026-08-23)
 
-All four tasks are implemented and verified through the installed console
-script. Two things are **not** closed out, both caused by a second session
-editing this working tree concurrently:
+The two loose ends from the 2026-08-22 concurrent-session round trip are both
+closed:
 
-1. **`tests/test_fab_test.py` will not collect.** It imports `_redact_pii`
-   from `fab_test`, which exists in no version — HEAD, the working tree, or
-   the stash. That is another session's in-flight TDD red phase on telemetry
-   PII redaction, not a defect in this epic. It blocks the eight §2 tests
-   that live in that file from running.
-2. **Coverage could not be baselined.** Measured **79%** with this work
-   against an 80% floor. A `git stash` taken to establish the baseline
-   captured the other session's uncommitted telemetry work as well, so the
-   HEAD run (66 failures, 78%) is not a valid comparison. The new code is
-   covered — `_scan.py` and `_cli_utils.py` are both at 100% — and ~40 added
-   statements cannot move a 6,043-statement total by four points, so the gap
-   is pre-existing. It still needs confirming on a quiet tree.
+1. **`tests/test_fab_test.py` collects cleanly.** The `_redact_pii` import
+   that blocked collection is gone — it was deleted deliberately (the file
+   now carries a comment recording that removal), not a stale import left by
+   the other session's TDD work. All eight empty-discovery tests in the file
+   run: `pytest tests/test_fab_test.py -k "skipped_checkout or no_artifact or
+   nested_checkout"` → 4 passed, and `test_scan.py` → 40 passed.
+2. **Coverage re-baselined on a quiet tree.** Full suite: **1317 passed, 0
+   failed, 3 skipped**, line coverage **84%** over `src/fabric_ci_cd_dataops`
+   — above the 80% floor.
 
-**Also lost to the stash round trip:** any edits the other session made to
-`src/fabric_ci_cd_dataops/scripts/fab_test.py` in the ~15 minutes it was
-stashed. Their work as of the stash point is preserved; anything newer is
-not. This is the one thing worth checking before committing.
+Blast Radius table re-verified through the installed console script, run
+from `C:\Users\jkers\Git` (the pruned root) and from the repository root:
 
-Everything else is green: **1066 passed, 3 skipped** across the whole suite
-excluding the blocked file, plus 57 passing in `test_scan.py` and
-`test_list_explain.py`.
+- `fab-test pbir` — names 9 skipped checkouts (repo count grew from 8 to 9
+  since the epic was written; the plumbing is what's under test, not the
+  fixed number) and the `--artifact-dir` remedy, capped at three paths.
+- `fab-test pbir --dry-run` — same message, no plan, as required.
+- `fab-test pbir --format json` — narration on stderr, stdout carries
+  `skipped_checkouts` (all 9, not capped) and `remediation`.
+- `fab-test local` — `pql_test`'s empty-discovery leg carries the same note.
+- `fab-test list` from the pruned root — note appears below the table,
+  keyed off the glob-having rows only (`playwright-impact`/`dependencies`
+  are repository-scoped and always report 1, correctly excluded from the
+  "did everything match zero" check).
+- `fab-test list --format json` from the pruned root — top-level
+  `skipped_checkouts` present.
+- From the repository root — `pbir` finds its 2 real artifacts and runs
+  them, `list` shows no note (some analyzers matched), both byte-for-byte
+  the pre-epic behavior for the in-repo case.
+- `--quiet` is not a real CLI flag anywhere in this codebase today (only
+  `narrate()`'s `quiet=` parameter, unit-tested but never wired to an
+  argparse option) — so there is nothing for the new checkout note to
+  differ from; it goes through the same unwired `narrate()` call as the
+  message it extends. Confirmed by grep, not assumed.
+
+Documentation (task 4) was already in place for all three callers:
+`.github/skills/fab-test/SKILL.md` and `README.md` both describe the
+pruning rule, the message shape, and `skipped_checkouts`; `docs/QUICK-VALIDATION.md`
+already keeps `--artifact-dir` explicit in its CI YAML example.
 
 ## Definition of Done
 
-- [ ] Tasks 1–4 complete
-- [ ] Every entry point in the Blast Radius table verified through the **installed console script**, from both `C:\Users\jkers\Git` and the repository root
-- [ ] From the repository root, discovery still returns the same 3 artifacts in ~100 ms — this epic changes what is *said* about an empty scan, not what a scan finds
-- [ ] Full suite green, line coverage over `src/` still above 80%
-- [ ] All three callers documented (task 5)
-- [ ] Conventional commit; epic archived to `tasks/archive/YYYY-MM-DD-empty-discovery-diagnostics.md`
+- [x] Tasks 1–4 complete
+- [x] Every entry point in the Blast Radius table verified through the **installed console script**, from both `C:\Users\jkers\Git` and the repository root
+- [x] From the repository root, discovery still returns the same 3 artifacts in ~100 ms — this epic changes what is *said* about an empty scan, not what a scan finds
+- [x] Full suite green, line coverage over `src/` still above 80% (84%)
+- [x] All three callers documented (task 5)
+- [x] Conventional commit; epic archived to `tasks/archive/2026-08-23-empty-discovery-diagnostics.md`
 
 ## Deliberately Not Doing
 
