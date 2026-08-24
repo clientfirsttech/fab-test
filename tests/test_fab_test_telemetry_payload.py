@@ -232,7 +232,7 @@ def test_dry_run_with_telemetry_prints_payload_preview_not_sent(tmp_path, monkey
 
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
-    output_dir = tmp_path / "analyzer-results"
+    output_dir = tmp_path / "fab-test-results"
 
     calls = []
     monkeypatch.setattr(
@@ -265,7 +265,7 @@ def test_dry_run_without_telemetry_flag_shows_no_preview(tmp_path, monkeypatch, 
     """
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
-    output_dir = tmp_path / "analyzer-results"
+    output_dir = tmp_path / "fab-test-results"
 
     monkeypatch.delenv("ENABLE_EVENTHOUSE_LOGGING", raising=False)
     args = _RunAnalyzerArgs(
@@ -286,7 +286,7 @@ def test_dry_run_no_telemetry_flag_suppresses_preview_even_with_env(
     """--no-telemetry suppresses the dry-run preview even if the env flag is on."""
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
-    output_dir = tmp_path / "analyzer-results"
+    output_dir = tmp_path / "fab-test-results"
 
     monkeypatch.setenv("ENABLE_EVENTHOUSE_LOGGING", "true")
     args = _RunAnalyzerArgs(artifact_dir, output_dir, telemetry=False, dry_run=True)
@@ -305,7 +305,7 @@ def test_telemetry_sent_normally_when_not_dry_run(tmp_path, monkeypatch):
 
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
-    output_dir = tmp_path / "analyzer-results"
+    output_dir = tmp_path / "fab-test-results"
 
     monkeypatch.setenv("ENABLE_EVENTHOUSE_LOGGING", "true")
     monkeypatch.setattr(
@@ -384,7 +384,7 @@ def test_telemetry_send_network_failure_does_not_affect_analyzer_exit_code(
 
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
-    output_dir = tmp_path / "analyzer-results"
+    output_dir = tmp_path / "fab-test-results"
     envelope_dir = output_dir / "pql_lint" / "SampleModel"
     envelope_dir.mkdir(parents=True)
     envelope_dir_json = envelope_dir / "envelope.json"

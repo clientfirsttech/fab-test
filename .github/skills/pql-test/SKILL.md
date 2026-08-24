@@ -18,8 +18,8 @@ pytest -m pql_test  /  pytest -m pql_test_integration
                 ├─ pql-test CLI  (shutil.which)
                 │     fallback: python -m pql_test
                 │
-                ├─ analyzer-results/pql_test/<artifact-stem>/native.json   ← raw CLI output
-                └─ analyzer-results/pql_test/<artifact-stem>/envelope.json ← shared envelope
+                ├─ fab-test-results/pql_test/<artifact-stem>/native.json   ← raw CLI output
+                └─ fab-test-results/pql_test/<artifact-stem>/envelope.json ← shared envelope
 ```
 
 ## CLI Interface
@@ -75,7 +75,7 @@ Every run writes `envelope.json` using `_analyzer_envelope.build_envelope()`:
   "status":              "passed | failed | error | timeout",
   "message":             "<human-readable summary>",
   "findings":            [],
-  "native_output_path":  "analyzer-results/pql_test/<stem>/native.json",
+  "native_output_path":  "fab-test-results/pql_test/<stem>/native.json",
   "duration_ms":         <int>,
   "test_results":        []
 }
@@ -110,8 +110,8 @@ Constraints {
 | `scripts/invoke_pql_test.py` | Wrapper — build_command, parse_findings, run_pql_test, main |
 | `scripts/_analyzer_envelope.py` | Shared envelope schema, Timer, write_envelope |
 | `tests/test_invoke_pql_test.py` | Contract test suite (marker: pql_test) |
-| `analyzer-results/pql_test/<stem>/envelope.json` | Shared envelope written on every run |
-| `analyzer-results/pql_test/<stem>/native.json` | Raw pql-test JSON output |
+| `fab-test-results/pql_test/<stem>/envelope.json` | Shared envelope written on every run |
+| `fab-test-results/pql_test/<stem>/native.json` | Raw pql-test JSON output |
 | `analyzers.json` (resolved via metadata layers: `.fab-test/metadata/` > `.github/metadata/` > packaged) | Registry entry for `pql_test` analyzer |
 
 ## analyzers.json Registry Pattern
@@ -124,7 +124,7 @@ Constraints {
   "command": "python scripts/invoke_pql_test.py --artifact-path {artifact_path} --artifact-name {artifact_name} --output-path {output_path}",
   "native_output": {
     "format": "json",
-    "path_pattern": "analyzer-results/pql_test/{artifact_stem}/native.json"
+    "path_pattern": "fab-test-results/pql_test/{artifact_stem}/native.json"
   }
 }
 ```

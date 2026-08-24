@@ -125,7 +125,7 @@ def test_a_folder_name_resolves_to_its_suffix():
 
 @pytest.mark.fab_test
 def test_a_folder_with_no_known_suffix_resolves_to_nothing():
-    """`definition` and `analyzer-results` are folders, not artifacts."""
+    """`definition` and `fab-test-results` are folders, not artifacts."""
     assert suffix_for("definition", _ROOT) is None
     assert suffix_for("Sales", _ROOT) is None
 

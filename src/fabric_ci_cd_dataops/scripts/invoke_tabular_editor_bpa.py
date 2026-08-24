@@ -11,8 +11,8 @@ Usage:
         --tmdl-path ".fabric/artifacts/SalesModel.SemanticModel" \
         --bpa-rules-path ".github/metadata/rules/BPARules.json" \
         --tabular-editor-path "./TabularEditor/TabularEditor.exe" \
-        --output-path "./analyzer-results/bpa/SalesModel/envelope.json" \
-        --native-output-path "./analyzer-results/bpa/SalesModel/native.xml"
+        --output-path "./fab-test-results/bpa/SalesModel/envelope.json" \
+        --native-output-path "./fab-test-results/bpa/SalesModel/native.xml"
 """
 
 import argparse
@@ -689,7 +689,7 @@ def main() -> int:
         default=None,
         help=(
             "Path where the BPA envelope JSON will be written "
-            "(default: analyzer-results/bpa/<stem>/envelope.json)"
+            "(default: fab-test-results/bpa/<stem>/envelope.json)"
         ),
     )
     parser.add_argument(
@@ -697,7 +697,7 @@ def main() -> int:
         default=None,
         help=(
             "Path where the native BPA XML will be written "
-            "(default: analyzer-results/bpa/<stem>/native.xml)"
+            "(default: fab-test-results/bpa/<stem>/native.xml)"
         ),
     )
 

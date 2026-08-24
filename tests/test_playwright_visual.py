@@ -45,8 +45,8 @@ def browser_type_launch_args(browser_type_launch_args: dict[str, Any]) -> dict[s
 
 
 def _results_root() -> Path:
-    """Return the analyzer-results root for this test run."""
-    return Path(os.getenv("PLAYWRIGHT_RESULTS_ROOT", "analyzer-results/playwright"))
+    """Return the fab-test-results root for this test run."""
+    return Path(os.getenv("PLAYWRIGHT_RESULTS_ROOT", "fab-test-results/playwright"))
 
 
 def _load_test_cases() -> list[dict[str, str]]:

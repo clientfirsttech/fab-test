@@ -187,7 +187,7 @@ resolvable:
   if: always()
   with:
     name: fab-test-run-manifest
-    path: analyzer-results/run.json
+    path: fab-test-results/run.json
 ```
 
 After the first final release, drop both index flags and pin normally

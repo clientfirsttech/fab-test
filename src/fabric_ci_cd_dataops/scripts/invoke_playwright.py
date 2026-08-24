@@ -8,7 +8,7 @@ spec that fails the pipeline if any visual-load error is detected.
 Usage:
     python invoke_playwright.py \
         --env-file .env \
-        --output-path ./analyzer-results/playwright/envelope.json
+        --output-path ./fab-test-results/playwright/envelope.json
 """
 
 from __future__ import annotations
@@ -59,7 +59,7 @@ _EVIDENCE_FILENAMES = {
 _SPEC_PATH = Path("tests") / "test_playwright_visual.py"
 
 # Default output location for test-case CSV/JSON artifacts.
-_DEFAULT_TEST_CASES_DIR = Path("analyzer-results") / "playwright" / "test-cases"
+_DEFAULT_TEST_CASES_DIR = Path("fab-test-results") / "playwright" / "test-cases"
 
 
 def log(message: str) -> None:
@@ -233,9 +233,9 @@ def _run_pytest(
         "-m",
         "playwright",
         "-v",
-        "--html=analyzer-results/playwright/report/index.html",
+        "--html=fab-test-results/playwright/report/index.html",
         "--self-contained-html",
-        "--junitxml=analyzer-results/playwright/report/results.xml",
+        "--junitxml=fab-test-results/playwright/report/results.xml",
     ]
 
     if verbosity >= 2:

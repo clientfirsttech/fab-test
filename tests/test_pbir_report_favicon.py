@@ -3,7 +3,7 @@
 FabInspCLI's ``TestRun.html`` ships a favicon link
 (``<link rel="icon" href="../icon/pbiinspector.png">``) that is relative to
 the *template's* install location, not the output directory the report
-lands in under ``analyzer-results/``, so it 404s when the report is
+lands in under ``fab-test-results/``, so it 404s when the report is
 actually opened. The fix inlines the icon as a base64 data URI using the
 icon file that already ships next to the inspector binary -- no new asset
 directory to copy, and no change to the vendored template itself.

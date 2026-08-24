@@ -173,7 +173,7 @@ def test_run_analyzer_bpa_on_unsupported_platform_fails_fast(tmp_path, monkeypat
 
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
-    output_dir = tmp_path / "analyzer-results"
+    output_dir = tmp_path / "fab-test-results"
 
     calls = []
     monkeypatch.setattr(
@@ -199,7 +199,7 @@ def test_run_analyzer_bpa_unsupported_platform_points_to_env_var(
     """
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
-    output_dir = tmp_path / "analyzer-results"
+    output_dir = tmp_path / "fab-test-results"
 
     monkeypatch.setattr(sys, "platform", "linux")
 

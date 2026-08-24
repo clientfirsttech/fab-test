@@ -269,7 +269,7 @@ class TestVerbosity:
         inspector.write_text("fake", encoding="utf-8")
         inspector.chmod(0o755)
         output = tmp_path / "out.json"
-        native_dir = tmp_path / "analyzer-results" / "pbir" / "SalesReport"
+        native_dir = tmp_path / "fab-test-results" / "pbir" / "SalesReport"
         native_dir.mkdir(parents=True, exist_ok=True)
         (native_dir / "native.json").write_text("[]", encoding="utf-8")
         mock_run.return_value = mock.Mock(returncode=0, stdout="", stderr="")
@@ -301,7 +301,7 @@ class TestVerbosity:
         inspector.write_text("fake", encoding="utf-8")
         inspector.chmod(0o755)
         output = tmp_path / "out.json"
-        native_dir = tmp_path / "analyzer-results" / "pbir" / "SalesReport"
+        native_dir = tmp_path / "fab-test-results" / "pbir" / "SalesReport"
         native_dir.mkdir(parents=True, exist_ok=True)
         (native_dir / "native.json").write_text("[]", encoding="utf-8")
         mock_run.return_value = mock.Mock(
@@ -340,7 +340,7 @@ class TestVerbosity:
             inspector.chmod(0o755)
             output = tmp_path / f"out-{level}.json"
             native_dir = (
-                tmp_path / "analyzer-results" / "pbir" / f"SalesReport-{level}"
+                tmp_path / "fab-test-results" / "pbir" / f"SalesReport-{level}"
             )
             native_dir.mkdir(parents=True, exist_ok=True)
             (native_dir / "native.json").write_text("[]", encoding="utf-8")
@@ -427,7 +427,7 @@ class TestRunInspector:
         output = tmp_path / "out.json"
 
         # The updated wrapper reads findings from the *native* output path.
-        native_dir = tmp_path / "analyzer-results" / "pbir" / "SalesReport"
+        native_dir = tmp_path / "fab-test-results" / "pbir" / "SalesReport"
         native_dir.mkdir(parents=True, exist_ok=True)
         findings = [{"RuleId": "AvoidBiDi", "LogType": 0, "Pass": False}]
         (native_dir / "native.json").write_text(
@@ -464,7 +464,7 @@ class TestRunInspector:
         inspector.chmod(0o755)
         output = tmp_path / "out.json"
 
-        native_dir = tmp_path / "analyzer-results" / "pbir" / "SalesReport"
+        native_dir = tmp_path / "fab-test-results" / "pbir" / "SalesReport"
         native_dir.mkdir(parents=True, exist_ok=True)
         findings = [
             {
@@ -510,7 +510,7 @@ class TestRunInspector:
         inspector.chmod(0o755)
         output = tmp_path / "out.json"
 
-        native_dir = tmp_path / "analyzer-results" / "pbir" / "SalesReport"
+        native_dir = tmp_path / "fab-test-results" / "pbir" / "SalesReport"
         native_dir.mkdir(parents=True, exist_ok=True)
         findings = [
             {
@@ -556,7 +556,7 @@ class TestRunInspector:
         inspector.chmod(0o755)
         output = tmp_path / "out.json"
 
-        native_dir = tmp_path / "analyzer-results" / "pbir" / "SalesReport"
+        native_dir = tmp_path / "fab-test-results" / "pbir" / "SalesReport"
         native_dir.mkdir(parents=True, exist_ok=True)
         findings = [
             {
@@ -616,7 +616,7 @@ class TestRunInspector:
         output = tmp_path / "out.json"
 
         native_dir = (
-            tmp_path / "analyzer-results" / "pbir" / "SalesReport" / "native.json"
+            tmp_path / "fab-test-results" / "pbir" / "SalesReport" / "native.json"
         )
         native_dir.mkdir(parents=True, exist_ok=True)
 
@@ -693,7 +693,7 @@ class TestRunInspector:
         inspector.chmod(0o755)
         output = tmp_path / "out.json"
 
-        native_dir = tmp_path / "analyzer-results" / "pbir" / "SalesReport"
+        native_dir = tmp_path / "fab-test-results" / "pbir" / "SalesReport"
         native_dir.mkdir(parents=True, exist_ok=True)
         findings = [
             {

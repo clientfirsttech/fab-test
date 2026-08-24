@@ -17,6 +17,7 @@ from pathlib import Path
 import pytest
 
 from fabric_ci_cd_dataops.scripts._scan import EXCLUDED_DIR_NAMES, find_artifact_dirs, scan
+from fabric_ci_cd_dataops.scripts.fab_test import RESULTS_ROOT
 
 SUFFIXES = (".SemanticModel", ".Report")
 
@@ -113,7 +114,7 @@ def test_excluded_directories_are_not_scanned(tmp_path, excluded):
 def test_the_output_directory_is_pruned_when_the_caller_says_so(tmp_path):
     """Analyzer results land in folders named after the artifacts that
     produced them; rediscovering those would compound every run."""
-    results = tmp_path / "analyzer-results"
+    results = tmp_path / "fab-test-results"
     _artifact(results / "bpa", "Sales.SemanticModel")
     real = _artifact(tmp_path, "Sales.SemanticModel")
 
@@ -147,7 +148,7 @@ def test_scanning_this_repository_stays_fast():
     root = Path(__file__).resolve().parent.parent
 
     start = time.perf_counter()
-    found = find_artifact_dirs(root, SUFFIXES, excluded_paths=[root / "analyzer-results"])
+    found = find_artifact_dirs(root, SUFFIXES, excluded_paths=[RESULTS_ROOT])
     elapsed = time.perf_counter() - start
 
     assert elapsed < 2.0, f"{elapsed:.2f}s to scan {len(found)} artifacts"

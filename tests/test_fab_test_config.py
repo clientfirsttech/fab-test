@@ -27,6 +27,23 @@ from tests.conftest import _TimeoutArgs
 
 
 @pytest.mark.fab_test
+def test_output_dir_packaged_default_is_fab_test_results(monkeypatch):
+    """With no config override, --output-dir defaults to fab-test-results.
+
+    Renamed from analyzer-results before the first release (no installed
+    base depended on the old name); nothing previously pinned this value,
+    which is how the rename went unverified by the suite.
+    """
+    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+
+    monkeypatch.setattr(fab_test_module, "_PYPROJECT_CONFIG", {})
+    parser = fab_test_module.build_parser()
+    ns = parser.parse_args(["bpa", "--dry-run"])
+    assert ns.output_dir == str(fab_test_module.RESULTS_ROOT)
+    assert ns.output_dir.endswith("fab-test-results")
+
+
+@pytest.mark.fab_test
 def test_common_flags_use_pyproject_config_as_default(monkeypatch):
     """--jobs/--format/--artifact-dir/--output-dir default from [tool.fab-test]."""
     from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module

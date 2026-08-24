@@ -332,7 +332,7 @@ def test_build_pql_test_command_forwards_workspace_id():
         workspace_id="workspace-123",
         environment="DEV",
     )
-    cmd = build_pql_test_command(artifact, args, REPO_ROOT / "analyzer-results")
+    cmd = build_pql_test_command(artifact, args, REPO_ROOT / "fab-test-results")
     assert "--workspace-id" in cmd
     idx = cmd.index("--workspace-id")
     assert cmd[idx + 1] == "workspace-123"
@@ -354,7 +354,7 @@ def test_build_pql_test_command_uses_fabric_workspace_id_env(monkeypatch):
     )
     monkeypatch.setenv("FABRIC_WORKSPACE_ID", "env-workspace-456")
     monkeypatch.setenv("FABRIC_ENVIRONMENT", "TEST")
-    cmd = build_pql_test_command(artifact, args, REPO_ROOT / "analyzer-results")
+    cmd = build_pql_test_command(artifact, args, REPO_ROOT / "fab-test-results")
     assert "--workspace-id" in cmd
     idx = cmd.index("--workspace-id")
     assert cmd[idx + 1] == "env-workspace-456"

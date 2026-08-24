@@ -125,7 +125,7 @@ def fix_favicon_link(report_path: Path, inspector_path: Path) -> None:
     FabInspCLI's template points the favicon at ``../icon/pbiinspector.png``,
     relative to where the template lives inside the FabInspCLI install --
     not the output directory where the generated report actually lands
-    (``analyzer-results/pbir/...``), so the link 404s once opened from
+    (``fab-test-results/pbir/...``), so the link 404s once opened from
     there. The icon file still exists next to the inspector binary, so it
     is read once and inlined as a data URI, the same technique the
     template already uses for its logo and page-wireframe images.
@@ -673,7 +673,7 @@ def main() -> int:
         default=None,
         help=(
             "Path where the PBIR Inspector envelope JSON will be written "
-            "(default: analyzer-results/pbir/<stem>/envelope.json)"
+            "(default: fab-test-results/pbir/<stem>/envelope.json)"
         ),
     )
     parser.add_argument(

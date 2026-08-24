@@ -2,7 +2,7 @@
 
 Scope
 -----
-`analyzer-results/run.json` is written once per invocation so a caller reads
+`fab-test-results/run.json` is written once per invocation so a caller reads
 one file instead of globbing result directories. Always passes on any
 machine — no external tool or artifact required.
 
@@ -153,10 +153,10 @@ def test_manifest_never_contains_a_redacted_secret_after_write(tmp_path):
 
 @pytest.mark.fab_test
 def test_main_writes_run_manifest_for_single_analyzer_dry_run(tmp_path):
-    """A real fab-test invocation writes analyzer-results/run.json."""
+    """A real fab-test invocation writes fab-test-results/run.json."""
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
-    output_dir = tmp_path / "analyzer-results"
+    output_dir = tmp_path / "fab-test-results"
 
     result = subprocess.run(
         [
@@ -211,7 +211,7 @@ def test_manifest_covers_every_analyzer_in_all_run(tmp_path, monkeypatch):
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
     (artifact_dir / "SampleModel.Report").mkdir(parents=True)
-    output_dir = tmp_path / "analyzer-results"
+    output_dir = tmp_path / "fab-test-results"
 
     monkeypatch.setattr(fab_test_module, "_all_analyzers", lambda: ("bpa", "pbir"))
     monkeypatch.setattr(fab_test_module, "_send_telemetry", lambda *a, **k: None)
@@ -249,7 +249,7 @@ def test_manifest_records_preflight_failure_with_exit_code(tmp_path, monkeypatch
 
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
-    output_dir = tmp_path / "analyzer-results"
+    output_dir = tmp_path / "fab-test-results"
 
     monkeypatch.setattr(
         fab_test_module, "_preflight_error", lambda name, args: ("tool not found", 127)
@@ -280,7 +280,7 @@ def test_manifest_records_timeout_status_for_artifact(tmp_path, monkeypatch):
 
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
-    output_dir = tmp_path / "analyzer-results"
+    output_dir = tmp_path / "fab-test-results"
 
     def _raise_timeout(cmd, **_kwargs):
         raise subprocess.TimeoutExpired(cmd=cmd, timeout=1)
@@ -350,7 +350,7 @@ def test_main_writes_local_origin_outside_ci(tmp_path, monkeypatch):
 
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
-    output_dir = tmp_path / "analyzer-results"
+    output_dir = tmp_path / "fab-test-results"
     monkeypatch.setattr(
         sys,
         "argv",
@@ -377,7 +377,7 @@ def test_main_writes_ci_origin_under_github_actions(tmp_path, monkeypatch):
 
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
-    output_dir = tmp_path / "analyzer-results"
+    output_dir = tmp_path / "fab-test-results"
     monkeypatch.setattr(
         sys,
         "argv",
@@ -462,7 +462,7 @@ def test_manifest_records_stderr_detail_when_analyzer_writes_no_envelope(
 
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "ThinReport.Report").mkdir(parents=True)
-    output_dir = tmp_path / "analyzer-results"
+    output_dir = tmp_path / "fab-test-results"
 
     _stub_analyzer_run(
         monkeypatch,
@@ -509,7 +509,7 @@ def test_manifest_records_detail_in_ci_where_run_json_is_the_only_artifact(
 
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "ThinReport.Report").mkdir(parents=True)
-    output_dir = tmp_path / "analyzer-results"
+    output_dir = tmp_path / "fab-test-results"
 
     monkeypatch.setenv("GITHUB_ACTIONS", "true")
     seen = _stub_analyzer_run(
@@ -543,7 +543,7 @@ def test_ci_annotations_survive_stderr_capture(tmp_path, monkeypatch, capsys):
 
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "ThinReport.Report").mkdir(parents=True)
-    output_dir = tmp_path / "analyzer-results"
+    output_dir = tmp_path / "fab-test-results"
 
     monkeypatch.setenv("GITHUB_ACTIONS", "true")
     _stub_analyzer_run(
@@ -574,7 +574,7 @@ def test_manifest_detail_stays_null_when_the_analyzer_wrote_an_envelope(
 
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "ThinReport.Report").mkdir(parents=True)
-    output_dir = tmp_path / "analyzer-results"
+    output_dir = tmp_path / "fab-test-results"
     envelope_dir = output_dir / "pbir" / "ThinReport"
     envelope_dir.mkdir(parents=True)
     (envelope_dir / "envelope.json").write_text(
