@@ -180,6 +180,34 @@ def test_init_scaffolds_a_commented_workspace_line(tmp_path):
 
 
 @pytest.mark.fab_test
+def test_init_scaffolds_a_commented_telemetry_block(tmp_path):
+    """The scaffolded fab-test.yml documents `telemetry.eventhouse`.
+
+    The key has worked since Eventhouse Shipping but was never added to the
+    scaffold, so a user running `init` had no way to discover that shipping
+    telemetry from their own machine is possible without reading the skill
+    or the source.
+    """
+    result = subprocess.run(
+        ["fab-test", "init"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        cwd=tmp_path,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+
+    content = (tmp_path / "fab-test.yml").read_text(encoding="utf-8")
+    assert "telemetry:" in content
+    assert "eventhouse:" in content
+    assert "uri:" in content
+    assert "database:" in content
+    assert "EVENTHOUSE_URI" in content
+    assert "EVENTHOUSE_DATABASE" in content
+
+
+@pytest.mark.fab_test
 def test_init_json_format_lists_created_files(tmp_path):
     """--format json reports which files were created."""
     result = subprocess.run(

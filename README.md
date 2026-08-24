@@ -369,6 +369,8 @@ telemetry:
     database: fabric_ops
 ```
 
+`fab-test init` scaffolds this block commented out, so it's discoverable in the generated `fab-test.yml` without reading these docs.
+
 **The tables create themselves on first use.** You need an Eventhouse and a KQL
 database; `fab-test` builds the rest. Before each run's first send it checks that
 its table and ingestion mapping exist, creates whatever is missing, and only then
