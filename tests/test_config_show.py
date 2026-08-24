@@ -101,7 +101,7 @@ def test_config_show_reports_default_origin_when_nothing_set(tmp_path):
     data = json.loads(result.stdout)
     timeout_row = next(row for row in data["settings"] if row["key"] == "timeout")
     assert timeout_row["origin"] == "default"
-    assert timeout_row["value"] == 120
+    assert timeout_row["value"] == 200
 
 
 @pytest.mark.fab_test

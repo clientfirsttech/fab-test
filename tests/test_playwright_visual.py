@@ -27,6 +27,23 @@ from fabric_ci_cd_dataops.scripts.playwright_validation.test_cases import saniti
 pytestmark = pytest.mark.playwright
 
 
+@pytest.fixture(scope="session")
+def browser_type_launch_args(browser_type_launch_args: dict[str, Any]) -> dict[str, Any]:
+    """Disable Chromium's same-origin policy for the embed sandbox.
+
+    Without this, the Power BI JS SDK's own calls to
+    api.powerbi.com/metadata/cluster/... and .../globalservice/... come
+    back 403 from the about:blank origin this spec embeds into, and the
+    SDK falls into its generic "Something went wrong" error page without
+    ever firing `rendered` or `error` on the report object -- so the race
+    in `test_report_visual_renders` hangs until the timeout instead of
+    failing fast with a real reason. Confirmed against kerski's own
+    working reference implementation (pbi-dataops-visual-error-testing),
+    which launches Chromium the same way.
+    """
+    return {**browser_type_launch_args, "args": ["--disable-web-security"]}
+
+
 def _results_root() -> Path:
     """Return the analyzer-results root for this test run."""
     return Path(os.getenv("PLAYWRIGHT_RESULTS_ROOT", "analyzer-results/playwright"))
@@ -73,6 +90,35 @@ def _write_evidence(
         (result_dir / "network.json").write_text(
             json.dumps(failed_requests, indent=2, default=str), encoding="utf-8"
         )
+
+
+def _capture_embed_error_details(page: Any, result_dir: Path) -> str:
+    """Best-effort extraction of Power BI's own "Something went wrong" panel.
+
+    The embed SDK's `report.on('error', ...)` does not always fire when the
+    failure happens before the report object finishes initializing (e.g. a
+    permissions or CORS problem) -- the iframe just shows its own generic
+    error page instead, and the render/error race times out with no
+    indication of why. Any details text found here is written to
+    ``embed_error_details.txt`` so a timeout's evidence names the real
+    cause instead of only restating the timeout.
+    """
+    for frame in page.frames:
+        text = ""
+        with contextlib.suppress(Exception):
+            details_link = frame.get_by_text("Show details", exact=False)
+            if details_link.count() > 0:
+                with contextlib.suppress(Exception):
+                    details_link.first.click(timeout=2000)
+                    frame.wait_for_timeout(500)
+            text = frame.locator("body").inner_text(timeout=1000)
+        if "Something went wrong" in text:
+            with contextlib.suppress(Exception):
+                (result_dir / "embed_error_details.txt").write_text(
+                    text.strip(), encoding="utf-8"
+                )
+            return text.strip()
+    return ""
 
 
 def _write_result(result_dir: Path, status: str, error: str = "") -> None:
@@ -215,6 +261,9 @@ def test_report_visual_renders(page, case: dict[str, str]) -> None:
 
     if result is None:
         error = f"Report did not render within {timeout_ms}ms"
+        details = _capture_embed_error_details(page, result_dir)
+        if details:
+            error += f"; embed error panel: {details}"
         _write_result(result_dir, "error", error)
         pytest.fail(error)
 

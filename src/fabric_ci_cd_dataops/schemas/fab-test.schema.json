@@ -29,7 +29,7 @@
     "timeout": {
       "type": "integer",
       "minimum": 1,
-      "description": "Per-artifact subprocess timeout in seconds [env: ANALYZER_TIMEOUT] (default: 120)."
+      "description": "Per-artifact subprocess timeout in seconds [env: ANALYZER_TIMEOUT] (default: 200)."
     },
     "environment": {
       "type": "string",
