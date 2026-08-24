@@ -14,6 +14,8 @@ Usage:
 """
 
 import argparse
+import base64
+import contextlib
 import json
 import os
 import shutil
@@ -112,6 +114,39 @@ def build_inspector_command(
     if verbose:
         command.extend(["-verbose", "true"])
     return command
+
+
+_BROKEN_FAVICON_LINK = '<link rel="icon" href="../icon/pbiinspector.png">'
+
+
+def fix_favicon_link(report_path: Path, inspector_path: Path) -> None:
+    """Inline TestRun.html's favicon so it survives leaving its install dir.
+
+    FabInspCLI's template points the favicon at ``../icon/pbiinspector.png``,
+    relative to where the template lives inside the FabInspCLI install --
+    not the output directory where the generated report actually lands
+    (``analyzer-results/pbir/...``), so the link 404s once opened from
+    there. The icon file still exists next to the inspector binary, so it
+    is read once and inlined as a data URI, the same technique the
+    template already uses for its logo and page-wireframe images.
+
+    Never raises: a missing report, a missing icon, or a template that no
+    longer contains the expected marker all leave the report untouched
+    rather than fail the pbir-test run over a cosmetic asset.
+    """
+    icon_path = inspector_path.parent / "Files" / "icon" / "pbiinspector.png"
+    if not report_path.is_file() or not icon_path.is_file():
+        return
+    try:
+        html = report_path.read_text(encoding="utf-8-sig")
+    except OSError:
+        return
+    if _BROKEN_FAVICON_LINK not in html:
+        return
+    data_uri = "data:image/png;base64," + base64.b64encode(icon_path.read_bytes()).decode("ascii")
+    html = html.replace(_BROKEN_FAVICON_LINK, f'<link rel="icon" href="{data_uri}">')
+    with contextlib.suppress(OSError):
+        report_path.write_text(html, encoding="utf-8")
 
 
 def write_results(
@@ -456,6 +491,7 @@ def run_inspector(args: argparse.Namespace) -> int:
         html_files = list(native_out.glob("*.html"))
         if html_files:
             native_html_out = html_files[0]
+            fix_favicon_link(native_html_out, inspector_path)
 
     error_count = sum(1 for f in findings if f.get("severity") == "error")
     warning_count = sum(1 for f in findings if f.get("severity") == "warning")

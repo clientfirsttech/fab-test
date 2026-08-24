@@ -120,6 +120,64 @@ def normalize_findings(findings: list[dict]) -> tuple[str, list[tuple]]:
     return "rules", rows
 
 
+def _test_result_status(entry: dict) -> str:
+    """Return a canonical PASS/FAIL/WARNING/ERROR/SKIPPED label for one full-list row.
+
+    A BPA-shaped row already carries a computed ``status`` (pass/error/
+    warning/skip -- see ``invoke_tabular_editor_bpa._bpa_result_status``);
+    this just upper-cases it into the same vocabulary ``finding_status``
+    already uses for pql-test-shaped rows, so the renderer needs one
+    filter mapping for either shape.
+    """
+    if "status" in entry:
+        return str(entry["status"]).upper()
+    return finding_status(entry)
+
+
+def normalize_test_results(test_results: list[dict]) -> tuple[str, list[tuple]]:
+    """Return ``(kind, sorted rows)`` for the FULL result list -- passes included.
+
+    Mirrors ``normalize_findings``'s two shapes (rules vs. tests), but
+    keeps every row rather than only violations, and every row ends with
+    a status column so the report can filter by it. Shares the same shape
+    detection (``is_test_finding``) so a row is never classified
+    differently here than it would be as a finding.
+    """
+    if not test_results:
+        return "rules", []
+
+    status_rank = {
+        "ERROR": 0, "FAIL": 0, "WARNING": 1, "SKIPPED": 2, "SKIP": 2, "PASS": 3,
+    }
+
+    if is_test_finding(test_results[0]):
+        rows = [
+            (
+                f.get("suite_name") or "?",
+                f.get("test_name") or "?",
+                f.get("expected") or "",
+                f.get("actual") or "",
+                _test_result_status(f),
+            )
+            for f in test_results
+        ]
+        rows.sort(key=lambda r: (status_rank.get(r[4], 1), str(r[0]).lower(), str(r[1]).lower()))
+        return "tests", rows
+
+    rows = [
+        (
+            f.get("rule") or f.get("RuleName") or "?",
+            f.get("severity") or f.get("Severity") or "",
+            f.get("object") or f.get("ObjectName") or "",
+            f.get("message") or f.get("Message") or f.get("description") or "",
+            _test_result_status(f),
+        )
+        for f in test_results
+    ]
+    rows.sort(key=lambda r: (status_rank.get(r[4], 1), str(r[0]).lower(), str(r[2]).lower()))
+    return "rules", rows
+
+
 def severity_rank(severity: Any) -> int:
     """Return a numeric severity rank for sorting (higher = more severe).
 
