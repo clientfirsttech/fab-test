@@ -262,6 +262,7 @@ def write_results(
     duration_ms: int = 0,
     started_at: str = "",
     test_summary: dict[str, int] | None = None,
+    test_results: list[dict[str, Any]] | None = None,
 ) -> None:
     """Write standardized BPA envelope JSON (replaces legacy flat JSON)."""
     env = build_envelope(
@@ -278,6 +279,9 @@ def write_results(
     env["rules_file"] = str(rules_path)
     if test_summary is not None:
         env["test_summary"] = test_summary
+    # Additive: every rule TE2 evaluated, passed or failed -- `findings`
+    # stays violations-only for the callers already reading that meaning.
+    env["test_results"] = test_results or []
     # Tabular Editor emits TRX, which is not something a person wants to
     # read, so the report is rendered from the envelope. No-op unless
     # --report was passed.
@@ -349,20 +353,67 @@ def _bpa_findings(
     return findings
 
 
+def _bpa_result_status(outcome: str, severity: Any) -> str:
+    """Map a TRX outcome to the pass/error/warning/skip vocabulary the report filters on.
+
+    A failed rule is "error" only once its severity crosses
+    ``BPA_ERROR_SEVERITY_THRESHOLD`` -- the same line `has_errors` uses to
+    decide the exit code, so a row never disagrees with the build gate
+    that read the same finding.
+    """
+    outcome = outcome.lower()
+    if outcome == "passed":
+        return "pass"
+    if outcome == "failed":
+        return "error" if severity_rank(severity) >= BPA_ERROR_SEVERITY_THRESHOLD else "warning"
+    return "skip"
+
+
+def _bpa_test_results(
+    root: Any, ns: dict[str, str], rules_map: dict[str, dict[str, str]]
+) -> list[dict[str, Any]]:
+    """Return one row per rule TE2 evaluated, passed or failed.
+
+    TRX already records every evaluated rule as a `<UnitTestResult>`;
+    `_bpa_findings` only keeps the failed ones for the callers that read
+    `findings` as violations. This is the full list, for the report's
+    all-tests view -- a passing run should not read as if nothing ran.
+    """
+    results: list[dict[str, Any]] = []
+    for result in root.findall(".//vs:Results/vs:UnitTestResult", ns):
+        meta = rules_map.get(result.get("testId", ""), {"RuleName": result.get("testName", "")})
+        outcome = result.get("outcome", "")
+        objects = _bpa_violating_objects(result, ns) if outcome.lower() == "failed" else []
+        results.append(
+            {
+                "RuleName": meta.get("RuleName", ""),
+                "RuleID": meta.get("RuleID", ""),
+                "Severity": meta.get("Severity", ""),
+                "Category": meta.get("Category", ""),
+                "ObjectName": ", ".join(objects),
+                "status": _bpa_result_status(outcome, meta.get("Severity", "")),
+            }
+        )
+    return results
+
+
 def _parse_bpa_native_output(
     native_out: Path,
-) -> tuple[list[dict[str, Any]], dict[str, int] | None]:
-    """Return ``(findings, test_summary)`` parsed from TE2's native output.
+) -> tuple[list[dict[str, Any]], dict[str, int] | None, list[dict[str, Any]]]:
+    """Return ``(findings, test_summary, test_results)`` from TE2's native output.
 
     TE2 writes VSTest XML (TRX). A bare JSON array is also accepted --
     older builds emitted one, and silently reading nothing would look
-    like a clean model rather than a parse failure.
+    like a clean model rather than a parse failure. ``test_results`` is
+    empty in the JSON-fallback case: it has no per-rule pass/fail shape to
+    draw a full list from, only the violations already in ``findings``.
 
     Returns empty results rather than raising: the caller falls back to
     the process exit code, which an exception here would lose.
     """
     findings: list[dict[str, Any]] = []
     test_summary: dict[str, int] | None = None
+    test_results: list[dict[str, Any]] = []
     if native_out.exists():
         try:
             raw_text = native_out.read_text(encoding="utf-8-sig")
@@ -388,6 +439,9 @@ def _parse_bpa_native_output(
 
                     # Parse results — only Failed outcomes produce findings
                     findings = _bpa_findings(root, ns, rules_map)
+                    # Every evaluated rule, passed or failed, for the report's
+                    # all-tests view.
+                    test_results = _bpa_test_results(root, ns, rules_map)
                 except ET.ParseError:
                     # Not XML — try JSON
                     raw = json.loads(raw_text)
@@ -397,7 +451,7 @@ def _parse_bpa_native_output(
                         findings = raw.get("findings", [])
         except (json.JSONDecodeError, OSError, UnicodeDecodeError):
             pass
-    return findings, test_summary
+    return findings, test_summary, test_results
 
 
 def _validate_bpa_inputs(
@@ -549,7 +603,7 @@ def run_bpa(args: argparse.Namespace) -> int:
         log(proc.stderr or "(empty)")
         log("")
 
-    findings, test_summary = _parse_bpa_native_output(native_out)
+    findings, test_summary, test_results = _parse_bpa_native_output(native_out)
 
     # TE2 BPA exit code equals violation count; use it when no file output was produced.
     # Without per-rule severity data, treat unknown violations as errors so the
@@ -582,6 +636,7 @@ def run_bpa(args: argparse.Namespace) -> int:
             duration_ms=timer.elapsed_ms,
             started_at=timer.started_at,
             test_summary=test_summary,
+            test_results=test_results,
         )
         if level >= _VERBOSITY_LEVELS["default"]:
             log(f"✅ {message}")
@@ -602,6 +657,7 @@ def run_bpa(args: argparse.Namespace) -> int:
         duration_ms=timer.elapsed_ms,
         started_at=timer.started_at,
         test_summary=test_summary,
+        test_results=test_results,
     )
 
     _narrate_outcome(findings, test_summary, proc.stderr, message, has_errors=has_errors)

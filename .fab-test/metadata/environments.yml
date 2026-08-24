@@ -34,7 +34,7 @@ environments:
 
   dev:
     description: "Development environment"
-    workspace_id: "859d238b-2a35-480a-a3e8-4aea7b281a17"
+    workspace_id: "798dfd00-0081-45d3-a7a7-f74f62e57277"
     allowed_branches:
       - develop
       - "feature/**"

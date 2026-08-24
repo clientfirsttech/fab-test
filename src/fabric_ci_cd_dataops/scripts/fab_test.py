@@ -57,6 +57,7 @@ from ._config import (
 )
 from ._credentials import probe_credentials, redact_secrets
 from ._desktop import bridge_cli_path, detect_desktop_instances
+from ._git_context import git_command_output, git_context
 from ._metadata import (
     ANALYZERS,
     BPA_RULES,
@@ -433,41 +434,13 @@ def _telemetry_enabled(args: argparse.Namespace) -> bool:
     return _telemetry_decision(args).enabled
 
 
-def _git_command_output(cmd: list[str]) -> str:
-    """Run a local git command and return trimmed stdout, or "" on any failure."""
-    try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
-    except Exception:  # noqa: BLE001 - boundary: git is optional context
-        # Swallowed silently on purpose. This only enriches telemetry with
-        # the repository, branch, and actor, and every caller already reads
-        # "" as "unknown". Warning here would fire on every run outside a
-        # git checkout -- a normal way to use fab-test -- so the noise would
-        # train people to ignore it.
-        return ""
-    return proc.stdout.strip() if proc.returncode == 0 else ""
-
-
-def _git_context() -> dict[str, str]:
-    """Return repository/branch/commit/actor context from GitHub Actions or git CLI.
-
-    Falls back to local git for branch, commit, and actor (via
-    ``git config user.email``) so telemetry still carries useful context on
-    local runs and self-hosted runners where ``GITHUB_*`` vars are empty.
-    """
-    ctx = {
-        "repository": os.getenv("GITHUB_REPOSITORY", ""),
-        "branch": os.getenv("GITHUB_REF_NAME", ""),
-        "commit": os.getenv("GITHUB_SHA", ""),
-        "actor": os.getenv("GITHUB_ACTOR", ""),
-        "workflow_run_id": os.getenv("GITHUB_RUN_ID", ""),
-    }
-    if not ctx["commit"]:
-        ctx["commit"] = _git_command_output(["git", "rev-parse", "HEAD"])
-    if not ctx["branch"]:
-        ctx["branch"] = _git_command_output(["git", "rev-parse", "--abbrev-ref", "HEAD"])
-    if not ctx["actor"]:
-        ctx["actor"] = _git_command_output(["git", "config", "user.email"])
-    return ctx
+# Re-exported under their historic private names: telemetry code and its
+# tests call `_git_context()`/`_git_command_output()` and monkeypatch them
+# as module attributes here. The implementation moved to `_git_context.py`
+# so `_report_html.py` (the run index) can share it without importing this
+# module, which would be a cycle.
+_git_command_output = git_command_output
+_git_context = git_context
 
 
 def _detect_origin() -> str:

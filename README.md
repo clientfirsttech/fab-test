@@ -296,7 +296,11 @@ Each artifact gets a self-contained HTML page beside its envelope, and `fab-test
   Index:  analyzer-results/index.html
 ```
 
-PBIR Inspector writes its own `TestRun.html` and it appears **with or without** `--report` — it is richer than anything generated from the envelope, so `fab-test` never overwrites it. Tabular Editor emits TRX and `pql-test` emits JSON, so those two get a generated `report.html`.
+PBIR Inspector writes its own `TestRun.html` and it appears **with or without** `--report` — it is richer than anything generated from the envelope, so `fab-test` never overwrites it (its favicon link is repaired in place, since the upstream template points at a path that no longer exists once the report is copied out). Tabular Editor emits TRX and `pql-test` emits JSON, so those two get a generated `report.html`.
+
+Both generated reports show **every test conducted, not only the failures** — pass, fail, warning, and skip — with an All / Errors / Warnings / Passed filter above the table so you can see what ran and still jump straight to what didn't. A passing run no longer reads as an empty page.
+
+The index also shows when the run happened and, in CI, who ran it and from which branch/commit (falling back to local `git`, or an em-dash outside a git checkout).
 
 Status and non-zero counts are coloured in a terminal. Colour is off when output is redirected, off whenever `NO_COLOR` is set, and never present under `--format json`.
 

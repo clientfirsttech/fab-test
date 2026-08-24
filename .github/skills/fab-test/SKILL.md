@@ -364,15 +364,23 @@ fab-test all --report --no-report   # invalid: mutually exclusive, exits 2
 | `pql-test` | Generated `report.html` | `pql-test` emits JSON and CI log annotations only. |
 | `pql-lint` | None | Currently hidden from the advertised surface, so a report would have no reader. |
 
-The generated report never overwrites an upstream one: `attach_report` is a no-op when the envelope already carries `native_html_output_path`.
+The generated report never overwrites an upstream one: `attach_report` is a no-op when the envelope already carries `native_html_output_path`. PBIR's own `TestRun.html` also has its favicon link repaired in place (`fix_favicon_link`) -- FabInspCLI ships it as a path relative to the tool's install directory, which 404s once the report lands under `analyzer-results/`, so it is inlined as a data URI instead.
 
 Every report is a single self-contained file — no external stylesheet, script, or font — so it opens from disk and survives being uploaded as a CI artifact. Rendering is deterministic: the same envelope always produces the same bytes, and the run time shown comes from the envelope's `started_at`, never from render time.
 
 **A failure to render is a warning, never a failed build.** Exit codes belong to findings, not to presentation.
 
+### The full test list and its filter
+
+`findings` only ever holds violations — a passing run has always rendered as "No findings" with no evidence of what ran. An envelope may additionally carry `test_results`: every test or rule the analyzer evaluated, passed or failed. When it is present and non-empty, `render_report` shows that full list instead of the findings-only table, each row tagged `pass`/`warning`/`error`/`skip`, with an **All / Errors / Warnings / Passed** filter above the table — pure CSS (hidden radio inputs + sibling selectors), no JavaScript, so the self-contained-report guarantee still holds. `bpa` and `pql_test` both populate `test_results` today; `pbir`'s own `TestRun.html` has its own filter UI and is untouched by this.
+
+**Extending this to a new analyzer**: populate `test_results` on the envelope with a list of dicts in either shape `normalize_findings` already recognizes (pql-test's `suite_name`/`test_name`/`passed`/`expected`/`actual`, or a rule shape with `rule`/`severity`/`object`/`message` plus a `status` key of `pass`/`error`/`warning`/`skip`) — the renderer, the filter, and the status colouring all come for free. No new HTML to write.
+
 ### The per-run index
 
 `fab-test all --report` also writes `analyzer-results/index.html` linking every report and envelope, so one run means one page to open rather than four. It is built from the same rows the terminal summary prints, so its counts cannot disagree with them. Written only for a multi-analyzer run — indexing one analyzer is a page pointing at a single link.
+
+The index header also shows **when the run happened and who ran it**: a UTC timestamp, plus branch/commit/actor sourced from `GITHUB_*` environment variables in CI, falling back to local `git` (branch, commit, `git config user.email`) outside CI, and to an em-dash (`—`) placeholder outside a git checkout entirely — it never raises. Per-analyzer `report.html` deliberately has no timestamp (see above): the index is scoped to one run, not a reusable artifact, which is why only it gained one.
 
 ### Finding the paths
 
@@ -891,7 +899,7 @@ Optional keys — **absent, never null**, so a consumer tests presence:
 | `started_at` | UTC ISO-8601 wall-clock time the run started. `duration_ms` says how long; this says when. |
 
 
-For `pql_test`, the envelope also contains `test_results` (full result array from pql-test).
+For `pql_test`, the envelope also contains `test_results` (full result array from pql-test, native shape). For `bpa`, it contains one entry per rule TE2 evaluated (`RuleName`/`RuleID`/`Severity`/`Category`/`ObjectName` plus a computed `status` of `pass`/`error`/`warning`), passed and failed alike — unlike `findings`, which stays failure-only. Both feed the report's full-list filter (see Reports above); either is `[]` when the analyzer produced no per-test breakdown.
 
 `status` values: `passed` | `failed` | `error` | `timeout`.
 
