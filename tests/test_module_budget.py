@@ -37,23 +37,29 @@ TEST_HARD = 900
 EXEMPTIONS: dict[str, tuple[int, str]] = {
     "src/fabric_ci_cd_dataops/scripts/fab_test.py": (
         2867,
-        "2026-08-23: the CLI entry point outgrew the hard budget years before "
-        "this ratchet existed. Its tests were split first (Test Module Split "
-        "epic) because a source split is only reviewable once its tests "
-        "aren't one 4,383-line file too -- see "
-        "tasks/fab-test-module-split-epic.md for the follow-up epic filed "
-        "to split it.",
+        (
+            "2026-08-23: the CLI entry point outgrew the hard budget years before "
+            "this ratchet existed. Its tests were split first (Test Module Split "
+            "epic) because a source split is only reviewable once its tests "
+            "aren't one 4,383-line file too -- see "
+            "tasks/fab-test-module-split-epic.md for the follow-up epic filed "
+            "to split it."
+        ),
     ),
     "src/fabric_ci_cd_dataops/scripts/fab_test_summary.py": (
         812,
-        "2026-08-23: 12 lines over hard, from unrelated feature work landing "
-        "since this file was last at 793; not yet worth a forced split for "
-        "12 lines. Revisit if it keeps growing.",
+        (
+            "2026-08-23: 12 lines over hard, from unrelated feature work landing "
+            "since this file was last at 793; not yet worth a forced split for "
+            "12 lines. Revisit if it keeps growing."
+        ),
     ),
     "src/fabric_ci_cd_dataops/scripts/fab_test_registry.py": (
         811,
-        "2026-08-23: 11 lines over hard, same story as fab_test_summary.py -- "
-        "small drift from other epics, not yet worth a forced split.",
+        (
+            "2026-08-23: 11 lines over hard, same story as fab_test_summary.py -- "
+            "small drift from other epics, not yet worth a forced split."
+        ),
     ),
 }
 

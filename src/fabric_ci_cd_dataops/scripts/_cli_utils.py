@@ -81,8 +81,10 @@ def skipped_checkout_lines(checkouts: Sequence[Path]) -> list[str]:
     verb = "was" if len(checkouts) == 1 else "were"
     plural = "" if len(checkouts) == 1 else "s"
     return [
-        f"    {len(checkouts)} git checkout{plural} below this root {verb} skipped — "
-        "a scan does not",
+        (
+            f"    {len(checkouts)} git checkout{plural} below this root {verb} skipped — "
+            "a scan does not"
+        ),
         "    descend into a nested repository. cd into one, or name it directly:",
         *(f"      --artifact-dir {path}" for path in checkouts[:CHECKOUTS_NAMED]),
     ]

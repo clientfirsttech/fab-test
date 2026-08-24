@@ -74,6 +74,14 @@ jobs:
       - name: Install package and test tools
         run: pip install -e ".[dev]"
 
+      # pytest-playwright drives a real browser for the HTML report tests.
+      # The pip install above only pulls the Python package -- the browser
+      # binary is a separate download that must run before pytest, or every
+      # playwright-backed test fails at fixture setup with "Executable
+      # doesn't exist".
+      - name: Install Playwright browsers
+        run: playwright install --with-deps chromium
+
       # The 80% floor lives here and nowhere else. pytest.ini must stay free
       # of coverage flags: a granular `pytest -m <marker>` run covers a
       # fraction of src/ by design, and gating it would defeat the
