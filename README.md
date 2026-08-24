@@ -349,7 +349,7 @@ Precedence, for every setting:
 | 1 (highest) | CLI flag | `--jobs 4` |
 | 2 | Environment variable | `ANALYZER_TIMEOUT=300` |
 | 3 | `fab-test.yml` (or `[tool.fab-test]` in `pyproject.toml`) | `jobs: 4` |
-| 4 (lowest) | Packaged default | `120` seconds |
+| 4 (lowest) | Packaged default | `200` seconds |
 
 `fab-test.yml` is meant to be committed — it holds no credentials, only settings and rule overlays (tune one BPA/PBIR Inspector rule without forking the packaged rules file). Credentials belong in a `.env` file (auto-discovered, gitignored) or a pipeline's own secrets store. See the [Configuration section of the fab-test skill](https://github.com/kerski/fab-test/blob/main/.github/skills/fab-test/SKILL.md#configuration) for the full settings list and rule-overlay keys.
 

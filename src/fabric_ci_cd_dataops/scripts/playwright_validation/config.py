@@ -229,7 +229,7 @@ def load_config(
         client_id=client_id,
         client_secret=client_secret,
         tenant_id=get("FABRIC_TENANT_ID"),
-        timeout_seconds=int(get("PLAYWRIGHT_TIMEOUT_SECONDS") or "60"),
+        timeout_seconds=int(get("PLAYWRIGHT_TIMEOUT_SECONDS") or "180"),
         headless=headless,
     )
 

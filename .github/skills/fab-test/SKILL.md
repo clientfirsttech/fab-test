@@ -427,7 +427,7 @@ fab-test config --validate         # confirm the config file's keys and types ar
 | 1 (highest) | CLI flag | `--jobs 4` |
 | 2 | Environment variable | `ANALYZER_TIMEOUT=300` |
 | 3 | `fab-test.yml` (or `[tool.fab-test]` in `pyproject.toml`) | `jobs: 4` |
-| 4 (lowest) | Packaged default | `120` seconds |
+| 4 (lowest) | Packaged default | `200` seconds |
 
 If both `fab-test.yml` and `[tool.fab-test]` are present, `fab-test.yml` wins per key and the CLI warns once about the duplicate source. `fab-test config --show --format json` reports each setting's origin as one of `flag`, `env:NAME`, `fab-test.yml:key`, or `default`.
 
@@ -439,7 +439,7 @@ If both `fab-test.yml` and `[tool.fab-test]` are present, `fab-test.yml` wins pe
 | `output_dir` | string | — | `analyzer-results` |
 | `jobs` | integer | — | `1` |
 | `format` | string (`text`\|`json`) | — | `text` |
-| `timeout` | integer | `ANALYZER_TIMEOUT` | `120` |
+| `timeout` | integer | `ANALYZER_TIMEOUT` | `200` |
 | `environment` | string | `FABRIC_ENVIRONMENT` | (none) |
 | `workspace` | string | `FABRIC_WORKSPACE_ID` | (none) — display name or GUID |
 | `report` | boolean | `ANALYZER_REPORT` | `false` — see Reports below |
@@ -603,7 +603,7 @@ remediation without parsing the log.
 | `--report` / `--no-report` | off | Write a readable HTML report beside each envelope [env: `ANALYZER_REPORT`] |
 | `--format {text,json}` | `text` | Aggregate summary output format (see Agent Contract above for the stdout guarantee) |
 | `-v`, `--verbose` | off | Increase output verbosity (one `-v` = per-finding detail, two `-v` = command + stdout/stderr) |
-| `--timeout SECONDS` | `120` | Per-artifact subprocess timeout [env: `ANALYZER_TIMEOUT`] |
+| `--timeout SECONDS` | `200` | Per-artifact subprocess timeout [env: `ANALYZER_TIMEOUT`] |
 | `--jobs N` | `1` | Run up to N artifacts in parallel for the same analyzer |
 
 ### Isolating a single artifact
