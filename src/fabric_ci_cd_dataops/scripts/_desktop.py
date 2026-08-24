@@ -95,8 +95,10 @@ def _running_desktop_file_path() -> Path | None:
                 "powershell",
                 "-NoProfile",
                 "-Command",
-                "Get-CimInstance Win32_Process -Filter \"Name='PBIDesktop.exe'\" "
-                "| Select-Object -ExpandProperty CommandLine",
+                (
+                    "Get-CimInstance Win32_Process -Filter \"Name='PBIDesktop.exe'\" "
+                    "| Select-Object -ExpandProperty CommandLine"
+                ),
             ],
             capture_output=True,
             text=True,
