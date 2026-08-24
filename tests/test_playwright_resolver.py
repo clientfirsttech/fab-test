@@ -49,6 +49,7 @@ class FakeClient:
     def __init__(self, items: dict[str, list[dict[str, Any]]] | None = None) -> None:
         self._items: dict[str, list[dict[str, Any]]] = items or {}
         self._dependents: dict[tuple[str, str], list[dict[str, Any]]] = {}
+        self._report_datasets: dict[tuple[str, str], str] = {}
 
     def add_item(
         self,
@@ -76,6 +77,15 @@ class FakeClient:
             {"id": report_id, "displayName": display_name, "type": "Report"}
         )
 
+    def add_report_dataset(
+        self,
+        workspace_id: str,
+        report_id: str,
+        dataset_id: str,
+    ) -> None:
+        """Bind a fake report to the semantic model it should resolve to."""
+        self._report_datasets[(workspace_id, report_id)] = dataset_id
+
     def list_items(
         self,
         workspace_id: str,
@@ -91,6 +101,10 @@ class FakeClient:
     ) -> list[dict[str, Any]]:
         """Return fake dependent reports."""
         return list(self._dependents.get((workspace_id, semantic_model_id), []))
+
+    def get_report_dataset_id(self, workspace_id: str, report_id: str) -> str:
+        """Return the fake dataset ID bound to the report, if any."""
+        return self._report_datasets.get((workspace_id, report_id), "")
 
 
 def test_resolve_environment_case_insensitive(env_file: Path) -> None:
@@ -247,8 +261,27 @@ def test_resolve_item_multiple_matches(env_file: Path) -> None:
     assert "Multiple Report items match" in str(exc_info.value)
 
 
-def test_resolve_report_returns_dataset_fallback(env_file: Path) -> None:
-    """Resolved report uses its own ID as dataset fallback."""
+def test_resolve_report_uses_bound_dataset_id(env_file: Path) -> None:
+    """Resolved report uses the semantic model it is actually bound to."""
+    client = FakeClient()
+    client.add_item("ws-dev", "Report", "rpt-1", "Sales Report")
+    client.add_report_dataset("ws-dev", "rpt-1", "sm-1")
+    resolved_env = resolve_environment("dev", env_path=env_file)
+
+    report = resolve_report("Sales Report", resolved_env, client)
+    assert report == ResolvedReport(
+        workspace_id="ws-dev",
+        report_id="rpt-1",
+        report_name="Sales Report",
+        semantic_model_id="sm-1",
+        environment="dev",
+    )
+
+
+def test_resolve_report_falls_back_to_own_id_when_dataset_unknown(
+    env_file: Path,
+) -> None:
+    """A report with no discoverable dataset falls back to its own ID."""
     client = FakeClient()
     client.add_item("ws-dev", "Report", "rpt-1", "Sales Report")
     resolved_env = resolve_environment("dev", env_path=env_file)

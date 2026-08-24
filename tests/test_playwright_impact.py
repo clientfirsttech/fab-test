@@ -91,6 +91,10 @@ class FakeClient:
         """Return fake dependent reports."""
         return list(self._dependents.get((workspace_id, semantic_model_id), []))
 
+    def get_report_dataset_id(self, workspace_id: str, report_id: str) -> str:
+        """Not exercised by the impact-analysis path; protocol filler."""
+        return ""
+
 
 @pytest.fixture
 def changed_artifacts(tmp_path: Path) -> Path:

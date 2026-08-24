@@ -63,6 +63,8 @@ class ServiceClient(Protocol):
         semantic_model_id: str,
     ) -> list[dict[str, Any]]: ...
 
+    def get_report_dataset_id(self, workspace_id: str, report_id: str) -> str: ...
+
     def list_workspaces(self) -> list[dict[str, Any]]: ...
 
 
@@ -344,9 +346,16 @@ def resolve_report(
     resolved_env: ResolvedEnvironment,
     client: ServiceClient,
 ) -> ResolvedReport:
-    """Resolve a report and infer its dataset/semantic-model dependency."""
+    """Resolve a report and its bound semantic model (dataset)."""
     resolved = resolve_item(name, "Report", resolved_env, client)
-    dataset_id = resolved.item_id  # Fallback when dependency API unavailable.
+    dataset_id = client.get_report_dataset_id(
+        resolved.workspace_id, resolved.item_id
+    )
+    if not dataset_id:
+        # Report exists but isn't bound to a dataset (or the client
+        # couldn't determine one) -- fall back to the report's own ID
+        # rather than failing resolution outright.
+        dataset_id = resolved.item_id
     return ResolvedReport(
         workspace_id=resolved.workspace_id,
         report_id=resolved.item_id,
