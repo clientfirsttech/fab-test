@@ -4,7 +4,7 @@ Guiding vision and constraints: [vision.md](vision.md)
 
 ## Active Epics
 
-- [Playwright Report Detail](tasks/playwright-report-detail-epic.md) — 📋 PLANNED. `fab-test playwright` currently reports every generated test case as identically failed on any failure and zero findings on any pass, and never links the screenshot/console/network evidence the pytest spec already captures per case. Confirmed live: `SampleModel-PQLAssert` hit a real Power BI "Something went wrong" embed error and the report said only "1 finding(s)" with no detail or evidence path. Extends the `test_results` pattern BPA/pql-test already got in HTML Report Format — deferred there, deferred again in Human-Readable Reports, now scoped as its own epic.
+- [Sort Direction Indicator](tasks/sort-direction-indicator-epic.md) — 📋 PLANNED. Follow-up to Search and Sort for Test Result Tables: clicking a column header sorts the full-list report table but shows no arrow for which column or direction, so a reader loses track after scanning the search box or a status filter. Adds a toggling ▲/▼ on the active column's header, cleared from any previously-sorted column.
 
 - [Fab-Test Module Split](tasks/fab-test-module-split-epic.md) — 📋 PLANNED. Follow-up to Test Module Split: `src/fabric_ci_cd_dataops/scripts/fab_test.py` is 2,867 lines against the 800-line hard budget in `tests/test_module_budget.py` and carries a named exemption there instead of a raised budget. Splits the parser, telemetry, per-artifact execution, admin subcommands, and the `local` bundle into their own modules behind the same `fab_test.py` entry point, now that its tests are already split behind it.
 

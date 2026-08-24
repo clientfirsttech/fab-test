@@ -149,6 +149,70 @@ def fix_favicon_link(report_path: Path, inspector_path: Path) -> None:
         report_path.write_text(html, encoding="utf-8")
 
 
+_BROKEN_IMAGE_SRC_MARKER = 'return "PBIInspectorPNG\\\\" + this.Id + ".png"'
+_INLINE_IMAGE_LOOKUP = "window.__pbirScreenshots"
+
+
+def _inline_png_map(folder: Path) -> dict[str, str]:
+    """Return ``{file stem: data URI}`` for every PNG in ``folder``.
+
+    A file that cannot be read is skipped rather than failing the whole
+    map -- one corrupt screenshot should not cost every other one its fix.
+    """
+    images: dict[str, str] = {}
+    for png in sorted(folder.glob("*.png")):
+        try:
+            images[png.stem] = "data:image/png;base64," + base64.b64encode(
+                png.read_bytes()
+            ).decode("ascii")
+        except OSError:
+            continue
+    return images
+
+
+def fix_screenshot_images(report_path: Path) -> None:
+    """Inline TestRun.html's per-object screenshots as base64 data URIs.
+
+    FabInspCLI's own template builds each screenshot's ``src`` as
+    ``PBIInspectorPNG\\<Id>.png`` -- a Windows-style relative path that
+    404s the moment the report is opened from somewhere that didn't keep
+    that exact sibling folder alongside it. The screenshots already ship
+    next to the report (``PBIInspectorPNG/``), so they are read once and
+    inlined the same way the favicon and the wireframe placeholder
+    already are, via a lookup table the template's own ``src`` function
+    checks first.
+
+    Never raises: a missing ``PBIInspectorPNG`` folder, a report that no
+    longer contains the expected template marker, or a file that cannot
+    be read all leave the report untouched -- the same contract
+    ``fix_favicon_link`` has. Also a no-op if the fix already ran once:
+    the lookup table it injects is itself the marker that it has.
+    """
+    folder = report_path.parent / "PBIInspectorPNG"
+    if not report_path.is_file() or not folder.is_dir():
+        return
+    try:
+        html = report_path.read_text(encoding="utf-8-sig")
+    except OSError:
+        return
+    if _BROKEN_IMAGE_SRC_MARKER not in html or _INLINE_IMAGE_LOOKUP in html:
+        return
+    images = _inline_png_map(folder)
+    if not images:
+        return
+    # </ is escaped so a filename cannot prematurely close the <script> tag.
+    payload = json.dumps(images).replace("</", "<\\/")
+    lookup_script = f"<script>{_INLINE_IMAGE_LOOKUP} = {payload};</script>"
+    fixed_src = (
+        f"return ({_INLINE_IMAGE_LOOKUP} && {_INLINE_IMAGE_LOOKUP}[this.Id]) "
+        '|| ("PBIInspectorPNG\\\\" + this.Id + ".png")'
+    )
+    html = html.replace(_BROKEN_IMAGE_SRC_MARKER, fixed_src)
+    html = html.replace("</head>", f"{lookup_script}</head>", 1) if "</head>" in html else lookup_script + html
+    with contextlib.suppress(OSError):
+        report_path.write_text(html, encoding="utf-8")
+
+
 def write_results(
     output_path: Path,
     status: str,
@@ -159,6 +223,7 @@ def write_results(
     native_out: "Path | None" = None,
     native_html_out: "Path | None" = None,
     duration_ms: int = 0,
+    test_results: list[dict[str, Any]] | None = None,
 ) -> None:
     """Write standardized PBIR Inspector envelope JSON."""
     env = build_envelope(
@@ -173,6 +238,10 @@ def write_results(
     env["rules_file"] = str(rules_path)
     if native_html_out is not None:
         env["native_html_output_path"] = str(native_html_out)
+    # Additive: every rule PBIR Inspector evaluated, passed or failed --
+    # `findings` stays violations-only for callers already reading that
+    # meaning. Mirrors BPA's `test_results` (HTML Report Format epic).
+    env["test_results"] = test_results or []
     write_envelope(output_path, env)
 
 
@@ -306,6 +375,26 @@ def _normalize_finding(finding: dict[str, Any]) -> dict[str, Any]:
         "object": finding.get("ParentDisplayName") or "",
         "message": finding.get("Message") or "",
     }
+
+
+def _pbir_status(finding: dict[str, Any]) -> str:
+    """Map a PBIR finding to the pass/error/warning vocabulary test_results shares."""
+    if _is_error_finding(finding):
+        return "error"
+    if _is_warning_finding(finding):
+        return "warning"
+    return "pass"
+
+
+def _pbir_test_results(raw_findings: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Return one row per rule result PBIR Inspector evaluated, passed or failed.
+
+    ``findings`` stays violations-only for the callers already reading
+    that meaning (exit code, printed table); this is the full list --
+    additive, same as BPA's ``_bpa_test_results`` -- so telemetry can see
+    what ran even on a run with nothing to report.
+    """
+    return [{**_normalize_finding(f), "status": _pbir_status(f)} for f in raw_findings]
 
 
 def _print_findings_table(findings: list[dict[str, Any]]) -> None:
@@ -479,11 +568,9 @@ def run_inspector(args: argparse.Namespace) -> int:
     if not raw_text.strip() and proc.stdout:
         raw_text = proc.stdout
 
-    findings = [
-        _normalize_finding(f)
-        for f in parse_findings(raw_text)
-        if _is_violation(f)
-    ]
+    raw_findings = parse_findings(raw_text)
+    findings = [_normalize_finding(f) for f in raw_findings if _is_violation(f)]
+    test_results = _pbir_test_results(raw_findings)
 
     has_errors = any(f["severity"] == "error" for f in findings)
 
@@ -492,6 +579,7 @@ def run_inspector(args: argparse.Namespace) -> int:
         if html_files:
             native_html_out = html_files[0]
             fix_favicon_link(native_html_out, inspector_path)
+            fix_screenshot_images(native_html_out)
 
     error_count = sum(1 for f in findings if f.get("severity") == "error")
     warning_count = sum(1 for f in findings if f.get("severity") == "warning")
@@ -508,6 +596,7 @@ def run_inspector(args: argparse.Namespace) -> int:
             native_out=native_out,
             native_html_out=native_html_out,
             duration_ms=timer.elapsed_ms,
+            test_results=test_results,
         )
         if level >= _VERBOSITY_LEVELS["default"]:
             log(f"✅ {message}")
@@ -533,6 +622,7 @@ def run_inspector(args: argparse.Namespace) -> int:
         native_out=native_out,
         native_html_out=native_html_out,
         duration_ms=timer.elapsed_ms,
+        test_results=test_results,
     )
 
     if level >= _VERBOSITY_LEVELS["default"]:

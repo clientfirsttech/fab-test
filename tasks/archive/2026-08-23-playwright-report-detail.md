@@ -1,6 +1,6 @@
 # Playwright Report Detail Epic
 
-**Status**: 📋 PLANNED
+**Status**: ✅ COMPLETED (2026-08-23)
 **Goal**: Make `fab-test playwright` output as evidence-rich as the BPA/pql-test reports it sits beside.
 
 ## Overview

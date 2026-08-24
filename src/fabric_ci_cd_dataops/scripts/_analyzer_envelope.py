@@ -151,6 +151,10 @@ def normalize_test_results(test_results: list[dict]) -> tuple[str, list[tuple]]:
     }
 
     if is_test_finding(test_results[0]):
+        # `evidence` is additive: only Playwright's rows carry it (screenshot/
+        # console/network paths for that case), so pql-test rows just end up
+        # with `{}` here -- falsy, so `_report_html` renders them exactly as
+        # it did before this column existed.
         rows = [
             (
                 f.get("suite_name") or "?",
@@ -158,6 +162,7 @@ def normalize_test_results(test_results: list[dict]) -> tuple[str, list[tuple]]:
                 f.get("expected") or "",
                 f.get("actual") or "",
                 _test_result_status(f),
+                f.get("evidence") or {},
             )
             for f in test_results
         ]

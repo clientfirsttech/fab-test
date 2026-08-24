@@ -1,6 +1,6 @@
 # Search and Sort for Test Result Tables Epic
 
-**Status**: 📋 PLANNED
+**Status**: ✅ COMPLETED (2026-08-23)
 **Goal**: Let a reader search and sort the full BPA/pql-test result tables without leaving the report.
 
 ## Overview

@@ -19,11 +19,16 @@ import pathlib
 import pytest
 
 from fabric_ci_cd_dataops.scripts._analyzer_envelope import (
-    build_envelope,
     normalize_findings,
     normalize_test_results,
 )
 from fabric_ci_cd_dataops.scripts._report_html import render_report, write_report
+from tests.conftest import (
+    _BPA_FAILED_RULE,
+    _BPA_PASSED_RULE,
+    _envelope,
+    _envelope_with_test_results,
+)
 
 _BPA_FINDING = {
     "RuleName": "[Performance] Do not use floating point data types",
@@ -45,22 +50,6 @@ _PQL_FINDING = {
     "actual": "99",
     "passed": False,
 }
-_BPA_PASSED_RULE = {
-    "RuleName": "Avoid bi-directional relationships",
-    "RuleID": "PERF_01",
-    "Severity": "2",
-    "Category": "Performance",
-    "ObjectName": "",
-    "status": "pass",
-}
-_BPA_FAILED_RULE = {
-    "RuleName": "Add descriptions to measures",
-    "RuleID": "MAINT_02",
-    "Severity": "3",
-    "Category": "Maintenance",
-    "ObjectName": "[Total Sales]",
-    "status": "error",
-}
 _PQL_PASSED_TEST = {
     "suite_name": "Revenue",
     "test_name": "total matches source",
@@ -68,17 +57,6 @@ _PQL_PASSED_TEST = {
     "actual": "100",
     "passed": True,
 }
-
-
-def _envelope(findings=None, **overrides):
-    base = {
-        "analyzer": "bpa",
-        "artifact_path": "Sales.SemanticModel",
-        "status": "passed",
-        "findings": findings if findings is not None else [],
-    }
-    base.update(overrides)
-    return build_envelope(**base)
 
 
 # --------------------------------------------------------------------------- #
@@ -254,12 +232,6 @@ def test_render_is_deterministic():
 # --------------------------------------------------------------------------- #
 
 
-def _envelope_with_test_results(test_results, **overrides):
-    env = _envelope([], **overrides)
-    env["test_results"] = test_results
-    return env
-
-
 @pytest.mark.fab_test
 def test_a_populated_test_results_field_renders_every_row_not_only_failures():
     """Given a passed rule and a failed rule, both rows should render."""
@@ -292,17 +264,6 @@ def test_full_list_rows_carry_a_data_status_attribute():
 
     assert 'data-status="pass"' in html
     assert 'data-status="error"' in html
-
-
-@pytest.mark.fab_test
-def test_full_list_filter_control_uses_no_javascript():
-    """Self-contained-report guarantee must hold for the new filter markup too."""
-    html = render_report(
-        _envelope_with_test_results([_BPA_PASSED_RULE, _BPA_FAILED_RULE])
-    )
-
-    for forbidden in ("http://", "https://", "<script", "<link ", "onclick"):
-        assert forbidden not in html, f"external or scripted reference: {forbidden}"
 
 
 @pytest.mark.fab_test

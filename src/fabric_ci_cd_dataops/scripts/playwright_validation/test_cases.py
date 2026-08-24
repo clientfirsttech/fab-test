@@ -10,11 +10,23 @@ from __future__ import annotations
 
 import csv
 import json
+import re
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
 from .config import PlaywrightValidationConfig
+
+
+def sanitize_case_id(test_case: str | None) -> str:
+    """Return a filesystem/pytest-node-safe id for one test case.
+
+    Shared by the pytest spec (which names the case's evidence directory)
+    and ``invoke_playwright.py`` (which has to find that same directory
+    afterwards to read it back) -- the two must agree on the exact
+    sanitization or the wrapper looks in a directory the spec never wrote.
+    """
+    return re.sub(r"[^\w\-]", "_", test_case or "unknown").strip("_")
 
 
 @dataclass(frozen=True)
