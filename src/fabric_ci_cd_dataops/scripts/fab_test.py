@@ -1545,6 +1545,27 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="ID",
         help="Semantic model / dataset ID override",
     )
+    playwright_p.add_argument(
+        "--pages",
+        choices=["auto", "none"],
+        default="auto",
+        dest="pages",
+        help=(
+            "Discover every report page and its own bookmarks by default. "
+            "'none' tests only the default page (default: auto)"
+        ),
+    )
+    playwright_p.add_argument(
+        "--roles",
+        choices=["auto", "none"],
+        default="auto",
+        dest="roles",
+        help=(
+            "Discover RLS/OLS roles and test the page matrix under each one "
+            "when RLS is enabled. 'none' tests only PLAYWRIGHT_ROLE "
+            "(default: auto)"
+        ),
+    )
 
     # --- playwright-impact ---
     impact_p = subs.add_parser(

@@ -68,8 +68,9 @@ def test_get_report_pages_returns_normalized_ids(client: FabricRestClient) -> No
     ]
 
 
-def test_get_report_bookmarks_parses_definition(client: FabricRestClient) -> None:
-    """Bookmarks are parsed from the base64-encoded bookmarks.json part."""
+def test_get_report_bookmarks_parses_flat_definition(client: FabricRestClient) -> None:
+    """Bookmarks are parsed from the legacy base64-encoded bookmarks.json part,
+    tagged with the page named in each bookmark's exploration state."""
     import base64
     import json
 
@@ -77,7 +78,11 @@ def test_get_report_bookmarks_parses_definition(client: FabricRestClient) -> Non
         json.dumps(
             {
                 "bookmarks": [
-                    {"name": "bmk1", "displayName": "Bookmark One"},
+                    {
+                        "name": "bmk1",
+                        "displayName": "Bookmark One",
+                        "explorationState": {"activeSection": "page1"},
+                    },
                     {"name": "bmk2"},
                 ]
             }
@@ -100,9 +105,182 @@ def test_get_report_bookmarks_parses_definition(client: FabricRestClient) -> Non
         bookmarks = client.get_report_bookmarks("ws-1", "rpt-1")
 
     assert bookmarks == [
-        {"bookmark_id": "bmk1", "bookmark_name": "Bookmark One"},
-        {"bookmark_id": "bmk2", "bookmark_name": "bmk2"},
+        {"bookmark_id": "bmk1", "bookmark_name": "Bookmark One", "page_id": "page1"},
+        {"bookmark_id": "bmk2", "bookmark_name": "bmk2", "page_id": ""},
     ]
+
+
+def test_get_report_bookmarks_expands_a_group_into_its_children(
+    client: FabricRestClient,
+) -> None:
+    """A bookmark group in the flat index carries no state of its own --
+    its children are tested, not the group itself."""
+    import base64
+    import json
+
+    bookmarks_payload = base64.b64encode(
+        json.dumps(
+            {
+                "bookmarks": [
+                    {
+                        "name": "group1",
+                        "displayName": "Group One",
+                        "children": [
+                            {
+                                "name": "child1",
+                                "displayName": "Child One",
+                                "explorationState": {"activeSection": "page1"},
+                            },
+                        ],
+                    },
+                ]
+            }
+        ).encode("utf-8")
+    ).decode("utf-8")
+    data = {
+        "definition": {
+            "parts": [
+                {"path": "definition/bookmarks.json", "payload": bookmarks_payload},
+            ]
+        }
+    }
+    with patch(
+        "fabric_ci_cd_dataops.scripts.playwright_validation.service_client.requests.request",
+        return_value=_mock_response(data),
+    ):
+        bookmarks = client.get_report_bookmarks("ws-1", "rpt-1")
+
+    assert bookmarks == [
+        {"bookmark_id": "child1", "bookmark_name": "Child One", "page_id": "page1"},
+    ]
+
+
+def test_get_report_bookmarks_parses_pbir_bookmark_files(
+    client: FabricRestClient,
+) -> None:
+    """Bookmarks are parsed from per-file PBIR ``definition/bookmarks/*.bookmark.json``
+    parts, each tagged with the page its exploration state targets."""
+    import base64
+    import json
+
+    payload = base64.b64encode(
+        json.dumps(
+            {
+                "name": "bmk1",
+                "displayName": "Bookmark One",
+                "explorationState": {"activeSection": "page1"},
+            }
+        ).encode("utf-8")
+    ).decode("utf-8")
+    data = {
+        "definition": {
+            "parts": [
+                {
+                    "path": "definition/bookmarks/bmk1.bookmark.json",
+                    "payload": payload,
+                },
+                {
+                    "path": "definition/bookmarks/bookmarks.json",
+                    "payload": base64.b64encode(b"{}").decode("utf-8"),
+                },
+            ]
+        }
+    }
+    with patch(
+        "fabric_ci_cd_dataops.scripts.playwright_validation.service_client.requests.request",
+        return_value=_mock_response(data),
+    ):
+        bookmarks = client.get_report_bookmarks("ws-1", "rpt-1")
+
+    assert bookmarks == [
+        {"bookmark_id": "bmk1", "bookmark_name": "Bookmark One", "page_id": "page1"},
+    ]
+
+
+def test_get_report_bookmarks_skips_a_pbir_group_files_own_part(
+    client: FabricRestClient,
+) -> None:
+    """A PBIR bookmark group's own ``*.bookmark.json`` lists children rather
+    than exploration state, and is skipped -- each child has its own part."""
+    import base64
+    import json
+
+    group_payload = base64.b64encode(
+        json.dumps({"name": "group1", "children": ["child1"]}).encode("utf-8")
+    ).decode("utf-8")
+    child_payload = base64.b64encode(
+        json.dumps(
+            {
+                "name": "child1",
+                "displayName": "Child One",
+                "explorationState": {"activeSection": "page1"},
+            }
+        ).encode("utf-8")
+    ).decode("utf-8")
+    data = {
+        "definition": {
+            "parts": [
+                {"path": "definition/bookmarks/group1.bookmark.json", "payload": group_payload},
+                {"path": "definition/bookmarks/child1.bookmark.json", "payload": child_payload},
+            ]
+        }
+    }
+    with patch(
+        "fabric_ci_cd_dataops.scripts.playwright_validation.service_client.requests.request",
+        return_value=_mock_response(data),
+    ):
+        bookmarks = client.get_report_bookmarks("ws-1", "rpt-1")
+
+    assert bookmarks == [
+        {"bookmark_id": "child1", "bookmark_name": "Child One", "page_id": "page1"},
+    ]
+
+
+def test_get_semantic_model_roles_reads_role_file_names(
+    client: FabricRestClient,
+) -> None:
+    """Role names come from ``definition/roles/<name>.tmdl`` part paths."""
+    data = {
+        "definition": {
+            "parts": [
+                {"path": "definition/roles/Manager.tmdl", "payload": ""},
+                {"path": "definition/roles/Analyst.tmdl", "payload": ""},
+                {"path": "definition/tables/Sales.tmdl", "payload": ""},
+            ]
+        }
+    }
+    with patch(
+        "fabric_ci_cd_dataops.scripts.playwright_validation.service_client.requests.request",
+        return_value=_mock_response(data),
+    ):
+        roles = client.get_semantic_model_roles("ws-1", "sm-1")
+
+    assert roles == ["Manager", "Analyst"]
+
+
+def test_get_semantic_model_roles_returns_empty_on_404(
+    client: FabricRestClient,
+) -> None:
+    """A semantic model with no PBIP definition yields no roles, not an error."""
+    with patch(
+        "fabric_ci_cd_dataops.scripts.playwright_validation.service_client.requests.request",
+        return_value=_mock_response({}, status_code=404),
+    ):
+        roles = client.get_semantic_model_roles("ws-1", "sm-1")
+
+    assert roles == []
+
+
+def test_get_report_bookmarks_returns_empty_on_404(client: FabricRestClient) -> None:
+    """A report with no PBIR definition yields no bookmarks, not an error --
+    pages and roles are still worth testing without it."""
+    with patch(
+        "fabric_ci_cd_dataops.scripts.playwright_validation.service_client.requests.request",
+        return_value=_mock_response({}, status_code=404),
+    ):
+        bookmarks = client.get_report_bookmarks("ws-1", "rpt-1")
+
+    assert bookmarks == []
 
 
 def test_get_dependent_reports_returns_reports(client: FabricRestClient) -> None:

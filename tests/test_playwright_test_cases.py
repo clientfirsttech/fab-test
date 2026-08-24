@@ -9,11 +9,13 @@ import pytest
 
 from fabric_ci_cd_dataops.scripts.playwright_validation.config import PlaywrightValidationConfig
 from fabric_ci_cd_dataops.scripts.playwright_validation.test_cases import (
-    TestCase as PlaywrightTestCase,
-)
-from fabric_ci_cd_dataops.scripts.playwright_validation.test_cases import (
+    DiscoveredBookmark,
+    DiscoveredPage,
     generate_test_cases,
     write_test_cases,
+)
+from fabric_ci_cd_dataops.scripts.playwright_validation.test_cases import (
+    TestCase as PlaywrightTestCase,
 )
 
 
@@ -89,6 +91,59 @@ def test_generate_cartesian_product(base_config: PlaywrightValidationConfig) -> 
     assert cases[0].page_name == "p1"
     assert cases[0].bookmark_id == "b1"
     assert cases[1].test_case == "SalesReport_p2_b1"
+
+
+def test_discovered_pages_emit_baseline_plus_own_bookmarks_only(
+    base_config: PlaywrightValidationConfig,
+) -> None:
+    """Each page gets a baseline case plus one case per its own bookmark --
+    never a bookmark belonging to a different page."""
+    pages = [
+        DiscoveredPage(
+            page_id="page1",
+            page_name="Page One",
+            bookmarks=[DiscoveredBookmark(bookmark_id="bmk1", bookmark_name="Bookmark One")],
+        ),
+        DiscoveredPage(page_id="page2", page_name="Page Two", bookmarks=[]),
+    ]
+
+    cases = generate_test_cases(base_config, pages=pages)
+
+    assert [(c.page_id, c.bookmark_id) for c in cases] == [
+        ("page1", ""),
+        ("page1", "bmk1"),
+        ("page2", ""),
+    ]
+    assert cases[1].test_case == "SalesReport_page1_bmk1"
+
+
+def test_discovered_matrix_repeats_once_per_role(
+    base_config: PlaywrightValidationConfig,
+) -> None:
+    """The page/bookmark matrix is emitted once per role, and each case
+    records its own role -- never a shared token across roles."""
+    pages = [DiscoveredPage(page_id="page1", page_name="Page One", bookmarks=[])]
+
+    cases = generate_test_cases(base_config, pages=pages, roles=["Manager", "Analyst"])
+
+    assert [(c.role, c.test_case) for c in cases] == [
+        ("Manager", "SalesReport_page1_no-bookmark_role-Manager"),
+        ("Analyst", "SalesReport_page1_no-bookmark_role-Analyst"),
+    ]
+
+
+def test_discovered_matrix_with_no_roles_uses_configured_role(
+    base_config: PlaywrightValidationConfig,
+) -> None:
+    """No discovered roles falls back to the single configured role, matching
+    the legacy single-role id shape."""
+    pages = [DiscoveredPage(page_id="page1", page_name="Page One", bookmarks=[])]
+
+    cases = generate_test_cases(base_config, pages=pages, roles=[])
+
+    assert len(cases) == 1
+    assert cases[0].role == ""
+    assert cases[0].test_case == "SalesReport_page1_no-bookmark"
 
 
 def test_write_test_cases_creates_csv_and_json(

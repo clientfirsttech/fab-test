@@ -77,7 +77,7 @@ def _run_main(tmp_path: Path, output_path: Path, test_cases_dir: Path):
             return_value=_config(),
         ),
         patch(
-            "fabric_ci_cd_dataops.scripts.invoke_playwright.get_embed_context",
+            "fabric_ci_cd_dataops.scripts.playwright_validation.discovery.get_embed_context",
             return_value=embed_context,
         ),
         patch(

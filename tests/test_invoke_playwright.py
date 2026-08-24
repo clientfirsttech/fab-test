@@ -175,7 +175,11 @@ def test_main_writes_envelope_and_returns_zero_on_success(
 
     with (
         patch("fabric_ci_cd_dataops.scripts.invoke_playwright.load_config", return_value=config),
-        patch("fabric_ci_cd_dataops.scripts.invoke_playwright.get_embed_context", return_value=embed_context),
+        patch("fabric_ci_cd_dataops.scripts.invoke_playwright.resolve_discovery", return_value=(None, None)),
+        patch(
+            "fabric_ci_cd_dataops.scripts.playwright_validation.discovery.get_embed_context",
+            return_value=embed_context,
+        ),
         patch("fabric_ci_cd_dataops.scripts.invoke_playwright._run_pytest", return_value=completed),
         patch("fabric_ci_cd_dataops.scripts.invoke_playwright._repo_root", return_value=tmp_path),
     ):
@@ -208,7 +212,11 @@ def test_main_writes_envelope_and_returns_one_on_failure(
 
     with (
         patch("fabric_ci_cd_dataops.scripts.invoke_playwright.load_config", return_value=config),
-        patch("fabric_ci_cd_dataops.scripts.invoke_playwright.get_embed_context", return_value=embed_context),
+        patch("fabric_ci_cd_dataops.scripts.invoke_playwright.resolve_discovery", return_value=(None, None)),
+        patch(
+            "fabric_ci_cd_dataops.scripts.playwright_validation.discovery.get_embed_context",
+            return_value=embed_context,
+        ),
         patch("fabric_ci_cd_dataops.scripts.invoke_playwright._run_pytest", return_value=completed),
         patch("fabric_ci_cd_dataops.scripts.invoke_playwright._repo_root", return_value=tmp_path),
     ):
@@ -228,8 +236,9 @@ def test_main_returns_one_on_api_error(
 
     with (
         patch("fabric_ci_cd_dataops.scripts.invoke_playwright.load_config", return_value=config),
+        patch("fabric_ci_cd_dataops.scripts.invoke_playwright.resolve_discovery", return_value=(None, None)),
         patch(
-            "fabric_ci_cd_dataops.scripts.invoke_playwright.get_embed_context",
+            "fabric_ci_cd_dataops.scripts.playwright_validation.discovery.get_embed_context",
             side_effect=PowerBiApiError("boom", 400),
         ),
         patch("fabric_ci_cd_dataops.scripts.invoke_playwright._repo_root", return_value=tmp_path),
@@ -240,6 +249,36 @@ def test_main_returns_one_on_api_error(
     data = output_path.read_text(encoding="utf-8")
     assert '"status": "error"' in data
     assert "boom" in data
+
+
+def test_discovered_roles_without_user_name_fail_before_minting_a_token(
+    config: PlaywrightValidationConfig,
+    tmp_path: Path,
+) -> None:
+    """Discovered roles with no PLAYWRIGHT_USER_NAME abort before any embed
+    token is minted -- GenerateToken silently drops the RLS identity when
+    the username is empty, so the run would otherwise pass while testing
+    no role at all."""
+    output_path = tmp_path / "envelope.json"
+
+    with (
+        patch("fabric_ci_cd_dataops.scripts.invoke_playwright.load_config", return_value=config),
+        patch(
+            "fabric_ci_cd_dataops.scripts.invoke_playwright.resolve_discovery",
+            return_value=(None, ["Manager"]),
+        ),
+        patch(
+            "fabric_ci_cd_dataops.scripts.invoke_playwright.acquire_embed_configs"
+        ) as mock_acquire,
+    ):
+        code = main(["--env-file", ".env", "--output-path", str(output_path)])
+
+    assert code == 1
+    mock_acquire.assert_not_called()
+    data = output_path.read_text(encoding="utf-8")
+    assert '"status": "error"' in data
+    assert "PLAYWRIGHT_USER_NAME" in data
+    assert "Manager" in data
 
 
 def test_resolution_exception_writes_envelope_instead_of_a_traceback(
@@ -288,8 +327,9 @@ def test_main_returns_one_on_unexpected_exception(
 
     with (
         patch("fabric_ci_cd_dataops.scripts.invoke_playwright.load_config", return_value=config),
+        patch("fabric_ci_cd_dataops.scripts.invoke_playwright.resolve_discovery", return_value=(None, None)),
         patch(
-            "fabric_ci_cd_dataops.scripts.invoke_playwright.get_embed_context",
+            "fabric_ci_cd_dataops.scripts.playwright_validation.discovery.get_embed_context",
             side_effect=ValueError("Unable to parse QueryString"),
         ),
         patch("fabric_ci_cd_dataops.scripts.invoke_playwright._repo_root", return_value=tmp_path),
@@ -312,8 +352,9 @@ def test_unexpected_exception_writes_error_annotation_to_stderr(
 
     with (
         patch("fabric_ci_cd_dataops.scripts.invoke_playwright.load_config", return_value=config),
+        patch("fabric_ci_cd_dataops.scripts.invoke_playwright.resolve_discovery", return_value=(None, None)),
         patch(
-            "fabric_ci_cd_dataops.scripts.invoke_playwright.get_embed_context",
+            "fabric_ci_cd_dataops.scripts.playwright_validation.discovery.get_embed_context",
             side_effect=RuntimeError("boom"),
         ),
         patch("fabric_ci_cd_dataops.scripts.invoke_playwright._repo_root", return_value=tmp_path),
@@ -383,7 +424,11 @@ def test_resolution_failure_in_impact_run_leaves_other_artifacts_intact(
             return_value=config,
         ),
         patch(
-            "fabric_ci_cd_dataops.scripts.invoke_playwright.get_embed_context",
+            "fabric_ci_cd_dataops.scripts.invoke_playwright.resolve_discovery",
+            return_value=(None, None),
+        ),
+        patch(
+            "fabric_ci_cd_dataops.scripts.playwright_validation.discovery.get_embed_context",
             side_effect=fake_get_embed_context,
         ),
         patch(

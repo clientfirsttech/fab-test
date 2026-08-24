@@ -11,7 +11,7 @@ from __future__ import annotations
 import csv
 import json
 import re
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -57,13 +57,75 @@ def _default_bookmark() -> tuple[str, str]:
     return "", ""
 
 
-def generate_test_cases(config: PlaywrightValidationConfig) -> list[TestCase]:
-    """Expand a config into a list of ``TestCase`` records.
+@dataclass(frozen=True)
+class DiscoveredBookmark:
+    """One bookmark, already known to belong to a specific page."""
 
-    Pages without an explicit name use the id as the name. Bookmarks without an
-    explicit name use the id as the name. If ``page_ids`` is empty, a single empty
-    page dimension is emitted. If ``bookmark_ids`` is empty, a single empty
-    bookmark dimension is emitted.
+    bookmark_id: str
+    bookmark_name: str
+
+
+@dataclass(frozen=True)
+class DiscoveredPage:
+    """One report page plus the bookmarks discovered to target it."""
+
+    page_id: str
+    page_name: str
+    bookmarks: list[DiscoveredBookmark] = field(default_factory=list)
+
+
+def _case_id(report_name: str, page_id: str, bookmark_id: str, role: str) -> str:
+    """Build a test-case id that cannot collide across page/bookmark/role.
+
+    Shared by the legacy cartesian path and the discovered-matrix path so
+    both id shapes stay compatible; the ``role`` segment is omitted when
+    empty so single-role runs keep today's id exactly.
+    """
+    return "_".join(
+        part
+        for part in [
+            report_name,
+            page_id or "default-page",
+            bookmark_id or "no-bookmark",
+            f"role-{role}" if role else "",
+        ]
+        if part
+    )
+
+
+def _build_case(
+    config: PlaywrightValidationConfig,
+    *,
+    page_id: str,
+    page_name: str,
+    bookmark_id: str,
+    bookmark_name: str,
+    role: str,
+) -> TestCase:
+    """Build one ``TestCase`` for a page/bookmark/role combination."""
+    return TestCase(
+        test_case=_case_id(config.report_name, page_id, bookmark_id, role),
+        report_name=config.report_name,
+        report_id=config.report_id,
+        workspace_id=config.workspace_id,
+        page_id=page_id,
+        page_name=page_name,
+        bookmark_id=bookmark_id,
+        bookmark_name=bookmark_name,
+        dataset_id=config.dataset_id,
+        user_name=config.user_name,
+        role=role,
+        report_type=getattr(config, "report_type", "report"),
+    )
+
+
+def _generate_cartesian_cases(config: PlaywrightValidationConfig) -> list[TestCase]:
+    """Cross every page id with every bookmark id under the one configured role.
+
+    This is the legacy shape, used whenever the caller has not supplied a
+    discovered page/bookmark matrix -- an explicit ``--page-ids`` or
+    ``--bookmark-ids`` override, or a run with discovery disabled. Pages and
+    bookmarks without an explicit name use the id as the name.
     """
     pages = config.page_ids or [""]
     bookmarks = config.bookmark_ids or [""]
@@ -75,33 +137,73 @@ def generate_test_cases(config: PlaywrightValidationConfig) -> list[TestCase]:
             bookmark_id, bookmark_name = (
                 (bookmark, bookmark) if bookmark else _default_bookmark()
             )
-            case_id = "_".join(
-                part
-                for part in [
-                    config.report_name,
-                    page_id or "default-page",
-                    bookmark_id or "no-bookmark",
-                ]
-                if part
-            )
             cases.append(
-                TestCase(
-                    test_case=case_id,
-                    report_name=config.report_name,
-                    report_id=config.report_id,
-                    workspace_id=config.workspace_id,
+                _build_case(
+                    config,
                     page_id=page_id,
                     page_name=page_name,
                     bookmark_id=bookmark_id,
                     bookmark_name=bookmark_name,
-                    dataset_id=config.dataset_id,
-                    user_name=config.user_name,
                     role=config.role,
-                    report_type=getattr(config, "report_type", "report"),
                 )
             )
-
     return cases
+
+
+def _generate_discovered_cases(
+    config: PlaywrightValidationConfig,
+    pages: list[DiscoveredPage],
+    roles: list[str],
+) -> list[TestCase]:
+    """Emit one baseline case per page plus one case per page's own bookmark,
+    repeated for each role -- never a page paired with another page's
+    bookmark, and never one token asked to cover two roles.
+    """
+    cases: list[TestCase] = []
+    for role in roles or [""]:
+        for page in pages:
+            cases.append(
+                _build_case(
+                    config,
+                    page_id=page.page_id,
+                    page_name=page.page_name,
+                    bookmark_id="",
+                    bookmark_name="",
+                    role=role,
+                )
+            )
+            cases.extend(
+                _build_case(
+                    config,
+                    page_id=page.page_id,
+                    page_name=page.page_name,
+                    bookmark_id=bookmark.bookmark_id,
+                    bookmark_name=bookmark.bookmark_name,
+                    role=role,
+                )
+                for bookmark in page.bookmarks
+            )
+    return cases
+
+
+def generate_test_cases(
+    config: PlaywrightValidationConfig,
+    *,
+    pages: list[DiscoveredPage] | None = None,
+    roles: list[str] | None = None,
+) -> list[TestCase]:
+    """Expand a config into a list of ``TestCase`` records.
+
+    Without ``pages``, crosses ``config.page_ids`` with ``config.bookmark_ids``
+    (or a single empty dimension for either that is unset) under the one
+    configured role -- the legacy shape, still used for an explicit
+    ``--page-ids``/``--bookmark-ids`` override. With ``pages`` (a discovered
+    matrix), each page's own bookmarks are used instead of every bookmark in
+    the report, and the whole matrix repeats once per entry in ``roles``.
+    """
+    if pages is not None:
+        return _generate_discovered_cases(config, pages, roles or [config.role])
+    return _generate_cartesian_cases(config)
 
 
 def _test_case_to_dict(case: TestCase) -> dict[str, Any]:
