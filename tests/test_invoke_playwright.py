@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import subprocess
+import tomllib
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+
+_ROOT = Path(__file__).resolve().parent.parent
 
 # Match the import path used by invoke_playwright.py so exception classes compare
 # equal when patched.
@@ -110,6 +113,18 @@ def test_write_findings_on_failure() -> None:
     assert findings[0]["severity"] == "error"
     assert findings[0]["object"] == "Report_default-page_no-bookmark"
     assert findings[0]["message"] == "render timeout"
+
+
+@pytest.mark.fab_test
+def test_pytest_html_and_pytest_playwright_are_dev_dependencies() -> None:
+    """`_run_pytest` passes `--html`/`--self-contained-html`, and the spec needs
+    `pytest-playwright`'s fixtures. A fresh `pip install -e ".[dev]"` must provide
+    both, or pytest rejects the flags as unrecognized (as it did in production)."""
+    pyproject = tomllib.loads((_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    dev = pyproject["project"]["optional-dependencies"]["dev"]
+
+    assert any(d.startswith("pytest-html") for d in dev), dev
+    assert any(d.startswith("pytest-playwright") for d in dev), dev
 
 
 def test_build_env_for_pytest_sets_expected_vars(
