@@ -279,6 +279,14 @@ class FabricServiceClient(ServiceClient):
             if report.get("datasetId") == semantic_model_id
         ]
 
+    def get_report_dataset_id(self, workspace_id: str, report_id: str) -> str:
+        """Return the semantic model (dataset) ID a report is bound to."""
+        data = self._rest_request(
+            "GET",
+            f"/v1.0/myorg/groups/{workspace_id}/reports/{report_id}",
+        )
+        return str(data.get("datasetId", ""))
+
 
 def build_fabric_service_client(
     *,
