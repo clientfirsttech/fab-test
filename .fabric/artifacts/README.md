@@ -29,13 +29,15 @@ Changed artifacts are published to `changed-artifacts.json` for downstream proce
 
 ## Artifact Types
 
-Artifact types are mapped in `.github/metadata/artifact-map.json`.
+Artifact types are mapped in `artifact-map.json`, resolved via the metadata
+layers (`.fab-test/metadata/` > `.github/metadata/` > packaged with the
+distribution).
 
 Each artifact type has:
 - Static analyzers (run before deployment)
 - Dynamic validators (run after deployment)
 
-See `.github/metadata/analyzers.json` for the complete analyzer matrix.
+See `analyzers.json` (same metadata layers) for the complete analyzer matrix.
 
 ## Deployment
 

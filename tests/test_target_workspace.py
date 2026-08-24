@@ -40,6 +40,9 @@ class _FakeClient:
     def get_dependent_reports(self, workspace_id, semantic_model_id):  # pragma: no cover
         return []
 
+    def get_report_dataset_id(self, workspace_id, report_id):  # pragma: no cover
+        return ""
+
 
 # --------------------------------------------------------------------------- #
 # Workspace name resolution

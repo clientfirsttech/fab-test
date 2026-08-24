@@ -18,7 +18,6 @@ This repository uses several local virtual environments. They are all ignored by
 | `.venv`     | General development environment with the package installed in editable mode (`pip install -e .`). |
 | `.venv-test`| Fresh, throwaway environment used to install and validate the locally built wheel exactly as a consumer would. |
 | `.venv-pkg` | Development/test environment with dev dependencies such as `pytest`, `coverage`, and `playwright`. |
-| `.venv-smoke`| Environment used by the GitHub Actions smoke-test helpers (`smoke-test-orchestrator`, `smoke-test-pql-test`). |
 
 All of these are optional. The only one the walkthrough below depends on is `.venv-test`.
 
@@ -93,6 +92,12 @@ without a `.pbip` beside it. Nested git checkouts, `.venv`, `node_modules`,
 An existing `.fabric/artifacts/` layout is found exactly as before, since it
 sits inside the working directory.
 
+If you run it one directory too high — in the folder that *holds* your
+repositories — everything below is a nested checkout, so nothing is found.
+The warning says how many checkouts it skipped and gives you the
+`--artifact-dir` to paste; `--format json` carries the same as
+`skipped_checkouts`.
+
 ### Discover artifacts without running anything
 
 ```bash
@@ -151,7 +156,7 @@ fab-test auth login                       # delegates to `pql-test auth login`
 fab-test all
 ```
 
-The default set is configured in `.github/metadata/analyzers.json`.
+The default set is configured in `analyzers.json` (resolved via the metadata layers: `.fab-test/metadata/` > `.github/metadata/` > packaged).
 
 ### Check readiness before running (doctor)
 
@@ -171,7 +176,7 @@ pytest -q --cov                      # measure locally, no gate
 pytest -q --cov --cov-fail-under=80  # exactly what CI runs
 ```
 
-The 80% floor is scoped to `src/fabric_ci_cd_dataops` with tests excluded. Four modules are omitted by explicit path — `eventhouse_logger.py`, both `smoke_test_*` harnesses, and `validate_fabric_service_client.py` — because each needs a live service to execute, so a unit test could only assert that its argument parser accepts flags. `tests/test_coverage_config.py` fails if one of those entries goes stale or if a core CLI module is ever added to the list.
+The 80% floor is scoped to `src/fabric_ci_cd_dataops` with tests excluded. One module is omitted by explicit path — `validate_fabric_service_client.py` — because it needs a live service to execute, so a unit test could only assert that its argument parser accepts flags. `eventhouse_logger.py` came off that list once its ingest was separable from the validators in front of it. `tests/test_coverage_config.py` fails if one of those entries goes stale or if a core CLI module is ever added to the list.
 
 **Never put a coverage flag in `pytest.ini`.** A granular `pytest -m bpa` run covers a fraction of `src/` by design; gating it would fail every marker run and defeat the point of having them.
 
@@ -219,7 +224,11 @@ Precedence, for every setting:
 
 No path flags are needed: commit the files under `.fab-test/metadata/` and every analyzer
 picks them up. Only `environments.yml` has no packaged default, so a workflow that deploys or
-resolves a deployed item by name has to supply it.
+resolves a deployed item by name has to supply it -- unless a workspace is already resolved
+from `--workspace-id`, `FABRIC_WORKSPACE_ID`, or `workspace:` in `fab-test.yml`, in which case
+`environments.yml` is never opened at all. The service-principal path below is still the CI
+recommendation regardless: it is what actually generates Playwright's embed token, which an
+ambient sign-in cannot do.
 
 ```yaml
 # committed alongside the workflow file, no secrets:
@@ -240,6 +249,15 @@ resolves a deployed item by name has to supply it.
   run: fab-test playwright --artifact ThinReport --env PROD --format json
 ```
 
+By default this discovers every page, each page's own bookmarks, and (when RLS
+is enabled) every semantic-model role, and tests the full matrix. Beyond the
+`Report.Read` / `Dataset.ReadWrite.All`-equivalent grant embedding already
+needed, the service principal also needs **`Report.Read.All`** (pages,
+bookmarks) and **`SemanticModel.Read.All`** (roles) to discover the matrix — a
+missing grant logs a warning and falls back to testing the single default
+page/role rather than failing the run. Add `--pages none --roles none` to the
+command above to keep the one-case-per-report shape every prior release had.
+
 See the [Configuration section of the fab-test skill](../.github/skills/fab-test/SKILL.md#configuration) for the full settings list and rule-overlay keys.
 
 ### Pipeline snippet: a reviewable report as the build artifact
@@ -257,13 +275,16 @@ See the [Configuration section of the fab-test skill](../.github/skills/fab-test
   with:
     name: fab-test-report
     path: |
-      analyzer-results/index.html
-      analyzer-results/**/report.html
-      analyzer-results/**/TestRun.html
-      analyzer-results/run.json
+      fab-test-results/index.html
+      fab-test-results/**/report.html
+      fab-test-results/**/TestRun.html
+      fab-test-results/playwright/test-cases/**
+      fab-test-results/run.json
 ```
 
 `if: always()` matters: the run you most want to read is the one that failed. Colour is automatically off because stdout is not a terminal — set `FORCE_COLOR: "1"` if your CI log viewer renders ANSI and you want it back.
+
+The `test-cases/**` line matters specifically for `playwright`: its `report.html` links to each case's own `screenshot.png`/`console.json`/`network.json` under that directory, and a link to a file the upload never included opens to nothing once downloaded.
 
 ### Pipeline snippet: targeting a deployed item by name
 
@@ -309,7 +330,7 @@ A copy-pasteable step for a CI job — gate on readiness, run with `--format jso
   uses: actions/upload-artifact@v4
   with:
     name: fab-test-run-manifest
-    path: analyzer-results/run.json
+    path: fab-test-results/run.json
 ```
 
 **Keep `--artifact-dir` explicit in CI.** Locally the default follows your
@@ -319,6 +340,106 @@ runner happens to start in, and a checkout that lands somewhere unexpected
 fails loudly instead of quietly analyzing nothing.
 
 `run.json` records `schema_version`, `fab_test_version`, `origin` (`"local"` locally, the detected CI system in a pipeline), `target` (the resolved target, or `null` for a discovery run), the invoked command (credentials redacted), per-artifact status, envelope paths, totals, and the final exit code — see the [Agent Contract](../.github/skills/fab-test/SKILL.md#agent-contract) for the full schema.
+
+**A failed artifact says why, in the manifest.** When an analyzer aborts before it can write an envelope — a missing `--env`, a missing prerequisite, a timeout — that artifact's `detail` carries the remediation message, so the uploaded manifest is self-contained:
+
+```json
+{
+  "analyzer": "playwright", "artifact": "ThinReport", "status": "failed",
+  "envelope_path": null, "errors": 0, "warnings": 0,
+  "detail": "No environment given, so there is nothing to resolve 'ThinReport' against. Pass --env, set FABRIC_ENVIRONMENT, or set `environment:` in fab-test.yml."
+}
+```
+
+This is the case where uploading `run.json` alone still tells you what to fix. It stays `null` when the analyzer *did* write an envelope — then `envelope_path` points at the findings, and those are the reason. Credential values are redacted out of `detail` on the way in, as they are from `command`.
+
+### Pipeline snippet: shipping telemetry to an Eventhouse
+
+Optional. Configuring a destination is what enables it — there is no separate flag —
+so this snippet is the whole setup: install the extra, supply the credentials the
+analyzers already use, and commit the address in `fab-test.yml`.
+
+```yaml
+- name: Install fab-test with the telemetry extra
+  run: pip install 'fab-test[telemetry]'
+
+- name: Run analyzers
+  env:
+    # The same service principal the analyzers use. There are no
+    # EVENTHOUSE_* credential variables.
+    FABRIC_TENANT_ID: ${{ secrets.FABRIC_TENANT_ID }}
+    FABRIC_SERVICE_PRINCIPAL_ID: ${{ secrets.FABRIC_SERVICE_PRINCIPAL_ID }}
+    FABRIC_SERVICE_PRINCIPAL_SECRET: ${{ secrets.FABRIC_SERVICE_PRINCIPAL_SECRET }}
+    # Optional: override the committed fab-test.yml address per environment.
+    EVENTHOUSE_URI: ${{ vars.EVENTHOUSE_URI }}
+    EVENTHOUSE_DATABASE: ${{ vars.EVENTHOUSE_DATABASE }}
+  run: fab-test all --format json --artifact-dir .fabric/artifacts
+
+- name: Upload run manifest
+  uses: actions/upload-artifact@v4
+  if: always()
+  with:
+    name: fab-test-run-manifest
+    path: fab-test-results/run.json
+```
+
+```yaml
+# fab-test.yml — committed; holds the address, never the credential
+telemetry:
+  eventhouse:
+    uri: https://<cluster>.kusto.fabric.microsoft.com
+    database: fabric_ops
+```
+
+**No setup step is required.** The job above works against an empty KQL database:
+before its first send, `fab-test` checks that the table and its `fab_test_payload`
+ingestion mapping exist and creates whatever is missing. A run against a healthy
+cluster issues no schema commands. Query the payload through the one column:
+`fabric_static_analysis | project Data.analyzer, Data.status, todatetime(Data.timestamp)`.
+
+For a governed cluster where CI may ingest but not alter schema, create them once
+by hand — the run prints exactly this when it cannot:
+
+```kusto
+.create-merge table fabric_static_analysis (Data: dynamic)
+.create-or-alter table fabric_static_analysis ingestion json mapping 'fab_test_payload'
+    '[{"column":"Data","path":"$","datatype":"dynamic"}]'
+
+.create-merge table fabric_dynamic_analysis (Data: dynamic)
+.create-or-alter table fabric_dynamic_analysis ingestion json mapping 'fab_test_payload'
+    '[{"column":"Data","path":"$","datatype":"dynamic"}]'
+```
+
+The mapping name is fixed and the mapping is **not optional** — without it Kusto maps
+by column name, matches nothing, and stores empty rows while reporting success. That
+is why `fab-test` verifies the mapping and not just the table.
+
+**`fab-test` creates tables, never databases or Eventhouses.** A missing database is
+reported as such rather than built.
+
+**Grant the credential the Database Ingestor role** on the KQL database (in Fabric:
+the Eventhouse item → Manage permissions). Without it the service principal
+authenticates perfectly and cannot ingest, which is indistinguishable from a bad
+secret unless something says so — `fab-test doctor` does, and so does the failure
+message.
+
+**Ingest is queued, not immediate.** A delivered record typically becomes queryable
+within a minute or two under the default batching policy, so a query straight after
+the run can legitimately return nothing yet. `telemetry delivered` means the cluster
+accepted the batch.
+
+The job's exit code is never affected by telemetry. A failed send prints one warning
+for the whole run and sets `telemetry_error` in `run.json`, so a pipeline that
+uploads only the manifest can still tell that records were dropped:
+
+```json
+{ "telemetry_error": "Forbidden (403): ... -- The credential authenticated but is not permitted to ingest. Grant it the Database Ingestor role ..." }
+```
+
+To turn it off for a job without touching the config file, set
+`ENABLE_EVENTHOUSE_LOGGING=false` or pass `--no-telemetry`. To see what would be sent
+without sending it, add `--dry-run` — it prints the resolved cluster, database, and
+table alongside each payload.
 
 ### Running the local-Desktop analyzer set in CI
 
@@ -335,7 +456,7 @@ fails loudly instead of quietly analyzing nothing.
   uses: actions/upload-artifact@v4
   with:
     name: fab-test-run-manifest
-    path: analyzer-results/run.json
+    path: fab-test-results/run.json
 ```
 
 The difference from running it on a laptop: no Power BI Desktop instance is open in CI, so `pql-test`'s DAX tests connect to nothing and degrade to a `skipped` status on that artifact (never a failure — see vision.md's "platform gaps degrade to skips") rather than binding to a `desktop` port. `pql-lint`, BPA, and PBIR Inspector are unaffected — they don't depend on Desktop at all.

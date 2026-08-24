@@ -1,6 +1,6 @@
 """Run manifest: one file per fab-test invocation (CLI Agent Ergonomics §11-12).
 
-Callers (humans, pipelines, and agents alike) read ``analyzer-results/run.json``
+Callers (humans, pipelines, and agents alike) read ``fab-test-results/run.json``
 instead of globbing result directories to learn what happened in the most
 recent invocation: the command that ran, every artifact's status and envelope
 path, totals, and the final exit code.
@@ -60,6 +60,11 @@ class RunManifest:
         # whether it read files, a Desktop instance, or a workspace --
         # which `origin` alone (local vs CI) does not answer.
         self.target = target
+        # Why this run's telemetry was not delivered, or None when it was
+        # (or when none was asked for). A pipeline reading only the manifest
+        # can otherwise not tell a run whose telemetry landed from one whose
+        # records were dropped.
+        self.telemetry_error: str | None = None
         self.artifacts: list[dict[str, Any]] = []
 
     def record_artifact(
@@ -102,6 +107,9 @@ class RunManifest:
             "command": self.invoked_command,
             "artifacts": self.artifacts,
             "totals": {"errors": total_errors, "warnings": total_warnings},
+            # Null when telemetry landed or none was requested. Additive and
+            # optional: a reader that does not know the key is unaffected.
+            "telemetry_error": self.telemetry_error,
             "exit_code": exit_code,
         }
 

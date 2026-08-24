@@ -8,11 +8,18 @@ touching artifacts, or spawning a subprocess — it is the engine behind
 """
 
 import json
+import tempfile
+from pathlib import Path
 
 import pytest
 
 from fabric_ci_cd_dataops.scripts._analyzer_tool_bootstrap import probe_executable
 from fabric_ci_cd_dataops.scripts.fab_test_registry import check_readiness
+
+# A path guaranteed not to exist, so credential/env-file resolution in this
+# module never picks up a real `.fab-test/.env` or `.env` a developer keeps
+# in their own checkout -- these tests must always pass on any machine.
+_NO_SUCH_ENV_FILE = str(Path(tempfile.gettempdir()) / "fab-test-test-isolation" / ".env")
 
 
 def _write_metadata(metadata_path, analyzer_name, tool_install):
@@ -159,7 +166,14 @@ def test_probe_never_spawns_a_subprocess(tmp_path, monkeypatch):
 @pytest.mark.fab_test
 def test_check_readiness_bpa_delegates_to_probe(tmp_path, monkeypatch):
     """check_readiness('bpa', args) resolves via the CLI flag like preflight_error does."""
+    import sys
+
     from fabric_ci_cd_dataops.scripts import fab_test_registry as registry
+
+    # bpa's tool_install requires_platform is "win32" (Tabular Editor is a
+    # Windows executable) -- pin the platform so this delegation test
+    # passes on any host, matching test_probe_reports_unsupported_platform.
+    monkeypatch.setattr(sys, "platform", "win32")
 
     existing = tmp_path / "TabularEditor.exe"
     existing.write_text("binary", encoding="utf-8")
@@ -219,9 +233,16 @@ _CLOUD_ENV_VARS = (
 
 
 def _clear_cloud_env(monkeypatch):
-    """Remove every workspace and credential variable the probe consults."""
+    """Remove every workspace and credential variable the probe consults.
+
+    Also pins `PLAYWRIGHT_ENV_FILE` to a nonexistent path -- the highest
+    priority source in `resolve_env_file`'s search order -- so a real
+    `.fab-test/.env` or `.env` in this checkout can never leak into these
+    tests via ambient discovery.
+    """
     for var in _CLOUD_ENV_VARS:
         monkeypatch.delenv(var, raising=False)
+    monkeypatch.setenv("PLAYWRIGHT_ENV_FILE", _NO_SUCH_ENV_FILE)
 
 
 def _set_service_principal(monkeypatch):
@@ -341,6 +362,29 @@ def test_playwright_does_not_fall_back_to_desktop(monkeypatch):
     result = registry.check_readiness("playwright", None)
 
     assert result["ready"] is False
+
+
+@pytest.mark.fab_test
+def test_playwright_ambient_credential_is_not_ready(monkeypatch):
+    """Playwright needs a real service principal; ambient auth is not enough.
+
+    Unlike pql_test, which can authenticate interactively,
+    ``get_embed_context`` always calls MSAL with a service-principal secret.
+    Reporting ready here would be the false green task 1 exists to remove --
+    an az-logged-in developer would see green and then hit an MSAL
+    traceback on the one command that cannot use their sign-in.
+    """
+    from fabric_ci_cd_dataops.scripts import _credentials
+    from fabric_ci_cd_dataops.scripts import fab_test_registry as registry
+
+    _clear_cloud_env(monkeypatch)
+    monkeypatch.setenv("FABRIC_WORKSPACE_ID", "33333333-3333-3333-3333-333333333333")
+    monkeypatch.setattr(_credentials, "ambient_credential_available", lambda: True)
+
+    result = registry.check_readiness("playwright", None)
+
+    assert result["ready"] is False
+    assert result["remediation"] is not None
 
 
 @pytest.mark.fab_test

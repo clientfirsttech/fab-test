@@ -63,6 +63,8 @@ class ServiceClient(Protocol):
         semantic_model_id: str,
     ) -> list[dict[str, Any]]: ...
 
+    def get_report_dataset_id(self, workspace_id: str, report_id: str) -> str: ...
+
     def list_workspaces(self) -> list[dict[str, Any]]: ...
 
 
@@ -108,7 +110,11 @@ def _load_environments(path: Path | None = None) -> dict[str, Any]:
         try:
             path = resolve_environments_yml().path
         except MetadataNotFoundError as exc:
-            raise ServiceResolutionError(str(exc)) from exc
+            raise ServiceResolutionError(
+                f"{exc} Alternatively, set `workspace:` in fab-test.yml, "
+                "FABRIC_WORKSPACE_ID, or pass --workspace-id -- any of "
+                "those resolves a workspace without environments.yml."
+            ) from exc
     try:
         with open(path, encoding="utf-8") as fh:
             data = yaml.safe_load(fh) or {}
@@ -149,6 +155,14 @@ def resolve_environment(
         ServiceResolutionError: If the environment is unknown or workspace ID
             is missing and no override is supplied.
     """
+    if workspace_id_override:
+        # The workspace is already known -- from `--workspace-id`,
+        # `FABRIC_WORKSPACE_ID`, or `workspace:` in fab-test.yml -- so
+        # there is nothing left for environments.yml to supply. Opening it
+        # anyway used to fail a run whose workspace was never in question
+        # when the file (or a `dev:` entry in it) was missing.
+        return ResolvedEnvironment(environment=env, workspace_id=workspace_id_override)
+
     environments = _load_environments(env_path)
     canonical = env.lower()
 
@@ -241,6 +255,32 @@ def resolve_workspace_id(client: ServiceClient, name_or_id: str) -> str:
     return matches[0]["id"]
 
 
+# Caps the no-match message at a readable length in an 80-column terminal.
+# The exception still carries every name in `candidates` -- only the
+# printed message is capped.
+_MAX_LISTED_CANDIDATES = 10
+
+
+def _no_match_message(
+    name: str, item_type: str, resolved_env: ResolvedEnvironment, all_names: list[str]
+) -> str:
+    """Build the "no match" message, naming the items the workspace has.
+
+    `resolve_item` used to attach every name to the exception as
+    ``candidates`` and then format a message that mentioned none of
+    them -- a dead end while the CLI was holding the answer.
+    """
+    base = f"No {item_type} matching '{name}' in workspace {resolved_env.workspace_id}."
+    if not all_names:
+        return f"{base} The workspace has no {item_type} items at all."
+
+    shown = all_names[:_MAX_LISTED_CANDIDATES]
+    remaining = len(all_names) - len(shown)
+    listed = ", ".join(shown)
+    suffix = f", and {remaining} more" if remaining > 0 else ""
+    return f"{base} Closest candidates: {listed}{suffix}."
+
+
 def resolve_item(
     name: str,
     item_type: str,
@@ -262,21 +302,18 @@ def resolve_item(
         ServiceResolutionError: If no item matches or multiple items match.
     """
     normalized = _normalize_name(name)
+    all_items = client.list_items(resolved_env.workspace_id, item_type)
     candidates = [
         item
-        for item in client.list_items(resolved_env.workspace_id, item_type)
+        for item in all_items
         if _normalize_name(item.get("displayName", "")) == normalized
         or item.get("displayName", "") == name
     ]
 
     if not candidates:
-        all_names = [
-            item.get("displayName", "")
-            for item in client.list_items(resolved_env.workspace_id, item_type)
-        ]
+        all_names = [item.get("displayName", "") for item in all_items]
         raise ServiceResolutionError(
-            f"No {item_type} matching '{name}' in workspace "
-            f"{resolved_env.workspace_id}.",
+            _no_match_message(name, item_type, resolved_env, all_names),
             environment=resolved_env.environment,
             workspace_id=resolved_env.workspace_id,
             item_type=item_type,
@@ -309,9 +346,16 @@ def resolve_report(
     resolved_env: ResolvedEnvironment,
     client: ServiceClient,
 ) -> ResolvedReport:
-    """Resolve a report and infer its dataset/semantic-model dependency."""
+    """Resolve a report and its bound semantic model (dataset)."""
     resolved = resolve_item(name, "Report", resolved_env, client)
-    dataset_id = resolved.item_id  # Fallback when dependency API unavailable.
+    dataset_id = client.get_report_dataset_id(
+        resolved.workspace_id, resolved.item_id
+    )
+    if not dataset_id:
+        # Report exists but isn't bound to a dataset (or the client
+        # couldn't determine one) -- fall back to the report's own ID
+        # rather than failing resolution outright.
+        dataset_id = resolved.item_id
     return ResolvedReport(
         workspace_id=resolved.workspace_id,
         report_id=resolved.item_id,

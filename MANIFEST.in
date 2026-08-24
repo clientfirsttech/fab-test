@@ -4,7 +4,7 @@ prune docs
 prune tests
 prune TabularEditor
 prune PBIR-Inspector
-prune analyzer-results
+prune fab-test-results
 prune .venv
 prune build
 prune dist

@@ -40,6 +40,11 @@ _VALID_KEYS: dict[str, type] = {
     # Nested disable/severity/extend keys are validated by _rule_overlay.py
     # itself at use time, not here.
     "rules": dict,
+    # Where telemetry goes (Eventhouse Shipping §1): {"eventhouse": {...}}.
+    # Validated below rather than at use time, unlike rules: a mistyped
+    # destination is not a finding that looks wrong, it is telemetry that
+    # silently lands nowhere.
+    "telemetry": dict,
 }
 
 
@@ -127,6 +132,47 @@ def _validate_rule_overlay(analyzer: str, overlay: Any) -> None:
             )
 
 
+_EVENTHOUSE_KEYS: dict[str, type] = {"uri": str, "database": str}
+
+
+def _validate_telemetry(telemetry: Any) -> None:
+    """Validate the `telemetry` block's keys and value types.
+
+    `eventhouse.table` is deliberately not a key: the table follows from
+    which analyzer ran, so accepting one here would only let the config and
+    the derivation disagree.
+    """
+    if not isinstance(telemetry, dict):
+        raise ConfigError(
+            f"config key 'telemetry' must be of type dict, got {type(telemetry).__name__}"
+        )
+    for section, block in telemetry.items():
+        if section != "eventhouse":
+            raise ConfigError(_unknown_key(f"telemetry.{section}", ("eventhouse",)))
+        if not isinstance(block, dict):
+            raise ConfigError(
+                f"config key 'telemetry.eventhouse' must be of type dict, "
+                f"got {type(block).__name__}"
+            )
+        for key, value in block.items():
+            path = f"telemetry.eventhouse.{key}"
+            if key not in _EVENTHOUSE_KEYS:
+                raise ConfigError(_unknown_key(path, _EVENTHOUSE_KEYS))
+            if not isinstance(value, _EVENTHOUSE_KEYS[key]):
+                raise ConfigError(
+                    f"config key '{path}' must be of type {_EVENTHOUSE_KEYS[key].__name__}, "
+                    f"got {type(value).__name__}"
+                )
+
+
+def _unknown_key(path: str, valid: Any) -> str:
+    """Return the 'unknown config key' message, suggesting the closest valid name."""
+    leaf = path.rsplit(".", 1)[-1]
+    suggestion = difflib.get_close_matches(leaf, valid, n=1)
+    hint = f" (did you mean '{suggestion[0]}'?)" if suggestion else ""
+    return f"unknown config key '{path}'{hint}"
+
+
 def validate_config(config: dict[str, Any]) -> None:
     """Validate a merged config dict's keys and value types.
 
@@ -149,6 +195,9 @@ def validate_config(config: dict[str, Any]) -> None:
                 f"config key '{key}' must be of type {expected_type.__name__}, "
                 f"got {type(value).__name__}"
             )
+
+    if "telemetry" in config:
+        _validate_telemetry(config["telemetry"])
 
     rules = config.get("rules")
     if isinstance(rules, dict):

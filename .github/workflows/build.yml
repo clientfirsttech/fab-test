@@ -39,6 +39,28 @@ jobs:
             >> "$GITHUB_STEP_SUMMARY" || true
           echo '```' >> "$GITHUB_STEP_SUMMARY"
 
+      # Also not a gate: the hard budget (src 800 / tests 900) is enforced by
+      # tests/test_module_budget.py instead, with named exemptions for the
+      # files already over it. This just surfaces the soft budget (src 400 /
+      # tests 500) so a file crossing it is visible before it reaches the
+      # hard one the way tests/test_fab_test.py did.
+      - name: Module size report
+        if: always()
+        run: |
+          echo "### Module size signals (non-gating)" >> "$GITHUB_STEP_SUMMARY"
+          echo "Hard budget is ratcheted in tests/test_module_budget.py." \
+            >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          for tree_budget in "src:400" "tests:500"; do
+            tree="${tree_budget%%:*}"
+            budget="${tree_budget##*:}"
+            find "$tree" -name '*.py' -exec wc -l {} + \
+              | sort -rn \
+              | awk -v b="$budget" -v t="$tree" \
+                '$1 > b && $2 != "total" {print $2": "$1" lines (soft budget "b" for "t"/)"}'
+          done >> "$GITHUB_STEP_SUMMARY" || true
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
   test:
     name: Tests
     runs-on: ubuntu-latest
@@ -51,6 +73,14 @@ jobs:
 
       - name: Install package and test tools
         run: pip install -e ".[dev]"
+
+      # pytest-playwright drives a real browser for the HTML report tests.
+      # The pip install above only pulls the Python package -- the browser
+      # binary is a separate download that must run before pytest, or every
+      # playwright-backed test fails at fixture setup with "Executable
+      # doesn't exist".
+      - name: Install Playwright browsers
+        run: playwright install --with-deps chromium
 
       # The 80% floor lives here and nowhere else. pytest.ini must stay free
       # of coverage flags: a granular `pytest -m <marker>` run covers a
@@ -101,8 +131,6 @@ jobs:
           python -m venv /tmp/venv
           /tmp/venv/bin/pip install dist/*.whl
           /tmp/venv/bin/fab-test --help
-          /tmp/venv/bin/smoke-test-orchestrator --help
-          /tmp/venv/bin/smoke-test-pql-test --help
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4

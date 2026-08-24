@@ -16,6 +16,13 @@ error.
 
 They read `pyproject.toml` and the source tree rather than building a
 wheel, so they are fast; the built wheel is asserted in CI.
+
+Playwright Through The Front Door §7 deleted this repository's own copies
+of these four files from `.github/metadata/` -- they were byte-identical
+to the packaged copy, so keeping both was a drift risk with nothing to
+show for it. There is now exactly one copy to test, not two to compare;
+the packaged tree is still the real subject worth asserting, since a
+consumer's fresh install has only what the wheel carries.
 """
 
 import tomllib
@@ -89,16 +96,29 @@ def test_no_package_data_glob_matches_nothing(package_data):
 
 
 @pytest.mark.fab_test
-@pytest.mark.parametrize("relative", _REQUIRED, ids=lambda p: p.as_posix())
-def test_the_packaged_copy_matches_this_repository_copy(relative):
-    """Two copies of a file drift, and the stale one answers confidently.
+def test_this_repository_no_longer_keeps_a_redundant_github_metadata_copy():
+    """The four byte-identical files are gone from `.github/metadata/`.
 
-    `.github/metadata/` wins inside this checkout, so a divergence here is
-    invisible to every test and every local run -- it only shows up for a
-    consumer installing from an index, who has no way to know their rules
-    differ from ours.
+    They used to duplicate the packaged copy exactly, which is what
+    `test_the_packaged_copy_matches_this_repository_copy` used to guard --
+    a redundant copy that could only drift, never diverge usefully. Deleting
+    them means resolution for this repository now falls through to the
+    packaged copy for every one of them (Playwright Through The Front Door
+    §7); this test guards against a stale copy quietly coming back.
     """
-    packaged = (PACKAGED_METADATA / relative).read_text(encoding="utf-8")
-    in_repo = (_ROOT / ".github" / "metadata" / relative).read_text(encoding="utf-8")
+    github_metadata = _ROOT / ".github" / "metadata"
+    for relative in _REQUIRED:
+        stale_path = github_metadata / relative
+        assert not stale_path.exists(), f"{stale_path} should not exist -- resolve from the packaged copy"
 
-    assert packaged == in_repo, f"{relative.as_posix()} has drifted from .github/metadata/"
+
+@pytest.mark.fab_test
+def test_environments_yml_lives_under_fab_test_metadata():
+    """`environments.yml` moved to `.fab-test/metadata/`, the packaged layout.
+
+    It has no packaged fallback (Environments Metadata Layers §2) and was
+    the only file in `.github/metadata/` actually doing work, so it moved
+    rather than being deleted.
+    """
+    assert (_ROOT / ".fab-test" / "metadata" / "environments.yml").is_file()
+    assert not (_ROOT / ".github" / "metadata" / "environments.yml").exists()

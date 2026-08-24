@@ -11,7 +11,7 @@ import pytest
 from fabric_ci_cd_dataops.scripts.validate_environments_yaml import validate_environments_yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_ENV_PATH = REPO_ROOT / ".github" / "metadata" / "environments.yml"
+DEFAULT_ENV_PATH = REPO_ROOT / ".fab-test" / "metadata" / "environments.yml"
 VALIDATOR_SCRIPT = "validate-environments-yaml"
 
 pytestmark = pytest.mark.fab_test
