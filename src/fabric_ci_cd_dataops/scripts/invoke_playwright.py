@@ -27,6 +27,7 @@ from ._analyzer_envelope import (
     envelope_path,
     write_envelope,
 )
+from ._report_html import attach_report
 from .playwright_validation.config import PlaywrightValidationConfig, load_config
 from .playwright_validation.embed_config import build_embed_config
 from .playwright_validation.fabric_service_client import (
@@ -42,8 +43,17 @@ from .playwright_validation.resolver import (
 from .playwright_validation.test_cases import (
     TestCase,
     generate_test_cases,
+    sanitize_case_id,
     write_test_cases,
 )
+
+# Evidence files the pytest spec writes per case (`_write_evidence`),
+# labeled the way they should read as links in the report/JSON output.
+_EVIDENCE_FILENAMES = {
+    "screenshot": "screenshot.png",
+    "console": "console.json",
+    "network": "network.json",
+}
 
 # Relative path from repo root to the pytest spec.
 _SPEC_PATH = Path("tests") / "test_playwright_visual.py"
@@ -97,6 +107,95 @@ def _write_findings(
         }
         for case in cases
     ]
+
+
+def _case_result_dir(case: TestCase, test_cases_dir: Path) -> Path:
+    """Return the directory the pytest spec wrote one case's evidence to.
+
+    Must sanitize the id exactly the way ``tests/test_playwright_visual.py``
+    does, via the same shared ``sanitize_case_id`` -- otherwise this looks
+    in a directory the spec never wrote to.
+    """
+    return test_cases_dir / sanitize_case_id(case.test_case)
+
+
+def _read_case_result(result_dir: Path) -> dict[str, str]:
+    """Read one case's actual outcome, tolerating a run where it was never
+    written (the pytest process crashed before reaching that case)."""
+    result_path = result_dir / "result.json"
+    if not result_path.is_file():
+        return {}
+    try:
+        return json.loads(result_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def _case_evidence(result_dir: Path) -> dict[str, str]:
+    """Return ``{label: path}`` for whichever evidence files exist for this case."""
+    return {
+        label: str(result_dir / filename)
+        for label, filename in _EVIDENCE_FILENAMES.items()
+        if (result_dir / filename).is_file()
+    }
+
+
+def _test_results_rows(
+    cases: list[TestCase],
+    test_cases_dir: Path,
+    *,
+    overall_success: bool,
+) -> list[dict[str, Any]]:
+    """One row per generated case, using its own result.json when the spec wrote one.
+
+    A case with no result.json (the pytest process never reached it, e.g.
+    a crash on an earlier case) falls back to the run's overall outcome
+    rather than reporting nothing -- the same "never silently drop a row"
+    contract `test_results` already has for BPA and PBIR.
+    """
+    rows = []
+    for case in cases:
+        result_dir = _case_result_dir(case, test_cases_dir)
+        result = _read_case_result(result_dir)
+        status = result.get("status") or ("pass" if overall_success else "error")
+        error = result.get("error", "")
+        rows.append(
+            {
+                "suite_name": case.report_name,
+                "test_name": case.test_case,
+                "expected": "rendered",
+                "actual": error or "rendered",
+                "status": status,
+                "evidence": _case_evidence(result_dir),
+            }
+        )
+    return rows
+
+
+def _findings_from_test_results(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Only the cases that actually failed, each with its own real error --
+    replaces the old blanket "every case failed identically" findings."""
+    return [
+        {
+            "rule": "visual_load_failed",
+            "severity": "error",
+            "object": row["test_name"],
+            "message": row["actual"],
+        }
+        for row in rows
+        if row["status"] != "pass"
+    ]
+
+
+def _write_playwright_envelope(output_path: Path, env: dict[str, Any]) -> None:
+    """Attach a report (no-op unless `--report`) and write the envelope.
+
+    The single funnel both `_run_single_report` and
+    `_write_embed_error_envelope` write through, so neither call site can
+    forget the report the way a direct `write_envelope` call would let it.
+    """
+    attach_report(env, output_path)
+    write_envelope(output_path, env)
 
 
 def _build_env_for_pytest(
@@ -329,6 +428,7 @@ def _write_embed_error_envelope(
     report_name: str,
     cases: list[TestCase],
     message: str,
+    test_cases_dir: Path | None = None,
 ) -> int:
     """Write an error envelope for an embed-context failure and return 1.
 
@@ -336,8 +436,16 @@ def _write_embed_error_envelope(
     try block: a `PowerBiApiError` and any other exception both end here so
     an agent caller always finds a reason in `run.json`, never a null
     ``detail`` from an exception that ran clean off the top of `main()`.
+    No case has run yet at this point, so every row falls back to
+    "error" -- `test_cases_dir` is omitted entirely when config resolution
+    failed before cases even existed.
     """
     findings = _write_findings(cases, success=False, message=message)
+    test_results = (
+        _test_results_rows(cases, test_cases_dir, overall_success=False)
+        if test_cases_dir is not None
+        else []
+    )
     env = build_envelope(
         analyzer="playwright",
         artifact_path=str(report_name),
@@ -346,7 +454,8 @@ def _write_embed_error_envelope(
         findings=findings,
         duration_ms=0,
     )
-    write_envelope(output_path, env)
+    env["test_results"] = test_results
+    _write_playwright_envelope(output_path, env)
     log_error(message)
     return 1
 
@@ -384,10 +493,14 @@ def _run_single_report(
         message = f"Power BI API error: {exc}"
         if exc.status_code:
             message += f" (HTTP {exc.status_code})"
-        return _write_embed_error_envelope(output_path, report_name, cases, message)
+        return _write_embed_error_envelope(
+            output_path, report_name, cases, message, test_cases_dir=test_cases_dir
+        )
     except Exception as exc:  # noqa: BLE001 - process boundary: never a bare traceback
         message = f"Failed to acquire embed context: {exc}"
-        return _write_embed_error_envelope(output_path, report_name, cases, message)
+        return _write_embed_error_envelope(
+            output_path, report_name, cases, message, test_cases_dir=test_cases_dir
+        )
 
     base_embed_config = build_embed_config(
         report_id=embed_context.report_id,
@@ -412,11 +525,8 @@ def _run_single_report(
     if summary:
         message += f" ({summary})"
 
-    findings = _write_findings(
-        cases,
-        success=success,
-        message="Visual load error detected" if not success else "",
-    )
+    test_results = _test_results_rows(cases, test_cases_dir, overall_success=success)
+    findings = _findings_from_test_results(test_results)
 
     env_out = build_envelope(
         analyzer="playwright",
@@ -426,7 +536,8 @@ def _run_single_report(
         findings=findings,
         duration_ms=timer.elapsed_ms,
     )
-    write_envelope(output_path, env_out)
+    env_out["test_results"] = test_results
+    _write_playwright_envelope(output_path, env_out)
 
     if level >= 1:
         log(proc.stdout or "")

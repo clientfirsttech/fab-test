@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+from fabric_ci_cd_dataops.scripts._analyzer_envelope import build_envelope
 from fabric_ci_cd_dataops.scripts._analyzer_report import AnalyzerReporter, _resolve_verbosity
 
 # pytest markers that belong to the analyzer contract tier.
@@ -275,3 +276,44 @@ def _fake_git_run(responses: dict[str, str]):
 def _stub_subprocess_run(*_args, **_kwargs):
     """A subprocess.run stand-in that always reports a clean, silent success."""
     return subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
+
+
+# --------------------------------------------------------------------------- #
+# Shared helpers for the HTML report renderer tests (test_report_html*.py)
+# --------------------------------------------------------------------------- #
+# Used by both the static-rendering contract tests and the interactivity
+# (search/sort) tests, so it moves here rather than being duplicated.
+
+_BPA_PASSED_RULE = {
+    "RuleName": "Avoid bi-directional relationships",
+    "RuleID": "PERF_01",
+    "Severity": "2",
+    "Category": "Performance",
+    "ObjectName": "",
+    "status": "pass",
+}
+_BPA_FAILED_RULE = {
+    "RuleName": "Add descriptions to measures",
+    "RuleID": "MAINT_02",
+    "Severity": "3",
+    "Category": "Maintenance",
+    "ObjectName": "[Total Sales]",
+    "status": "error",
+}
+
+
+def _envelope(findings=None, **overrides):
+    base = {
+        "analyzer": "bpa",
+        "artifact_path": "Sales.SemanticModel",
+        "status": "passed",
+        "findings": findings if findings is not None else [],
+    }
+    base.update(overrides)
+    return build_envelope(**base)
+
+
+def _envelope_with_test_results(test_results, **overrides):
+    env = _envelope([], **overrides)
+    env["test_results"] = test_results
+    return env

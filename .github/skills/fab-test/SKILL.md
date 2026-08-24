@@ -364,17 +364,19 @@ fab-test all --report --no-report   # invalid: mutually exclusive, exits 2
 | `pql-test` | Generated `report.html` | `pql-test` emits JSON and CI log annotations only. |
 | `pql-lint` | None | Currently hidden from the advertised surface, so a report would have no reader. |
 
-The generated report never overwrites an upstream one: `attach_report` is a no-op when the envelope already carries `native_html_output_path`. PBIR's own `TestRun.html` also has its favicon link repaired in place (`fix_favicon_link`) -- FabInspCLI ships it as a path relative to the tool's install directory, which 404s once the report lands under `analyzer-results/`, so it is inlined as a data URI instead.
+The generated report never overwrites an upstream one: `attach_report` is a no-op when the envelope already carries `native_html_output_path`. PBIR's own `TestRun.html` also has two upstream asset paths repaired in place, both by inlining as base64 data URIs rather than leaving a relative path for the browser to resolve: the favicon (`fix_favicon_link`) -- FabInspCLI ships it relative to the tool's *install* directory, which 404s once the report lands under `analyzer-results/` -- and each per-object screenshot (`fix_screenshot_images`) -- the template builds that `src` as `PBIInspectorPNG\<Id>.png`, a Windows-style relative path with the same problem. An object whose screenshot file genuinely isn't in that folder is left as it was; only the images that exist but couldn't resolve get fixed.
 
-Every report is a single self-contained file — no external stylesheet, script, or font — so it opens from disk and survives being uploaded as a CI artifact. Rendering is deterministic: the same envelope always produces the same bytes, and the run time shown comes from the envelope's `started_at`, never from render time.
+Every report is a single self-contained file — no external stylesheet, script, or font ever fetches, links, or points off the page, so it opens from disk and survives being uploaded as a CI artifact. Rendering is deterministic: the same envelope always produces the same bytes, and the run time shown comes from the envelope's `started_at`, never from render time.
 
 **A failure to render is a warning, never a failed build.** Exit codes belong to findings, not to presentation.
 
 ### The full test list and its filter
 
-`findings` only ever holds violations — a passing run has always rendered as "No findings" with no evidence of what ran. An envelope may additionally carry `test_results`: every test or rule the analyzer evaluated, passed or failed. When it is present and non-empty, `render_report` shows that full list instead of the findings-only table, each row tagged `pass`/`warning`/`error`/`skip`, with an **All / Errors / Warnings / Passed** filter above the table — pure CSS (hidden radio inputs + sibling selectors), no JavaScript, so the self-contained-report guarantee still holds. `bpa` and `pql_test` both populate `test_results` today; `pbir`'s own `TestRun.html` has its own filter UI and is untouched by this.
+`findings` only ever holds violations — a passing run has always rendered as "No findings" with no evidence of what ran. An envelope may additionally carry `test_results`: every test or rule the analyzer evaluated, passed or failed. When it is present and non-empty, `render_report` shows that full list instead of the findings-only table, each row tagged `pass`/`warning`/`error`/`skip`, with an **All / Errors / Warnings / Passed** filter above the table — pure CSS (hidden radio inputs + sibling selectors). `bpa` and `pql_test` both populate `test_results` today; `pbir`'s own `TestRun.html` has its own filter UI and is untouched by this.
 
-**Extending this to a new analyzer**: populate `test_results` on the envelope with a list of dicts in either shape `normalize_findings` already recognizes (pql-test's `suite_name`/`test_name`/`passed`/`expected`/`actual`, or a rule shape with `rule`/`severity`/`object`/`message` plus a `status` key of `pass`/`error`/`warning`/`skip`) — the renderer, the filter, and the status colouring all come for free. No new HTML to write.
+The full list also has a **search box and clickable, sortable column headers** (Search and Sort epic) — the one place the report emits an inline `<script>`. It never fetches, links, or references anything outside the page, so the self-contained-report guarantee still holds; only the stricter "no script at all" claim was relaxed. Typing in the search box hides any row whose text doesn't match, live; clicking a header sorts by that column (ascending, then descending on a second click), and appends a ▲/▼ arrow to that header so the active column and direction stay visible — clicking a different header moves the arrow, clearing the previous one (Sort Direction Indicator epic). Both search and sort compose with the status filter and with each other, and a "No matching rows" message appears if all three combine to nothing. None of this appears on the findings-only table or the per-run index — both have no full test list to search or sort, so neither gets the search box or the script.
+
+**Extending this to a new analyzer**: populate `test_results` on the envelope with a list of dicts in either shape `normalize_findings` already recognizes (pql-test's `suite_name`/`test_name`/`passed`/`expected`/`actual`, or a rule shape with `rule`/`severity`/`object`/`message` plus a `status` key of `pass`/`error`/`warning`/`skip`) — the renderer, the filter, the search box, the column sort, and the status colouring all come for free. No new HTML to write.
 
 ### The per-run index
 
@@ -731,6 +733,21 @@ discoverable: `fab-test init` scaffolds a commented line for it, and
 `fab-test config --show` lists its effective value and origin (`fab-test.yml:workspace`,
 `env:FABRIC_WORKSPACE_ID`, etc.) alongside every other setting.
 
+**Every generated case gets its own accurate result, not the run's outcome copy-pasted.**
+`analyzer-results/playwright/test-cases/<case>/result.json` (written by the pytest
+spec itself, per case) records that case's real `status` (`pass`/`error`) and, on
+failure, the actual detail -- the embed error, a render timeout, or an RDL error
+modal -- rather than the fixed string every case used to share. The envelope's
+`test_results` carries one row per case built from that file (falling back to the
+run's overall outcome only for a case the process never reached), so `findings`
+now names only the case that actually failed, with its own message -- a report
+with 5 pages and 1 real failure reports 1 finding, not 5 identical ones. Each row
+also carries an `evidence` map (`screenshot`/`console`/`network`, whichever files
+exist for that case); `--report`'s generated `report.html` renders those as links
+in an added column, and `--output-path`'s `envelope.json` -- what `output_path`
+in `--format json` output already points an agent at -- carries the same paths,
+so nothing beyond reading that one file is needed to reach the evidence.
+
 Static `.env` mode uses workspace, report, dataset IDs directly from the env file:
 
 ```bash
@@ -899,7 +916,7 @@ Optional keys — **absent, never null**, so a consumer tests presence:
 | `started_at` | UTC ISO-8601 wall-clock time the run started. `duration_ms` says how long; this says when. |
 
 
-For `pql_test`, the envelope also contains `test_results` (full result array from pql-test, native shape). For `bpa`, it contains one entry per rule TE2 evaluated (`RuleName`/`RuleID`/`Severity`/`Category`/`ObjectName` plus a computed `status` of `pass`/`error`/`warning`), passed and failed alike — unlike `findings`, which stays failure-only. Both feed the report's full-list filter (see Reports above); either is `[]` when the analyzer produced no per-test breakdown.
+For `pql_test`, the envelope also contains `test_results` (full result array from pql-test, native shape). For `bpa`, it contains one entry per rule TE2 evaluated (`RuleName`/`RuleID`/`Severity`/`Category`/`ObjectName` plus a computed `status` of `pass`/`error`/`warning`), passed and failed alike — unlike `findings`, which stays failure-only. `pbir` matches the same idea in the shared `rule`/`severity`/`object`/`message` shape (each with a `status`), so telemetry can see every rule PBIR Inspector evaluated, not only the ones that failed — `pbir`'s own `TestRun.html` still has its own filter UI, so this field feeds telemetry, not the shared report's full-list filter, for that analyzer specifically. `playwright` uses the pql-test-shaped `test_results` too (one row per generated report x page x bookmark case), plus an `evidence` map per row (`screenshot`/`console`/`network` paths, whichever exist) that the shared renderer turns into links when `--report` is on (see the `playwright` section above). All four are `[]` when the analyzer produced no per-test breakdown.
 
 `status` values: `passed` | `failed` | `error` | `timeout`.
 

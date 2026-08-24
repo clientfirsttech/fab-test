@@ -231,6 +231,15 @@ fab-test playwright --artifact "Not Working Visuals"
 `--workspace-id`, `FABRIC_WORKSPACE_ID`, or `workspace:` in `fab-test.yml` --
 a repository that already pins its workspace there keeps working unchanged.
 
+A run with 5 report x page x bookmark cases and 1 real failure now says so —
+`envelope.json`'s `test_results` carries one row per case with that case's own
+real outcome, so `findings` names only the case that actually failed instead of
+tagging all 5 identically. Each row also points at that case's own evidence
+(`analyzer-results/playwright/test-cases/<case>/screenshot.png`, plus
+`console.json`/`network.json` when there's something to capture); `--report`
+renders those as links right in the table, and the same paths are in
+`envelope.json` for a script or an agent to open directly.
+
 ### Naming what to test
 
 Every analyzer subcommand takes an optional target. Omit it and `fab-test` discovers everything matching, as before. The grammar is the one `pql-test` and the Fabric CLI already use, so a target pasted from either works here unchanged.
@@ -296,9 +305,11 @@ Each artifact gets a self-contained HTML page beside its envelope, and `fab-test
   Index:  analyzer-results/index.html
 ```
 
-PBIR Inspector writes its own `TestRun.html` and it appears **with or without** `--report` — it is richer than anything generated from the envelope, so `fab-test` never overwrites it (its favicon link is repaired in place, since the upstream template points at a path that no longer exists once the report is copied out). Tabular Editor emits TRX and `pql-test` emits JSON, so those two get a generated `report.html`.
+PBIR Inspector writes its own `TestRun.html` and it appears **with or without** `--report` — it is richer than anything generated from the envelope, so `fab-test` never overwrites it. Two upstream asset paths in it are repaired in place, both by inlining as base64 so nothing 404s once the report is copied out of the tool's install directory: the favicon link, and every per-object screenshot. Tabular Editor emits TRX and `pql-test` emits JSON, so those two get a generated `report.html`.
 
-Both generated reports show **every test conducted, not only the failures** — pass, fail, warning, and skip — with an All / Errors / Warnings / Passed filter above the table so you can see what ran and still jump straight to what didn't. A passing run no longer reads as an empty page.
+Every analyzer's envelope also records **every test conducted, not only the failures** — pass, fail, warning, and skip. The two generated reports show that as a table with an All / Errors / Warnings / Passed filter, so a passing run no longer reads as an empty page; PBIR Inspector's own report keeps its own UI, so for that one the full list is there for telemetry to read rather than for the filter to show.
+
+That table also has a **search box and sortable column headers**: type to narrow to a rule, test, or object by name, or click a header to sort by that column (click again to reverse) — the sorted column shows a ▲/▼ arrow so it's obvious which column and direction is active, and the arrow moves to whichever column you click next. Both work together with the status filter. The report stays fully offline and self-contained — the small script behind search and sort never fetches or links to anything outside the page itself.
 
 The index also shows when the run happened and, in CI, who ran it and from which branch/commit (falling back to local `git`, or an em-dash outside a git checkout).
 

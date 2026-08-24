@@ -16,12 +16,13 @@ import contextlib
 import csv
 import json
 import os
-import re
 import time
 from pathlib import Path
 from typing import Any
 
 import pytest
+
+from fabric_ci_cd_dataops.scripts.playwright_validation.test_cases import sanitize_case_id
 
 pytestmark = pytest.mark.playwright
 
@@ -45,8 +46,7 @@ def _load_test_cases() -> list[dict[str, str]]:
 
 def _test_case_id(case: dict[str, str]) -> str:
     """Return a pytest-friendly node id for a test case."""
-    raw = case.get("test_case") or "unknown"
-    return re.sub(r"[^\w\-]", "_", raw).strip("_")
+    return sanitize_case_id(case.get("test_case"))
 
 
 def _case_result_dir(case: dict[str, str]) -> Path:
@@ -73,6 +73,22 @@ def _write_evidence(
         (result_dir / "network.json").write_text(
             json.dumps(failed_requests, indent=2, default=str), encoding="utf-8"
         )
+
+
+def _write_result(result_dir: Path, status: str, error: str = "") -> None:
+    """Record this case's actual outcome.
+
+    The pytest process's own exit code only says whether *any* case
+    failed, not which one -- with several report x page x bookmark
+    combinations in one run, that is not enough for
+    ``invoke_playwright.py`` to tell a real failure from a case that
+    never ran. ``status`` uses the same pass/error vocabulary the BPA and
+    PBIR wrappers already normalize their own test_results to.
+    """
+    result_dir.mkdir(parents=True, exist_ok=True)
+    (result_dir / "result.json").write_text(
+        json.dumps({"status": status, "error": error}), encoding="utf-8"
+    )
 
 
 TEST_CASES = _load_test_cases()
@@ -170,12 +186,16 @@ def test_report_visual_renders(page, case: dict[str, str]) -> None:
         )
     except Exception as exc:
         _write_evidence(page, result_dir, console_logs, failed_requests)
-        pytest.fail(f"Failed to evaluate Power BI embed script: {exc}")
+        error = f"Failed to evaluate Power BI embed script: {exc}"
+        _write_result(result_dir, "error", error)
+        pytest.fail(error)
 
     embed_error = page.evaluate("() => window.__pbiEmbedError")
     if embed_error:
         _write_evidence(page, result_dir, console_logs, failed_requests)
-        pytest.fail(f"Power BI embed failed: {embed_error}")
+        error = f"Power BI embed failed: {embed_error}"
+        _write_result(result_dir, "error", error)
+        pytest.fail(error)
 
     # Race rendered vs error.
     deadline = time.monotonic() + (timeout_ms / 1000.0)
@@ -194,10 +214,16 @@ def test_report_visual_renders(page, case: dict[str, str]) -> None:
         time.sleep(2)
 
     if result is None:
-        pytest.fail(f"Report did not render within {timeout_ms}ms")
+        error = f"Report did not render within {timeout_ms}ms"
+        _write_result(result_dir, "error", error)
+        pytest.fail(error)
 
     if isinstance(result, str) and result.startswith("error:"):
-        pytest.fail(f"Power BI error event fired: {result[len('error:'):]}")
+        error = f"Power BI error event fired: {result[len('error:'):]}"
+        _write_result(result_dir, "error", error)
+        pytest.fail(error)
+
+    _write_result(result_dir, "pass")
 
 
 def _test_paginated_report(page: Any, case: dict[str, str]) -> None:
@@ -252,7 +278,9 @@ def _test_paginated_report(page: Any, case: dict[str, str]) -> None:
         )
     except Exception as exc:
         _write_evidence(page, result_dir, console_logs, failed_requests)
-        pytest.fail(f"Failed to evaluate RDL embed script: {exc}")
+        error = f"Failed to evaluate RDL embed script: {exc}"
+        _write_result(result_dir, "error", error)
+        pytest.fail(error)
 
     page.wait_for_timeout(rdl_wait_seconds * 1000)
 
@@ -279,4 +307,8 @@ def _test_paginated_report(page: Any, case: dict[str, str]) -> None:
     _write_evidence(page, result_dir, console_logs, failed_requests)
 
     if error_found:
-        pytest.fail("RDL error modal detected")
+        error = "RDL error modal detected"
+        _write_result(result_dir, "error", error)
+        pytest.fail(error)
+
+    _write_result(result_dir, "pass")
