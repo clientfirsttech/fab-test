@@ -1,6 +1,6 @@
 # Sort Direction Indicator Epic
 
-**Status**: 📋 PLANNED
+**Status**: ✅ COMPLETED (2026-08-24)
 **Goal**: Show which column a full-list report table is sorted by, and in which direction.
 
 ## Overview
