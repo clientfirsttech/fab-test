@@ -29,7 +29,7 @@
 # Ship analyzer telemetry to a Fabric Eventhouse. A configured destination is
 # the enablement -- there is no separate on/off flag. Either key can instead
 # be set via EVENTHOUSE_URI / EVENTHOUSE_DATABASE, which win over this file.
- telemetry:
-   eventhouse:
-     uri: https://ingest-trd-2r5mk6nt03ycj37zre.z2.kusto.fabric.microsoft.com
-     database: fab-test
+# telemetry:
+#   eventhouse:
+#     uri: https://ingest-trd-2r5mk6nt03ycj37zre.z2.kusto.fabric.microsoft.com
+#     database: fab-test

@@ -166,7 +166,14 @@ def test_probe_never_spawns_a_subprocess(tmp_path, monkeypatch):
 @pytest.mark.fab_test
 def test_check_readiness_bpa_delegates_to_probe(tmp_path, monkeypatch):
     """check_readiness('bpa', args) resolves via the CLI flag like preflight_error does."""
+    import sys
+
     from fabric_ci_cd_dataops.scripts import fab_test_registry as registry
+
+    # bpa's tool_install requires_platform is "win32" (Tabular Editor is a
+    # Windows executable) -- pin the platform so this delegation test
+    # passes on any host, matching test_probe_reports_unsupported_platform.
+    monkeypatch.setattr(sys, "platform", "win32")
 
     existing = tmp_path / "TabularEditor.exe"
     existing.write_text("binary", encoding="utf-8")

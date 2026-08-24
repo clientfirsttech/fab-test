@@ -205,6 +205,11 @@ def test_status_reports_fab_test_env_as_the_origin(tmp_path):
             "FABRIC_SERVICE_PRINCIPAL_ID",
             "FABRIC_SERVICE_PRINCIPAL_SECRET",
             "PLAYWRIGHT_ENV_FILE",
+            # `_repo_root()` prefers GITHUB_WORKSPACE over cwd, which would
+            # make discovery ignore `cwd=tmp_path` below and look in the
+            # real checkout instead -- only invisible locally, where this
+            # variable is unset.
+            "GITHUB_WORKSPACE",
         }
     }
     result = _run_cli("auth", "status", "--format", "json", env=env, cwd=tmp_path)

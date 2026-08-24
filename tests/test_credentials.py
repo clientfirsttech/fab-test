@@ -56,6 +56,11 @@ def clean_env(monkeypatch):
     for var in _ALL_VARS:
         monkeypatch.delenv(var, raising=False)
     monkeypatch.setenv("PLAYWRIGHT_ENV_FILE", _NO_SUCH_ENV_FILE)
+    # `_repo_root()` prefers GITHUB_WORKSPACE over cwd, which would make
+    # discovery ignore a test's `monkeypatch.chdir(tmp_path)` and look in
+    # the real checkout instead -- only invisible locally, where this
+    # variable is unset.
+    monkeypatch.delenv("GITHUB_WORKSPACE", raising=False)
     monkeypatch.setattr(_credentials, "ambient_credential_available", lambda: False)
     return monkeypatch
 

@@ -9,11 +9,23 @@ analyzer name, both spellings behaving identically end to end, and --help
     pytest -m fab_test
 """
 import json
+import re
 import subprocess
 
 import pytest
 
 from fabric_ci_cd_dataops.scripts.fab_test import _SUBCOMMAND_ALIASES
+
+# The telemetry preview in `--dry-run` output stamps the current time, so
+# two subprocess invocations a few milliseconds apart never print byte-
+# identical stdout. Masked out before the alias/canonical comparison below,
+# which cares whether the two spellings behave the same -- not whether they
+# ran in the same instant.
+_TIMESTAMP_RE = re.compile(r'"timestamp": "[^"]*"')
+
+
+def _mask_timestamp(text: str) -> str:
+    return _TIMESTAMP_RE.sub('"timestamp": "<redacted>"', text)
 
 # --------------------------------------------------------------------------- #
 # Normalize subcommand aliases
@@ -40,7 +52,7 @@ def test_pql_test_hyphen_alias_behaves_like_underscore():
         capture_output=True, text=True, check=False,
     )
     assert canonical.returncode == aliased.returncode == 0
-    assert canonical.stdout == aliased.stdout
+    assert _mask_timestamp(canonical.stdout) == _mask_timestamp(aliased.stdout)
 
 
 @pytest.mark.fab_test
@@ -55,7 +67,7 @@ def test_pql_lint_hyphen_alias_behaves_like_underscore():
         capture_output=True, text=True, check=False,
     )
     assert canonical.returncode == aliased.returncode == 0
-    assert canonical.stdout == aliased.stdout
+    assert _mask_timestamp(canonical.stdout) == _mask_timestamp(aliased.stdout)
 
 
 @pytest.mark.fab_test
