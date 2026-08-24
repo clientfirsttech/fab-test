@@ -194,24 +194,25 @@ def test_status_reports_fab_test_env_as_the_origin(tmp_path):
         encoding="utf-8",
     )
 
-    env = {
-        k: v
-        for k, v in os.environ.items()
-        if k
-        not in {
-            "FABRIC_TENANT_ID",
-            "FABRIC_CLIENT_ID",
-            "FABRIC_CLIENT_SECRET",
-            "FABRIC_SERVICE_PRINCIPAL_ID",
-            "FABRIC_SERVICE_PRINCIPAL_SECRET",
-            "PLAYWRIGHT_ENV_FILE",
-            # `_repo_root()` prefers GITHUB_WORKSPACE over cwd, which would
-            # make discovery ignore `cwd=tmp_path` below and look in the
-            # real checkout instead -- only invisible locally, where this
-            # variable is unset.
-            "GITHUB_WORKSPACE",
-        }
-    }
+    # `_run_cli` merges this dict onto a copy of the real os.environ rather
+    # than replacing it, so a key merely absent here (via a filtered
+    # comprehension) is not actually unset when the real environment has
+    # it -- as GITHUB_WORKSPACE always does in CI, never locally, which is
+    # exactly why this needs to be an explicit override, not an omission.
+    _unset = (
+        "FABRIC_TENANT_ID",
+        "FABRIC_CLIENT_ID",
+        "FABRIC_CLIENT_SECRET",
+        "FABRIC_SERVICE_PRINCIPAL_ID",
+        "FABRIC_SERVICE_PRINCIPAL_SECRET",
+        "PLAYWRIGHT_ENV_FILE",
+        # `_repo_root()` prefers GITHUB_WORKSPACE over cwd, which would
+        # make discovery ignore `cwd=tmp_path` below and look in the real
+        # checkout instead of the `.fab-test/.env` written above.
+        "GITHUB_WORKSPACE",
+    )
+    env = {k: v for k, v in os.environ.items() if k not in _unset}
+    env.update(dict.fromkeys(_unset, ""))
     result = _run_cli("auth", "status", "--format", "json", env=env, cwd=tmp_path)
 
     assert result.returncode == 0, result.stderr
