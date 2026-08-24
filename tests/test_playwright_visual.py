@@ -75,6 +75,35 @@ def _write_evidence(
         )
 
 
+def _capture_embed_error_details(page: Any, result_dir: Path) -> str:
+    """Best-effort extraction of Power BI's own "Something went wrong" panel.
+
+    The embed SDK's `report.on('error', ...)` does not always fire when the
+    failure happens before the report object finishes initializing (e.g. a
+    permissions or CORS problem) -- the iframe just shows its own generic
+    error page instead, and the render/error race times out with no
+    indication of why. Any details text found here is written to
+    ``embed_error_details.txt`` so a timeout's evidence names the real
+    cause instead of only restating the timeout.
+    """
+    for frame in page.frames:
+        text = ""
+        with contextlib.suppress(Exception):
+            details_link = frame.get_by_text("Show details", exact=False)
+            if details_link.count() > 0:
+                with contextlib.suppress(Exception):
+                    details_link.first.click(timeout=2000)
+                    frame.wait_for_timeout(500)
+            text = frame.locator("body").inner_text(timeout=1000)
+        if "Something went wrong" in text:
+            with contextlib.suppress(Exception):
+                (result_dir / "embed_error_details.txt").write_text(
+                    text.strip(), encoding="utf-8"
+                )
+            return text.strip()
+    return ""
+
+
 def _write_result(result_dir: Path, status: str, error: str = "") -> None:
     """Record this case's actual outcome.
 
@@ -145,8 +174,18 @@ def test_report_visual_renders(page, case: dict[str, str]) -> None:
     # Wait briefly for the library to register itself on window.powerbi.
     page.wait_for_function("() => typeof window.powerbi !== 'undefined'", timeout=10000)
 
-    # Inject the report container and embed configuration.
-    page.set_content("<html><body style='margin:0;height:100vh;'></body></html>")
+    # Size the existing body as the report container. Deliberately NOT
+    # page.set_content(): that performs document.open()/write(), which removes
+    # every window event listener -- including the WindowPostMessageProxy
+    # listener the Power BI service uses to receive events from the embed
+    # iframe. The iframe still renders (it is self-contained), but no `rendered`
+    # or `error` ever reaches a handler, so the race below times out on a report
+    # that is visibly fine. Measured A/B against a real workspace: with
+    # set_content, 6 postMessages arrive and 0 SDK events fire; without it, the
+    # same run reports `loaded` at 8.7s and `rendered` at 12.5s.
+    page.evaluate(
+        "() => { document.body.style.margin = '0'; document.body.style.height = '100vh'; }"
+    )
     try:
         page.evaluate(
             """([config]) => {
@@ -215,6 +254,9 @@ def test_report_visual_renders(page, case: dict[str, str]) -> None:
 
     if result is None:
         error = f"Report did not render within {timeout_ms}ms"
+        details = _capture_embed_error_details(page, result_dir)
+        if details:
+            error += f"; embed error panel: {details}"
         _write_result(result_dir, "error", error)
         pytest.fail(error)
 
