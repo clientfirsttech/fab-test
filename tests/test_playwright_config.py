@@ -103,7 +103,7 @@ def test_load_config_defaults_when_optional_omitted(
     assert config.page_ids == []
     assert config.bookmark_ids == []
     assert config.cloud == "public"
-    assert config.timeout_seconds == 60
+    assert config.timeout_seconds == 180
     assert config.headless is True
     assert config.user_name == ""
     assert config.role == ""

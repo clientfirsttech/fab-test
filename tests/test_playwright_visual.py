@@ -27,6 +27,23 @@ from fabric_ci_cd_dataops.scripts.playwright_validation.test_cases import saniti
 pytestmark = pytest.mark.playwright
 
 
+@pytest.fixture(scope="session")
+def browser_type_launch_args(browser_type_launch_args: dict[str, Any]) -> dict[str, Any]:
+    """Disable Chromium's same-origin policy for the embed sandbox.
+
+    Without this, the Power BI JS SDK's own calls to
+    api.powerbi.com/metadata/cluster/... and .../globalservice/... come
+    back 403 from the about:blank origin this spec embeds into, and the
+    SDK falls into its generic "Something went wrong" error page without
+    ever firing `rendered` or `error` on the report object -- so the race
+    in `test_report_visual_renders` hangs until the timeout instead of
+    failing fast with a real reason. Confirmed against kerski's own
+    working reference implementation (pbi-dataops-visual-error-testing),
+    which launches Chromium the same way.
+    """
+    return {**browser_type_launch_args, "args": ["--disable-web-security"]}
+
+
 def _results_root() -> Path:
     """Return the analyzer-results root for this test run."""
     return Path(os.getenv("PLAYWRIGHT_RESULTS_ROOT", "analyzer-results/playwright"))

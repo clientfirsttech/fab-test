@@ -234,8 +234,10 @@ def _verbosity_env(args: argparse.Namespace) -> str:
 
 
 # Default per-artifact subprocess timeout (seconds), used when neither
-# --timeout nor ANALYZER_TIMEOUT is set. Matches the longest wrapper timeout.
-_DEFAULT_SUBPROCESS_TIMEOUT = 120
+# --timeout nor ANALYZER_TIMEOUT is set. Matches the longest wrapper timeout:
+# playwright's own render-wait budget (PLAYWRIGHT_TIMEOUT_SECONDS, default
+# 180s) plus headroom for auth and browser startup.
+_DEFAULT_SUBPROCESS_TIMEOUT = 200
 
 
 # Defined in _report_html so fab_test_summary can ask the same question
@@ -2051,7 +2053,7 @@ _FAB_TEST_YML_TEMPLATE = """\
 # output_dir: analyzer-results      # root for result envelopes and the run manifest
 # jobs: 1                          # artifacts to run in parallel for the same analyzer
 # format: text                     # text | json
-# timeout: 120                     # per-artifact subprocess timeout in seconds [env: ANALYZER_TIMEOUT]
+# timeout: 200                     # per-artifact subprocess timeout in seconds [env: ANALYZER_TIMEOUT]
 # environment: DEV                 # default environment label [env: FABRIC_ENVIRONMENT]
 # workspace: Sales Dev             # default workspace name or GUID [env: FABRIC_WORKSPACE_ID]
 

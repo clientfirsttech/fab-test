@@ -44,10 +44,17 @@ def test_resolve_timeout_uses_env_when_no_cli_flag(monkeypatch):
 
 
 @pytest.mark.fab_test
-def test_resolve_timeout_defaults_to_120(monkeypatch):
-    """With neither --timeout nor ANALYZER_TIMEOUT set, the default is 120."""
+def test_resolve_timeout_defaults_to_200(monkeypatch):
+    """With neither --timeout nor ANALYZER_TIMEOUT set, the default is 200.
+
+    200 must stay above PLAYWRIGHT_TIMEOUT_SECONDS's default (180) plus
+    auth/startup overhead -- this is the outer subprocess timeout that
+    wraps every analyzer invocation, and killing the playwright wrapper
+    before its own render-wait budget elapses would be worse than the
+    render timeout it is meant to catch.
+    """
     monkeypatch.delenv("ANALYZER_TIMEOUT", raising=False)
-    assert _resolve_timeout(_TimeoutArgs(timeout=None)) == 120
+    assert _resolve_timeout(_TimeoutArgs(timeout=None)) == 200
 
 
 @pytest.mark.fab_test
