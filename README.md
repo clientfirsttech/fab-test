@@ -239,7 +239,7 @@ A run with 5 report x page x bookmark cases and 1 real failure now says so —
 `envelope.json`'s `test_results` carries one row per case with that case's own
 real outcome, so `findings` names only the case that actually failed instead of
 tagging all 5 identically. Each row also points at that case's own evidence
-(`analyzer-results/playwright/test-cases/<case>/screenshot.png`, plus
+(`fab-test-results/playwright/test-cases/<case>/screenshot.png`, plus
 `console.json`/`network.json` when there's something to capture); `--report`
 renders those as links right in the table, and the same paths are in
 `envelope.json` for a script or an agent to open directly.
@@ -291,7 +291,7 @@ fab-test all --report
 
 Reports are **opt-in** — nothing is written without the flag, so no existing run gets slower. Add `report: true` to `fab-test.yml` to turn them on for good.
 
-Each artifact gets a self-contained HTML page beside its envelope, and `fab-test all --report` also writes `analyzer-results/index.html` linking them all, so one run means one page to open:
+Each artifact gets a self-contained HTML page beside its envelope, and `fab-test all --report` also writes `fab-test-results/index.html` linking them all, so one run means one page to open:
 
 ```
   ╭────────────┬───────────────────────┬──────────┬───────┬────────╮
@@ -302,11 +302,11 @@ Each artifact gets a self-contained HTML page beside its envelope, and `fab-test
   ╰────────────┴───────────────────────┴──────────┴───────┴────────╯
 
   pbir/SampleModel-PQLAssert
-    analyzer-results/pbir/SampleModel-PQLAssert/native.json/TestRun.html
+    fab-test-results/pbir/SampleModel-PQLAssert/native.json/TestRun.html
   bpa/SampleModel-PQLAssert
-    analyzer-results/bpa/SampleModel-PQLAssert/report.html
+    fab-test-results/bpa/SampleModel-PQLAssert/report.html
 
-  Index:  analyzer-results/index.html
+  Index:  fab-test-results/index.html
 ```
 
 PBIR Inspector writes its own `TestRun.html` and it appears **with or without** `--report` — it is richer than anything generated from the envelope, so `fab-test` never overwrites it. Two upstream asset paths in it are repaired in place, both by inlining as base64 so nothing 404s once the report is copied out of the tool's install directory: the favicon link, and every per-object screenshot. Tabular Editor emits TRX and `pql-test` emits JSON, so those two get a generated `report.html`.
@@ -327,7 +327,7 @@ Status and non-zero counts are coloured in a terminal. Colour is off when output
 fab-test doctor --format json          # 1. is each analyzer's tool/credential ready?
 fab-test list --format json            # 2. what subcommands exist, and how many artifacts match?
 fab-test bpa --format json             # 3. run it — stdout is exactly one JSON document
-cat analyzer-results/run.json          # 4. read the manifest instead of globbing result dirs
+cat fab-test-results/run.json          # 4. read the manifest instead of globbing result dirs
 ```
 
 `--format json` guarantees stdout carries nothing but the payload — narration goes to stderr. When a run fails, `run.json` says why without a second file: an artifact whose analyzer aborted before writing an envelope carries the remediation message in its `detail` field (`"Pass --env, set FABRIC_ENVIRONMENT, ..."`), so uploading the manifest alone is enough to diagnose a red build. See the [Agent Contract](https://github.com/kerski/fab-test/blob/main/.github/skills/fab-test/SKILL.md#agent-contract) for exit codes, the JSON stdout guarantee, and the `run.json` schema.

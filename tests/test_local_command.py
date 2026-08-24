@@ -147,7 +147,7 @@ def test_local_exit_code_is_zero_when_every_analyzer_is_skipped(tmp_path, monkey
 
 @pytest.mark.fab_test
 def test_local_writes_run_manifest(tmp_path, monkeypatch):
-    """fab-test local still writes analyzer-results/run.json."""
+    """fab-test local still writes fab-test-results/run.json."""
     from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
 
     monkeypatch.setattr(

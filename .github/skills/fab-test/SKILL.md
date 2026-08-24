@@ -114,9 +114,9 @@ fab-test doctor --local --format json
 }
 ```
 
-### The run manifest (`analyzer-results/run.json`)
+### The run manifest (`fab-test-results/run.json`)
 
-Every analyzer invocation (a single subcommand or `all`) writes one `run.json` under `--output-dir` (default `analyzer-results/`), so a caller reads one file instead of globbing result directories:
+Every analyzer invocation (a single subcommand or `all`) writes one `run.json` under `--output-dir` (default `fab-test-results/`), so a caller reads one file instead of globbing result directories:
 
 ```json
 {
@@ -138,7 +138,7 @@ Every analyzer invocation (a single subcommand or `all`) writes one `run.json` u
       "analyzer": "bpa",
       "artifact": "SampleModel-PQLAssert",
       "status": "passed",
-      "envelope_path": "analyzer-results/bpa/SampleModel-PQLAssert/envelope.json",
+      "envelope_path": "fab-test-results/bpa/SampleModel-PQLAssert/envelope.json",
       "errors": 0,
       "warnings": 21,
       "detail": null
@@ -186,7 +186,7 @@ Per-artifact `status` is one of `passed` / `failed` / `skipped` / `timeout` / `p
 `pql-lint` is **hidden from the advertised surface**: it is absent from `--help`, `fab-test list`, and the default `doctor` report. It remains fully invocable — `fab-test pql-lint`, its `pql_lint` alias, `fab-test pql-lint --help`, `fab-test explain pql_lint`, and `fab-test doctor --analyzer pql_lint` all work exactly as before. `fab-test local` no longer includes it, though: a bundle should not run what the CLI does not offer. Hiding is a visibility state, never a removal: the backward-compatibility constraint in [vision.md](../../../vision.md) means existing commands keep working.
 
 Underscore spellings (`pql_test`, `pql_lint`, `playwright_impact`) still work silently as aliases —
-existing scripts and muscle memory keep working. Result directories under `analyzer-results/`
+existing scripts and muscle memory keep working. Result directories under `fab-test-results/`
 use the original underscore names regardless of which spelling you invoke.
 
 ## Targeting
@@ -364,7 +364,7 @@ fab-test all --report --no-report   # invalid: mutually exclusive, exits 2
 | `pql-test` | Generated `report.html` | `pql-test` emits JSON and CI log annotations only. |
 | `pql-lint` | None | Currently hidden from the advertised surface, so a report would have no reader. |
 
-The generated report never overwrites an upstream one: `attach_report` is a no-op when the envelope already carries `native_html_output_path`. PBIR's own `TestRun.html` also has two upstream asset paths repaired in place, both by inlining as base64 data URIs rather than leaving a relative path for the browser to resolve: the favicon (`fix_favicon_link`) -- FabInspCLI ships it relative to the tool's *install* directory, which 404s once the report lands under `analyzer-results/` -- and each per-object screenshot (`fix_screenshot_images`) -- the template builds that `src` as `PBIInspectorPNG\<Id>.png`, a Windows-style relative path with the same problem. An object whose screenshot file genuinely isn't in that folder is left as it was; only the images that exist but couldn't resolve get fixed.
+The generated report never overwrites an upstream one: `attach_report` is a no-op when the envelope already carries `native_html_output_path`. PBIR's own `TestRun.html` also has two upstream asset paths repaired in place, both by inlining as base64 data URIs rather than leaving a relative path for the browser to resolve: the favicon (`fix_favicon_link`) -- FabInspCLI ships it relative to the tool's *install* directory, which 404s once the report lands under `fab-test-results/` -- and each per-object screenshot (`fix_screenshot_images`) -- the template builds that `src` as `PBIInspectorPNG\<Id>.png`, a Windows-style relative path with the same problem. An object whose screenshot file genuinely isn't in that folder is left as it was; only the images that exist but couldn't resolve get fixed.
 
 Every report is a single self-contained file — no external stylesheet, script, or font ever fetches, links, or points off the page, so it opens from disk and survives being uploaded as a CI artifact. Rendering is deterministic: the same envelope always produces the same bytes, and the run time shown comes from the envelope's `started_at`, never from render time.
 
@@ -380,7 +380,7 @@ The full list also has a **search box and clickable, sortable column headers** (
 
 ### The per-run index
 
-`fab-test all --report` also writes `analyzer-results/index.html` linking every report and envelope, so one run means one page to open rather than four. It is built from the same rows the terminal summary prints, so its counts cannot disagree with them. Written only for a multi-analyzer run — indexing one analyzer is a page pointing at a single link.
+`fab-test all --report` also writes `fab-test-results/index.html` linking every report and envelope, so one run means one page to open rather than four. It is built from the same rows the terminal summary prints, so its counts cannot disagree with them. Written only for a multi-analyzer run — indexing one analyzer is a page pointing at a single link.
 
 The index header also shows **when the run happened and who ran it**: a UTC timestamp, plus branch/commit/actor sourced from `GITHUB_*` environment variables in CI, falling back to local `git` (branch, commit, `git config user.email`) outside CI, and to an em-dash (`—`) placeholder outside a git checkout entirely — it never raises. Per-analyzer `report.html` deliberately has no timestamp (see above): the index is scoped to one run, not a reusable artifact, which is why only it gained one.
 
@@ -397,9 +397,9 @@ The `all` summary lists one path per artifact beneath the table — the report w
   ╰────────────┴───────────────────────┴──────────┴───────┴────────╯
 
   pbir/SampleModel-PQLAssert
-    analyzer-results/pbir/SampleModel-PQLAssert/native.json/TestRun.html
+    fab-test-results/pbir/SampleModel-PQLAssert/native.json/TestRun.html
   bpa/SampleModel-PQLAssert
-    analyzer-results/bpa/SampleModel-PQLAssert/report.html
+    fab-test-results/bpa/SampleModel-PQLAssert/report.html
 ```
 
 Paths are relative to the working directory and never truncated, so they stay clickable in a terminal that linkifies them. Under `--format json` each artifact row carries `report_path` (null when absent) alongside `output_path`, which keeps its existing meaning.
@@ -436,7 +436,7 @@ If both `fab-test.yml` and `[tool.fab-test]` are present, `fab-test.yml` wins pe
 | Key | Type | Env var | Default |
 |-----|------|---------|---------|
 | `artifact_dir` | string | — | the working directory |
-| `output_dir` | string | — | `analyzer-results` |
+| `output_dir` | string | — | `fab-test-results` |
 | `jobs` | integer | — | `1` |
 | `format` | string (`text`\|`json`) | — | `text` |
 | `timeout` | integer | `ANALYZER_TIMEOUT` | `200` |
@@ -597,7 +597,7 @@ remediation without parsing the log.
 | `TARGET` (positional) | (discover all) | What to test — see [Targeting](#targeting) for the grammar |
 | `--artifact STEM` | (all) | Deprecated alias for `TARGET`; passing both exits `2` |
 | `--artifact-dir DIR` | the working directory | Root to discover artifacts under, recursively |
-| `--output-dir DIR` | `analyzer-results` | Root directory for result envelopes |
+| `--output-dir DIR` | `fab-test-results` | Root directory for result envelopes |
 | `--dry-run` | off | List matching artifacts without running any analyzer |
 | `--telemetry` / `--no-telemetry` | config-driven | Force/suppress Eventhouse telemetry. A configured destination already enables it; `--telemetry` with none configured exits `2` — see [Telemetry](#telemetry) |
 | `--report` / `--no-report` | off | Write a readable HTML report beside each envelope [env: `ANALYZER_REPORT`] |
@@ -736,7 +736,7 @@ discoverable: `fab-test init` scaffolds a commented line for it, and
 `env:FABRIC_WORKSPACE_ID`, etc.) alongside every other setting.
 
 **Every generated case gets its own accurate result, not the run's outcome copy-pasted.**
-`analyzer-results/playwright/test-cases/<case>/result.json` (written by the pytest
+`fab-test-results/playwright/test-cases/<case>/result.json` (written by the pytest
 spec itself, per case) records that case's real `status` (`pass`/`error`) and, on
 failure, the actual detail -- the embed error, a render timeout, or an RDL error
 modal -- rather than the fixed string every case used to share. The envelope's
@@ -781,7 +781,7 @@ Impact-manifest mode validates every report impacted by changed artifacts. It is
 
 ```bash
 fab-test playwright-impact --changed-artifacts changed-artifacts.json --env dev --env-file .env
-fab-test playwright --impact-manifest analyzer-results/playwright/impact-manifest.json --env dev --env-file .env
+fab-test playwright --impact-manifest fab-test-results/playwright/impact-manifest.json --env dev --env-file .env
 ```
 
 Browser setup:
@@ -867,14 +867,14 @@ fab-test pbir -vv            # resolved command + stdout/stderr
 fab-test all --verbose       # same as -v
 ```
 
-Result files under `analyzer-results/` are identical regardless of verbosity.
+Result files under `fab-test-results/` are identical regardless of verbosity.
 
 ## Result Locations
 
 All results follow the same layout regardless of analyzer:
 
 ```
-analyzer-results/
+fab-test-results/
   run.json            ← one manifest per invocation
   index.html          ← per-run index, only with --report on a multi-analyzer run
   bpa/

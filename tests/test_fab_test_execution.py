@@ -77,7 +77,7 @@ def test_run_analyzer_passes_resolved_timeout_to_subprocess(tmp_path, monkeypatc
 
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
-    output_dir = tmp_path / "analyzer-results"
+    output_dir = tmp_path / "fab-test-results"
 
     monkeypatch.delenv("ANALYZER_TIMEOUT", raising=False)
     monkeypatch.setattr(fab_test_module, "_send_telemetry", lambda *a, **k: None)
@@ -129,7 +129,7 @@ def test_run_analyzer_default_jobs_runs_artifacts_sequentially(tmp_path, monkeyp
     artifact_dir = tmp_path / "artifacts"
     for i in range(3):
         (artifact_dir / f"Model{i}.SemanticModel").mkdir(parents=True)
-    output_dir = tmp_path / "analyzer-results"
+    output_dir = tmp_path / "fab-test-results"
 
     monkeypatch.setattr(fab_test_module, "_send_telemetry", lambda *a, **k: None)
 
@@ -166,7 +166,7 @@ def test_run_analyzer_jobs_n_runs_artifacts_concurrently(tmp_path, monkeypatch):
     artifact_dir = tmp_path / "artifacts"
     for i in range(3):
         (artifact_dir / f"Model{i}.SemanticModel").mkdir(parents=True)
-    output_dir = tmp_path / "analyzer-results"
+    output_dir = tmp_path / "fab-test-results"
 
     monkeypatch.setattr(fab_test_module, "_send_telemetry", lambda *a, **k: None)
 
@@ -195,7 +195,7 @@ def test_run_analyzer_parallel_writes_one_envelope_per_artifact(tmp_path, monkey
     stems = [f"Model{i}" for i in range(3)]
     for stem in stems:
         (artifact_dir / f"{stem}.SemanticModel").mkdir(parents=True)
-    output_dir = tmp_path / "analyzer-results"
+    output_dir = tmp_path / "fab-test-results"
 
     monkeypatch.setattr(fab_test_module, "_send_telemetry", lambda *a, **k: None)
 
@@ -235,7 +235,7 @@ def test_progress_shown_non_ci_multiple_artifacts(tmp_path, monkeypatch, capsys)
     artifact_dir = tmp_path / "artifacts"
     for i in range(3):
         (artifact_dir / f"Model{i}.SemanticModel").mkdir(parents=True)
-    output_dir = tmp_path / "analyzer-results"
+    output_dir = tmp_path / "fab-test-results"
 
     monkeypatch.setattr(fab_test_module, "_is_ci", lambda: False)
     monkeypatch.setattr(fab_test_module, "_send_telemetry", lambda *a, **k: None)
@@ -258,7 +258,7 @@ def test_progress_not_shown_for_single_artifact(tmp_path, monkeypatch, capsys):
 
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
-    output_dir = tmp_path / "analyzer-results"
+    output_dir = tmp_path / "fab-test-results"
 
     monkeypatch.setattr(fab_test_module, "_is_ci", lambda: False)
     monkeypatch.setattr(fab_test_module, "_send_telemetry", lambda *a, **k: None)
@@ -280,7 +280,7 @@ def test_progress_emitted_as_ci_notice(tmp_path, monkeypatch, capsys):
     artifact_dir = tmp_path / "artifacts"
     for i in range(2):
         (artifact_dir / f"Model{i}.SemanticModel").mkdir(parents=True)
-    output_dir = tmp_path / "analyzer-results"
+    output_dir = tmp_path / "fab-test-results"
 
     monkeypatch.setattr(fab_test_module, "_is_ci", lambda: True)
     monkeypatch.setattr(fab_test_module, "_send_telemetry", lambda *a, **k: None)
@@ -305,7 +305,7 @@ def test_artifact_start_line_still_printed_alongside_progress(tmp_path, monkeypa
 
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
-    output_dir = tmp_path / "analyzer-results"
+    output_dir = tmp_path / "fab-test-results"
 
     monkeypatch.setattr(fab_test_module, "_is_ci", lambda: False)
     monkeypatch.setattr(fab_test_module, "_send_telemetry", lambda *a, **k: None)
@@ -351,7 +351,7 @@ def test_run_analyzer_warning_no_name_error_outside_ci(tmp_path, monkeypatch):
 
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
-    output_dir = tmp_path / "analyzer-results"
+    output_dir = tmp_path / "fab-test-results"
     _make_warning_envelope(output_dir, "pql_lint", "SampleModel")
 
     monkeypatch.setattr(fab_test_module, "_is_ci", lambda: False)
@@ -374,7 +374,7 @@ def test_run_analyzer_warning_emits_pr_review_comment_in_ci(tmp_path, monkeypatc
 
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
-    output_dir = tmp_path / "analyzer-results"
+    output_dir = tmp_path / "fab-test-results"
     _make_warning_envelope(output_dir, "pql_lint", "SampleModel")
 
     calls = []
@@ -413,7 +413,7 @@ def test_run_analyzer_playwright_with_impact_manifest_is_repository_scoped(
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "ReportOne.Report").mkdir(parents=True)
     (artifact_dir / "ReportTwo.Report").mkdir(parents=True)
-    output_dir = tmp_path / "analyzer-results"
+    output_dir = tmp_path / "fab-test-results"
     impact_manifest = tmp_path / "impact-manifest.json"
     impact_manifest.write_text(json.dumps({"reports": []}), encoding="utf-8")
 
@@ -447,7 +447,7 @@ def test_run_analyzer_error_does_not_emit_pr_review_comment(tmp_path, monkeypatc
 
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
-    output_dir = tmp_path / "analyzer-results"
+    output_dir = tmp_path / "fab-test-results"
     envelope = output_dir / "pql_lint" / "SampleModel" / "envelope.json"
     envelope.parent.mkdir(parents=True)
     envelope.write_text(

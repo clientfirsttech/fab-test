@@ -65,7 +65,7 @@ Add `--format json` for a single machine-readable document instead.
 
 ## DAX tests against your open Desktop instance
 
-If you have the `.pbip` open in Power BI Desktop, `fab-test local` (via `pql-test`) connects to it automatically — no `--workspace-id`, no credentials. `fab-test local`'s subparser doesn't even expose a `--workspace-id` flag, so there's no way to accidentally reach for a Fabric workspace from the local path. The run manifest (`analyzer-results/run.json`) records `"origin": "local"` and, when a Desktop instance was matched, a `"desktop"` field on the `pql_test` envelope naming the port and model it bound to.
+If you have the `.pbip` open in Power BI Desktop, `fab-test local` (via `pql-test`) connects to it automatically — no `--workspace-id`, no credentials. `fab-test local`'s subparser doesn't even expose a `--workspace-id` flag, so there's no way to accidentally reach for a Fabric workspace from the local path. The run manifest (`fab-test-results/run.json`) records `"origin": "local"` and, when a Desktop instance was matched, a `"desktop"` field on the `pql_test` envelope naming the port and model it bound to.
 
 ## Moving to CI later
 

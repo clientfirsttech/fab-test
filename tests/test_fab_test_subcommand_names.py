@@ -150,10 +150,10 @@ def test_list_reports_canonical_name_and_aliases():
 
 @pytest.mark.fab_test
 def test_result_directory_name_unchanged_when_invoked_via_canonical_form(tmp_path):
-    """Invoking via the new canonical 'pql-test' still writes under analyzer-results/pql_test/."""
+    """Invoking via the new canonical 'pql-test' still writes under fab-test-results/pql_test/."""
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
-    output_dir = tmp_path / "analyzer-results"
+    output_dir = tmp_path / "fab-test-results"
 
     result = subprocess.run(
         [

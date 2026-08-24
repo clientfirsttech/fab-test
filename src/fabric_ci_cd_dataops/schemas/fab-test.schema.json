@@ -11,7 +11,7 @@
     },
     "output_dir": {
       "type": "string",
-      "description": "Root directory for result envelopes and the run manifest (default: analyzer-results)."
+      "description": "Root directory for result envelopes and the run manifest (default: fab-test-results)."
     },
     "jobs": {
       "type": "integer",

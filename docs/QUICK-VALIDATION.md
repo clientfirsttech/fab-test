@@ -266,11 +266,11 @@ See the [Configuration section of the fab-test skill](../.github/skills/fab-test
   with:
     name: fab-test-report
     path: |
-      analyzer-results/index.html
-      analyzer-results/**/report.html
-      analyzer-results/**/TestRun.html
-      analyzer-results/playwright/test-cases/**
-      analyzer-results/run.json
+      fab-test-results/index.html
+      fab-test-results/**/report.html
+      fab-test-results/**/TestRun.html
+      fab-test-results/playwright/test-cases/**
+      fab-test-results/run.json
 ```
 
 `if: always()` matters: the run you most want to read is the one that failed. Colour is automatically off because stdout is not a terminal — set `FORCE_COLOR: "1"` if your CI log viewer renders ANSI and you want it back.
@@ -321,7 +321,7 @@ A copy-pasteable step for a CI job — gate on readiness, run with `--format jso
   uses: actions/upload-artifact@v4
   with:
     name: fab-test-run-manifest
-    path: analyzer-results/run.json
+    path: fab-test-results/run.json
 ```
 
 **Keep `--artifact-dir` explicit in CI.** Locally the default follows your
@@ -371,7 +371,7 @@ analyzers already use, and commit the address in `fab-test.yml`.
   if: always()
   with:
     name: fab-test-run-manifest
-    path: analyzer-results/run.json
+    path: fab-test-results/run.json
 ```
 
 ```yaml
@@ -447,7 +447,7 @@ table alongside each payload.
   uses: actions/upload-artifact@v4
   with:
     name: fab-test-run-manifest
-    path: analyzer-results/run.json
+    path: fab-test-results/run.json
 ```
 
 The difference from running it on a laptop: no Power BI Desktop instance is open in CI, so `pql-test`'s DAX tests connect to nothing and degrade to a `skipped` status on that artifact (never a failure — see vision.md's "platform gaps degrade to skips") rather than binding to a `desktop` port. `pql-lint`, BPA, and PBIR Inspector are unaffected — they don't depend on Desktop at all.

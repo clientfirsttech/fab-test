@@ -52,7 +52,7 @@ PBIRInspectorCLI [options]
 PBIRInspectorCLI \
   -fabricitem ".fabric/artifacts/SalesReport.Report" \
   -rules ".github/metadata/rules/pbi-inspector-custom-rules.json" \
-  -output "./analyzer-results/pbir/SalesReport/native.json" \
+  -output "./fab-test-results/pbir/SalesReport/native.json" \
   -formats JSON,HTML \
   -verbose true
 
@@ -113,7 +113,7 @@ scripts/invoke_pbir_inspector.py       ← Python wrapper
 ### Output layout
 
 ```
-analyzer-results/pbir/<artifact-stem>/
+fab-test-results/pbir/<artifact-stem>/
 ├── envelope.json                          ← standardized envelope
 └── native.json/                           ← directory created by CLI
     ├── TestRun_<guid>_<HHMMSS>.json       ← raw JSON results

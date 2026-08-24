@@ -74,7 +74,7 @@ def test_no_credential_value_reaches_the_payload(tmp_path, monkeypatch):
         [
             "fab-test", "--config", str(config), "pql_lint",
             "--artifact-dir", str(artifact_dir),
-            "--output-dir", str(tmp_path / "analyzer-results"),
+            "--output-dir", str(tmp_path / "fab-test-results"),
         ],
     )
 
@@ -128,7 +128,7 @@ def test_the_redacted_failure_reaches_the_manifest_and_the_log_already_redacted(
     (artifact_dir / "Sales.SemanticModel").mkdir(parents=True)
     config = tmp_path / "fab-test.yml"
     config.write_text(_CONFIG_YAML, encoding="utf-8")
-    output_dir = tmp_path / "analyzer-results"
+    output_dir = tmp_path / "fab-test-results"
     monkeypatch.setattr(
         sys,
         "argv",
@@ -168,7 +168,7 @@ def test_the_dry_run_names_the_destination_but_never_the_secret(tmp_path, monkey
         [
             "fab-test", "--config", str(config), "pql_lint",
             "--artifact-dir", str(artifact_dir),
-            "--output-dir", str(tmp_path / "analyzer-results"),
+            "--output-dir", str(tmp_path / "fab-test-results"),
             "--dry-run",
         ],
     )

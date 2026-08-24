@@ -33,7 +33,7 @@ def test_json_format_real_run_has_no_narration_on_stdout(tmp_path, monkeypatch, 
     artifact_dir = tmp_path / "artifacts"
     for i in range(2):
         (artifact_dir / f"Model{i}.SemanticModel").mkdir(parents=True)
-    output_dir = tmp_path / "analyzer-results"
+    output_dir = tmp_path / "fab-test-results"
 
     monkeypatch.setattr(fab_test_module, "_is_ci", lambda: False)
     monkeypatch.setattr(fab_test_module, "_send_telemetry", lambda *a, **k: None)
@@ -57,7 +57,7 @@ def test_text_format_narration_still_on_stdout(tmp_path, monkeypatch, capsys):
 
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
-    output_dir = tmp_path / "analyzer-results"
+    output_dir = tmp_path / "fab-test-results"
 
     monkeypatch.setattr(fab_test_module, "_is_ci", lambda: False)
     monkeypatch.setattr(fab_test_module, "_send_telemetry", lambda *a, **k: None)
@@ -79,7 +79,7 @@ def test_missing_artifacts_warning_narrated_by_format(tmp_path, capsys):
     """
     artifact_dir = tmp_path / "empty"
     artifact_dir.mkdir()
-    output_dir = tmp_path / "analyzer-results"
+    output_dir = tmp_path / "fab-test-results"
 
     args = _RunAnalyzerArgs(artifact_dir, output_dir, output_format="json")
     code = _run_analyzer("bpa", args, output_dir)
@@ -103,7 +103,7 @@ def test_json_format_passes_stdout_pipe_to_subprocess(tmp_path, monkeypatch):
 
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
-    output_dir = tmp_path / "analyzer-results"
+    output_dir = tmp_path / "fab-test-results"
 
     monkeypatch.setattr(fab_test_module, "_send_telemetry", lambda *a, **k: None)
 
@@ -128,7 +128,7 @@ def test_text_format_does_not_capture_subprocess_stdout(tmp_path, monkeypatch):
 
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
-    output_dir = tmp_path / "analyzer-results"
+    output_dir = tmp_path / "fab-test-results"
 
     monkeypatch.setattr(fab_test_module, "_send_telemetry", lambda *a, **k: None)
 
@@ -155,7 +155,7 @@ def test_json_format_reemits_captured_subprocess_stdout_to_stderr(tmp_path, monk
 
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
-    output_dir = tmp_path / "analyzer-results"
+    output_dir = tmp_path / "fab-test-results"
 
     monkeypatch.setattr(fab_test_module, "_send_telemetry", lambda *a, **k: None)
     monkeypatch.setattr(
@@ -183,7 +183,7 @@ def test_json_format_verbose_still_narrates_and_stdout_stays_valid(tmp_path, mon
 
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
-    output_dir = tmp_path / "analyzer-results"
+    output_dir = tmp_path / "fab-test-results"
 
     monkeypatch.setattr(fab_test_module, "_send_telemetry", lambda *a, **k: None)
     monkeypatch.setattr(
@@ -214,7 +214,7 @@ def test_json_format_timeout_reemits_captured_stdout_before_timeout(
 
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
-    output_dir = tmp_path / "analyzer-results"
+    output_dir = tmp_path / "fab-test-results"
 
     monkeypatch.setattr(fab_test_module, "_send_telemetry", lambda *a, **k: None)
 
@@ -245,7 +245,7 @@ def test_json_format_sets_analyzer_output_mode_env_for_subprocess(tmp_path, monk
 
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
-    output_dir = tmp_path / "analyzer-results"
+    output_dir = tmp_path / "fab-test-results"
 
     monkeypatch.setattr(fab_test_module, "_send_telemetry", lambda *a, **k: None)
 
@@ -270,7 +270,7 @@ def test_text_format_leaves_analyzer_output_mode_env_unset(tmp_path, monkeypatch
 
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
-    output_dir = tmp_path / "analyzer-results"
+    output_dir = tmp_path / "fab-test-results"
 
     monkeypatch.setattr(fab_test_module, "_send_telemetry", lambda *a, **k: None)
 

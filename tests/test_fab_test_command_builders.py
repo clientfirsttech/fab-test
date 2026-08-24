@@ -63,7 +63,7 @@ def test_build_pql_test_command_adds_desktop_flags_when_instance_matches(tmp_pat
     )
 
     args = argparse.Namespace(workspace_id="", environment="")
-    cmd = build_pql_test_command(model_dir, args, REPO_ROOT / "analyzer-results")
+    cmd = build_pql_test_command(model_dir, args, REPO_ROOT / "fab-test-results")
 
     assert "--desktop-port" in cmd
     assert cmd[cmd.index("--desktop-port") + 1] == "51234"
@@ -84,7 +84,7 @@ def test_build_pql_test_command_skips_detection_when_workspace_id_given(tmp_path
     monkeypatch.setattr(fab_test_registry, "detect_desktop_instances", _fail_if_called)
 
     args = argparse.Namespace(workspace_id="workspace-123", environment="")
-    cmd = build_pql_test_command(model_dir, args, REPO_ROOT / "analyzer-results")
+    cmd = build_pql_test_command(model_dir, args, REPO_ROOT / "fab-test-results")
 
     assert "--desktop-port" not in cmd
     assert "--desktop-model-name" not in cmd
@@ -99,7 +99,7 @@ def test_build_pql_test_command_omits_desktop_flags_when_no_instance_running(tmp
     monkeypatch.setattr(fab_test_registry, "detect_desktop_instances", list)
 
     args = argparse.Namespace(workspace_id="", environment="")
-    cmd = build_pql_test_command(model_dir, args, REPO_ROOT / "analyzer-results")
+    cmd = build_pql_test_command(model_dir, args, REPO_ROOT / "fab-test-results")
 
     assert "--desktop-port" not in cmd
     assert "--desktop-model-name" not in cmd
@@ -120,7 +120,7 @@ def test_build_pql_test_command_omits_desktop_flags_when_artifact_has_no_pbip(tm
     )
 
     args = argparse.Namespace(workspace_id="", environment="")
-    cmd = build_pql_test_command(model_dir, args, REPO_ROOT / "analyzer-results")
+    cmd = build_pql_test_command(model_dir, args, REPO_ROOT / "fab-test-results")
 
     assert "--desktop-port" not in cmd
 

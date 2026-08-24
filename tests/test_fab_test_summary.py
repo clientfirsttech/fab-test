@@ -201,7 +201,7 @@ def test_pql_test_status_labels():
 @pytest.mark.fab_test
 def test_print_summary_shows_test_summary_and_severity_breakdown(tmp_path, capsys):
     """Summary line includes test counters and error/warning breakdown."""
-    output_dir = tmp_path / "analyzer-results"
+    output_dir = tmp_path / "fab-test-results"
     envelope = output_dir / "bpa" / "SampleModel" / "envelope.json"
     envelope.parent.mkdir(parents=True)
     envelope.write_text(
@@ -253,7 +253,7 @@ def test_print_summary_default_does_not_show_findings(capsys):
 @pytest.mark.fab_test
 def test_print_summary_verbose_shows_findings_for_failed_artifact(tmp_path, capsys):
     """Verbose mode surfaces the failed artifact's findings from its envelope."""
-    output_dir = tmp_path / "analyzer-results"
+    output_dir = tmp_path / "fab-test-results"
     envelope = output_dir / "bpa" / "SampleModel" / "envelope.json"
     envelope.parent.mkdir(parents=True)
     envelope.write_text(
@@ -288,7 +288,7 @@ def test_print_summary_verbose_shows_findings_for_failed_artifact(tmp_path, caps
 @pytest.mark.fab_test
 def test_print_summary_pql_test_counters(tmp_path, capsys):
     """pql-test summary line shows total/passed/failed/skipped counters."""
-    output_dir = tmp_path / "analyzer-results"
+    output_dir = tmp_path / "fab-test-results"
     envelope = output_dir / "pql_test" / "SampleModel" / "envelope.json"
     envelope.parent.mkdir(parents=True)
     envelope.write_text(
@@ -325,7 +325,7 @@ def test_print_summary_pql_test_counters(tmp_path, capsys):
 @pytest.mark.fab_test
 def test_print_summary_pql_test_verbose_table(tmp_path, capsys):
     """pql-test verbose output shows the test-results table."""
-    output_dir = tmp_path / "analyzer-results"
+    output_dir = tmp_path / "fab-test-results"
     envelope = output_dir / "pql_test" / "SampleModel" / "envelope.json"
     envelope.parent.mkdir(parents=True)
     envelope.write_text(
@@ -385,7 +385,7 @@ class _FakeArgs:
 @pytest.mark.fab_test
 def test_print_all_summary_shows_aggregate_errors_and_warnings(tmp_path, capsys):
     """Aggregate summary totals errors and warnings across analyzers."""
-    output_dir = tmp_path / "analyzer-results"
+    output_dir = tmp_path / "fab-test-results"
     for analyzer, stem, findings in [
         ("bpa", "SampleModel", [{"rule": "R1", "severity": "Error"}] * 2),
         ("pbir", "SampleModel", [{"rule": "R2", "severity": "Warning"}] * 3),
@@ -423,7 +423,7 @@ def test_print_all_summary_shows_aggregate_errors_and_warnings(tmp_path, capsys)
 @pytest.mark.fab_test
 def test_print_all_summary_no_artifacts_analyzed(tmp_path, capsys):
     """When no artifacts match, the aggregate summary reports that clearly."""
-    output_dir = tmp_path / "analyzer-results"
+    output_dir = tmp_path / "fab-test-results"
     artifact_dir = tmp_path / "artifacts"
     args = _FakeArgs(artifact_dir=artifact_dir)
     code = _print_all_summary(
@@ -482,7 +482,7 @@ def test_all_format_json_dry_run_is_valid_json():
 @pytest.mark.fab_test
 def test_print_summary_json_format(tmp_path, capsys):
     """_print_summary with output_format='json' emits JSON."""
-    output_dir = tmp_path / "analyzer-results"
+    output_dir = tmp_path / "fab-test-results"
     envelope = output_dir / "bpa" / "SampleModel" / "envelope.json"
     envelope.parent.mkdir(parents=True)
     envelope.write_text(
@@ -505,7 +505,7 @@ def test_print_summary_json_format(tmp_path, capsys):
 @pytest.mark.fab_test
 def test_print_all_summary_json_format(tmp_path, capsys):
     """_print_all_summary with output_format='json' emits JSON."""
-    output_dir = tmp_path / "analyzer-results"
+    output_dir = tmp_path / "fab-test-results"
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
     envelope = output_dir / "bpa" / "SampleModel" / "envelope.json"

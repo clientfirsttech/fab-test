@@ -149,6 +149,16 @@ def repo_root() -> Path:
 
 
 @pytest.fixture
+def results_root(tmp_path: Path) -> Path:
+    """Per-test stand-in for the packaged results directory (fab-test-results/).
+
+    Centralizes the literal so the next rename touches one file instead of
+    every test module that builds its own output_dir.
+    """
+    return tmp_path / "fab-test-results"
+
+
+@pytest.fixture
 def sample_analyzers_metadata(tmp_path: Path) -> Path:
     """Create a sample analyzers.json metadata file for testing."""
     metadata = {

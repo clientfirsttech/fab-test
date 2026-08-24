@@ -46,7 +46,7 @@ def _run(tmp_path, monkeypatch, *, config: str | None = _CONFIG_YAML, argv_extra
     from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
 
     artifact_dir = _artifacts(tmp_path)
-    output_dir = tmp_path / "analyzer-results"
+    output_dir = tmp_path / "fab-test-results"
     argv = ["fab-test"]
     if config is not None:
         config_path = tmp_path / "fab-test.yml"

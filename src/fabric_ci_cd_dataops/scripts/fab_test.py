@@ -14,7 +14,7 @@ Usage:
 Global flags (all subcommands):
     --artifact STEM      Only analyze the artifact matching this stem
     --artifact-dir DIR   Root to discover artifacts under (default: the working directory)
-    --output-dir DIR     Root for result envelopes (default: analyzer-results)
+    --output-dir DIR     Root for result envelopes (default: fab-test-results)
     --dry-run            List matching artifacts without running any analyzer
     --telemetry          Stream telemetry to Eventhouse when configured
     --no-telemetry       Suppress telemetry even when configured
@@ -155,7 +155,11 @@ SCRIPTS_DIR = REPO_ROOT / "scripts"
 # local` started here and found things. One answer to "where are my
 # artifacts?", and it is the directory you are standing in.
 ARTIFACT_ROOT = REPO_ROOT
-RESULTS_ROOT = REPO_ROOT / "analyzer-results"
+# "analyzer-results" (pre-1.0.0.0) named nothing -- any repo already using
+# another tool's directory of that name silently shared it, and a reader
+# had no way to tell which tool wrote it. Renamed before the first release,
+# so there is no installed base to keep working against the old name.
+RESULTS_ROOT = REPO_ROOT / "fab-test-results"
 
 
 _PYPROJECT_CONFIG, _FILE_CONFIG_WARNINGS = merged_file_config(REPO_ROOT, REPO_ROOT / "pyproject.toml")
@@ -1220,7 +1224,7 @@ _SUBCOMMAND_ALIASES = {
 }
 
 # Canonical (hyphenated, displayed) subcommand name -> internal registry key,
-# for the handful where they diverge. Result directories (analyzer-results/
+# for the handful where they diverge. Result directories (fab-test-results/
 # <key>/...) stay on the registry key so historical results remain readable.
 _CANONICAL_TO_REGISTRY_KEY = {
     "pql-test": "pql_test",
@@ -2050,7 +2054,7 @@ _FAB_TEST_YML_TEMPLATE = """\
 # effective value and origin of each setting right now.
 
 # artifact_dir: .fabric/artifacts   # root to discover artifacts (repo root for `fab-test local`)
-# output_dir: analyzer-results      # root for result envelopes and the run manifest
+# output_dir: fab-test-results      # root for result envelopes and the run manifest
 # jobs: 1                          # artifacts to run in parallel for the same analyzer
 # format: text                     # text | json
 # timeout: 200                     # per-artifact subprocess timeout in seconds [env: ANALYZER_TIMEOUT]

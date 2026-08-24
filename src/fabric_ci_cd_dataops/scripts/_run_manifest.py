@@ -1,6 +1,6 @@
 """Run manifest: one file per fab-test invocation (CLI Agent Ergonomics §11-12).
 
-Callers (humans, pipelines, and agents alike) read ``analyzer-results/run.json``
+Callers (humans, pipelines, and agents alike) read ``fab-test-results/run.json``
 instead of globbing result directories to learn what happened in the most
 recent invocation: the command that ran, every artifact's status and envelope
 path, totals, and the final exit code.

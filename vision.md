@@ -39,8 +39,9 @@ Constraints {
                      run legitimately covers a fraction of src/
   (simplicity)    => keep it simple where possible; prefer one flag over a subsystem,
                      one file over a format, and no abstraction until the second caller
-  (backward compat) => existing commands, env vars, and result paths keep working;
-                       new surfaces are additive and optional
+  (backward compat) => existing commands, env vars, and result paths released in
+                       1.0.0 and later keep working; new surfaces are additive
+                       and optional
   (secrets)       => credentials are never written to stdout, result envelopes, the run
                      manifest, or telemetry
   (documentation) => an epic is not done until all three callers are documented: the

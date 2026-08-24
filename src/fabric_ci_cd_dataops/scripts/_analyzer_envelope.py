@@ -55,8 +55,8 @@ ENVELOPE_OPTIONAL_KEYS: frozenset = frozenset(
     }
 )
 
-# Output layout: analyzer-results/<analyzer>/<artifact-stem>/
-_RESULTS_ROOT = "analyzer-results"
+# Output layout: fab-test-results/<analyzer>/<artifact-stem>/
+_RESULTS_ROOT = "fab-test-results"
 
 
 def is_test_finding(finding: dict) -> bool:

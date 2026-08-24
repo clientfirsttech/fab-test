@@ -47,9 +47,9 @@ def _run_cli(*argv, cwd=None):
 def test_path_under_the_working_directory_is_shown_relative(tmp_path, monkeypatch):
     """The common case: short enough to fit, complete enough to click."""
     monkeypatch.chdir(tmp_path)
-    target = tmp_path / "analyzer-results" / "bpa" / "Sales" / "envelope.json"
+    target = tmp_path / "fab-test-results" / "bpa" / "Sales" / "envelope.json"
 
-    assert _display_path(target) == str(Path("analyzer-results/bpa/Sales/envelope.json"))
+    assert _display_path(target) == str(Path("fab-test-results/bpa/Sales/envelope.json"))
 
 
 @pytest.mark.fab_test
@@ -57,8 +57,8 @@ def test_a_relative_input_is_still_resolved_and_shortened(tmp_path, monkeypatch)
     """--output-dir is often already relative; the result must not double up."""
     monkeypatch.chdir(tmp_path)
 
-    assert _display_path("analyzer-results/bpa/Sales/envelope.json") == str(
-        Path("analyzer-results/bpa/Sales/envelope.json")
+    assert _display_path("fab-test-results/bpa/Sales/envelope.json") == str(
+        Path("fab-test-results/bpa/Sales/envelope.json")
     )
 
 
@@ -82,7 +82,7 @@ def test_summary_shows_the_whole_path_with_no_ellipsis(artifact_tree):
         "--artifact-dir",
         str(artifact_tree),
         "--output-dir",
-        "analyzer-results",
+        "fab-test-results",
         "--dry-run",
         cwd=str(artifact_tree),
     )
@@ -100,7 +100,7 @@ def test_json_output_keeps_absolute_paths(artifact_tree):
         "--artifact-dir",
         str(artifact_tree),
         "--output-dir",
-        str(artifact_tree / "analyzer-results"),
+        str(artifact_tree / "fab-test-results"),
         "--dry-run",
         "--format",
         "json",

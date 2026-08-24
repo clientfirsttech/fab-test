@@ -55,7 +55,7 @@ class TestAnalyzerReporter:
             "status": "passed",
             "findings_count": 0,
             "duration_ms": 42,
-            "envelope_path": "analyzer-results/bpa/SalesModel/envelope.json",
+            "envelope_path": "fab-test-results/bpa/SalesModel/envelope.json",
             "native_path": "",
             "skip_reason": "",
             "findings": [],

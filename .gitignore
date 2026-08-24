@@ -46,7 +46,7 @@ apm.yml
 .ruff_cache/
 .fab-test-tools/**
 # Local analyzer output
-analyzer-results/
+fab-test-results/
 
 # Claude Code worktrees
 .claude/worktrees/
