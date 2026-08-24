@@ -155,6 +155,11 @@ retries for that reason, and a manual install may need the same patience.
 5. Update the README's install section: once the project exists on PyPI,
    `pip install fab-test` is true for the first time and the "not yet" wording
    has to go.
+6. Leave the logo's `raw.githubusercontent.com` URL in the README as an
+   absolute link, not a relative one. README.md is the literal
+   `long_description` uploaded to both indexes (`readme = "README.md"` in
+   `pyproject.toml`); a relative image path renders on GitHub but shows as a
+   broken image on PyPI/TestPyPI, which have no repository context.
 
 ---
 
