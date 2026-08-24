@@ -16,7 +16,15 @@ import pytest
 
 from fabric_ci_cd_dataops.scripts.fab_test_summary import _print_config_show
 
-_EXPECTED_KEYS = {"artifact_dir", "output_dir", "jobs", "format", "timeout", "environment"}
+_EXPECTED_KEYS = {
+    "artifact_dir",
+    "output_dir",
+    "jobs",
+    "format",
+    "timeout",
+    "environment",
+    "workspace",
+}
 
 # Resolved by metadata layer rather than by flag/env/config, so their origins
 # name a directory (`.fab-test/metadata`, `.github/metadata`, `packaged`)
@@ -93,7 +101,7 @@ def test_config_show_reports_default_origin_when_nothing_set(tmp_path):
     data = json.loads(result.stdout)
     timeout_row = next(row for row in data["settings"] if row["key"] == "timeout")
     assert timeout_row["origin"] == "default"
-    assert timeout_row["value"] == 120
+    assert timeout_row["value"] == 200
 
 
 @pytest.mark.fab_test
@@ -115,6 +123,51 @@ def test_config_show_reports_config_file_origin(tmp_path):
     timeout_row = next(row for row in data["settings"] if row["key"] == "timeout")
     assert timeout_row["value"] == 45
     assert timeout_row["origin"] == "fab-test.yml:timeout"
+
+
+@pytest.mark.fab_test
+def test_config_show_reports_env_origin_for_workspace(monkeypatch):
+    """FABRIC_WORKSPACE_ID set: workspace's origin names the env var, not the file.
+
+    `workspace:` works today (Artifact Targeting §3) but was undiscoverable
+    -- absent from `_SETTING_SPECS` and therefore from `config --show`. A
+    setting that cannot be found is a setting that does not exist.
+    """
+    result = subprocess.run(
+        ["fab-test", "config", "--show", "--format", "json"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        env={**os.environ, "FABRIC_WORKSPACE_ID": "11111111-1111-1111-1111-111111111111"},
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    data = json.loads(result.stdout)
+    workspace_row = next(row for row in data["settings"] if row["key"] == "workspace")
+    assert workspace_row["value"] == "11111111-1111-1111-1111-111111111111"
+    assert workspace_row["origin"] == "env:FABRIC_WORKSPACE_ID"
+
+
+@pytest.mark.fab_test
+def test_config_show_reports_config_file_origin_for_workspace(tmp_path):
+    """`workspace:` set in fab-test.yml shows origin fab-test.yml:workspace."""
+    (tmp_path / "fab-test.yml").write_text("workspace: Sales Dev\n", encoding="utf-8")
+
+    result = subprocess.run(
+        ["fab-test", "config", "--show", "--format", "json"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        env={k: v for k, v in os.environ.items() if k != "FABRIC_WORKSPACE_ID"},
+        cwd=tmp_path,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    data = json.loads(result.stdout)
+    workspace_row = next(row for row in data["settings"] if row["key"] == "workspace")
+    assert workspace_row["value"] == "Sales Dev"
+    assert workspace_row["origin"] == "fab-test.yml:workspace"
 
 
 # --------------------------------------------------------------------------- #

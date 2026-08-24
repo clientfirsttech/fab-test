@@ -12,12 +12,14 @@ import json
 import os
 import shutil
 import sys
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
 from tabulate import tabulate
 
 from ._analyzer_envelope import normalize_findings, severity_counts
+from ._cli_utils import CHECKOUT_REMEDIATION, skipped_checkout_lines
 from ._report_html import resolve_report, write_index
 from ._table_style import TABLE_FORMAT, table_padding
 from ._target import target_from_args
@@ -90,10 +92,27 @@ def _status_label(status: str) -> str:
     }.get(status, status)
 
 
-def _print_list(rows: list[dict[str, Any]], output_format: str = "text") -> int:
-    """Print the `fab-test list` capability report. Always exits 0."""
+def _print_list(
+    rows: list[dict[str, Any]],
+    output_format: str = "text",
+    *,
+    skipped_checkouts: Sequence[Path] = (),
+) -> int:
+    """Print the `fab-test list` capability report. Always exits 0.
+
+    ``skipped_checkouts`` is populated only when every discovering
+    analyzer matched nothing *and* the scan pruned repositories. A column
+    of zeroes otherwise reads as "there is nothing here", which is the
+    one thing it does not mean.
+    """
     if output_format == "json":
-        print(json.dumps({"analyzers": rows}, indent=2))
+        payload: dict[str, Any] = {
+            "analyzers": rows,
+            "skipped_checkouts": [str(path) for path in skipped_checkouts],
+        }
+        if skipped_checkouts:
+            payload["remediation"] = CHECKOUT_REMEDIATION
+        print(json.dumps(payload, indent=2))
         return 0
 
     display_rows = [
@@ -114,6 +133,8 @@ def _print_list(rows: list[dict[str, Any]], output_format: str = "text") -> int:
         stralign="left",
     )
     print(table)
+    for line in skipped_checkout_lines(skipped_checkouts):
+        print(line)
     return 0
 
 
@@ -160,24 +181,32 @@ def _print_doctor(rows: list[dict[str, Any]], output_format: str = "text") -> in
     """Print the `fab-test doctor` readiness report.
 
     Returns 0 if at least one analyzer is ready, else 1.
+
+    ``ready`` is tri-state. None means "not applicable, or not verifiable
+    from here" and is neither a pass nor a failure: it neither satisfies the
+    at-least-one-ready condition nor prevents it. Telemetry uses it, because
+    an optional feature nobody configured must not report a broken install,
+    and a credential that resolves is not proof it may ingest.
     """
-    any_ready = any(r["ready"] for r in rows)
+    any_ready = any(r["ready"] is True for r in rows)
+    blocking = [r for r in rows if r["ready"] is False]
 
     if output_format == "json":
         print(json.dumps({"analyzers": rows}, indent=2))
-        return 0 if any_ready else 1
+        return 0 if any_ready or not blocking else 1
 
     paint = color_enabled()
     for r in rows:
-        icon = "✅" if r["ready"] else "❌"
+        icon = {True: "✅", False: "❌", None: "ℹ"}[r["ready"]]
         location = f" — {r['resolved_path']}" if r["resolved_path"] else ""
-        reason = _paint(r["reason"], "green" if r["ready"] else "red", enabled=paint)
+        colour = {True: "green", False: "red", None: "yellow"}[r["ready"]]
+        reason = _paint(r["reason"], colour, enabled=paint)
         print(f"{icon} {r['analyzer']}: {reason}{location}")
-        if not r["ready"] and r["remediation"]:
+        if r["ready"] is not True and r["remediation"]:
             # Yellow, not red: this is the actionable half, and colouring it
             # the same as the failure would flatten the distinction.
             print(_paint(f"   → {r['remediation']}", "yellow", enabled=paint))
-    return 0 if any_ready else 1
+    return 0 if any_ready or not blocking else 1
 
 
 def _print_config_show(rows: list[dict[str, Any]], output_format: str = "text") -> int:

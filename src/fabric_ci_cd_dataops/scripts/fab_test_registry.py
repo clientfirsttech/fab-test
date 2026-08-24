@@ -27,25 +27,17 @@ from ._desktop import (
     detect_desktop_instances,
     match_instance_to_artifact,
 )
-from ._metadata import ANALYZERS, BPA_RULES, PBIR_RULES, metadata_path
+from ._metadata import ANALYZERS, BPA_RULES, PBIR_RULES, default_repo_root, metadata_path
 from ._pbip_discovery import discover_pbip_projects
 from ._report_html import resolve_report
 from ._rule_overlay import apply_overlay, apply_pbir_overlay
 from ._scan import find_artifact_dirs
 from ._target import ResolvedTarget
 
-# Reuse the same repo-root logic as fab_test.py so paths stay consistent.
-
-
-def _repo_root() -> Path:
-    """Return the repository root."""
-    workspace = os.getenv("GITHUB_WORKSPACE")
-    if workspace:
-        return Path(workspace).resolve()
-    return Path.cwd().resolve()
-
-
-REPO_ROOT = _repo_root()
+# Shares _metadata.default_repo_root with fab_test.py, so the two cannot
+# disagree about what the repository is. This comment used to claim the reuse
+# while a third copy of the rule sat underneath it.
+REPO_ROOT = default_repo_root()
 SCRIPTS_DIR = REPO_ROOT / "scripts"
 
 
@@ -531,6 +523,12 @@ def build_playwright_command(
     dataset_id = getattr(args, "dataset_id", "")
     if dataset_id:
         cmd += ["--dataset-id", dataset_id]
+    pages = getattr(args, "pages", "auto")
+    if pages != "auto":
+        cmd += ["--pages", pages]
+    roles = getattr(args, "roles", "auto")
+    if roles != "auto":
+        cmd += ["--roles", roles]
     return cmd
 
 
@@ -690,6 +688,24 @@ def _cloud_readiness(name: str, args: argparse.Namespace | None) -> dict[str, An
 
     if workspace_id:
         status = probe_credentials()
+        # Playwright always calls MSAL with a service-principal secret to
+        # generate an embed token -- unlike pql_test, an ambient credential
+        # (az login, managed identity) cannot stand in. Reporting ready off
+        # `status.resolved` alone would be the false green task 1 exists to
+        # remove: green from `doctor`, then an MSAL error on the one
+        # command that cannot use an ambient sign-in.
+        if name == "playwright" and not status.verified:
+            return {
+                "ready": False,
+                "resolved_path": None,
+                "reason": f"workspace configured; playwright needs a full service principal ({status.detail})",
+                "remediation": status.remediation or (
+                    "set FABRIC_TENANT_ID, FABRIC_CLIENT_ID (or "
+                    "FABRIC_SERVICE_PRINCIPAL_ID), and FABRIC_CLIENT_SECRET "
+                    "(or FABRIC_SERVICE_PRINCIPAL_SECRET) in the environment "
+                    "or a .env file"
+                ),
+            }
         if status.resolved:
             reason = (
                 f"workspace configured, credentials from {status.source}"

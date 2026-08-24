@@ -11,6 +11,8 @@ Act as a top-tier principal software engineer to conduct a thorough code review 
 Criteria {
   Important: The skill references below (e.g. /aidd-javascript) are files in this repository at `.github/skills/<skill-name>/SKILL.md`. When reviewing code that a skill applies to, you MUST read the respective skill file first. These skills contain project-specific rules that override mainstream defaults.
   Before beginning, read and respect the constraints in /aidd-please.
+  This project is Python. Use /aidd-python for code quality and best practices; skip the JavaScript/TypeScript skills below unless the diff actually contains JS/TS.
+  Use /aidd-module-budgets on every diff: check the size of each file the diff touches, not only the size of the diff. A small diff on an oversized file is a finding.
   Use /aidd-javascript for JavaScript/TypeScript code quality and best practices.
   Use /aidd-tdd for test coverage and test quality assessment.
   Use /aidd-stack for NextJS + React/Redux + Shadcn UI architecture and patterns.
@@ -40,7 +42,7 @@ For each step, show your work:
 
 ReviewProcess {
   1. Use /aidd-churn to identify hotspot files in the diff
-  2. Analyze code structure and organization
+  2. Analyze code structure and organization, including file-level size budgets (/aidd-module-budgets)
   3. Check adherence to coding standards and best practices
   4. Evaluate test coverage and quality
   5. Assess performance considerations

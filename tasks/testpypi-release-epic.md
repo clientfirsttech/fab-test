@@ -1,6 +1,6 @@
 # TestPyPI Release Epic
 
-**Status**: 📋 PLANNED
+**Status**: 🚧 IN-PROGRESS — 8 of 9 tasks done. What remains needs a human with the `jkerski` TestPyPI account: the pending trusted publisher has to be registered before any upload can succeed, and nothing has been published yet, so the install cannot be verified. The fields to enter are recorded verbatim in [docs/RELEASE.md](../docs/RELEASE.md).
 **Goal**: Publish `fab-test` 1.0.0.0.dev1 to TestPyPI as an installable package, and document the install for all three callers.
 
 ## Overview
@@ -18,7 +18,7 @@ Publishing target is `kerski/fab-test` under the TestPyPI account `jkerski`.
 
 ---
 
-## One Version, One Place
+## One Version, One Place  ✅ (a53e36c)
 
 Make `__init__.py` the only place the version is written, and set it to `1.0.0.0.dev1`.
 
@@ -30,7 +30,7 @@ Make `__init__.py` the only place the version is written, and set it to `1.0.0.0
 
 ---
 
-## Rules Ship With The Package
+## Rules Ship With The Package  ✅ (a53e36c)
 
 Package the rulesets and `analyzers.json` so an install outside a checkout can run.
 
@@ -43,7 +43,7 @@ Package the rulesets and `analyzers.json` so an install outside a checkout can r
 
 ---
 
-## Repo-Local Metadata Overrides
+## Repo-Local Metadata Overrides  ✅ (`_metadata.py` layer chain)
 
 Give a consumer `.fab-test/metadata/` to override packaged metadata, without a new config key.
 
@@ -57,7 +57,7 @@ Give a consumer `.fab-test/metadata/` to override packaged metadata, without a n
 
 ---
 
-## Deferred From Metadata Packaging
+## Deferred From Metadata Packaging  ✅ (closed by the Environments Metadata Layers epic)
 
 Two more copies of the same pattern, found after tasks 2-3 landed. Both are
 invoked by workflows inside a checkout rather than as console scripts, so
@@ -71,7 +71,7 @@ out of scope above, and why they are recorded rather than silently skipped.
 
 ---
 
-## Pre-Release Tags Never Reach PyPI
+## Pre-Release Tags Never Reach PyPI  ✅ (56e22f3)
 
 Separate the rehearsal path from the production path in the publish workflows.
 
@@ -82,7 +82,7 @@ Separate the rehearsal path from the production path in the publish workflows.
 
 ---
 
-## Install From TestPyPI Is Verified, Not Assumed
+## Install From TestPyPI Is Verified, Not Assumed  ⛔ BLOCKED — needs the trusted publisher registered by hand first
 
 Prove the published artifact installs and runs, rather than trusting that it uploaded.
 
@@ -93,7 +93,7 @@ Prove the published artifact installs and runs, rather than trusting that it upl
 
 ---
 
-## Package Metadata Points At The Right Repository
+## Package Metadata Points At The Right Repository  ✅ (56e22f3)
 
 The project page is the first thing a reader sees, and every URL on it is currently wrong.
 
@@ -105,7 +105,7 @@ The project page is the first thing a reader sees, and every URL on it is curren
 
 ---
 
-## The README Stops Claiming PyPI
+## The README Stops Claiming PyPI  ✅ (this commit)
 
 Say what a reader can actually run today.
 
@@ -116,7 +116,7 @@ Say what a reader can actually run today.
 
 ---
 
-## A Release Runbook For All Three Callers
+## A Release Runbook For All Three Callers  ✅ (this commit)
 
 One document per the Definition of Done, covering the steps a workflow cannot take.
 

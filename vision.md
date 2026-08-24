@@ -39,8 +39,9 @@ Constraints {
                      run legitimately covers a fraction of src/
   (simplicity)    => keep it simple where possible; prefer one flag over a subsystem,
                      one file over a format, and no abstraction until the second caller
-  (backward compat) => existing commands, env vars, and result paths keep working;
-                       new surfaces are additive and optional
+  (backward compat) => existing commands, env vars, and result paths released in
+                       1.0.0 and later keep working; new surfaces are additive
+                       and optional
   (secrets)       => credentials are never written to stdout, result envelopes, the run
                      manifest, or telemetry
   (documentation) => an epic is not done until all three callers are documented: the
@@ -53,7 +54,7 @@ Constraints {
 }
 ```
 
-Markers available for granular runs are declared in [`pytest.ini`](pytest.ini): `fab_test`, `analyzers`, `bpa`, `pbir`, `pql_test`, `pql_lint`, `prompt_lint`, `playwright`, `smoke`, `integration`.
+Markers available for granular runs are declared in [`pytest.ini`](pytest.ini): `fab_test`, `analyzers`, `bpa`, `pbir`, `pql_test`, `pql_lint`, `prompt_lint`, `playwright`, `integration`.
 
 ## How Coverage Is Measured
 
@@ -67,7 +68,7 @@ The coverage floor and the granular-test constraint pull in opposite directions 
 
 Rules: coverage is scoped to `src/fabric_ci_cd_dataops` (tests are excluded from the denominator), the 80% floor is a ratchet that does not go down, and the threshold lives in the CI invocation — **not** in `pytest.ini`, where it would fail every granular run and defeat the token-saving constraint.
 
-Four modules are omitted from the denominator, by explicit path in `[tool.coverage.run]`: `eventhouse_logger.py`, the two `smoke_test_*` harnesses, and `validate_fabric_service_client.py`. Each needs a live service to execute at all, so a unit test could only assert that its argument parser accepts flags — which would inflate the figure rather than improve it. Exclusions are single files, never patterns, so library code added later cannot fall into the gap; `tests/test_coverage_config.py` fails if an entry goes stale or if a core CLI module is ever listed.
+One module is omitted from the denominator, by explicit path in `[tool.coverage.run]`: `validate_fabric_service_client.py`. It needs a live service to execute at all, so a unit test could only assert that its argument parser accepts flags — which would inflate the figure rather than improve it. `eventhouse_logger.py` was listed too until it earned a seam (Eventhouse Shipping §5): the ingest needs a cluster, but the validators deciding what reaches the wire never did, and being omitted is how they went untested entirely. Exclusions are single files, never patterns, so library code added later cannot fall into the gap; `tests/test_coverage_config.py` fails if an entry goes stale or if a core CLI module is ever listed.
 
 Complexity is ratcheted the same way, by count rather than per function: `tests/test_complexity_budget.py` fails if the report grows. Gating each function would block a PR over one extra branch, which is a gate people route around; leaving it unwatched is how the report went from 36 findings to 45 across two epics before anyone looked.
 

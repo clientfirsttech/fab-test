@@ -28,6 +28,33 @@ def _repo_root() -> Path:
     return Path.cwd().resolve()
 
 
+def resolve_env_file(explicit: Path | str | None = None) -> Path:
+    """Return the ``.env`` file both credential callers should read.
+
+    Search order: ``explicit`` (``--env-file``) > ``PLAYWRIGHT_ENV_FILE`` >
+    ``.fab-test/.env`` > ``./.env``. Defined once, here, so
+    ``_credentials.py`` and this loader -- which used to default to a bare
+    ``Path(".env")`` and ``repo_root / ".env"`` respectively, and therefore
+    agreed only when invoked from the repository root -- cannot drift
+    apart again. ``.fab-test/.env`` is preferred over the root when both
+    exist: it is the location `fab-test init` scaffolds and guards with its
+    own ``.gitignore``, rather than depending on a consumer's root
+    ``.gitignore`` already covering ``.env``.
+    """
+    if explicit is not None:
+        return Path(explicit).resolve()
+
+    env_var = os.getenv("PLAYWRIGHT_ENV_FILE")
+    if env_var:
+        return Path(env_var).resolve()
+
+    repo_root = _repo_root()
+    fab_test_env = repo_root / ".fab-test" / ".env"
+    if fab_test_env.exists():
+        return fab_test_env
+    return (repo_root / ".env").resolve()
+
+
 def _api_root_for(cloud: str) -> str:
     """Return the Power BI REST API root URL for the named cloud.
 
@@ -162,14 +189,7 @@ def load_config(
     Raises:
         ValueError: If required configuration is missing.
     """
-    repo_root = _repo_root()
-
-    if env_file is None:
-        env_file = Path(
-            os.getenv("PLAYWRIGHT_ENV_FILE", str(repo_root / ".env"))
-        ).resolve()
-    else:
-        env_file = Path(env_file).resolve()
+    env_file = resolve_env_file(env_file)
 
     def get(name: str) -> str:
         return _env_or_env_file(name, env_file)
@@ -209,7 +229,7 @@ def load_config(
         client_id=client_id,
         client_secret=client_secret,
         tenant_id=get("FABRIC_TENANT_ID"),
-        timeout_seconds=int(get("PLAYWRIGHT_TIMEOUT_SECONDS") or "60"),
+        timeout_seconds=int(get("PLAYWRIGHT_TIMEOUT_SECONDS") or "180"),
         headless=headless,
     )
 

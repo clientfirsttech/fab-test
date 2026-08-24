@@ -52,7 +52,11 @@ def test_doctor_json_format_has_stable_keys():
     assert result.returncode in (0, 1), result.stderr
     summary = json.loads(result.stdout)
     assert "analyzers" in summary
-    assert len(summary["analyzers"]) == len(visible_analyzers())
+    # Every visible analyzer, plus the telemetry row (Eventhouse Shipping §7),
+    # which is reported in the same shape but never counts toward whether
+    # doctor passes.
+    assert len(summary["analyzers"]) == len(visible_analyzers()) + 1
+    assert summary["analyzers"][-1]["analyzer"] == "telemetry"
     for entry in summary["analyzers"]:
         assert set(entry.keys()) == _DOCTOR_KEYS, f"key mismatch: {entry.keys()}"
 

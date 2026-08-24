@@ -55,7 +55,7 @@ def _resolved(**overrides):
     return CredentialStatus(**defaults)
 
 
-def _run_cli(*argv, env=None):
+def _run_cli(*argv, env=None, cwd=None):
     return subprocess.run(
         [sys.executable, "-m", "fabric_ci_cd_dataops.scripts.fab_test", *argv],
         capture_output=True,
@@ -63,6 +63,7 @@ def _run_cli(*argv, env=None):
         encoding="utf-8",
         errors="replace",
         env={**os.environ, **(env or {})},
+        cwd=cwd,
         check=False,
     )
 
@@ -174,6 +175,49 @@ def test_status_json_is_one_document(monkeypatch, capsys):
     payload = json.loads(capsys.readouterr().out)
     assert payload["identity"]["source"] == "environment"
     assert payload["identity"]["verified"] is True
+
+
+@pytest.mark.fab_test
+def test_status_reports_fab_test_env_as_the_origin(tmp_path):
+    """`auth status` names .fab-test/.env, not a generic ".env", as the source.
+
+    Task 8 unifies discovery so both `_credentials` and the Playwright
+    config loader prefer `.fab-test/.env` over a root `.env` when both
+    exist; `auth status` is the caller that surfaces which one won.
+    """
+    fab_test_dir = tmp_path / ".fab-test"
+    fab_test_dir.mkdir()
+    (fab_test_dir / ".env").write_text(
+        "FABRIC_TENANT_ID=11111111-1111-1111-1111-111111111111\n"
+        "FABRIC_CLIENT_ID=22222222-2222-2222-2222-222222222222\n"
+        "FABRIC_CLIENT_SECRET=s3cr3t-do-not-print\n",
+        encoding="utf-8",
+    )
+
+    # `_run_cli` merges this dict onto a copy of the real os.environ rather
+    # than replacing it, so a key merely absent here (via a filtered
+    # comprehension) is not actually unset when the real environment has
+    # it -- as GITHUB_WORKSPACE always does in CI, never locally, which is
+    # exactly why this needs to be an explicit override, not an omission.
+    _unset = (
+        "FABRIC_TENANT_ID",
+        "FABRIC_CLIENT_ID",
+        "FABRIC_CLIENT_SECRET",
+        "FABRIC_SERVICE_PRINCIPAL_ID",
+        "FABRIC_SERVICE_PRINCIPAL_SECRET",
+        "PLAYWRIGHT_ENV_FILE",
+        # `_repo_root()` prefers GITHUB_WORKSPACE over cwd, which would
+        # make discovery ignore `cwd=tmp_path` below and look in the real
+        # checkout instead of the `.fab-test/.env` written above.
+        "GITHUB_WORKSPACE",
+    )
+    env = {k: v for k, v in os.environ.items() if k not in _unset}
+    env.update(dict.fromkeys(_unset, ""))
+    result = _run_cli("auth", "status", "--format", "json", env=env, cwd=tmp_path)
+
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["identity"]["source"] == ".fab-test/.env"
 
 
 @pytest.mark.fab_test

@@ -32,6 +32,7 @@ import argparse
 import json
 import os
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -43,6 +44,166 @@ VALID_TABLES = [
     "fabric_deployments",
     "fabric_testbed_runs"
 ]
+
+TELEMETRY_EXTRA_HINT = "pip install 'fab-test[telemetry]'"
+
+# The ingestion mapping each telemetry table must define. The tables carry a
+# single `Data: dynamic` column and downstream Eventhouse functions do the
+# transforming, so the wire stays schema-independent: a new payload field is
+# a new key inside `Data`, never a table alteration and never a broken
+# ingest. The KQL to create a table and this mapping is in the Telemetry
+# section of .github/skills/fab-test/SKILL.md; fab-test never creates them.
+#
+# Referencing it is not optional. Without a mapping the service maps by
+# column name, matches nothing, and stores empty rows while reporting
+# success -- which is the failure this whole module was rewritten to end.
+PAYLOAD_MAPPING = "fab_test_payload"
+
+# path "$" puts the whole JSON object into the one column.
+_MAPPING_BODY = '[{"column":"Data","path":"$","datatype":"dynamic"}]'
+
+
+class DestinationError(Exception):
+    """The telemetry table or its mapping is missing and could not be created.
+
+    Carries its own message through `describe_ingest_failure` unchanged: it
+    already names the table, the database, and the KQL, and appending an
+    ingest-permission hint to a table-creation failure would send the reader
+    to the wrong grant.
+    """
+
+
+def create_statements(table: str) -> str:
+    """Return the KQL that creates ``table`` and its ingestion mapping.
+
+    One definition, used both to build the destination and to tell a reader
+    how to build it by hand, so the documented statements cannot drift from
+    the ones that actually run.
+    """
+    return (
+        f"  .create-merge table {table} (Data: dynamic)\n"
+        f"  .create-or-alter table {table} ingestion json mapping '{PAYLOAD_MAPPING}' "
+        f"'{_MAPPING_BODY}'"
+    )
+
+
+def _unreachable_message(database: str, exc: Exception) -> str:
+    """Explain why the destination could not be inspected.
+
+    A missing database and an unreachable cluster look similar in a stack
+    trace and need opposite responses, so they are separated here rather
+    than left to the reader.
+    """
+    detail = f"{exc}"
+    if "not found" in detail.lower() and database.lower() in detail.lower():
+        return (
+            f"telemetry database {database} was not found. fab-test creates tables, "
+            f"never databases -- create the KQL database in Fabric first, then rerun."
+        )
+    return f"telemetry destination could not be inspected on database {database}: {detail}"
+
+
+class TelemetryDependencyError(Exception):
+    """The Kusto ingest client is not installed.
+
+    Deliberately not an ``ImportError``: the caller turns this into a warning
+    rather than a crash, and catching a bare ImportError there would swallow
+    unrelated import bugs in the same handler.
+    """
+
+
+@dataclass(frozen=True)
+class IngestDependencies:
+    """The Kusto symbols ingest needs, loaded on demand."""
+
+    connection_string_builder: Any
+    ingest_client: Any
+    ingestion_properties: Any
+    data_format: Any
+
+
+# What Kusto says when the credential is valid and the grant is not. A
+# service principal without the Database Ingestor role fails the same way a
+# bad secret does, and sending a reader to rotate a working secret wastes
+# the one clue they had.
+_AUTHORIZATION_MARKERS = ("forbidden", "unauthorized", "not authorized", "403")
+
+_INGESTOR_ROLE_HINT = (
+    "The credential authenticated but is not permitted to ingest. Grant it the "
+    "Database Ingestor role on the KQL database (Fabric: the Eventhouse item -> "
+    "Manage permissions), then retry."
+)
+
+
+def describe_ingest_failure(exc: Exception) -> str:
+    """Return a reportable reason for an ingest failure.
+
+    Redacted before it is returned: Kusto errors can quote the connection
+    string that produced them, and the secrets constraint puts telemetry on
+    the same footing as stdout and the run manifest.
+    """
+    from ._credentials import redact_secrets
+
+    message = redact_secrets(f"{exc}")
+    if isinstance(exc, DestinationError):
+        # Already names the table, the database, and the KQL. Appending an
+        # ingest-permission hint would point at the wrong grant: creating a
+        # table needs more than Database Ingestor, not the same thing.
+        return message
+    if any(marker in message.lower() for marker in _AUTHORIZATION_MARKERS):
+        return f"{message} -- {_INGESTOR_ROLE_HINT}"
+    return message
+
+
+def build_ingest_credential(env_file: Path | str | None = None) -> Any:
+    """Return an Azure credential for Kusto ingest.
+
+    The service principal the CLI already resolves, or
+    `DefaultAzureCredential` when none is set -- the rule
+    `build_fabric_service_client` documents, applied to a different endpoint.
+    A partially configured principal raises rather than falling back.
+    """
+    from ._credentials import resolve_service_principal
+
+    principal = resolve_service_principal(env_file)
+    if principal is None:
+        from azure.identity import DefaultAzureCredential
+
+        return DefaultAzureCredential()
+
+    from azure.identity import ClientSecretCredential
+
+    return ClientSecretCredential(
+        tenant_id=principal.tenant_id,
+        client_id=principal.client_id,
+        client_secret=principal.client_secret,
+    )
+
+
+def load_ingest_dependencies() -> IngestDependencies:
+    """Import the Kusto ingest client, or say how to install it.
+
+    Imported here rather than at module scope so a run that never configures
+    a destination never pays for the SDK -- the same deferral `_credentials`
+    and `_target` already use.
+    """
+    try:
+        # DataFormat is exported by azure.kusto.data, not azure.kusto.ingest --
+        # importing it from the latter raises ImportError even with both
+        # packages installed, which reads as a missing extra and is not one.
+        from azure.kusto.data import DataFormat, KustoConnectionStringBuilder
+        from azure.kusto.ingest import IngestionProperties, QueuedIngestClient
+    except ImportError as exc:
+        raise TelemetryDependencyError(
+            "telemetry is configured but the Kusto ingest client is not installed. "
+            f"Install it with: {TELEMETRY_EXTRA_HINT}"
+        ) from exc
+    return IngestDependencies(
+        connection_string_builder=KustoConnectionStringBuilder,
+        ingest_client=QueuedIngestClient,
+        ingestion_properties=IngestionProperties,
+        data_format=DataFormat,
+    )
 
 
 def publish_analyzer_telemetry(
@@ -187,78 +348,264 @@ def validate_payload_schema(payload: dict, table_name: str, terse: bool = False)
     return True
 
 
-def publish_to_eventhouse(table_name: str, payload: dict, terse: bool = False) -> bool:
+@dataclass(frozen=True)
+class FlushResult:
+    """What a flush actually did.
+
+    ``ok`` is False for a flush that did not deliver, which is the whole
+    point of this task: the placeholder returned True for a send that never
+    happened, so every caller -- including the handler that would have
+    warned -- was told it worked.
     """
-    Publish telemetry payload to Eventhouse table.
 
-    This is a placeholder implementation. The actual implementation will use:
-    - Kusto Python SDK (azure-kusto-data, azure-kusto-ingest)
-    - Azure Identity for authentication
-    - Eventhouse connection string from secrets
+    ok: bool
+    sent: int
+    error: str | None = None
 
-    Example implementation:
 
+class EventhouseSink:
+    """Collects telemetry for one run and ingests it in as few calls as possible.
+
+    A run-scoped batch rather than a send per artifact: `_send_telemetry` is
+    called from `_run_one_artifact`, so ingesting inline would pay
+    connection setup once per artifact and open a queued-ingest client N
+    times for one logical run.
+
+    Nothing is imported, authenticated, or connected until `flush` has
+    something to deliver.
+    """
+
+    def __init__(self, config, env_file: Path | str | None = None):
+        self.config = config
+        self.env_file = env_file
+        self._batches: dict[str, list[dict]] = {}
+        # Tables whose destination this run has already confirmed, so a
+        # second flush does not re-check what it just built.
+        self._ensured: set[str] = set()
+
+    def add(self, table: str, payload: dict) -> None:
+        """Queue one record for ``table``."""
+        self._batches.setdefault(table, []).append(payload)
+
+    @property
+    def pending(self) -> int:
+        """How many records are waiting to be delivered."""
+        return sum(len(rows) for rows in self._batches.values())
+
+    def flush(self) -> FlushResult:
+        """Deliver everything queued, and report what happened.
+
+        Never raises. Telemetry is non-blocking by contract, and a raise
+        here would let a diagnostic feature fail a build.
+        """
+        batches, self._batches = self._batches, {}
+        queued = sum(len(rows) for rows in batches.values())
+        if not queued:
+            return FlushResult(ok=True, sent=0)
+        if not self.config.configured:
+            return FlushResult(
+                ok=False,
+                sent=0,
+                error=(
+                    "telemetry has records to send but no Eventhouse destination is "
+                    "configured; set `telemetry.eventhouse` in fab-test.yml"
+                ),
+            )
+        try:
+            # Ensured before anything is sent, and never after. Queued ingest
+            # accepts a batch aimed at a table that does not exist -- the
+            # request is valid and the failure happens later, in a pipeline
+            # nobody is watching -- so a send that cannot land would
+            # otherwise be reported as delivered.
+            for table in batches:
+                self._ensure_destination(table)
+            for table, rows in batches.items():
+                self._ingest(table, rows)
+        except Exception as exc:  # noqa: BLE001 - boundary: telemetry never fails a run
+            return FlushResult(ok=False, sent=0, error=describe_ingest_failure(exc))
+        return FlushResult(ok=True, sent=queued)
+
+    def _ensure_destination(self, table: str) -> None:
+        """Create ``table`` and its ingestion mapping if either is missing.
+
+        Checked once per table per flush: this is a management round trip
+        against the query endpoint, and paying it per record would repeat
+        the mistake batching was introduced to fix.
+
+        `fab-test` creates tables, never databases or Eventhouses. A missing
+        database is reported rather than built, and that boundary is visible
+        in the message.
+        """
+        if table in self._ensured:
+            return
+        cluster = self._cluster()
+        try:
+            existing = cluster.show_tables(self.config.database)
+        except Exception as exc:
+            raise DestinationError(_unreachable_message(self.config.database, exc)) from exc
+
+        if table not in existing:
+            self._create(cluster.create_table, table, "table")
+        elif PAYLOAD_MAPPING in cluster.show_mappings(self.config.database, table):
+            # Both halves present: nothing to build.
+            self._ensured.add(table)
+            return
+
+        # A table this run just created has no mapping either, and a
+        # pre-existing one without a mapping ingests *successfully* into
+        # empty rows -- the quietest failure of the three.
+        self._create(cluster.create_mapping, table, "ingestion mapping")
+        self._ensured.add(table)
+
+    def _create(self, action, table: str, what: str) -> None:
+        """Run one creation step, or explain why the destination is unusable."""
+        try:
+            if what == "table":
+                action(self.config.database, table)
+            else:
+                action(self.config.database, table, PAYLOAD_MAPPING)
+        except Exception as exc:
+            raise DestinationError(
+                f"telemetry {what} is missing and could not be created: "
+                f"{table} in database {self.config.database} ({exc}). "
+                f"Either grant the credential permission to create tables, or run:\n"
+                f"{create_statements(table)}"
+            ) from exc
+
+    def _ingest(self, table: str, rows: list[dict]) -> None:
+        """Ingest one table's rows. The seam tests replace with a stand-in."""
+        deps = self._dependencies()
+        client = self._client(deps)
+        properties = deps.ingestion_properties(
+            database=self.config.database,
+            table=table,
+            data_format=deps.data_format.JSON,
+            # Without this the service maps by column name, and a table whose
+            # only column is `Data` would silently keep nothing. The mapping
+            # puts the whole payload object in that one column, which is what
+            # makes the wire schema-independent: a new payload field is a new
+            # key inside `Data`, not a table alteration.
+            ingestion_mapping_reference=PAYLOAD_MAPPING,
+        )
+        client.ingest_from_stream(_json_lines(rows), ingestion_properties=properties)
+
+    def _cluster(self) -> Any:
+        """Return the cluster's management endpoint. A seam for tests.
+
+        Built against the *query* URI, not the ingest one: management
+        commands are refused by the ingest endpoint.
+        """
+        return _ClusterAdmin(_query_uri(self.config.uri), self._credential())
+
+    def _dependencies(self) -> IngestDependencies:
+        """Load the Kusto symbols. A seam, so a test need not install the SDK."""
+        return load_ingest_dependencies()
+
+    def _credential(self) -> Any:
+        """Resolve the ingest credential. A seam, so a test need not authenticate."""
+        return build_ingest_credential(self.env_file)
+
+    def _client(self, deps: IngestDependencies):
+        """Build the queued-ingest client, once per flush that needs one."""
+        # The ingest endpoint is the cluster URI with an `ingest-` prefix on
+        # the host; Kusto rejects a queued ingest aimed at the query endpoint.
+        kcsb = deps.connection_string_builder.with_azure_token_credential(
+            _ingest_uri(self.config.uri), self._credential()
+        )
+        return deps.ingest_client(kcsb)
+
+
+class _ClusterAdmin:
+    """The cluster's management endpoint: inspect and create telemetry tables.
+
+    Thin on purpose. Everything it does is a `.show` or a `.create`, and the
+    decisions about *when* belong to `EventhouseSink`, which is what makes
+    them testable without a cluster.
+    """
+
+    def __init__(self, query_uri: str, credential: Any):
         from azure.kusto.data import KustoClient, KustoConnectionStringBuilder
-        from azure.kusto.ingest import QueuedIngestClient, IngestionProperties
-        from azure.identity import DefaultAzureCredential
 
-        # Build connection
-        kcsb = KustoConnectionStringBuilder.with_aad_managed_service_identity_authentication(
-            eventhouse_uri
+        self._client = KustoClient(
+            KustoConnectionStringBuilder.with_azure_token_credential(query_uri, credential)
         )
 
-        # Create ingest client
-        ingest_client = QueuedIngestClient(kcsb)
+    def show_tables(self, database: str) -> list[str]:
+        """Return the table names in ``database``."""
+        response = self._client.execute_mgmt(database, ".show tables")
+        return [row["TableName"] for row in response.primary_results[0]]
 
-        # Ingest data
-        ingestion_props = IngestionProperties(
-            database=database_name,
-            table=table_name,
-            data_format="json"
+    def show_mappings(self, database: str, table: str) -> list[str]:
+        """Return the JSON ingestion mapping names defined on ``table``."""
+        response = self._client.execute_mgmt(
+            database, f".show table {table} ingestion json mappings"
+        )
+        return [row["Name"] for row in response.primary_results[0]]
+
+    def create_table(self, database: str, table: str) -> None:
+        """Create ``table`` with the single dynamic column, if absent."""
+        self._client.execute_mgmt(database, f".create-merge table {table} (Data: dynamic)")
+
+    def create_mapping(self, database: str, table: str, mapping: str) -> None:
+        """Create or replace ``table``'s payload ingestion mapping."""
+        self._client.execute_mgmt(
+            database,
+            f".create-or-alter table {table} ingestion json mapping "
+            f"'{mapping}' '{_MAPPING_BODY}'",
         )
 
-        ingest_client.ingest_from_dict([payload], ingestion_properties=ingestion_props)
+
+def _query_uri(uri: str) -> str:
+    """Return the query endpoint for a cluster URI.
+
+    The inverse of `_ingest_uri`: a caller may configure either form, and
+    management commands are refused by the ingest endpoint.
     """
-    if not terse:
-        print("\n" + "="*80)
-        print("EVENTHOUSE TELEMETRY LOGGER")
-        print("="*80)
-        print(f"\n📊 Table:       {table_name}")
-        print(f"📦 Artifact:    {payload.get('artifact_name', 'N/A')}")
-        print(f"🏷️  Type:       {payload.get('artifact_type', 'N/A')}")
-        print(f"🔖 Commit:      {payload.get('commit_sha', 'N/A')}")
-        print(f"⏰ Timestamp:   {payload.get('timestamp', 'N/A')}")
-        print("\n" + "-"*80)
-        print("CONSTRAINT C9: Telemetry is optional and never mandatory")
-        print("-"*80)
+    scheme, separator, rest = uri.partition("://")
+    if not separator:
+        return uri
+    return f"{scheme}://{rest[len('ingest-'):]}" if rest.startswith("ingest-") else uri
 
-        print("\n📋 Payload Preview:")
-        print(json.dumps(payload, indent=2))
 
-        print("\n🔧 Eventhouse Publishing (to be implemented):")
-        print("""
-    Required Dependencies:
-        pip install azure-kusto-data azure-kusto-ingest azure-identity
+def _ingest_uri(query_uri: str) -> str:
+    """Return the ingest endpoint for a cluster's query URI."""
+    scheme, _, rest = query_uri.partition("://")
+    if not rest:
+        return query_uri
+    if rest.startswith("ingest-"):
+        return query_uri
+    return f"{scheme}://ingest-{rest}"
 
-    Expected Configuration:
-        EVENTHOUSE_URI: from GitHub Secrets or Environment Variables
-        DATABASE_NAME: from metadata configuration
-        TABLE_NAME: derived from analysis type
 
-    Schema Source:
-        https://github.com/kerski/pbi-teams-more-analytic-support (Eventhouse branch)
-        Eventhouse schema is the system of record per Constraint C9
-    """)
+def _json_lines(rows: list[dict]):
+    """Return the rows as a newline-delimited JSON stream for ingest."""
+    import io
 
-        print("\n⚠️  STATUS: Placeholder Implementation")
-        print("\nThis script will publish telemetry to Eventhouse once:")
-        print("  1. Eventhouse connection is configured")
-        print("  2. Kusto Python SDK dependencies are installed")
-        print("  3. Eventhouse tables are created per reference schema")
-        print("\n" + "="*80)
-        print("✅ TELEMETRY LOGGING SIMULATION COMPLETED")
-        print("="*80 + "\n")
+    body = "\n".join(json.dumps(row, default=str) for row in rows)
+    return io.BytesIO(body.encode("utf-8"))
 
+
+def publish_to_eventhouse(table_name: str, payload: dict, terse: bool = False) -> bool:
+    """Publish one telemetry payload immediately.
+
+    The single-record path, used by this module's own CLI. `fab-test`
+    batches instead -- see `EventhouseSink`.
+    """
+    from ._config import merged_file_config
+    from ._metadata import default_repo_root
+    from ._telemetry import resolve_eventhouse_config
+
+    repo_root = default_repo_root()
+    file_config, _ = merged_file_config(repo_root, repo_root / "pyproject.toml")
+    sink = EventhouseSink(resolve_eventhouse_config(file_config))
+    sink.add(table_name, payload)
+    result = sink.flush()
+    if not result.ok:
+        terse_print(terse, "ERROR", "eventhouse_logger", result.error or "ingest failed")
+        if not terse:
+            print(f"Error: telemetry was not delivered: {result.error}", file=sys.stderr)
+        return False
+    terse_print(terse, "OK", "eventhouse_logger", f"ingested 1 record into {table_name}")
     return True
 
 

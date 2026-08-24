@@ -57,6 +57,9 @@ Crossing one is a signal to split the function, not to raise the number.
 
 Raising a budget is a decision. Say why in the commit message.
 
+These are all function-level. File-level budgets — module and test-module length,
+and where to split — live in [aidd-module-budgets](../aidd-module-budgets/SKILL.md).
+
 ## The Over-Engineering Lens
 
 When reviewing, look for these before looking at style:

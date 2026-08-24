@@ -14,7 +14,7 @@ Usage:
 Global flags (all subcommands):
     --artifact STEM      Only analyze the artifact matching this stem
     --artifact-dir DIR   Root to discover artifacts under (default: the working directory)
-    --output-dir DIR     Root for result envelopes (default: analyzer-results)
+    --output-dir DIR     Root for result envelopes (default: fab-test-results)
     --dry-run            List matching artifacts without running any analyzer
     --telemetry          Stream telemetry to Eventhouse when configured
     --no-telemetry       Suppress telemetry even when configured
@@ -25,7 +25,6 @@ Global flags (all subcommands):
 import argparse
 import contextlib
 import difflib
-import hashlib
 import importlib.util
 import json
 import os
@@ -48,7 +47,7 @@ from ._analyzer_annotations import (
     emit_workflow_annotations,
 )
 from ._analyzer_envelope import severity_counts
-from ._cli_utils import narrate
+from ._cli_utils import CHECKOUT_REMEDIATION, narrate, skipped_checkout_lines
 from ._config import (
     CONFIG_FILENAME,
     ConfigError,
@@ -56,14 +55,24 @@ from ._config import (
     resolve_setting,
     validate_config,
 )
-from ._credentials import probe_credentials
+from ._credentials import probe_credentials, redact_secrets
 from ._desktop import bridge_cli_path, detect_desktop_instances
-from ._metadata import ANALYZERS, BPA_RULES, PBIR_RULES, metadata_path, resolve_metadata
+from ._git_context import git_command_output, git_context
+from ._metadata import (
+    ANALYZERS,
+    BPA_RULES,
+    PBIR_RULES,
+    default_repo_root,
+    metadata_path,
+    resolve_metadata,
+)
 from ._pbip_discovery import discover_pbip_projects as _discover_pbip_projects
 from ._report_html import resolve_report
 from ._run_manifest import RunManifest
+from ._scan import find_skipped_checkouts as _find_skipped_checkouts
 from ._target import TargetError, select_target, target_from_args, workspace_conflict
-from .eventhouse_logger import publish_analyzer_telemetry
+from ._telemetry import TelemetryDecision, eventhouse_rows, telemetry_decision
+from .eventhouse_logger import EventhouseSink, publish_analyzer_telemetry
 from .fab_test_registry import (
     _DEFAULT_BPA_RULES,
     _DEFAULT_INSPECTOR_PATH,
@@ -133,22 +142,11 @@ if hasattr(sys.stdout, "reconfigure"):
 if hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
-def _repo_root() -> Path:
-    """Return the repository root.
-
-    In CI the runner checks out the repo into ``GITHUB_WORKSPACE``. When the
-    package is installed as a wheel, ``__file__`` points into ``site-packages``,
-    so resolving paths from the script location is wrong. Use the current
-    working directory as the default root so ``fab-test`` operates on the repo
-    it is invoked from.
-    """
-    workspace = os.getenv("GITHUB_WORKSPACE")
-    if workspace:
-        return Path(workspace).resolve()
-    return Path.cwd().resolve()
-
-
-REPO_ROOT = _repo_root()
+# _metadata.default_repo_root is the one decider (see its docstring). When the
+# package is installed as a wheel, __file__ points into site-packages, so
+# resolving paths from the script location would be wrong -- the working
+# directory is what `fab-test` operates on.
+REPO_ROOT = default_repo_root()
 SCRIPTS_DIR = REPO_ROOT / "scripts"
 # Where discovery starts when nobody says otherwise. This was
 # `.fabric/artifacts` -- this repository's CI layout, not anything Power BI
@@ -157,7 +155,11 @@ SCRIPTS_DIR = REPO_ROOT / "scripts"
 # local` started here and found things. One answer to "where are my
 # artifacts?", and it is the directory you are standing in.
 ARTIFACT_ROOT = REPO_ROOT
-RESULTS_ROOT = REPO_ROOT / "analyzer-results"
+# "analyzer-results" (pre-1.0.0.0) named nothing -- any repo already using
+# another tool's directory of that name silently shared it, and a reader
+# had no way to tell which tool wrote it. Renamed before the first release,
+# so there is no installed base to keep working against the old name.
+RESULTS_ROOT = REPO_ROOT / "fab-test-results"
 
 
 _PYPROJECT_CONFIG, _FILE_CONFIG_WARNINGS = merged_file_config(REPO_ROOT, REPO_ROOT / "pyproject.toml")
@@ -197,6 +199,34 @@ def _clean_annotation(line: str) -> str:
     return line
 
 
+# Long enough for the full remediation sentences the analyzers actually emit,
+# which name every flag and environment variable that would resolve the
+# failure, and short enough that a stack trace cannot turn run.json into a
+# log file.
+_DETAIL_MAX_CHARS = 500
+
+
+def _stderr_detail(stderr: str | None) -> str | None:
+    """Return the analyzer's failure message for `run.json`, or None.
+
+    Called only when the analyzer exited non-zero *without* writing an
+    envelope, so its stderr is the only account of what went wrong. An
+    `::error::` line is the message the analyzer chose to surface, so it wins
+    over whatever noise trails it; failing that, the last non-empty line does.
+
+    Redacted on the way in: the secrets constraint puts the run manifest on
+    the same footing as stdout and telemetry, and a child that interpolates a
+    client secret into its own error text would otherwise write it to a file
+    a pipeline uploads.
+    """
+    lines = [line.strip() for line in (stderr or "").splitlines() if line.strip()]
+    if not lines:
+        return None
+    annotated = [line for line in lines if line.startswith("::error::")]
+    chosen = _clean_annotation(annotated[-1] if annotated else lines[-1])
+    return redact_secrets(chosen)[:_DETAIL_MAX_CHARS]
+
+
 def _verbosity_env(args: argparse.Namespace) -> str:
     """Map fab-test -v/-vv flags to ANALYZER_VERBOSITY values."""
     count = getattr(args, "verbose", 0) or 0
@@ -208,8 +238,10 @@ def _verbosity_env(args: argparse.Namespace) -> str:
 
 
 # Default per-artifact subprocess timeout (seconds), used when neither
-# --timeout nor ANALYZER_TIMEOUT is set. Matches the longest wrapper timeout.
-_DEFAULT_SUBPROCESS_TIMEOUT = 120
+# --timeout nor ANALYZER_TIMEOUT is set. Matches the longest wrapper timeout:
+# playwright's own render-wait budget (PLAYWRIGHT_TIMEOUT_SECONDS, default
+# 180s) plus headroom for auth and browser startup.
+_DEFAULT_SUBPROCESS_TIMEOUT = 200
 
 
 # Defined in _report_html so fab_test_summary can ask the same question
@@ -256,50 +288,165 @@ def _apply_environment_default(
     args.environment = value
 
 
-def _telemetry_enabled(args: argparse.Namespace) -> bool:
-    """Return True when telemetry should be streamed for this invocation."""
-    if args.telemetry is False:
-        return False
-    if args.telemetry is True:
-        return True
-    return os.getenv("ENABLE_EVENTHOUSE_LOGGING", "").lower() == "true"
+def _telemetry_table(analyzer: str) -> str:
+    """Return the Eventhouse table an analyzer's records land in.
 
-
-def _git_command_output(cmd: list[str]) -> str:
-    """Run a local git command and return trimmed stdout, or "" on any failure."""
-    try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
-    except Exception:  # noqa: BLE001 - boundary: git is optional context
-        # Swallowed silently on purpose. This only enriches telemetry with
-        # the repository, branch, and actor, and every caller already reads
-        # "" as "unknown". Warning here would fire on every run outside a
-        # git checkout -- a normal way to use fab-test -- so the noise would
-        # train people to ignore it.
-        return ""
-    return proc.stdout.strip() if proc.returncode == 0 else ""
-
-
-def _git_context() -> dict[str, str]:
-    """Return repository/branch/commit/actor context from GitHub Actions or git CLI.
-
-    Falls back to local git for branch, commit, and actor (via
-    ``git config user.email``) so telemetry still carries useful context on
-    local runs and self-hosted runners where ``GITHUB_*`` vars are empty.
+    Derived, never configured: a config key would only let the file and the
+    derivation disagree about where a record went.
     """
-    ctx = {
-        "repository": os.getenv("GITHUB_REPOSITORY", ""),
-        "branch": os.getenv("GITHUB_REF_NAME", ""),
-        "commit": os.getenv("GITHUB_SHA", ""),
-        "actor": os.getenv("GITHUB_ACTOR", ""),
-        "workflow_run_id": os.getenv("GITHUB_RUN_ID", ""),
-    }
-    if not ctx["commit"]:
-        ctx["commit"] = _git_command_output(["git", "rev-parse", "HEAD"])
-    if not ctx["branch"]:
-        ctx["branch"] = _git_command_output(["git", "rev-parse", "--abbrev-ref", "HEAD"])
-    if not ctx["actor"]:
-        ctx["actor"] = _git_command_output(["git", "config", "user.email"])
-    return ctx
+    return "fabric_dynamic_analysis" if analyzer == "pql_test" else "fabric_static_analysis"
+
+
+def _telemetry_destination(decision: TelemetryDecision, analyzer: str) -> str:
+    """Describe where telemetry would go, for the --dry-run preview."""
+    if not decision.eventhouse.configured:
+        return "not configured (set `telemetry.eventhouse` in fab-test.yml)"
+    return (
+        f"{decision.eventhouse.uri} / {decision.eventhouse.database} "
+        f"/ {_telemetry_table(analyzer)}"
+    )
+
+
+def _telemetry_readiness(args: argparse.Namespace) -> dict[str, Any]:
+    """Return a `doctor` row for telemetry.
+
+    ``ready`` is tri-state. False is a problem the caller can fix; None means
+    "not applicable or not verifiable here" and never counts toward whether
+    `doctor` passes -- telemetry is optional, and a run that never wanted it
+    must not be reported as broken.
+
+    A configured destination with resolvable credentials still returns None
+    rather than True. Ingest permission is a grant on the KQL database, and
+    a service principal without the Database Ingestor role authenticates
+    perfectly and cannot ingest. `doctor` once reported four cloud analyzers
+    ready with no credentials at all; claiming ready on the strength of a
+    resolvable credential would be the same false green.
+    """
+    from ._credentials import (
+        IncompleteServicePrincipalError,
+        ambient_credential_available,
+        resolve_service_principal,
+    )
+    from .eventhouse_logger import (
+        TelemetryDependencyError,
+        load_ingest_dependencies,
+    )
+
+    def _row(ready, reason, remediation=None, resolved_path=None):
+        return {
+            "analyzer": "telemetry",
+            "ready": ready,
+            "reason": reason,
+            "remediation": remediation,
+            "resolved_path": resolved_path,
+        }
+
+    eventhouse = _telemetry_decision(args).eventhouse
+    if not eventhouse.configured:
+        return _row(None, "not configured (optional; set `telemetry.eventhouse` to enable)")
+
+    destination = f"{eventhouse.uri} / {eventhouse.database}"
+
+    try:
+        load_ingest_dependencies()
+    except TelemetryDependencyError as exc:
+        return _row(False, "ingest client not installed", str(exc), destination)
+
+    env_file = getattr(args, "playwright_env_file", None)
+    try:
+        principal = resolve_service_principal(env_file)
+    except IncompleteServicePrincipalError as exc:
+        return _row(False, "service principal is incomplete", str(exc), destination)
+
+    if principal is None and not ambient_credential_available():
+        return _row(
+            False,
+            "no credentials resolved",
+            "Set FABRIC_TENANT_ID, FABRIC_SERVICE_PRINCIPAL_ID, and "
+            "FABRIC_SERVICE_PRINCIPAL_SECRET, or sign in with `az login`",
+            destination,
+        )
+
+    return _row(
+        None,
+        "configured; ingest permission unverified",
+        "Tables are created on first use. If that fails, the credential needs rights "
+        "to create tables as well as the Database Ingestor role on the KQL database "
+        "(Fabric: the Eventhouse item -> Manage permissions); the failure message "
+        "carries the KQL to run by hand instead",
+        destination,
+    )
+
+
+def _open_telemetry(args: argparse.Namespace) -> Any:
+    """Open this run's telemetry sink, or None when nothing asked for one.
+
+    Keyed off `requested` rather than `enabled` so a run that asked but has
+    nowhere to send still reaches `_close_telemetry`, which is what makes a
+    silently-discarded record impossible.
+    """
+    decision = _telemetry_decision(args)
+    if not decision.requested:
+        return None
+    return EventhouseSink(
+        decision.eventhouse, env_file=getattr(args, "playwright_env_file", None)
+    )
+
+
+def _close_telemetry(sink: Any, args: argparse.Namespace) -> str | None:
+    """Deliver the run's telemetry and report once. Returns the failure, if any.
+
+    Once per run, not once per artifact: N identical warnings for one
+    unreachable cluster is noise that hides the next problem.
+    """
+    if sink is None:
+        return None
+    output_format = getattr(args, "output_format", "text")
+    decision = _telemetry_decision(args)
+    if not decision.eventhouse.configured:
+        message = (
+            "telemetry was requested but no Eventhouse destination is configured; "
+            "set `telemetry.eventhouse` in fab-test.yml or EVENTHOUSE_URI/EVENTHOUSE_DATABASE"
+        )
+        narrate(f"::warning::{message}", output_format=output_format)
+        return message
+
+    result = sink.flush()
+    if result.ok:
+        if result.sent:
+            narrate(
+                f"  ✓ fab-test: telemetry delivered ({result.sent} record(s))",
+                output_format=output_format,
+            )
+        return None
+    narrate(f"::warning::Telemetry not delivered: {result.error}", output_format=output_format)
+    return result.error
+
+
+def _telemetry_decision(args: argparse.Namespace) -> TelemetryDecision:
+    """Resolve this run's telemetry decision from the flags and the config file."""
+    return telemetry_decision(
+        cli_telemetry=getattr(args, "telemetry", None),
+        file_config=getattr(args, "file_config", None) or {},
+    )
+
+
+def _telemetry_enabled(args: argparse.Namespace) -> bool:
+    """Return True when telemetry should be streamed for this invocation.
+
+    The rule itself lives in `_telemetry`, which `eventhouse_logger` also
+    reads; this stays because two call sites and their tests name it.
+    """
+    return _telemetry_decision(args).enabled
+
+
+# Re-exported under their historic private names: telemetry code and its
+# tests call `_git_context()`/`_git_command_output()` and monkeypatch them
+# as module attributes here. The implementation moved to `_git_context.py`
+# so `_report_html.py` (the run index) can share it without importing this
+# module, which would be a cycle.
+_git_command_output = git_command_output
+_git_context = git_context
 
 
 def _detect_origin() -> str:
@@ -337,16 +484,53 @@ def _machine_context() -> dict[str, str]:
     return context
 
 
-def _redact_pii(value: str) -> str:
-    """Redact a value that looks like PII (e.g. an email address).
+def _relativize_paths(value: Any, repo_root: Path) -> Any:
+    """Rewrite absolute paths under ``repo_root`` to repository-relative ones.
 
-    Hashes rather than drops the value so it stays usable for correlating
-    runs by the same actor without exposing the raw email in telemetry.
+    Applied to the telemetry payload only, never to the envelope on disk: a
+    human clicking a result wants the absolute path, and an Eventhouse row
+    does not.
+
+    The leak this closes is not obvious from the payload's own fields. Every
+    analyzer envelope carries `artifact_path` and `rules_file`, and the whole
+    envelope is embedded as `results`, so `C:\\Users\\<name>\\...` shipped the
+    operating-system username in plaintext on every local run -- while
+    `actor`, the field meant to identify the run, was hashed into something
+    nobody could resolve.
+
+    A path *outside* the repository is dropped to its final component rather
+    than rewritten as `../../..`, which would leak the depth of the home
+    directory and mean nothing to a reader of the table.
     """
-    if "@" in value:
-        digest = hashlib.sha256(value.encode("utf-8")).hexdigest()[:16]
-        return f"sha256:{digest}"
+    if isinstance(value, dict):
+        return {key: _relativize_paths(item, repo_root) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_relativize_paths(item, repo_root) for item in value]
+    if not isinstance(value, str) or not value:
+        return value
+    return _relative_to_root(value, repo_root)
+
+
+def _relative_to_root(value: str, repo_root: Path) -> str:
+    """Return one string with any absolute path in it made repository-relative."""
+    root = f"{repo_root}"
+    if root and root in value:
+        # Both separators: an envelope written on Windows carries backslashes
+        # while the JSON that quotes it may not.
+        return value.replace(f"{root}\\", "").replace(f"{root}/", "").replace(root, ".")
+    if _looks_absolute(value):
+        return Path(value).name
     return value
+
+
+def _looks_absolute(value: str) -> str | bool:
+    """Whether a string looks like an absolute filesystem path.
+
+    Deliberately narrow: a false positive would rewrite an ordinary message
+    into its last path-like component, which is worse than leaving a path
+    that names nothing sensitive.
+    """
+    return value.startswith(("/", "\\")) or (len(value) > 2 and value[1:3] in (":\\", ":/"))
 
 
 def _build_telemetry_payload(
@@ -358,14 +542,19 @@ def _build_telemetry_payload(
     """Build a telemetry payload for an analyzer/artifact run."""
     errors, warnings = severity_counts(envelope.get("findings", []))
     ctx = _git_context()
-    return {
+    payload = {
         "timestamp": datetime.now(UTC).isoformat(),
         "artifact_name": artifact.stem,
         "artifact_type": artifact.suffix.lstrip("."),
         "commit_sha": ctx.get("commit", ""),
         "workflow_run_id": ctx.get("workflow_run_id", ""),
         "repository": ctx.get("repository", ""),
-        "actor": _redact_pii(ctx.get("actor", "")),
+        # Recorded as given. Hashing this answered "was this the same person
+        # as last time" and nothing else, while the username leaked anyway
+        # through the paths below -- so it bought no privacy and cost the
+        # attribution the field exists for. The repository already stores
+        # this address in plaintext on every commit.
+        "actor": ctx.get("actor", ""),
         "branch": ctx.get("branch", ""),
         "origin": _detect_origin(),
         "environment": environment,
@@ -377,6 +566,11 @@ def _build_telemetry_payload(
         "results": envelope,
         **_machine_context(),
     }
+    # Last, over the whole payload including the embedded envelope: the
+    # username leaked through `results.artifact_path`, not through any field
+    # named above, so relativizing only the fields we thought about is how
+    # this was missed the first time.
+    return _relativize_paths(payload, REPO_ROOT)
 
 
 _REQUIRED_TELEMETRY_FIELDS = ("analyzer", "artifact_name", "status", "timestamp")
@@ -415,17 +609,21 @@ def _send_telemetry(
     artifact: Path,
     envelope: dict[str, Any],
     args: argparse.Namespace,
+    sink: Any = None,
 ) -> None:
-    """Send a telemetry record if enabled. Telemetry failure is non-blocking."""
+    """Queue a telemetry record if enabled. Telemetry failure is non-blocking.
+
+    Queued rather than sent: one run's records go out in as few ingests as
+    the tables allow, because this is called once per artifact and a client
+    per artifact would pay connection setup N times. `sink` is None only for
+    a caller that has not opened one, which then falls back to the immediate
+    single-record path.
+    """
     if not _telemetry_enabled(args):
         return
 
     output_format = getattr(args, "output_format", "text")
-    table = (
-        "fabric_dynamic_analysis"
-        if analyzer == "pql_test"
-        else "fabric_static_analysis"
-    )
+    table = _telemetry_table(analyzer)
     payload = _build_telemetry_payload(
         analyzer,
         artifact,
@@ -434,6 +632,9 @@ def _send_telemetry(
     )
     validated = _validate_telemetry_payload(payload, output_format)
     if validated is None:
+        return
+    if sink is not None:
+        sink.add(table, validated)
         return
     try:
         publish_analyzer_telemetry(table, validated, force=True)
@@ -471,6 +672,9 @@ class _RunContext:
     sub_env: dict[str, str]
     timeout: int
     manifest: RunManifest | None = None
+    # One sink per run, drained once at the end. Ingesting inline would open
+    # a queued-ingest client per artifact for one logical run.
+    telemetry: Any = None
 
 
 def _run_one_artifact(
@@ -513,7 +717,11 @@ def _run_one_artifact(
         proc = subprocess.run(
             cmd,
             stdout=subprocess.PIPE if capture_stdout else None,
-            stderr=None if ctx.in_ci else subprocess.PIPE,
+            # Piped in every mode, CI included. Inheriting it there sent the
+            # analyzer's remediation to the log and nowhere else, leaving
+            # run.json -- often the only artifact a pipeline uploads -- saying
+            # the run failed and not why. Re-emitted below either way.
+            stderr=subprocess.PIPE,
             text=True,
             encoding="utf-8",
             errors="replace",
@@ -538,15 +746,21 @@ def _run_one_artifact(
     if capture_stdout:
         _reemit(proc.stdout)
 
-    if not ctx.in_ci and proc.stderr:
-        for line in proc.stderr.splitlines():
-            clean = _clean_annotation(line)
-            if clean.strip():
-                narrate(f"  {clean}", output_format=output_format)
+    if proc.stderr:
+        if ctx.in_ci:
+            # Verbatim: GitHub renders `::error::` against the file, and a
+            # stripped prefix is a lost annotation.
+            print(proc.stderr, end="", file=sys.stderr)
+        else:
+            for line in proc.stderr.splitlines():
+                clean = _clean_annotation(line)
+                if clean.strip():
+                    narrate(f"  {clean}", output_format=output_format)
 
     # Read the envelope and apply the error/warning threshold ourselves so
     # warnings never fail the build.
     envelope = _read_artifact_envelope(output_dir, name, artifact.stem)
+    aborted = False
     if envelope is None and proc.returncode == 0:
         envelope = {
             "status": "passed",
@@ -555,6 +769,9 @@ def _run_one_artifact(
             "analyzer": name,
         }
     elif envelope is None:
+        # Nothing to read: the analyzer aborted before it could write one, so
+        # its stderr is the only record of the reason. `detail` below carries it.
+        aborted = True
         envelope = {
             "status": "failed",
             "findings": [],
@@ -569,7 +786,7 @@ def _run_one_artifact(
         emit_workflow_annotations(envelope)
     if warnings > 0:
         emit_pr_review_comments(envelope, str(artifact))
-    _send_telemetry(name, artifact, envelope, args)
+    _send_telemetry(name, artifact, envelope, args, ctx.telemetry)
 
     if ctx.manifest is not None:
         envelope_path = output_dir / name / artifact.stem / "envelope.json"
@@ -580,6 +797,7 @@ def _run_one_artifact(
             str(envelope_path) if envelope_path.exists() else None,
             errors,
             warnings,
+            detail=_stderr_detail(proc.stderr) if aborted else None,
         )
 
     return (artifact.stem, artifact_code)
@@ -661,9 +879,17 @@ def _discover_for(name: str, args: argparse.Namespace, glob: str) -> list[Path]:
 def _report_no_artifacts(
     name: str, glob: str, args: argparse.Namespace, *, emit_own_json: bool
 ) -> int:
-    """Narrate an empty discovery. Always exits 0 -- nothing matched is not a failure."""
+    """Narrate an empty discovery. Always exits 0 -- nothing matched is not a failure.
+
+    An empty result has two very different causes that used to read
+    identically: the root holds no artifacts, or every candidate below it
+    was pruned as a nested checkout. The second is what a developer sees
+    running `fab-test` from a folder of sibling repositories, and it is
+    the one with a fix worth naming.
+    """
     output_format = getattr(args, "output_format", "text")
     target = _target_of(args)
+    checkouts: list[Path] = []
     if target is not None and target.path is not None:
         # A path target named a specific location, so reporting what the
         # scan of --artifact-dir turned up would answer a question the
@@ -673,13 +899,25 @@ def _report_no_artifacts(
             output_format=output_format,
         )
     else:
+        artifact_dir = Path(args.artifact_dir)
+        checkouts = _find_skipped_checkouts(artifact_dir)
+        # No `.pbip` clause: pairing enriches a result, and has not decided
+        # whether an artifact exists since discovery went suffix-based.
         narrate(
-            f"  ⚠ fab-test {name}: no {glob} artifacts or .pbip projects found under "
-            f"{Path(args.artifact_dir)}",
+            f"  ⚠ fab-test {name}: no {glob} artifacts found under {artifact_dir}",
             output_format=output_format,
         )
+        for line in skipped_checkout_lines(checkouts):
+            narrate(line, output_format=output_format)
     if emit_own_json:
-        print(json.dumps({"analyzer": name, "artifacts": []}, indent=2))
+        payload: dict[str, Any] = {
+            "analyzer": name,
+            "artifacts": [],
+            "skipped_checkouts": [str(path) for path in checkouts],
+        }
+        if checkouts:
+            payload["remediation"] = CHECKOUT_REMEDIATION
+        print(json.dumps(payload, indent=2))
     return 0
 
 
@@ -715,7 +953,15 @@ def _report_dry_run(
             f"  • {a.name}  (analyzers: {analyzers}){source_note}",
             output_format=output_format,
         )
-    if _telemetry_enabled(args):
+    # Keyed off "the caller asked", not "we could send". A preview whose job
+    # is to show what would happen has to survive an unset destination and
+    # say that the destination is what is unset.
+    decision = _telemetry_decision(args)
+    if decision.requested:
+        narrate(
+            f"\n  Telemetry destination: {_telemetry_destination(decision, name)}",
+            output_format=output_format,
+        )
         environment = getattr(args, "environment", "") or os.getenv("FABRIC_ENVIRONMENT", "")
         for a in artifacts:
             preview = _build_telemetry_payload(
@@ -805,6 +1051,7 @@ def _run_analyzer(
     args: argparse.Namespace,
     output_dir: Path,
     manifest: RunManifest | None = None,
+    telemetry: Any = None,
 ) -> int:
     """Run one analyzer against all matching artifacts.
 
@@ -838,6 +1085,7 @@ def _run_analyzer(
         sub_env=_analyzer_sub_env(args, output_format),
         timeout=_resolve_timeout(args),
         manifest=manifest,
+        telemetry=telemetry,
     )
     total = len(artifacts)
 
@@ -976,7 +1224,7 @@ _SUBCOMMAND_ALIASES = {
 }
 
 # Canonical (hyphenated, displayed) subcommand name -> internal registry key,
-# for the handful where they diverge. Result directories (analyzer-results/
+# for the handful where they diverge. Result directories (fab-test-results/
 # <key>/...) stay on the registry key so historical results remain readable.
 _CANONICAL_TO_REGISTRY_KEY = {
     "pql-test": "pql_test",
@@ -1296,6 +1544,27 @@ def build_parser() -> argparse.ArgumentParser:
         dest="dataset_id",
         metavar="ID",
         help="Semantic model / dataset ID override",
+    )
+    playwright_p.add_argument(
+        "--pages",
+        choices=["auto", "none"],
+        default="auto",
+        dest="pages",
+        help=(
+            "Discover every report page and its own bookmarks by default. "
+            "'none' tests only the default page (default: auto)"
+        ),
+    )
+    playwright_p.add_argument(
+        "--roles",
+        choices=["auto", "none"],
+        default="auto",
+        dest="roles",
+        help=(
+            "Discover RLS/OLS roles and test the page matrix under each one "
+            "when RLS is enabled. 'none' tests only PLAYWRIGHT_ROLE "
+            "(default: auto)"
+        ),
     )
 
     # --- playwright-impact ---
@@ -1723,6 +1992,7 @@ _SETTING_SPECS: list[tuple[str, str | None, Any, type | None]] = [
     ("format", None, "text", None),
     ("timeout", "ANALYZER_TIMEOUT", _DEFAULT_SUBPROCESS_TIMEOUT, int),
     ("environment", "FABRIC_ENVIRONMENT", "", None),
+    ("workspace", "FABRIC_WORKSPACE_ID", "", None),
 ]
 
 _SECRET_KEY_MARKERS = ("secret", "password", "token", "api_key")
@@ -1789,6 +2059,7 @@ def _config_show(args: argparse.Namespace) -> int:
         display_value = "<redacted>" if _is_secret_key(key) else value
         rows.append({"key": key, "value": display_value, "origin": origin})
     rows.extend(_ruleset_rows())
+    rows.extend(eventhouse_rows(file_config))
     return _print_config_show(rows, output_format)
 
 
@@ -1804,11 +2075,12 @@ _FAB_TEST_YML_TEMPLATE = """\
 # effective value and origin of each setting right now.
 
 # artifact_dir: .fabric/artifacts   # root to discover artifacts (repo root for `fab-test local`)
-# output_dir: analyzer-results      # root for result envelopes and the run manifest
+# output_dir: fab-test-results      # root for result envelopes and the run manifest
 # jobs: 1                          # artifacts to run in parallel for the same analyzer
 # format: text                     # text | json
-# timeout: 120                     # per-artifact subprocess timeout in seconds [env: ANALYZER_TIMEOUT]
+# timeout: 200                     # per-artifact subprocess timeout in seconds [env: ANALYZER_TIMEOUT]
 # environment: DEV                 # default environment label [env: FABRIC_ENVIRONMENT]
+# workspace: Sales Dev             # default workspace name or GUID [env: FABRIC_WORKSPACE_ID]
 
 # Rule overlays: deltas applied to a packaged ruleset instead of forking it.
 # rules:
@@ -1819,40 +2091,64 @@ _FAB_TEST_YML_TEMPLATE = """\
 #   pbir:
 #     disable: [RULE_ID]
 #     severity: {RULE_ID: warning}        # warning | error (PBIR Inspector has no "info" level)
+
+# Ship analyzer telemetry to a Fabric Eventhouse. A configured destination is
+# the enablement -- there is no separate on/off flag. Either key can instead
+# be set via EVENTHOUSE_URI / EVENTHOUSE_DATABASE, which win over this file.
+# telemetry:
+#   eventhouse:
+#     uri: https://<cluster>.kusto.fabric.microsoft.com       # [env: EVENTHOUSE_URI]
+#     database: <database-name>                               # [env: EVENTHOUSE_DATABASE]
 """
 
 _ENV_EXAMPLE_TEMPLATE = """\
-# .env.example -- copy to .env and fill in the values you need.
-# .env is auto-discovered at the repository root; --env-file overrides it.
-# Never commit the real .env -- it holds credentials.
+# .env.example -- copy to .fab-test/.env and fill in the values you need.
+# Search order: --env-file > PLAYWRIGHT_ENV_FILE > .fab-test/.env > ./.env.
+# Never commit the real .env -- .fab-test/.gitignore keeps this directory's
+# copy untracked even though .fab-test/metadata/ is meant to be checked in.
 
 # Service principal for Fabric/Power BI REST API access.
-# Leave all three unset to fall back to DefaultAzureCredential (az login,
-# a managed identity, VS Code sign-in, ...).
+# All three are optional for local use: leave them unset to fall back to
+# DefaultAzureCredential (az login, a managed identity, VS Code sign-in,
+# ...) for every command except `fab-test playwright`, which always needs
+# a full service principal to generate an embed token.
 FABRIC_TENANT_ID=
 FABRIC_CLIENT_ID=
 FABRIC_CLIENT_SECRET=
 
-# Playwright visual/error validation target.
+# Playwright visual/error validation target. Only needed when not using
+# --artifact to resolve a report from a deployed workspace.
 PLAYWRIGHT_WORKSPACE_ID=
 PLAYWRIGHT_REPORT_ID=
 PLAYWRIGHT_REPORT_NAME=
 PLAYWRIGHT_DATASET_ID=
 """
 
+_FAB_TEST_GITIGNORE_TEMPLATE = """\
+# fab-test's own guard: .fab-test/metadata/ is meant to be checked in,
+# but a .env in this directory holds credentials and never should be.
+.env
+"""
+
 
 def _init(args: argparse.Namespace) -> int:
-    """Scaffold a commented fab-test.yml and .env.example.
+    """Scaffold a commented fab-test.yml, .fab-test/.gitignore, and
+    .fab-test/.env.example.
 
     Never overwrites an existing file -- each is reported and left
     untouched instead. --dry-run reports what would be created without
-    writing anything.
+    writing anything. `.fab-test/.env.example` replaces the root
+    `.env.example` for new repositories: it lives beside the `.gitignore`
+    that makes a real `.env` in the same directory safe to keep, rather
+    than depending on a consumer's root `.gitignore` already covering it.
     """
     output_format = getattr(args, "output_format", "text")
     dry_run = getattr(args, "dry_run", False)
+    fab_test_dir = REPO_ROOT / ".fab-test"
     templates = {
         REPO_ROOT / CONFIG_FILENAME: _FAB_TEST_YML_TEMPLATE,
-        REPO_ROOT / ".env.example": _ENV_EXAMPLE_TEMPLATE,
+        fab_test_dir / ".gitignore": _FAB_TEST_GITIGNORE_TEMPLATE,
+        fab_test_dir / ".env.example": _ENV_EXAMPLE_TEMPLATE,
     }
 
     created = []
@@ -1869,6 +2165,7 @@ def _init(args: argparse.Namespace) -> int:
             would_create.append(str(path))
             narrate(f"  fab-test init: would create {path}", output_format=output_format)
         else:
+            path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(template, encoding="utf-8")
             created.append(str(path))
             narrate(f"  ✓ fab-test init: created {path}", output_format=output_format)
@@ -1953,6 +2250,12 @@ def _doctor(args: argparse.Namespace) -> int:
     # the menu should not refuse to answer a direct question about it.
     names = [only] if only else list(_visible_analyzers())
     rows = [{"analyzer": name, **_check_readiness(name, args)} for name in names]
+    if not only:
+        # Reported alongside the analyzers because it fails the same ways --
+        # a missing tool, a missing credential -- but never counted toward
+        # whether doctor passes: telemetry is optional, and a run that never
+        # wanted it is not a broken installation.
+        rows.append(_telemetry_readiness(args))
     return _print_doctor(rows, output_format)
 
 
@@ -1988,7 +2291,15 @@ def _list_analyzers(args: argparse.Namespace) -> int:
                 "scopes": sorted(_ANALYZER_SCOPES.get(name, frozenset())),
             }
         )
-    return _print_list(rows, output_format)
+    # A repository-scoped analyzer always reports 1 and never discovers, so
+    # "everything matched nothing" is a question about the discovering rows
+    # alone. Only then is the scan worth explaining -- a partial result is
+    # not a problem, and the walk is not free.
+    discovered = [row["matched_artifacts"] for row in rows if row["glob"]]
+    checkouts = (
+        _find_skipped_checkouts(artifact_dir) if discovered and not any(discovered) else []
+    )
+    return _print_list(rows, output_format, skipped_checkouts=checkouts)
 
 
 def _explain_analyzer(args: argparse.Namespace) -> int:
@@ -2361,6 +2672,7 @@ def _run_local(args: argparse.Namespace) -> int:
     manifest = RunManifest(
         _FAB_TEST_VERSION, sys.argv, origin=_detect_origin(), target=_manifest_target(args)
     )
+    telemetry = _open_telemetry(args)
 
     results: list[dict[str, Any]] = []
     for name in _LOCAL_ANALYZERS:
@@ -2373,10 +2685,13 @@ def _run_local(args: argparse.Namespace) -> int:
             )
             results.append({"analyzer": name, "status": "skipped", "reason": readiness["reason"]})
             continue
-        code = _run_analyzer(name, args, output_dir, manifest)
+        code = _run_analyzer(name, args, output_dir, manifest, telemetry)
         results.append({"analyzer": name, "status": "ran", "exit_code": code})
 
     exit_code = 1 if any(r.get("exit_code", 0) != 0 for r in results) else 0
+    # Flushed before the manifest is written so run.json can record whether
+    # this run's telemetry landed.
+    manifest.telemetry_error = _close_telemetry(telemetry, args)
     manifest.write(output_dir, exit_code)
     if output_format == "json":
         print(json.dumps({"analyzer": "local", "results": results, "exit_code": exit_code}, indent=2))
@@ -2400,6 +2715,15 @@ def _prepare_config(args: argparse.Namespace) -> int | None:
         return 2
     for warning in warnings:
         narrate(f"  ⚠ fab-test: {warning}", output_format=getattr(args, "output_format", "text"))
+
+    # An explicit --telemetry with no destination is a configuration problem,
+    # reported here so it costs one message per run rather than one per
+    # artifact -- and before any analyzer starts, so nothing runs only to
+    # discover its telemetry had nowhere to go.
+    refusal = _telemetry_decision(args).refusal
+    if refusal:
+        print(f"  ✗ fab-test: {refusal}", file=sys.stderr)
+        return 2
     return None
 
 
@@ -2472,6 +2796,7 @@ def _dispatch_run(args: argparse.Namespace) -> int:
     manifest = RunManifest(
         _FAB_TEST_VERSION, sys.argv, origin=_detect_origin(), target=_manifest_target(args)
     )
+    telemetry = _open_telemetry(args)
 
     target = args.resolved_target
 
@@ -2494,7 +2819,9 @@ def _dispatch_run(args: argparse.Namespace) -> int:
             else:
                 runnable.append(name)
         if runnable:
-            codes = [_run_analyzer(name, args, output_dir, manifest) for name in runnable]
+            codes = [
+                _run_analyzer(name, args, output_dir, manifest, telemetry) for name in runnable
+            ]
             exit_code = _print_all_summary(output_dir, runnable, codes, args)
         elif analyzers:
             narrate(
@@ -2511,8 +2838,11 @@ def _dispatch_run(args: argparse.Namespace) -> int:
     else:
         # The scope refusal for a single analyzer already ran above, before
         # any network call.
-        exit_code = _run_analyzer(args.analyzer, args, output_dir, manifest)
+        exit_code = _run_analyzer(args.analyzer, args, output_dir, manifest, telemetry)
 
+    # One flush for the whole run, `all` included: a sink per analyzer would
+    # reopen the ingest client for each of them.
+    manifest.telemetry_error = _close_telemetry(telemetry, args)
     manifest.write(output_dir, exit_code)
     return exit_code
 

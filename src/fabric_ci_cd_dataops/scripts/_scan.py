@@ -22,8 +22,9 @@ that: `rglob` has no way to say "do not descend".
 from __future__ import annotations
 
 import os
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterable
 from pathlib import Path
+from typing import NamedTuple
 
 # Never worth walking, and expensive when walked: a virtualenv or a
 # node_modules can hold tens of thousands of directories and cannot hold a
@@ -59,13 +60,28 @@ def _is_nested_checkout(directory: Path, root: Path) -> bool:
     return directory != root and (directory / ".git").exists()
 
 
-def iter_artifact_dirs(
+class ScanResult(NamedTuple):
+    """What one walk found, and what it refused to walk into.
+
+    `skipped_checkouts` exists because pruning silently makes an empty
+    result ambiguous: a caller cannot tell a repository with no artifacts
+    from a directory of sibling repositories, every one of which was
+    pruned. Only nested checkouts are reported -- `EXCLUDED_DIR_NAMES`
+    and caller-supplied `excluded_paths` are not, since naming `.venv`
+    tells the caller nothing they can act on.
+    """
+
+    artifacts: list[Path]
+    skipped_checkouts: list[Path]
+
+
+def scan(
     root: Path,
     suffixes: Iterable[str],
     *,
     excluded_paths: Iterable[Path] = (),
-) -> Iterator[Path]:
-    """Yield every directory under ``root`` whose name ends in a suffix.
+) -> ScanResult:
+    """Walk ``root`` once for directories whose name ends in a suffix.
 
     ``excluded_paths`` prunes specific trees the caller owns -- the run's
     output directory above all, since analyzer results land in folders
@@ -75,12 +91,18 @@ def iter_artifact_dirs(
     A matched directory is not descended into. Fabric artifacts do not
     nest, and `Sales.SemanticModel/definition` is a matched artifact's
     contents rather than another artifact.
+
+    Both lists come from the same walk. Counting the pruned checkouts
+    separately would walk twice and give the prune rules a second home to
+    drift from.
     """
     root = root.resolve()
     if not root.is_dir():
-        return
+        return ScanResult([], [])
     suffix_tuple = tuple(suffixes)
     pruned = {path.resolve() for path in excluded_paths}
+    artifacts: list[Path] = []
+    checkouts: list[Path] = []
 
     for dirpath, dirnames, _filenames in os.walk(root):
         current = Path(dirpath)
@@ -90,12 +112,15 @@ def iter_artifact_dirs(
             if name in EXCLUDED_DIR_NAMES or child in pruned:
                 continue
             if _is_nested_checkout(child, root):
+                checkouts.append(child)
                 continue
             if name.endswith(suffix_tuple):
-                yield child
+                artifacts.append(child)
                 continue
             keep.append(name)
         dirnames[:] = keep
+
+    return ScanResult(sorted(set(artifacts)), sorted(set(checkouts)))
 
 
 def find_artifact_dirs(
@@ -104,5 +129,17 @@ def find_artifact_dirs(
     *,
     excluded_paths: Iterable[Path] = (),
 ) -> list[Path]:
-    """Return `iter_artifact_dirs` sorted and deduplicated."""
-    return sorted(set(iter_artifact_dirs(root, suffixes, excluded_paths=excluded_paths)))
+    """Return just the artifacts `scan` found, sorted and deduplicated."""
+    return scan(root, suffixes, excluded_paths=excluded_paths).artifacts
+
+
+def find_skipped_checkouts(root: Path) -> list[Path]:
+    """The nested git checkouts a scan of ``root`` refuses to walk into.
+
+    A second walk, run only when a caller has to explain a result that
+    came back empty. It shares `scan` rather than restating the prune
+    rule, so the explanation cannot drift from the behaviour it
+    describes. No suffix is passed, so nothing is collected but the
+    checkouts themselves.
+    """
+    return scan(root, ()).skipped_checkouts

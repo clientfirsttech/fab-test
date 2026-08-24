@@ -1,6 +1,13 @@
 # Telemetry Context Epic
 
 **Status**: ✅ COMPLETED (2026-08-18)
+
+> **Correction (2026-08-22).** This epic built the telemetry *payload* and never the
+> wire. `publish_to_eventhouse` was a placeholder that printed a banner and returned
+> `True`, so "the payload is sent as it is today" below was literally true and
+> concealed that nothing was ever transmitted. Read every requirement here as being
+> about what a record contains, not whether it arrives. Delivery starts with
+> [Eventhouse Shipping](../eventhouse-shipping-epic.md).
 **Goal**: Ensure analyzer telemetry always carries repository, branch, actor, and run context.
 
 ## Overview
@@ -37,7 +44,7 @@ Include enough non-sensitive machine context to diagnose environment-specific fa
 **Requirements**:
 - Given telemetry is enabled, then each payload includes `platform` (e.g., `win32`, `linux`), `python_version`, and `fab-test` version.
 - Given the OS platform cannot be determined, then the field is omitted rather than causing a send failure.
-- Given personally identifiable information would be included, then it is redacted before transmission.
+- ~~Given personally identifiable information would be included, then it is redacted before transmission.~~ **Reversed 2026-08-23.** Reading real ingested rows showed this requirement achieving the opposite of its intent. `actor` was hashed to `sha256:...` -- unresolvable, so the attribution the field exists for was lost -- while the operating-system username shipped in plaintext through the absolute paths inside the embedded `results` envelope, which the redaction never touched. Identifying people by accident and failing to identify them on purpose. `actor` is now recorded as given, and payload paths are made repository-relative. See `tests/test_telemetry_identity.py`.
 
 ---
 

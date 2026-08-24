@@ -22,6 +22,7 @@ from pathlib import Path
 import pytest
 
 from fabric_ci_cd_dataops.scripts._target import TargetError, parse_target, select_target
+from fabric_ci_cd_dataops.scripts.fab_test import RESULTS_ROOT
 from fabric_ci_cd_dataops.scripts.fab_test_registry import discover_artifacts
 
 
@@ -330,11 +331,11 @@ def test_the_run_output_directory_is_not_rediscovered(tmp_path):
     produced them, so an unpruned scan compounds every run."""
     real = tmp_path / "Sales.SemanticModel"
     real.mkdir()
-    results = tmp_path / "analyzer-results" / "bpa"
+    results = tmp_path / "fab-test-results" / "bpa"
     (results / "Sales.SemanticModel").mkdir(parents=True)
 
     found = discover_artifacts(
-        tmp_path, "*.SemanticModel", None, output_dir=tmp_path / "analyzer-results"
+        tmp_path, "*.SemanticModel", None, output_dir=tmp_path / "fab-test-results"
     )
 
     assert found == [real.resolve()]
@@ -345,6 +346,6 @@ def test_a_nested_checkout_does_not_multiply_this_repository():
     """Measured before the change: a naive recursive scan of this repository
     returns 8 artifacts, 5 of them worktree copies of the other 3."""
     root = Path(__file__).resolve().parent.parent
-    found = discover_artifacts(root, "*.SemanticModel", None, output_dir=root / "analyzer-results")
+    found = discover_artifacts(root, "*.SemanticModel", None, output_dir=RESULTS_ROOT)
 
     assert [p.name for p in found] == ["SampleModel-PQLAssert.SemanticModel"]

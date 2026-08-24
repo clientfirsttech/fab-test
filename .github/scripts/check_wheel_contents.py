@@ -44,7 +44,8 @@ FORBIDDEN = (
     "tests/",
     "TabularEditor/",
     "PBIR-Inspector/",
-    "analyzer-results/",
+    "analyzer-results/",  # pre-1.0.0.0 name; kept as a permanent guard
+    "fab-test-results/",
     ".venv/",
     ".env",
     "bandit-report",

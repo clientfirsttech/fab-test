@@ -222,3 +222,114 @@ def test_explain_falls_back_to_placeholder_when_no_artifact_matches(tmp_path):
     code = fab_test_module._explain_analyzer(args)
 
     assert code == 0
+
+
+# --------------------------------------------------------------------------- #
+# An all-zero table explains itself (Empty Discovery Diagnostics §3)
+# --------------------------------------------------------------------------- #
+
+
+def _checkout(parent, name):
+    """A directory the scan refuses to walk into, as a real repository is."""
+    checkout = parent / name
+    (checkout / ".git").mkdir(parents=True)
+    return checkout
+
+
+@pytest.mark.fab_test
+def test_list_explains_a_table_of_zeroes(tmp_path):
+    """Given a root whose every candidate was pruned, `list` reports 0 for
+    each analyzer, which reads as "this tool can do nothing here" when the
+    truth is that it never looked inside the repositories below.
+    """
+    _checkout(tmp_path, "project-a")
+    _checkout(tmp_path, "project-b")
+
+    result = subprocess.run(
+        ["fab-test", "list", "--artifact-dir", str(tmp_path)],
+        capture_output=True, text=True, check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "2 git checkouts" in result.stdout
+    assert "--artifact-dir" in result.stdout
+
+
+@pytest.mark.fab_test
+def test_list_says_nothing_when_a_scan_pruned_nothing(tmp_path):
+    """Given an ordinary empty directory, a zero count is the whole truth."""
+    result = subprocess.run(
+        ["fab-test", "list", "--artifact-dir", str(tmp_path)],
+        capture_output=True, text=True, check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "checkout" not in result.stdout
+
+
+@pytest.mark.fab_test
+def test_list_says_nothing_when_an_analyzer_matched_something(tmp_path):
+    """Given a partial result, there is no confusing absence to explain."""
+    _checkout(tmp_path, "project-a")
+    (tmp_path / "Sales.SemanticModel" / "definition").mkdir(parents=True)
+
+    result = subprocess.run(
+        ["fab-test", "list", "--artifact-dir", str(tmp_path)],
+        capture_output=True, text=True, check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "checkout" not in result.stdout
+
+
+@pytest.mark.fab_test
+def test_list_json_carries_the_skipped_checkouts(tmp_path):
+    """The agent caller reads the payload, not the table."""
+    checkout = _checkout(tmp_path, "project-a")
+
+    result = subprocess.run(
+        ["fab-test", "list", "--artifact-dir", str(tmp_path), "--format", "json"],
+        capture_output=True, text=True, check=False,
+    )
+
+    payload = json.loads(result.stdout)
+    assert payload["skipped_checkouts"] == [str(checkout)]
+    assert "--artifact-dir" in payload["remediation"]
+
+
+@pytest.mark.fab_test
+def test_print_list_json_payload_shape(tmp_path, capsys):
+    """Given the JSON list payload, the checkout keys travel with the rows.
+
+    Exercised in-process because every other `list` test shells out, which
+    leaves this branch uncovered however green the suite looks.
+    """
+    from fabric_ci_cd_dataops.scripts.fab_test_summary import _print_list
+
+    row = {
+        "analyzer": "bpa",
+        "aliases": [],
+        "glob": "*.SemanticModel",
+        "matched_artifacts": 0,
+        "required_tool": "Tabular Editor",
+        "scopes": ["path"],
+    }
+
+    assert _print_list([row], "json", skipped_checkouts=[tmp_path / "repo"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["analyzers"] == [row]
+    assert payload["skipped_checkouts"] == [str(tmp_path / "repo")]
+    assert "--artifact-dir" in payload["remediation"]
+
+
+@pytest.mark.fab_test
+def test_print_list_json_payload_omits_remediation_when_nothing_was_pruned(capsys):
+    """Given nothing was pruned, there is nothing to remediate."""
+    from fabric_ci_cd_dataops.scripts.fab_test_summary import _print_list
+
+    assert _print_list([], "json") == 0
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["skipped_checkouts"] == []
+    assert "remediation" not in payload

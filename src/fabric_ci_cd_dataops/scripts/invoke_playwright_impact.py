@@ -5,7 +5,7 @@ Usage:
     python scripts/invoke_playwright_impact.py \
         --changed-artifacts changed-artifacts.json \
         --env dev \
-        --output analyzer-results/playwright/impact-manifest.json
+        --output fab-test-results/playwright/impact-manifest.json
 """
 
 from __future__ import annotations
@@ -101,7 +101,7 @@ def main(argv: list[str] | None = None) -> int:
     else:
         output_path = (
             _repo_root()
-            / "analyzer-results"
+            / "fab-test-results"
             / "playwright"
             / "impact-manifest.json"
         )

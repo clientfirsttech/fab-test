@@ -1,7 +1,17 @@
 name: "Copilot Setup Steps"
 
-# Automatically run the setup steps when they are changed to allow for easy validation, and
-# allow manual testing through the repository's "Actions" tab
+# What GitHub Copilot's coding agent runs before it starts, so the agent
+# begins with dependencies installed rather than discovering them.
+#
+# This arrived from a JS/TS template and every step after the checkout was
+# wrong for this project: `npm ci` with no package.json anywhere in the tree
+# (which failed on every run), Node and Bun toolchains nothing here uses,
+# two scripts under a top-level `scripts/` directory that does not exist, and
+# Python 3.11 against a `requires-python = ">=3.12"` project. A setup that
+# errors is worse than no setup, because the agent inherits it.
+#
+# Runs on changes to itself so it can be validated the same way, and on
+# demand from the Actions tab. Asserted by tests/test_workflow_triggers.py.
 on:
     workflow_dispatch:
     push:
@@ -12,7 +22,7 @@ on:
             - .github/workflows/copilot-setup-steps.yml
 
 jobs:
-    # The job MUST be called `copilot-setup-steps` or it will not be picked up by Copilot.
+    # The job MUST be called `copilot-setup-steps` or Copilot will not pick it up.
     copilot-setup-steps:
         runs-on: ubuntu-latest
 
@@ -23,41 +33,35 @@ jobs:
             - name: Checkout code
               uses: actions/checkout@v4
 
-            - name: Set up Node.js
-              uses: actions/setup-node@v4
+            # Matches build.yml. The agent and CI disagreeing about the
+            # interpreter is a class of bug that only shows up in one of them.
+            - name: Set up Python
+              uses: actions/setup-python@v5
               with:
-                  node-version: "20"
+                  python-version: "3.12"
 
-            - name: Set up Bun
-              uses: oven-sh/setup-bun@v2
-              with:
-                  bun-version: latest
+            # The whole point: editable install plus the dev extra, so ruff and
+            # pytest are present and the console scripts are on PATH. Several
+            # contract tests launch `fab-test` as a subprocess and cannot pass
+            # without that.
+            - name: Install the package and its dev tools
+              run: pip install -e ".[dev]"
 
-            - name: Install root dependencies
-              run: npm ci
-
-            - name: Verify repository baseline files
+            - name: Verify the agent's baseline documents are present
               run: |
                   test -f vision.md
                   test -f plan.md
                   test -f README.md
+                  test -f CLAUDE.md
+                  test -f .github/copilot-instructions.md
 
-            - name: Verify baseline works without RTK
-              env:
-                  DISABLE_RTK: "1"
+            - name: Verify the console scripts resolve
               run: |
-                  git status
-                  python --version
-                  python scripts/rtk_hook_guard.py
-                  test -f .github/hooks/rtk-rewrite.json
+                  fab-test --version
+                  fab-test doctor --analyzer bpa || true
 
-            - name: Set up Python
-              uses: actions/setup-python@v5
-              with:
-                  python-version: "3.11"
-
-            - name: Install Python dependencies
-              run: pip install pyyaml
-
-            - name: Validate environments.yml schema
-              run: python scripts/validate_environments_schema.py --terse
+            - name: Verify the toolchain the agent will be asked to run
+              run: |
+                  ruff --version
+                  pytest --version
+                  ruff check .

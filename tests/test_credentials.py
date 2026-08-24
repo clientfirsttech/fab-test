@@ -17,11 +17,18 @@ any machine.
 """
 
 import json
+import tempfile
+from pathlib import Path
 
 import pytest
 
 from fabric_ci_cd_dataops.scripts import _credentials
 from fabric_ci_cd_dataops.scripts._credentials import probe_credentials
+
+# A path guaranteed not to exist, so `.env` discovery in this module never
+# picks up a real `.fab-test/.env` or `.env` a developer keeps in their own
+# checkout -- these tests must always pass on any machine.
+_NO_SUCH_ENV_FILE = str(Path(tempfile.gettempdir()) / "fab-test-test-isolation" / ".env")
 
 _ALL_VARS = (
     "FABRIC_TENANT_ID",
@@ -39,9 +46,21 @@ _SECRET = "s3cr3t-do-not-print"
 
 @pytest.fixture
 def clean_env(monkeypatch):
-    """No credential variables, and ambient off unless a test turns it on."""
+    """No credential variables, and ambient off unless a test turns it on.
+
+    `PLAYWRIGHT_ENV_FILE` is pinned to a nonexistent path rather than
+    deleted: deleting it would fall through to `.fab-test/.env` / `.env`
+    discovery, which would leak in a real credential file this checkout
+    happens to have.
+    """
     for var in _ALL_VARS:
         monkeypatch.delenv(var, raising=False)
+    monkeypatch.setenv("PLAYWRIGHT_ENV_FILE", _NO_SUCH_ENV_FILE)
+    # `_repo_root()` prefers GITHUB_WORKSPACE over cwd, which would make
+    # discovery ignore a test's `monkeypatch.chdir(tmp_path)` and look in
+    # the real checkout instead -- only invisible locally, where this
+    # variable is unset.
+    monkeypatch.delenv("GITHUB_WORKSPACE", raising=False)
     monkeypatch.setattr(_credentials, "ambient_credential_available", lambda: False)
     return monkeypatch
 
@@ -146,6 +165,97 @@ def test_missing_env_file_is_not_an_error(clean_env, tmp_path):
     status = probe_credentials(env_file=tmp_path / "absent.env")
 
     assert status.resolved is False
+
+
+# --------------------------------------------------------------------------- #
+# .fab-test/.env vs root .env (task 8: one search order, one directory)
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.fab_test
+def test_default_discovery_prefers_fab_test_env_over_root_env(
+    clean_env, tmp_path, monkeypatch
+):
+    """With both present and no explicit path, .fab-test/.env wins.
+
+    Two discovery implementations used to disagree -- `_credentials`
+    defaulted to a bare ``Path(".env")`` (cwd-relative) while the
+    Playwright config loader defaulted to ``repo_root / ".env"``. This
+    pins the single order both now share.
+    """
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("PLAYWRIGHT_ENV_FILE", raising=False)
+
+    (tmp_path / ".env").write_text(
+        f"FABRIC_TENANT_ID=root-tenant\n"
+        f"FABRIC_SERVICE_PRINCIPAL_ID={_CLIENT}\n"
+        f"FABRIC_SERVICE_PRINCIPAL_SECRET={_SECRET}\n",
+        encoding="utf-8",
+    )
+    fab_test_dir = tmp_path / ".fab-test"
+    fab_test_dir.mkdir()
+    (fab_test_dir / ".env").write_text(
+        f"FABRIC_TENANT_ID={_TENANT}\n"
+        f"FABRIC_SERVICE_PRINCIPAL_ID={_CLIENT}\n"
+        f"FABRIC_SERVICE_PRINCIPAL_SECRET={_SECRET}\n",
+        encoding="utf-8",
+    )
+
+    status = probe_credentials()
+
+    assert status.tenant_id == _TENANT
+    assert status.source == ".fab-test/.env"
+
+
+@pytest.mark.fab_test
+def test_default_discovery_falls_back_to_root_env_when_fab_test_env_absent(
+    clean_env, tmp_path, monkeypatch
+):
+    """A repository with only a root .env keeps working unchanged (backward-compat)."""
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("PLAYWRIGHT_ENV_FILE", raising=False)
+
+    (tmp_path / ".env").write_text(
+        f"FABRIC_TENANT_ID={_TENANT}\n"
+        f"FABRIC_SERVICE_PRINCIPAL_ID={_CLIENT}\n"
+        f"FABRIC_SERVICE_PRINCIPAL_SECRET={_SECRET}\n",
+        encoding="utf-8",
+    )
+
+    status = probe_credentials()
+
+    assert status.tenant_id == _TENANT
+    assert status.source == ".env"
+
+
+@pytest.mark.fab_test
+def test_playwright_config_loader_shares_the_same_default_discovery(
+    clean_env, tmp_path, monkeypatch
+):
+    """`playwright_validation.config.load_config` resolves the same file
+    `_credentials` does -- the exact fork this task exists to fix."""
+    from fabric_ci_cd_dataops.scripts.playwright_validation.config import load_config
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("PLAYWRIGHT_ENV_FILE", raising=False)
+    monkeypatch.delenv("GITHUB_WORKSPACE", raising=False)
+
+    fab_test_dir = tmp_path / ".fab-test"
+    fab_test_dir.mkdir()
+    (fab_test_dir / ".env").write_text(
+        "PLAYWRIGHT_WORKSPACE_ID=ws-1\n"
+        "PLAYWRIGHT_REPORT_ID=rpt-1\n"
+        "PLAYWRIGHT_DATASET_ID=ds-1\n"
+        f"FABRIC_TENANT_ID={_TENANT}\n"
+        f"FABRIC_CLIENT_ID={_CLIENT}\n"
+        f"FABRIC_CLIENT_SECRET={_SECRET}\n",
+        encoding="utf-8",
+    )
+
+    config = load_config(None, required=True)
+
+    assert config.workspace_id == "ws-1"
+    assert config.tenant_id == _TENANT
 
 
 # --------------------------------------------------------------------------- #

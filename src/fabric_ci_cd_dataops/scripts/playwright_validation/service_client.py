@@ -6,12 +6,14 @@ testable without live service access.
 
 from __future__ import annotations
 
+import base64
+import json
 from dataclasses import dataclass
 from typing import Any
 
 import requests
 
-from .config import _api_root_for
+from .config import _api_root_for, _fabric_api_root_for
 
 
 class ServiceClientError(Exception):
@@ -45,6 +47,76 @@ def _api_headers(token: FabricToken) -> dict[str, str]:
     }
 
 
+def _decode_payload(payload: str) -> dict[str, Any] | None:
+    """Base64-decode and JSON-parse a ``getDefinition`` part payload."""
+    try:
+        decoded = base64.b64decode(payload).decode("utf-8")
+        return json.loads(decoded)
+    except (ValueError, UnicodeDecodeError, json.JSONDecodeError):
+        return None
+
+
+def _bookmark_page_id(bookmark: dict[str, Any]) -> str:
+    """Return the page a bookmark targets from its exploration state."""
+    return str(bookmark.get("explorationState", {}).get("activeSection", ""))
+
+
+def _flatten_bookmark_entry(entry: dict[str, Any]) -> list[dict[str, str]]:
+    """Expand one bookmark-index entry into testable bookmarks.
+
+    A bookmark group carries no state of its own -- only its ``children``
+    do -- so a group is expanded into its children rather than tested as a
+    bookmark itself.
+    """
+    children = entry.get("children")
+    if children:
+        return [
+            {
+                "bookmark_id": child.get("name", ""),
+                "bookmark_name": child.get("displayName", child.get("name", "")),
+                "page_id": _bookmark_page_id(child),
+            }
+            for child in children
+        ]
+    return [
+        {
+            "bookmark_id": entry.get("name", ""),
+            "bookmark_name": entry.get("displayName", entry.get("name", "")),
+            "page_id": _bookmark_page_id(entry),
+        }
+    ]
+
+
+def _decode_bookmark_index(payload: str) -> list[dict[str, str]]:
+    """Parse the legacy flat ``definition/bookmarks.json`` shape."""
+    data = _decode_payload(payload)
+    if not data:
+        return []
+    return [
+        bookmark
+        for entry in data.get("bookmarks", [])
+        for bookmark in _flatten_bookmark_entry(entry)
+    ]
+
+
+def _decode_bookmark_file(payload: str) -> dict[str, str] | None:
+    """Parse one PBIR ``definition/bookmarks/<name>.bookmark.json`` part.
+
+    A bookmark *group*'s own file lists its children rather than carrying
+    exploration state itself, so it is skipped here -- each child gets its
+    own ``*.bookmark.json`` part, which this function is called on
+    separately.
+    """
+    data = _decode_payload(payload)
+    if not data or data.get("children"):
+        return None
+    return {
+        "bookmark_id": data.get("name", ""),
+        "bookmark_name": data.get("displayName", data.get("name", "")),
+        "page_id": _bookmark_page_id(data),
+    }
+
+
 class FabricRestClient:
     """Client backed by direct Fabric REST API calls.
 
@@ -61,12 +133,17 @@ class FabricRestClient:
         method: str,
         path: str,
         *,
+        api_root: str = "",
         params: dict[str, str] | None = None,
         json_payload: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """Make a Fabric REST API request and return the JSON body."""
-        api_root = _api_root_for(self._token.cloud)
-        url = f"{api_root}{path}"
+        """Make a Fabric REST API request and return the JSON body.
+
+        ``api_root`` overrides the default Power BI root for calls that
+        must go through the Fabric REST API instead (e.g. semantic model
+        definitions), matching ``FabricServiceClient``'s ``_rest_request``.
+        """
+        url = f"{api_root or _api_root_for(self._token.cloud)}{path}"
         response = requests.request(
             method,
             url,
@@ -138,11 +215,16 @@ class FabricRestClient:
         workspace_id: str,
         report_id: str,
     ) -> list[dict[str, str]]:
-        """Return bookmarks from the report's PBIP-style definition.
+        """Return bookmarks from the report's PBIR-style definition, each
+        tagged with the page it targets.
 
-        Downloads the report definition and parses ``definition/bookmarks.json``.
-        Falls back to an empty list when the definition or bookmarks file is
-        unavailable.
+        Reads every bookmark part under ``definition/bookmarks/`` (one
+        ``*.bookmark.json`` file per bookmark, the PBIR shape) plus a flat
+        ``definition/bookmarks.json`` for older exports. ``page_id`` comes
+        from each bookmark's ``explorationState.activeSection`` so a
+        bookmark can be paired with the one page it belongs to instead of
+        every page in the report. Falls back to an empty list when the
+        definition or no bookmark parts are found.
         """
         try:
             data = self._request(
@@ -154,27 +236,51 @@ class FabricRestClient:
                 return []
             raise
 
+        bookmarks: list[dict[str, str]] = []
         for part in data.get("definition", {}).get("parts", []):
-            if part.get("path") == "definition/bookmarks.json":
-                import base64
-                import json
+            path = part.get("path", "")
+            if path == "definition/bookmarks.json":
+                bookmarks.extend(_decode_bookmark_index(part.get("payload", "")))
+            elif path.startswith("definition/bookmarks/") and path.endswith(
+                ".bookmark.json"
+            ):
+                bookmark = _decode_bookmark_file(part.get("payload", ""))
+                if bookmark:
+                    bookmarks.append(bookmark)
+        return bookmarks
 
-                payload = part.get("payload", "")
-                try:
-                    decoded = base64.b64decode(payload).decode("utf-8")
-                    bookmarks = json.loads(decoded)
-                except (ValueError, UnicodeDecodeError):
-                    return []
-                return [
-                    {
-                        "bookmark_id": bookmark.get("name", ""),
-                        "bookmark_name": bookmark.get(
-                            "displayName", bookmark.get("name", "")
-                        ),
-                    }
-                    for bookmark in bookmarks.get("bookmarks", [])
-                ]
-        return []
+    def get_semantic_model_roles(
+        self,
+        workspace_id: str,
+        semantic_model_id: str,
+    ) -> list[str]:
+        """Return RLS/OLS role names defined on the semantic model.
+
+        Downloads the semantic model definition over the Fabric REST API and
+        derives each role's name from its ``definition/roles/<RoleName>.tmdl``
+        part path -- Power BI Desktop names each role file after the role
+        itself, so the path is a reliable source without parsing TMDL role
+        syntax. Falls back to an empty list when the definition is
+        unavailable (e.g. a legacy, non-PBIP-enabled semantic model).
+        """
+        try:
+            data = self._request(
+                "POST",
+                f"/v1/workspaces/{workspace_id}/semanticModels/"
+                f"{semantic_model_id}/getDefinition",
+                api_root=_fabric_api_root_for(self._token.cloud),
+            )
+        except ServiceClientError as exc:
+            if exc.status_code == 404:
+                return []
+            raise
+
+        roles = []
+        for part in data.get("definition", {}).get("parts", []):
+            path = part.get("path", "")
+            if path.startswith("definition/roles/") and path.endswith(".tmdl"):
+                roles.append(path.rsplit("/", 1)[-1][: -len(".tmdl")])
+        return roles
 
     def get_dependent_reports(
         self,

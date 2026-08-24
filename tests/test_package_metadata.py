@@ -104,9 +104,25 @@ def test_every_readme_link_resolves_off_the_project_page(readme):
 
 
 @pytest.mark.fab_test
-def test_the_readme_does_not_link_the_old_repository_name(readme):
-    """A renamed repository redirects today and stops redirecting eventually."""
-    assert _STALE_REPOSITORY not in readme
+def test_no_readme_link_treats_the_old_repository_as_this_one(readme):
+    """This package's own files must not be linked through the old name.
+
+    Naming `fabric-ci-cd-dataops` is legitimate -- it is a different project,
+    the reference implementation that consumes this CLI. What must not happen
+    is a `/blob/` or `/tree/` link reaching into *our* files through it: a
+    rename redirects today and stops redirecting eventually.
+
+    An earlier blanket find-and-replace went the other way and rewrote that
+    legitimate cross-reference into a link to this repository, which made the
+    sentence claim fab-test is its own reference implementation.
+    """
+    into_our_files = [
+        href
+        for href in re.findall(r"\[[^\]]*\]\(([^)]+)\)", readme)
+        if _STALE_REPOSITORY in href and ("/blob/" in href or "/tree/" in href)
+    ]
+
+    assert into_our_files == [], into_our_files
 
 
 @pytest.mark.fab_test
