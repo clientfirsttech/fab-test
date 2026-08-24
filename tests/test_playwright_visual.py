@@ -121,6 +121,67 @@ def _capture_embed_error_details(page: Any, result_dir: Path) -> str:
     return ""
 
 
+class _NoEmbedConfigForRole(Exception):
+    """Raised when a role-keyed matrix has no embed config for this case's role."""
+
+
+def _embed_config_for_role(role: str) -> dict[str, Any] | None:
+    """Return the embed config for a case's role.
+
+    A matrix spanning more than one role gets ``PLAYWRIGHT_EMBED_CONFIGS``, a
+    role-keyed map -- one embed token per role, since a token carries its RLS
+    identity baked in and cannot cover two roles. A single-role run only ever
+    sets ``PLAYWRIGHT_EMBED_CONFIG``, so that stays the fallback. A case whose
+    role has no entry in ``PLAYWRIGHT_EMBED_CONFIGS`` raises rather than
+    silently falling back to another role's token.
+    """
+    configs_json = os.getenv("PLAYWRIGHT_EMBED_CONFIGS")
+    if configs_json:
+        configs = json.loads(configs_json)
+        if role not in configs:
+            raise _NoEmbedConfigForRole(
+                f"no embed config for role '{role or 'default'}'"
+            )
+        return configs[role]
+
+    embed_config_json = os.getenv("PLAYWRIGHT_EMBED_CONFIG")
+    if not embed_config_json:
+        return None
+    return json.loads(embed_config_json)
+
+
+def test_embed_config_for_role_raises_for_missing_role(monkeypatch) -> None:
+    """A case whose role has no entry in PLAYWRIGHT_EMBED_CONFIGS fails
+    loudly instead of silently reusing another role's token."""
+    monkeypatch.setenv(
+        "PLAYWRIGHT_EMBED_CONFIGS",
+        json.dumps({"Manager": {"accessToken": "manager-token"}}),
+    )
+    monkeypatch.delenv("PLAYWRIGHT_EMBED_CONFIG", raising=False)
+
+    with pytest.raises(_NoEmbedConfigForRole):
+        _embed_config_for_role("Analyst")
+
+
+def test_embed_config_for_role_returns_the_matching_entry(monkeypatch) -> None:
+    """A case's own role picks its own embed config out of the role map."""
+    monkeypatch.setenv(
+        "PLAYWRIGHT_EMBED_CONFIGS",
+        json.dumps({"Manager": {"accessToken": "manager-token"}}),
+    )
+
+    assert _embed_config_for_role("Manager") == {"accessToken": "manager-token"}
+
+
+def test_embed_config_for_role_falls_back_to_single_role_env(monkeypatch) -> None:
+    """A single-role run has no PLAYWRIGHT_EMBED_CONFIGS at all, and every
+    case falls back to the one PLAYWRIGHT_EMBED_CONFIG regardless of role."""
+    monkeypatch.delenv("PLAYWRIGHT_EMBED_CONFIGS", raising=False)
+    monkeypatch.setenv("PLAYWRIGHT_EMBED_CONFIG", json.dumps({"accessToken": "t"}))
+
+    assert _embed_config_for_role("") == {"accessToken": "t"}
+
+
 def _write_result(result_dir: Path, status: str, error: str = "") -> None:
     """Record this case's actual outcome.
 
@@ -151,11 +212,15 @@ def test_report_visual_renders(page, case: dict[str, str]) -> None:
         _test_paginated_report(page, case)
         return
 
-    embed_config_json = os.getenv("PLAYWRIGHT_EMBED_CONFIG")
-    if not embed_config_json:
+    try:
+        base_config = _embed_config_for_role(case.get("role", ""))
+    except _NoEmbedConfigForRole as exc:
+        error = f"{exc} (case {case.get('test_case')})"
+        _write_result(_case_result_dir(case), "error", error)
+        pytest.fail(error)
+    if base_config is None:
         pytest.skip("PLAYWRIGHT_EMBED_CONFIG not set; run via invoke_playwright.py")
 
-    base_config = json.loads(embed_config_json)
     config = dict(base_config)
     if case.get("page_id"):
         config["pageName"] = case["page_id"]
@@ -287,11 +352,15 @@ def test_report_visual_renders(page, case: dict[str, str]) -> None:
 
 def _test_paginated_report(page: Any, case: dict[str, str]) -> None:
     """Embed a paginated (RDL) report and fail if an error modal is detected."""
-    embed_config_json = os.getenv("PLAYWRIGHT_EMBED_CONFIG")
-    if not embed_config_json:
+    try:
+        base_config = _embed_config_for_role(case.get("role", ""))
+    except _NoEmbedConfigForRole as exc:
+        error = f"{exc} (case {case.get('test_case')})"
+        _write_result(_case_result_dir(case), "error", error)
+        pytest.fail(error)
+    if base_config is None:
         pytest.skip("PLAYWRIGHT_EMBED_CONFIG not set; run via invoke_playwright.py")
 
-    base_config = json.loads(embed_config_json)
     config = dict(base_config)
     config["type"] = "report"
 

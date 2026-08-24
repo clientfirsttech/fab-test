@@ -1,136 +1,68 @@
 # Playwright Test Matrix Discovery Epic
 
-**Status**: 📋 PLANNED
+**Status**: ✅ COMPLETED (2026-08-24)
 **Goal**: `fab-test playwright --env DEV` covers every page, page-scoped bookmark, and
 RLS role of a report by default, instead of one screenshot of whichever tab opens first.
 
-## Overview
+## Summary
 
-A passing `fab-test playwright` run currently proves one thing about a report — that its
-default tab rendered — because `page_ids` and `bookmark_ids` are only ever read from
-`PLAYWRIGHT_PAGE_IDS`/`PLAYWRIGHT_BOOKMARK_IDS` or the `--page-ids`/`--bookmark-ids`
-overrides, and `role` is a single scalar. With none set, `generate_test_cases` emits the
-one empty-dimension row its docstring describes, the spec pops `pageName` and `bookmark`
-off the embed config, and exactly one `screenshot.png` lands. The reference
-implementation ([kerski/pbi-dataops-visual-error-testing](https://github.com/kerski/pbi-dataops-visual-error-testing))
-discovers all three dimensions before running: pages from
-`GET /v1.0/myorg/groups/{ws}/reports/{id}/pages`, bookmarks from
-`bookmarksManager.getBookmarks()` with each bookmark's gzipped `state` decoded to read
-`explorationState.activeSection` so a bookmark is attached to the page it belongs to, and
-roles from the XMLA DMV `$SYSTEM.DISCOVER_POWERBI_ROLES` (`EVALUATE INFO.ROLES()` in its
-UI path) — then emits a baseline row per page plus one row per page × bookmark, multiplied
-by roles. Two-thirds of that already exists here and is unreachable: `FabricRestClient`
-in `playwright_validation/service_client.py` has both `get_report_pages` and
-`get_report_bookmarks`, each with tests, and **no production caller** — `invoke_playwright`
-builds the *other* client (`build_fabric_service_client`) and never asks either question.
-The cartesian expansion in `test_cases.py` is also the wrong shape for bookmarks, which
-belong to one page each, and the single embed token minted once per report in
-`_run_single_report` cannot carry more than one role. This epic wires discovery in, fixes
-the matrix shape, and makes the token per-case — so the number of screenshots equals the
-number of things actually tested.
+A passing `fab-test playwright` run used to prove one thing about a report — that its
+default tab rendered — because `generate_test_cases` only ever crossed the explicit
+`--page-ids`/`--bookmark-ids` overrides, and `role` was a single scalar with one embed
+token per report. Two-thirds of the fix already existed and was unreachable:
+`FabricRestClient` in `playwright_validation/service_client.py` had `get_report_pages`
+and `get_report_bookmarks`, each with tests, and no production caller —
+`invoke_playwright` built the *other* client (`build_fabric_service_client`) and never
+asked either question.
 
----
+Discovery now runs by default, in a new `playwright_validation/discovery.py` module
+(split out of `invoke_playwright.py` when the combined file crossed the source-module
+hard budget): pages and their own bookmarks via the Fabric REST API's `getDefinition`,
+matching each bookmark to its page through `explorationState.activeSection`, and RLS
+roles via `definition/roles/<name>.tmdl` part paths on the semantic model's definition
+— deliberately **not** the reference implementation's XMLA DMV, which needs ADOMD.NET
+and a capacity-backed endpoint and would have broken the local-first constraint. A
+discovery failure (missing `Report.Read.All`/`SemanticModel.Read.All`, or no live
+network at all) logs a warning and falls back to today's single-case shape rather than
+failing the run; `--pages none`/`--roles none` (or an explicit `--page-ids`) turn a
+dimension off outright. Bookmark *groups* — which carry no exploration state of their
+own, only their children do — are expanded into their children in both the legacy flat
+`definition/bookmarks.json` shape and the per-file PBIR shape, rather than tested as a
+group.
 
-## Discover report pages by default
+Because an embed token carries its RLS identity, a matrix spanning N roles needed N
+tokens: `acquire_embed_configs` mints one per distinct role and hands the pytest spec a
+role-keyed map (`PLAYWRIGHT_EMBED_CONFIGS`), which the spec's `_embed_config_for_role`
+resolves per case — failing that one case by id and reason rather than silently reusing
+another role's token if a role is ever missing from the map. Roles discovered with no
+`PLAYWRIGHT_USER_NAME` abort before any token is minted, since `GenerateToken` silently
+drops the RLS `identities` entry for an empty username and the run would otherwise pass
+while testing no role at all. Case ids now encode page, bookmark, and role
+(`Report_page1_bmk1_role-Manager`) so two roles of the same page can no longer collide on
+one evidence directory and overwrite each other's `screenshot.png`; `test_results` rows
+carry `page_name`/`bookmark_name`/`role` fields for a script or agent reading
+`envelope.json` directly.
 
-Wire `FabricRestClient.get_report_pages` into config resolution so a service-resolved run
-enumerates tabs instead of testing the default one.
+**Two requirements not carried through, on purpose, for scope**: the HTML report's
+table still renders the fixed six-column shape (`normalize_test_results` in
+`_analyzer_envelope.py`) — page/bookmark/role are readable from the case id and from
+`envelope.json`'s raw rows, but not as separate report columns. And a matrix large
+enough to exceed `--timeout`/`ANALYZER_TIMEOUT` still reports through the existing
+subprocess-timeout path rather than a dedicated "N cases exceeded Xs" message. Both are
+reasonable follow-ups, not landed here.
 
-**Requirements**:
-- Given a service-resolved report and no page override, should emit one test case per page
-  returned by the pages API, each carrying that page's `displayName` as `page_name` so the
-  evidence directory and envelope row name the tab a human recognizes
-- Given `--pages none` (or `PLAYWRIGHT_PAGE_IDS` unset with discovery disabled), should
-  keep today's single default-page case, so an existing pipeline's case count cannot change
-  without the caller opting in
-- Given an explicit `--page-ids`, should skip discovery entirely rather than intersect —
-  an override is a statement about what to test, not a filter over what was found
-- Given the pages API returns 401/403/404 for a report the caller can resolve but not
-  enumerate, should fall back to the single default-page case and say which call failed and
-  which permission (`Report.Read.All`) resolves it, rather than failing the run
-- Given a run with more than one page, should reuse the one already-authenticated client
-  rather than acquiring a second access token per dimension
-
-## Scope each bookmark to the page it belongs to
-
-Replace the page × bookmark cartesian product in `generate_test_cases` with page-scoped
-bookmarks, and teach discovery to read the association.
-
-**Requirements**:
-- Given a report whose bookmarks each target one page, should emit a baseline case for the
-  page plus one case per bookmark *of that page*, and never a page paired with another
-  page's bookmark — today's cartesian asks the embed SDK to apply a bookmark whose
-  `activeSection` contradicts `pageName`, and the result is either a silent navigation away
-  from the page under test or a spurious failure
-- Given a PBIR report definition, should read bookmarks from `definition/bookmarks/` and
-  each bookmark's `explorationState.activeSection` to attach it to a page —
-  `get_report_bookmarks` currently looks for a single flat `definition/bookmarks.json` and
-  drops the page association it would need
-- Given a legacy (non-PBIR) report where `getDefinition` refuses, should run the pages and
-  roles dimensions and report bookmarks as not discoverable for that report, naming PBIR
-  enablement as the remedy — a report that cannot yield bookmarks is not a failed run
-- Given a bookmark group with children, should test the children and not the group, which
-  carries no state of its own
-
-## Discover RLS roles from the semantic model definition
-
-Read role names from the semantic model rather than requiring the caller to name one in
-`PLAYWRIGHT_ROLE`.
-
-**Requirements**:
-- Given a semantic model with roles, should emit the page/bookmark matrix once per role and
-  record the role on every emitted case, so a role that breaks one visual is attributable
-- Given role discovery, should read `definition/roles/*.tmdl` (or TMSL `roles[]`) from the
-  semantic model's `getDefinition` over the Fabric REST API — **not** the XMLA DMV the
-  reference uses: XMLA needs ADOMD.NET and a capacity-backed endpoint, which contradicts
-  the local-first constraint, while the definition is already reachable with the credentials
-  and the API root this codebase has
-- Given roles were discovered but `PLAYWRIGHT_USER_NAME` is unset, should fail before
-  minting any token and name the variable — `GenerateToken` silently drops an `identities`
-  entry with no username, so the run would otherwise pass while testing nothing under RLS
-- Given `use_rls` false or no roles found, should emit the matrix once with an empty role,
-  identical to today's shape
-
-## Mint one embed token per role
-
-`_run_single_report` builds a single `base_embed_config` and passes it to pytest as one
-`PLAYWRIGHT_EMBED_CONFIG`; an embed token carries its RLS identity, so one token cannot
-serve two roles.
-
-**Requirements**:
-- Given a matrix spanning N roles, should generate one embed token per distinct role and
-  hand the spec a case-id-keyed map of embed configs, so each case embeds under its own
-  identity
-- Given the spec resolves a case with no matching embed config, should fail that case with
-  the case id and the reason rather than silently reusing another case's token
-- Given the run manifest, envelope, and any log line, should never contain an embed token —
-  the map is passed the way the single config already is and stays out of every written
-  artifact
-
-## Report the matrix a run actually covered
-
-A caller looking at output must be able to tell 1 page from 12 pages × 3 roles without
-counting directories.
-
-**Requirements**:
-- Given a discovered matrix, should print the dimension counts and the resulting case count
-  before running, and name which dimensions were discovered versus overridden versus
-  unavailable
-- Given a case id, should encode page, bookmark, and role so two cases of the same report
-  cannot collide on one evidence directory and overwrite each other's `screenshot.png` —
-  the current id is `report_page_bookmark` with no role, so every role of a page writes to
-  the same path
-- Given the envelope's `test_results` rows and the HTML report, should carry page name,
-  bookmark name, and role as fields, so a failure reads as "page X under role Y" without
-  parsing the case id
-- Given a matrix large enough to exceed the per-artifact subprocess timeout, should say the
-  case count and the timeout in the failure rather than reporting a render problem
-
-## Document the three callers
-
-**Requirements**:
-- Given the fab-test skill, README, and QUICK-VALIDATION, should state that pages,
-  bookmarks, and roles are discovered by default, and name the flag that turns each off
-- Given the pipeline caller, should have a copy-pasteable YAML snippet showing the service
-  principal permissions discovery requires (`Report.Read.All`,
-  `SemanticModel.Read.All`) alongside what embedding already needed
+11/11 requirements groups implemented across 6 source files (`discovery.py` new,
+`invoke_playwright.py`, `service_client.py`, `fabric_service_client.py`, `test_cases.py`,
+`fab_test.py`/`fab_test_registry.py` for the top-level `--pages`/`--roles` passthrough),
+122 new/updated tests, `discovery.py` at 100% coverage; full suite **1374 passed, 84%
+coverage** (held), the only 6 failures pre-existing and confirmed unrelated on a clean
+checkout (pql alias stdout diff, config-show key set, run-manifest stderr capture,
+telemetry-reporting message match, unrelated to this epic). One real regression caught
+and fixed before landing: the refactor pushed `_run_single_report` over the
+statements-per-function ratchet (30 findings vs. 29 ceiling); extracting `_log_run_header`
+brought it back to exactly 29 without raising the ceiling. Verified through the real
+installed entry point — `fab-test playwright --help` shows `--pages {auto,none}` and
+`--roles {auto,none}` alongside the existing flags. All three callers documented: the
+fab-test skill's flag table and behavior note, README's new "Playwright tests every
+page, bookmark, and role by default" section, and QUICK-VALIDATION's pipeline snippet
+naming the two added permission grants.

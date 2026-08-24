@@ -29,11 +29,9 @@ from ._analyzer_envelope import (
 )
 from ._report_html import attach_report
 from .playwright_validation.config import PlaywrightValidationConfig, load_config
-from .playwright_validation.embed_config import build_embed_config
-from .playwright_validation.fabric_service_client import (
-    build_fabric_service_client,
-)
-from .playwright_validation.power_bi_api import PowerBiApiError, get_embed_context
+from .playwright_validation.discovery import acquire_embed_configs, resolve_discovery
+from .playwright_validation.fabric_service_client import build_fabric_service_client
+from .playwright_validation.power_bi_api import PowerBiApiError
 from .playwright_validation.resolver import (
     ResolvedReport,
     ServiceResolutionError,
@@ -167,6 +165,9 @@ def _test_results_rows(
                 "actual": error or "rendered",
                 "status": status,
                 "evidence": _case_evidence(result_dir),
+                "page_name": case.page_name,
+                "bookmark_name": case.bookmark_name,
+                "role": case.role,
             }
         )
     return rows
@@ -203,13 +204,24 @@ def _build_env_for_pytest(
     cases: list[TestCase],
     embed_config: dict[str, Any],
     output_dir: Path,
+    *,
+    embed_configs_by_role: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, str]:
-    """Build environment variables consumed by the pytest spec."""
+    """Build environment variables consumed by the pytest spec.
+
+    ``embed_config`` stays the single-role default the spec falls back to.
+    ``embed_configs_by_role`` is set only when the matrix spans more than one
+    role -- each role's embed token carries that role's RLS identity, so one
+    token cannot serve two roles, and the spec picks the entry matching each
+    case's own ``role`` column instead of reusing the default for every case.
+    """
     env = os.environ.copy()
     csv_path, _ = write_test_cases(cases, output_dir)
 
     env["PLAYWRIGHT_TEST_CASES"] = str(csv_path.resolve())
     env["PLAYWRIGHT_EMBED_CONFIG"] = json.dumps(embed_config)
+    if embed_configs_by_role:
+        env["PLAYWRIGHT_EMBED_CONFIGS"] = json.dumps(embed_configs_by_role)
     env["PLAYWRIGHT_TIMEOUT_MS"] = str(config.timeout_seconds * 1000)
     env["PLAYWRIGHT_HEADLESS"] = "false" if not config.headless else "true"
     env["PLAYWRIGHT_RESULTS_ROOT"] = str(output_dir.resolve())
@@ -403,6 +415,25 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Comma-separated bookmark IDs (advanced override).",
     )
     parser.add_argument(
+        "--pages",
+        choices=["auto", "none"],
+        default="auto",
+        help=(
+            "Discover every report page and its own bookmarks by default. "
+            "Pass 'none' to test only the default page (default: auto)."
+        ),
+    )
+    parser.add_argument(
+        "--roles",
+        choices=["auto", "none"],
+        default="auto",
+        help=(
+            "Discover RLS/OLS roles from the semantic model and test the "
+            "page matrix under each one when RLS is enabled. Pass 'none' to "
+            "test only the configured PLAYWRIGHT_ROLE (default: auto)."
+        ),
+    )
+    parser.add_argument(
         "--impact-manifest",
         help="Path to an impacted-report manifest JSON.",
     )
@@ -460,6 +491,28 @@ def _write_embed_error_envelope(
     return 1
 
 
+def _log_run_header(
+    report_name: str,
+    output_path: Path,
+    cases: list[TestCase],
+    pages: list[Any] | None,
+    distinct_roles: list[str],
+) -> None:
+    """Print the run header, and the discovered matrix when there is one."""
+    log("================================")
+    log(f"playwright -> {report_name}")
+    log("================================")
+    if pages is not None:
+        bookmark_count = sum(len(p.bookmarks) for p in pages)
+        log(
+            f"📐 Matrix:   {len(pages)} page(s), {bookmark_count} bookmark(s), "
+            f"{len(distinct_roles) or 1} role(s)"
+        )
+    log(f"📋 Cases:   {len(cases)}")
+    log(f"📊 Envelope: {output_path}")
+    log("")
+
+
 def _run_single_report(
     config: PlaywrightValidationConfig,
     args: argparse.Namespace,
@@ -467,7 +520,8 @@ def _run_single_report(
     report_name_override: str = "",
 ) -> int:
     """Run Playwright validation for a single resolved report."""
-    cases = generate_test_cases(config)
+    pages, roles = resolve_discovery(config, args)
+    cases = generate_test_cases(config, pages=pages, roles=roles)
     if not cases:
         log("::notice::No Playwright test cases generated; skipping validation.")
         return 0
@@ -478,17 +532,26 @@ def _run_single_report(
     report_name = report_name_override or config.report_name
     output_path = Path(args.output_path).resolve() if args.output_path else envelope_path("playwright", report_name)
 
+    distinct_roles = sorted({case.role for case in cases})
+    if roles and not config.user_name:
+        # `generate_embed_token` silently drops the `identities` entry when
+        # `user_name` is empty, so a run would otherwise pass while every
+        # "role" case actually embedded with no RLS identity at all.
+        message = (
+            "Discovered RLS roles "
+            f"({', '.join(roles)}) but PLAYWRIGHT_USER_NAME is unset; set it "
+            "before any embed token is minted, or pass --roles none."
+        )
+        return _write_embed_error_envelope(
+            output_path, report_name, cases, message, test_cases_dir=test_cases_dir
+        )
+
     level = args.verbose
     if level >= 1:
-        log("================================")
-        log(f"playwright -> {report_name}")
-        log("================================")
-        log(f"📋 Cases:   {len(cases)}")
-        log(f"📊 Envelope: {output_path}")
-        log("")
+        _log_run_header(report_name, output_path, cases, pages, distinct_roles)
 
     try:
-        embed_context = get_embed_context(config)
+        embed_configs_by_role = acquire_embed_configs(config, distinct_roles or [""])
     except PowerBiApiError as exc:
         message = f"Power BI API error: {exc}"
         if exc.status_code:
@@ -502,13 +565,18 @@ def _run_single_report(
             output_path, report_name, cases, message, test_cases_dir=test_cases_dir
         )
 
-    base_embed_config = build_embed_config(
-        report_id=embed_context.report_id,
-        embed_url=embed_context.embed_url,
-        embed_token=embed_context.embed_token,
-    ).to_dict()
+    base_embed_config = next(iter(embed_configs_by_role.values()))
+    embed_configs_by_role_for_env = (
+        embed_configs_by_role if len(embed_configs_by_role) > 1 else None
+    )
 
-    env = _build_env_for_pytest(config, cases, base_embed_config, test_cases_dir)
+    env = _build_env_for_pytest(
+        config,
+        cases,
+        base_embed_config,
+        test_cases_dir,
+        embed_configs_by_role=embed_configs_by_role_for_env,
+    )
 
     with Timer() as timer:
         proc = _run_pytest(env, verbosity=level)

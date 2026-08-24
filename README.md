@@ -244,6 +244,24 @@ tagging all 5 identically. Each row also points at that case's own evidence
 renders those as links right in the table, and the same paths are in
 `envelope.json` for a script or an agent to open directly.
 
+### Playwright tests every page, bookmark, and role by default
+
+`fab-test playwright` discovers a report's pages, each page's own bookmarks,
+and (when RLS is enabled) the semantic model's roles, and tests the full
+matrix — not just whichever tab opens first. Discovery needs `Report.Read.All`
+and `SemanticModel.Read.All` on the service principal in addition to what
+embedding already required; a missing grant logs a warning and falls back to
+testing the one default page rather than failing the run. Turn a dimension off
+with `--pages none` / `--roles none`:
+
+```bash
+# Every page, every page's bookmarks, every role
+fab-test playwright --artifact "Not Working Visuals" --env dev
+
+# Only the default page/role, matching every prior release
+fab-test playwright --artifact "Not Working Visuals" --env dev --pages none --roles none
+```
+
 ### Naming what to test
 
 Every analyzer subcommand takes an optional target. Omit it and `fab-test` discovers everything matching, as before. The grammar is the one `pql-test` and the Fabric CLI already use, so a target pasted from either works here unchanged.

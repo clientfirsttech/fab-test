@@ -249,6 +249,15 @@ ambient sign-in cannot do.
   run: fab-test playwright --artifact ThinReport --env PROD --format json
 ```
 
+By default this discovers every page, each page's own bookmarks, and (when RLS
+is enabled) every semantic-model role, and tests the full matrix. Beyond the
+`Report.Read` / `Dataset.ReadWrite.All`-equivalent grant embedding already
+needed, the service principal also needs **`Report.Read.All`** (pages,
+bookmarks) and **`SemanticModel.Read.All`** (roles) to discover the matrix — a
+missing grant logs a warning and falls back to testing the single default
+page/role rather than failing the run. Add `--pages none --roles none` to the
+command above to keep the one-case-per-report shape every prior release had.
+
 See the [Configuration section of the fab-test skill](../.github/skills/fab-test/SKILL.md#configuration) for the full settings list and rule-overlay keys.
 
 ### Pipeline snippet: a reviewable report as the build artifact

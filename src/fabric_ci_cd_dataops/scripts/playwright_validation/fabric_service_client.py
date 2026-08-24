@@ -152,6 +152,16 @@ class FabricServiceClient(ServiceClient):
         instance.credential_source = credential_source
         return instance
 
+    @property
+    def access_token(self) -> str:
+        """Return the already-acquired access token.
+
+        Lets a caller that needs a second Fabric REST client (e.g. the
+        pages/bookmarks/roles discovery in ``service_client.FabricRestClient``)
+        reuse this client's auth instead of authenticating a second time.
+        """
+        return self._access_token
+
     def _headers(self) -> dict[str, str]:
         return {
             "Authorization": f"Bearer {self._access_token}",

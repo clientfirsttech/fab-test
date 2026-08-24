@@ -698,6 +698,22 @@ Playwright validation can run in three modes: static `.env` mode, service-resolv
 | `--workspace-id ID` | Explicit workspace ID override [env: `FABRIC_WORKSPACE_ID`] |
 | `--dataset-id ID` | Explicit dataset / semantic-model ID override |
 | `--impact-manifest PATH` | Validate every report listed in the impacted-report manifest once, regardless of local `.Report` artifacts |
+| `--pages {auto,none}` | Discover every report page and its own bookmarks (default: `auto`); `none` tests only the default page |
+| `--roles {auto,none}` | Discover RLS/OLS roles from the semantic model and test the page matrix under each one when RLS is enabled (default: `auto`); `none` tests only `PLAYWRIGHT_ROLE` |
+
+**By default, `playwright` tests every page, every page's own bookmarks, and every
+RLS role — not just the default tab.** `--pages none`/`--roles none` (or `PLAYWRIGHT_PAGE_IDS`/
+`--page-ids`, which skip discovery entirely as an explicit override) fall back to the
+one-case shape every prior release had. Discovery needs `Report.Read.All` (pages,
+bookmarks) and `SemanticModel.Read.All` (roles) on the service principal beyond what
+embedding already required; a missing grant logs a warning and falls back to the
+single-case shape rather than failing the run. Each role gets its own embed token —
+a token carries its RLS identity, so one token cannot cover two roles — and
+discovered roles with no `PLAYWRIGHT_USER_NAME` abort before any token is minted
+rather than silently testing no role at all (`GenerateToken` drops the identity
+entry with an empty username). Case ids and `test_results` rows now carry page,
+bookmark, and role, so two roles of the same page write to different evidence
+directories instead of overwriting each other's `screenshot.png`.
 
 **`playwright` always needs a full service principal — unlike every other analyzer.**
 `get_embed_context` calls MSAL with a client secret to generate the embed token; an
