@@ -1,5 +1,9 @@
 # fab-test
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/kerski/fab-test/main/docs/images/fab-test-logo.png" alt="fab-test logo" width="200">
+</p>
+
 Metadata-driven CI/CD and validation framework for Microsoft Fabric artifacts.
 
 This package provides the `fab-test` CLI and supporting analyzer wrappers used by the [fabric-ci-cd-dataops](https://github.com/kerski/fabric-ci-cd-dataops) reference implementation.
