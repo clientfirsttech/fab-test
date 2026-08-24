@@ -461,6 +461,8 @@ telemetry:
 
 **Configuring a complete destination is what enables shipping.** There is no separate on switch. `eventhouse.table` is not a key — the table is derived from the analyzer (`pql-test` → `fabric_dynamic_analysis`, everything else → `fabric_static_analysis`).
 
+`fab-test init` scaffolds this block commented out in the generated `fab-test.yml`, alongside the `rules:` example, so it's discoverable without reading this skill.
+
 Resolution order for whether a run ships, highest first:
 
 | Precedence | Signal | Effect |

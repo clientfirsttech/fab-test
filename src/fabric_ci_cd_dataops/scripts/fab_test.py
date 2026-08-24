@@ -2064,6 +2064,14 @@ _FAB_TEST_YML_TEMPLATE = """\
 #   pbir:
 #     disable: [RULE_ID]
 #     severity: {RULE_ID: warning}        # warning | error (PBIR Inspector has no "info" level)
+
+# Ship analyzer telemetry to a Fabric Eventhouse. A configured destination is
+# the enablement -- there is no separate on/off flag. Either key can instead
+# be set via EVENTHOUSE_URI / EVENTHOUSE_DATABASE, which win over this file.
+# telemetry:
+#   eventhouse:
+#     uri: https://<cluster>.kusto.fabric.microsoft.com       # [env: EVENTHOUSE_URI]
+#     database: <database-name>                               # [env: EVENTHOUSE_DATABASE]
 """
 
 _ENV_EXAMPLE_TEMPLATE = """\
