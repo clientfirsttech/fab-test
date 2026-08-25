@@ -274,14 +274,20 @@ def test_report_visual_renders(page, case: dict[str, str]) -> None:
                 window.__pbiRenderResult = null;
                 window.__pbiEmbedError = null;
                 try {
-                    const report = window.powerbi.embed(document.body, config);
-                    report.on('rendered', () => {
+                    window.powerbi.embed(document.body, config);
+                    // Listen at the document level, not report.on(): a
+                    // broken visual (e.g. an invalid field reference) fires
+                    // an 'error' CustomEvent that the SDK dispatches on
+                    // document.body but never surfaces through the report
+                    // object's own .on('error') binding, so a report-level
+                    // listener sees only 'rendered' and misses it.
+                    document.body.addEventListener('rendered', () => {
                         window.__pbiRenderResult = 'rendered';
-                    });
-                    report.on('error', (event) => {
+                    }, { once: true });
+                    document.body.addEventListener('error', (event) => {
                         window.__pbiRenderResult = 'error:' +
                             JSON.stringify(event.detail || event);
-                    });
+                    }, { once: true });
                 } catch (err) {
                     function describeError(e) {
                         if (Array.isArray(e)) {
