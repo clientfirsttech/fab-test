@@ -431,54 +431,56 @@ def _print_findings_table(findings: list[dict[str, Any]]) -> None:
     )
 
 
-def run_inspector(args: argparse.Namespace) -> int:
-    """Run the PBIR Inspector analyzer and return an exit code."""
-    artifact_path = validate_path(args.artifact_path, "Report artifact path")
-    rules_path = validate_path(args.rules_path, "Rules file")
-    inspector_path = validate_path(args.inspector_path, "PBIR Inspector binary")
-    ensure_executable(inspector_path)
+def _log_run_header(
+    level: int,
+    artifact_stem: str,
+    artifact_path: Path,
+    rules_path: Path,
+    inspector_path: Path,
+    output_path: Path,
+    native_out: Path,
+) -> None:
+    """Print the pre-run banner, once verbosity clears the default threshold."""
+    if level < _VERBOSITY_LEVELS["default"]:
+        return
+    log("================================")
+    log(f"PBIR Inspector  →  {artifact_stem}")
+    log("================================")
+    log(f"📋 Artifact: {artifact_path}")
+    log(f"📏 Rules:    {rules_path}")
+    log(f"🔧 Tool:     {inspector_path}")
+    log(f"📊 Envelope: {output_path}")
+    log(f"📄 Native JSON: {native_out}")
+    log("")
 
-    artifact_stem = artifact_path.stem
-    _env_out = envelope_path("pbir", artifact_stem)
-    _nat_out = native_output_path("pbir", artifact_stem, "json")
 
-    output_path = Path(args.output_path) if args.output_path else _env_out
-    native_out = _nat_out
-    emit_html: bool = getattr(args, "emit_html", False)
-    native_html_out: Path | None = None
-
-    level = _verbosity()
-
-    if level >= _VERBOSITY_LEVELS["default"]:
-        log("================================")
-        log(f"PBIR Inspector  →  {artifact_stem}")
-        log("================================")
-        log(f"📋 Artifact: {artifact_path}")
-        log(f"📏 Rules:    {rules_path}")
-        log(f"🔧 Tool:     {inspector_path}")
-        log(f"📊 Envelope: {output_path}")
-        log(f"📄 Native JSON: {native_out}")
-        if native_html_out:
-            log(f"📄 Native HTML: {native_html_out}")
-        log("")
-
-    # Ensure output directories exist before invoking the tool.
-    native_out.parent.mkdir(parents=True, exist_ok=True)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-
-    formats = "JSON,HTML" if emit_html else "JSON"
-    command = build_inspector_command(
-        inspector_path=inspector_path,
-        artifact_path=artifact_path,
-        rules_path=rules_path,
-        output_path=native_out,
-        output_format=formats,
+def _write_inspector_failure(
+    output_path: Path,
+    artifact_path: Path,
+    rules_path: Path,
+    native_out: Path,
+    status: str,
+    message: str,
+) -> int:
+    """Write a failure envelope for a process that never produced output."""
+    write_results(
+        WrapperResult(output_path, status, [], artifact_path, message=message, native_out=native_out),
+        rules_path,
     )
+    print(f"::error::{message}", file=sys.stderr)
+    return 1
 
-    if level >= _VERBOSITY_LEVELS["debug"]:
-        log(f"Executing: {' '.join(command)}")
-        log("")
 
+def _run_inspector_process(
+    command: list[str],
+    output_path: Path,
+    artifact_path: Path,
+    rules_path: Path,
+    native_out: Path,
+    inspector_path: Path,
+) -> "tuple[subprocess.CompletedProcess, int] | int":
+    """Run the inspector binary, timed. Returns ``(proc, elapsed_ms)`` on success,
+    or writes a failure envelope and returns an exit code if it could not run."""
     with Timer() as timer:
         try:
             proc = subprocess.run(
@@ -490,40 +492,19 @@ def run_inspector(args: argparse.Namespace) -> int:
                 check=False,
             )
         except subprocess.TimeoutExpired:
-            message = (
-                f"PBIR Inspector timed out after {INSPECTOR_TIMEOUT_SECONDS} seconds"
-            )
-            write_results(
-                WrapperResult(output_path, "timeout", [], artifact_path, message=message, native_out=native_out),
-                rules_path,
-            )
-            print(f"::error::{message}", file=sys.stderr)
-            return 1
+            message = f"PBIR Inspector timed out after {INSPECTOR_TIMEOUT_SECONDS} seconds"
+            return _write_inspector_failure(output_path, artifact_path, rules_path, native_out, "timeout", message)
         except FileNotFoundError:
             message = f"PBIR Inspector binary not found: {inspector_path}"
-            write_results(
-                WrapperResult(output_path, "error", [], artifact_path, message=message, native_out=native_out),
-                rules_path,
-            )
-            print(f"::error::{message}", file=sys.stderr)
-            return 1
-        except Exception as exc:  # noqa: BLE001 - catch-all for wrapper safety
+            return _write_inspector_failure(output_path, artifact_path, rules_path, native_out, "error", message)
+        except Exception as exc:  # noqa: BLE001 - wrapper boundary; failures become an envelope
             message = f"Unexpected error running PBIR Inspector: {exc}"
-            write_results(
-                WrapperResult(output_path, "error", [], artifact_path, message=message, native_out=native_out),
-                rules_path,
-            )
-            print(f"::error::{message}", file=sys.stderr)
-            return 1
+            return _write_inspector_failure(output_path, artifact_path, rules_path, native_out, "error", message)
+    return proc, timer.elapsed_ms
 
-    if level >= _VERBOSITY_LEVELS["debug"] and (proc.stdout or proc.stderr):
-        log("--- stdout ---")
-        log(proc.stdout or "(empty)")
-        log("--- stderr ---")
-        log(proc.stderr or "(empty)")
-        log("")
 
-    findings: list[dict[str, Any]] = []
+def _read_native_output(native_out: Path, fallback_stdout: str) -> str:
+    """Return PBIR Inspector's raw JSON, preferring the file it wrote to stdout."""
     raw_text = ""
     if native_out.is_dir():
         json_files = sorted(
@@ -544,91 +525,150 @@ def run_inspector(args: argparse.Namespace) -> int:
         except OSError:
             raw_text = ""
 
-    if not raw_text.strip() and proc.stdout:
-        raw_text = proc.stdout
+    if not raw_text.strip() and fallback_stdout:
+        raw_text = fallback_stdout
+    return raw_text
 
-    raw_findings = parse_findings(raw_text)
-    findings = [_normalize_finding(f) for f in raw_findings if _is_violation(f)]
-    test_results = _pbir_test_results(raw_findings)
 
-    has_errors = any(f["severity"] == "error" for f in findings)
+def _locate_native_html(native_out: Path, emit_html: bool, inspector_path: Path) -> Path | None:
+    """Return the generated HTML report, fixing up its embedded assets, if any."""
+    if not (emit_html and native_out.is_dir()):
+        return None
+    html_files = list(native_out.glob("*.html"))
+    if not html_files:
+        return None
+    native_html_out = html_files[0]
+    fix_favicon_link(native_html_out, inspector_path)
+    fix_screenshot_images(native_html_out)
+    return native_html_out
 
-    if emit_html and native_out.is_dir():
-        html_files = list(native_out.glob("*.html"))
-        if html_files:
-            native_html_out = html_files[0]
-            fix_favicon_link(native_html_out, inspector_path)
-            fix_screenshot_images(native_html_out)
 
+def _classify_inspector_result(findings: list[dict[str, Any]], returncode: int) -> dict[str, Any]:
+    """Derive status/message/counts from findings alone -- no I/O."""
     error_count = sum(1 for f in findings if f.get("severity") == "error")
     warning_count = sum(1 for f in findings if f.get("severity") == "warning")
-
     if not findings:
-        message = "PBIR Inspector passed with no findings"
-        write_results(
-            WrapperResult(
-                output_path,
-                "passed",
-                [],
-                artifact_path,
-                message=message,
-                native_out=native_out,
-                duration_ms=timer.elapsed_ms,
-                test_results=test_results,
-            ),
-            rules_path,
-            native_html_out=native_html_out,
-        )
-        if level >= _VERBOSITY_LEVELS["default"]:
-            log(f"✅ {message}")
-            log(f"📁 Envelope:    {output_path}")
-            log(f"📄 Native JSON: {native_out}")
-            if native_html_out:
-                log(f"📄 Native HTML: {native_html_out}")
-        return 0
-
+        return {
+            "status": "passed",
+            "message": "PBIR Inspector passed with no findings",
+            "has_errors": False,
+            "error_count": 0,
+            "warning_count": 0,
+        }
+    has_errors = error_count > 0
     message = (
         f"PBIR Inspector found {len(findings)} finding(s) "
         f"(errors: {error_count}, warnings: {warning_count}, "
-        f"exit code {proc.returncode})"
+        f"exit code {returncode})"
     )
-    status = "failed" if has_errors else "warning"
+    return {
+        "status": "failed" if has_errors else "warning",
+        "message": message,
+        "has_errors": has_errors,
+        "error_count": error_count,
+        "warning_count": warning_count,
+    }
+
+
+def _log_inspector_outcome(
+    outcome: dict[str, Any],
+    findings: list[dict[str, Any]],
+    output_path: Path,
+    native_out: Path,
+    native_html_out: Path | None,
+    level: int,
+) -> None:
+    """Print the post-run summary lines, matching the pre-split log order."""
+    if level < _VERBOSITY_LEVELS["default"]:
+        return
+    if not findings:
+        log(f"✅ {outcome['message']}")
+    log(f"📁 Envelope:    {output_path}")
+    log(f"📄 Native JSON: {native_out}")
+    if native_html_out:
+        log(f"📄 Native HTML: {native_html_out}")
+    if findings:
+        log(f"📊 {len(findings)} finding(s) ({outcome['error_count']} error(s), {outcome['warning_count']} warning(s))")
+        if level >= _VERBOSITY_LEVELS["verbose"]:
+            _print_findings_table(findings)
+
+
+def run_inspector(args: argparse.Namespace) -> int:
+    """Run the PBIR Inspector analyzer and return an exit code."""
+    artifact_path = validate_path(args.artifact_path, "Report artifact path")
+    rules_path = validate_path(args.rules_path, "Rules file")
+    inspector_path = validate_path(args.inspector_path, "PBIR Inspector binary")
+    ensure_executable(inspector_path)
+
+    artifact_stem = artifact_path.stem
+    output_path = Path(args.output_path) if args.output_path else envelope_path("pbir", artifact_stem)
+    native_out = native_output_path("pbir", artifact_stem, "json")
+    emit_html: bool = getattr(args, "emit_html", False)
+
+    level = _verbosity()
+    _log_run_header(level, artifact_stem, artifact_path, rules_path, inspector_path, output_path, native_out)
+
+    # Ensure output directories exist before invoking the tool.
+    native_out.parent.mkdir(parents=True, exist_ok=True)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    formats = "JSON,HTML" if emit_html else "JSON"
+    command = build_inspector_command(
+        inspector_path=inspector_path,
+        artifact_path=artifact_path,
+        rules_path=rules_path,
+        output_path=native_out,
+        output_format=formats,
+    )
+
+    if level >= _VERBOSITY_LEVELS["debug"]:
+        log(f"Executing: {' '.join(command)}")
+        log("")
+
+    result = _run_inspector_process(command, output_path, artifact_path, rules_path, native_out, inspector_path)
+    if isinstance(result, int):
+        return result
+    proc, elapsed_ms = result
+
+    if level >= _VERBOSITY_LEVELS["debug"] and (proc.stdout or proc.stderr):
+        log("--- stdout ---")
+        log(proc.stdout or "(empty)")
+        log("--- stderr ---")
+        log(proc.stderr or "(empty)")
+        log("")
+
+    raw_text = _read_native_output(native_out, proc.stdout)
+    raw_findings = parse_findings(raw_text)
+    findings = [_normalize_finding(f) for f in raw_findings if _is_violation(f)]
+    test_results = _pbir_test_results(raw_findings)
+    native_html_out = _locate_native_html(native_out, emit_html, inspector_path)
+
+    outcome = _classify_inspector_result(findings, proc.returncode)
     write_results(
         WrapperResult(
             output_path,
-            status,
+            outcome["status"],
             findings,
             artifact_path,
-            message=message,
+            message=outcome["message"],
             native_out=native_out,
-            duration_ms=timer.elapsed_ms,
+            duration_ms=elapsed_ms,
             test_results=test_results,
         ),
         rules_path,
         native_html_out=native_html_out,
     )
+    _log_inspector_outcome(outcome, findings, output_path, native_out, native_html_out, level)
 
-    if level >= _VERBOSITY_LEVELS["default"]:
-        log(f"📁 Envelope:    {output_path}")
-        log(f"📄 Native JSON: {native_out}")
-        if native_html_out:
-            log(f"📄 Native HTML: {native_html_out}")
-
-    if level >= _VERBOSITY_LEVELS["default"] and findings:
-        log(
-            f"📊 {len(findings)} finding(s) "
-            f"({error_count} error(s), {warning_count} warning(s))"
-        )
-
-    if level >= _VERBOSITY_LEVELS["verbose"]:
-        _print_findings_table(findings)
+    if not findings:
+        return 0
 
     if proc.stderr:
         print(f"::error::{proc.stderr}", file=sys.stderr)
 
-    annotation = "::error::" if has_errors else "::warning::"
-    print(f"{annotation}{message}", file=sys.stderr)
-    return 1 if has_errors else 0
+    annotation = "::error::" if outcome["has_errors"] else "::warning::"
+    print(f"{annotation}{outcome['message']}", file=sys.stderr)
+    return 1 if outcome["has_errors"] else 0
 
 
 def main() -> int:

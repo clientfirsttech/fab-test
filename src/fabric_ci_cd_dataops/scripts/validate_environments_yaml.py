@@ -63,101 +63,118 @@ def _info(message: str) -> None:
     print(f"✅ {message}")
 
 
+def _validate_top_level_keys(config: dict) -> list[str]:
+    """Check the required/allowed set of top-level keys."""
+    errors: list[str] = []
+    missing_top = REQUIRED_TOP_LEVEL_KEYS - config.keys()
+    if missing_top:
+        errors.append(f"Missing top-level keys: {sorted(missing_top)}")
+    extra_top = config.keys() - REQUIRED_TOP_LEVEL_KEYS - {"promotion_chain"}
+    if extra_top:
+        errors.append(f"Unexpected top-level keys: {sorted(extra_top)}")
+    return errors
+
+
+def _validate_deployment_window(env_name: str, deployment_window: object) -> list[str]:
+    """Check one environment's optional ``deployment_window`` block."""
+    if not isinstance(deployment_window, dict):
+        return [f"Environment '{env_name}' deployment_window must be a mapping"]
+
+    errors: list[str] = []
+    missing_dw = REQUIRED_DEPLOYMENT_WINDOW_KEYS - deployment_window.keys()
+    if missing_dw:
+        errors.append(
+            f"Environment '{env_name}' deployment_window missing keys: {sorted(missing_dw)}"
+        )
+    extra_dw = deployment_window.keys() - ALLOWED_DEPLOYMENT_WINDOW_KEYS
+    if extra_dw:
+        errors.append(
+            f"Environment '{env_name}' deployment_window unexpected keys: {sorted(extra_dw)}"
+        )
+    return errors
+
+
+def _validate_environment_block(env_name: str, env_block: object) -> list[str]:
+    """Check one environment's required/allowed keys and nested blocks."""
+    if not isinstance(env_block, dict):
+        return [f"Environment '{env_name}' must be a mapping"]
+
+    errors: list[str] = []
+    missing_env = REQUIRED_ENVIRONMENT_KEYS - env_block.keys()
+    if missing_env:
+        errors.append(f"Environment '{env_name}' missing required keys: {sorted(missing_env)}")
+
+    extra_env = env_block.keys() - ALLOWED_ENVIRONMENT_KEYS
+    if extra_env:
+        errors.append(f"Environment '{env_name}' has unexpected keys: {sorted(extra_env)}")
+
+    if not isinstance(env_block.get("allowed_branches", []), list):
+        errors.append(f"Environment '{env_name}' allowed_branches must be a list")
+
+    deployment_window = env_block.get("deployment_window")
+    if deployment_window is not None:
+        errors += _validate_deployment_window(env_name, deployment_window)
+    return errors
+
+
+def _validate_environments(environments: object) -> list[str]:
+    """Check the ``environments`` mapping and each of its entries."""
+    if environments is None:
+        return []
+    if not isinstance(environments, dict) or not environments:
+        return ["'environments' must be a non-empty mapping"]
+
+    errors: list[str] = []
+    for env_name, env_block in environments.items():
+        errors += _validate_environment_block(env_name, env_block)
+    return errors
+
+
+def _validate_promotion_chain(promotion_chain: object, environments: object) -> list[str]:
+    """Check ``promotion_chain`` shape and that it matches ``environments``."""
+    if promotion_chain is None:
+        return []
+    if not isinstance(promotion_chain, list):
+        return ["'promotion_chain' must be a list"]
+    if not isinstance(environments, dict):
+        return []
+
+    errors: list[str] = []
+    env_names = set(environments.keys())
+    chain_names = set(promotion_chain)
+    missing_in_chain = env_names - chain_names
+    if missing_in_chain:
+        errors.append(f"Environments missing from promotion_chain: {sorted(missing_in_chain)}")
+    unknown_in_chain = chain_names - env_names
+    if unknown_in_chain:
+        errors.append(f"Unknown environments in promotion_chain: {sorted(unknown_in_chain)}")
+    return errors
+
+
 def validate_environments_yaml(path: Path) -> list[str]:
     """
     Validate environments.yml at the given path.
 
     Returns a list of error messages. An empty list indicates the file is valid.
     """
-    errors: list[str] = []
-
     if not path.exists():
-        errors.append(f"File not found: {path}")
-        return errors
+        return [f"File not found: {path}"]
 
     try:
         with open(path, encoding="utf-8") as f:
             config = yaml.safe_load(f) or {}
     except yaml.YAMLError as exc:
-        errors.append(f"Invalid YAML in {path}: {exc}")
-        return errors
+        return [f"Invalid YAML in {path}: {exc}"]
 
     if not isinstance(config, dict):
-        errors.append(f"Top level of {path} must be a mapping, got {type(config).__name__}")
-        return errors
-
-    missing_top = REQUIRED_TOP_LEVEL_KEYS - config.keys()
-    if missing_top:
-        errors.append(f"Missing top-level keys: {sorted(missing_top)}")
-
-    extra_top = config.keys() - REQUIRED_TOP_LEVEL_KEYS - {"promotion_chain"}
-    if extra_top:
-        errors.append(f"Unexpected top-level keys: {sorted(extra_top)}")
+        return [f"Top level of {path} must be a mapping, got {type(config).__name__}"]
 
     environments = config.get("environments")
-    if environments is not None:
-        if not isinstance(environments, dict) or not environments:
-            errors.append("'environments' must be a non-empty mapping")
-        else:
-            for env_name, env_block in environments.items():
-                if not isinstance(env_block, dict):
-                    errors.append(f"Environment '{env_name}' must be a mapping")
-                    continue
-
-                missing_env = REQUIRED_ENVIRONMENT_KEYS - env_block.keys()
-                if missing_env:
-                    errors.append(
-                        f"Environment '{env_name}' missing required keys: {sorted(missing_env)}"
-                    )
-
-                extra_env = env_block.keys() - ALLOWED_ENVIRONMENT_KEYS
-                if extra_env:
-                    errors.append(
-                        f"Environment '{env_name}' has unexpected keys: {sorted(extra_env)}"
-                    )
-
-                if not isinstance(env_block.get("allowed_branches", []), list):
-                    errors.append(f"Environment '{env_name}' allowed_branches must be a list")
-
-                deployment_window = env_block.get("deployment_window")
-                if deployment_window is not None:
-                    if not isinstance(deployment_window, dict):
-                        errors.append(
-                            f"Environment '{env_name}' deployment_window must be a mapping"
-                        )
-                    else:
-                        missing_dw = REQUIRED_DEPLOYMENT_WINDOW_KEYS - deployment_window.keys()
-                        if missing_dw:
-                            errors.append(
-                                f"Environment '{env_name}' deployment_window missing keys: "
-                                f"{sorted(missing_dw)}"
-                            )
-                        extra_dw = deployment_window.keys() - ALLOWED_DEPLOYMENT_WINDOW_KEYS
-                        if extra_dw:
-                            errors.append(
-                                f"Environment '{env_name}' deployment_window unexpected keys: "
-                                f"{sorted(extra_dw)}"
-                            )
-
-    promotion_chain = config.get("promotion_chain")
-    if promotion_chain is not None:
-        if not isinstance(promotion_chain, list):
-            errors.append("'promotion_chain' must be a list")
-        elif environments is not None and isinstance(environments, dict):
-            env_names = set(environments.keys())
-            chain_names = set(promotion_chain)
-            missing_in_chain = env_names - chain_names
-            if missing_in_chain:
-                errors.append(
-                    f"Environments missing from promotion_chain: {sorted(missing_in_chain)}"
-                )
-            unknown_in_chain = chain_names - env_names
-            if unknown_in_chain:
-                errors.append(
-                    f"Unknown environments in promotion_chain: {sorted(unknown_in_chain)}"
-                )
-
-    return errors
+    return (
+        _validate_top_level_keys(config)
+        + _validate_environments(environments)
+        + _validate_promotion_chain(config.get("promotion_chain"), environments)
+    )
 
 
 def main(argv: list[str] | None = None) -> int:
