@@ -1,0 +1,66 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.12.0/schema.json",
+  "name": "9c05e390048999766512",
+  "position": {
+    "x": 10.052414760276974,
+    "y": 0,
+    "z": 0,
+    "height": 534.21404154614777,
+    "width": 646.22666316066261,
+    "tabOrder": 0
+  },
+  "visual": {
+    "visualType": "card",
+    "query": {
+      "queryState": {
+        "Values": {
+          "projections": [
+            {
+              "field": {
+                "Aggregation": {
+                  "Expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Table"
+                        }
+                      },
+                      "Property": "Column B"
+                    }
+                  },
+                  "Function": 0
+                }
+              },
+              "queryRef": "Sum(Table.Column B)",
+              "nativeQueryRef": "Sum of Column B"
+            }
+          ]
+        }
+      },
+      "sortDefinition": {
+        "sort": [
+          {
+            "field": {
+              "Aggregation": {
+                "Expression": {
+                  "Column": {
+                    "Expression": {
+                      "SourceRef": {
+                        "Entity": "Table"
+                      }
+                    },
+                    "Property": "Column B"
+                  }
+                },
+                "Function": 0
+              }
+            },
+            "direction": "Descending"
+          }
+        ],
+        "isDefaultSort": true
+      }
+    },
+    "drillFilterOtherVisuals": true
+  }
+}
