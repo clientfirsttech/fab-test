@@ -182,6 +182,73 @@ def test_embed_config_for_role_falls_back_to_single_role_env(monkeypatch) -> Non
     assert _embed_config_for_role("") == {"accessToken": "t"}
 
 
+class _FakeClock:
+    """Deterministic stand-in for time.monotonic()/time.sleep() in tests."""
+
+    def __init__(self) -> None:
+        self.now = 0.0
+
+    def monotonic(self) -> float:
+        return self.now
+
+    def sleep(self, seconds: float) -> None:
+        self.now += seconds
+
+
+def test_wait_for_render_result_lets_a_delayed_error_overwrite_rendered() -> None:
+    """`rendered` and a per-visual `error` are not guaranteed to arrive in a
+    fixed order. A `rendered` read must not return immediately -- it has to
+    give a later `error` overwrite a chance to win during the grace window."""
+    clock = _FakeClock()
+    reads = iter(["rendered", "rendered", 'error:{"message":"Missing_References"}'])
+
+    result = _wait_for_render_result(
+        lambda: next(reads),
+        timeout_seconds=60,
+        grace_seconds=2,
+        poll_interval=1,
+        now=clock.monotonic,
+        sleep=clock.sleep,
+    )
+
+    assert result == 'error:{"message":"Missing_References"}'
+
+
+def test_wait_for_render_result_returns_error_immediately_without_waiting_for_grace() -> None:
+    """An error is terminal the moment it is seen -- no need to keep polling."""
+    clock = _FakeClock()
+    reads = iter(['error:{"message":"boom"}'])
+
+    result = _wait_for_render_result(
+        lambda: next(reads),
+        timeout_seconds=60,
+        grace_seconds=5,
+        poll_interval=1,
+        now=clock.monotonic,
+        sleep=clock.sleep,
+    )
+
+    assert result == 'error:{"message":"boom"}'
+    assert clock.now == 0.0
+
+
+def test_wait_for_render_result_returns_rendered_once_grace_period_is_clean() -> None:
+    """No error arrives during the grace window -- `rendered` is a genuine pass."""
+    clock = _FakeClock()
+    reads = iter(["rendered"] * 10)
+
+    result = _wait_for_render_result(
+        lambda: next(reads),
+        timeout_seconds=60,
+        grace_seconds=2,
+        poll_interval=1,
+        now=clock.monotonic,
+        sleep=clock.sleep,
+    )
+
+    assert result == "rendered"
+
+
 def _write_result(result_dir: Path, status: str, error: str = "") -> None:
     """Record this case's actual outcome.
 
@@ -196,6 +263,41 @@ def _write_result(result_dir: Path, status: str, error: str = "") -> None:
     (result_dir / "result.json").write_text(
         json.dumps({"status": status, "error": error}), encoding="utf-8"
     )
+
+
+def _wait_for_render_result(
+    read_result,
+    *,
+    timeout_seconds: float,
+    grace_seconds: float,
+    poll_interval: float = 0.5,
+    now=time.monotonic,
+    sleep=time.sleep,
+) -> str | None:
+    """Poll ``read_result`` for a terminal render outcome.
+
+    An `'error:...'` reading is terminal immediately. A `'rendered'`
+    reading is not: Power BI's report-level `rendered` event and a broken
+    visual's own `error` event are not guaranteed to arrive in a fixed
+    order, so `'rendered'` only starts a grace window during which a later
+    `error` overwrite still wins -- otherwise whichever event the poll
+    happens to observe first decides the case, and a real visual failure
+    can be missed purely by timing.
+    """
+    deadline = now() + timeout_seconds
+    rendered_at: float | None = None
+    result: str | None = None
+    while now() < deadline:
+        result = read_result()
+        if isinstance(result, str) and result.startswith("error:"):
+            return result
+        if result == "rendered":
+            if rendered_at is None:
+                rendered_at = now()
+            elif now() - rendered_at >= grace_seconds:
+                return result
+        sleep(poll_interval)
+    return result
 
 
 TEST_CASES = _load_test_cases()
@@ -273,21 +375,46 @@ def test_report_visual_renders(page, case: dict[str, str]) -> None:
             """([config]) => {
                 window.__pbiRenderResult = null;
                 window.__pbiEmbedError = null;
+                window.__pbiEventLog = [];
                 try {
-                    window.powerbi.embed(document.body, config);
-                    // Listen at the document level, not report.on(): a
-                    // broken visual (e.g. an invalid field reference) fires
-                    // an 'error' CustomEvent that the SDK dispatches on
-                    // document.body but never surfaces through the report
-                    // object's own .on('error') binding, so a report-level
-                    // listener sees only 'rendered' and misses it.
+                    const logEvent = (name) => (event) => {
+                        window.__pbiEventLog.push({
+                            name,
+                            t: performance.now(),
+                            detail: (() => {
+                                try {
+                                    return JSON.stringify(event.detail || null);
+                                } catch (_) {
+                                    return String(event.detail);
+                                }
+                            })(),
+                        });
+                    };
+                    // Record every SDK event seen on document.body, in
+                    // order, as evidence (event_log.json below) -- this is
+                    // how the 'error'-then-'rendered' clobbering race was
+                    // actually found, and it is the diagnostic to reach for
+                    // the next time these events surprise us.
+                    ["rendered", "error", "loaded", "rendering",
+                     "visualRendered", "commandTriggered"].forEach((name) => {
+                        document.body.addEventListener(name, logEvent(name));
+                    });
+                    // 'error' and 'rendered' can both fire (e.g. a broken
+                    // visual's error a few dozen ms before the report shell's
+                    // own rendered) -- whichever handler runs LAST must not
+                    // blindly overwrite the other's result, or an error that
+                    // arrived first gets clobbered back to 'rendered'.
                     document.body.addEventListener('rendered', () => {
-                        window.__pbiRenderResult = 'rendered';
+                        const already = window.__pbiRenderResult;
+                        if (!(typeof already === 'string' && already.startsWith('error:'))) {
+                            window.__pbiRenderResult = 'rendered';
+                        }
                     }, { once: true });
                     document.body.addEventListener('error', (event) => {
                         window.__pbiRenderResult = 'error:' +
                             JSON.stringify(event.detail || event);
                     }, { once: true });
+                    window.powerbi.embed(document.body, config);
                 } catch (err) {
                     function describeError(e) {
                         if (Array.isArray(e)) {
@@ -324,17 +451,27 @@ def test_report_visual_renders(page, case: dict[str, str]) -> None:
         _write_result(result_dir, "error", error)
         pytest.fail(error)
 
-    # Race rendered vs error.
-    deadline = time.monotonic() + (timeout_ms / 1000.0)
-    result: str | None = None
-    while time.monotonic() < deadline:
-        result = page.evaluate("() => window.__pbiRenderResult")
-        if result:
-            break
-        time.sleep(0.5)
+    # Race rendered vs error, giving a delayed per-visual error a grace
+    # window to overwrite an already-observed rendered (see
+    # _wait_for_render_result).
+    grace_ms = int(os.getenv("PLAYWRIGHT_VISUAL_ERROR_GRACE_MS", "5000"))
+    result = _wait_for_render_result(
+        lambda: page.evaluate("() => window.__pbiRenderResult"),
+        timeout_seconds=timeout_ms / 1000.0,
+        grace_seconds=grace_ms / 1000.0,
+    )
 
     # Capture evidence before asserting so failures always include artifacts.
     _write_evidence(page, result_dir, console_logs, failed_requests)
+
+    # Evidence: every SDK event actually observed on document.body, in
+    # order, regardless of pass/fail -- see event_log.json.
+    with contextlib.suppress(Exception):
+        event_log = page.evaluate("() => window.__pbiEventLog")
+        if event_log:
+            (result_dir / "event_log.json").write_text(
+                json.dumps(event_log, indent=2), encoding="utf-8"
+            )
 
     if not headless:
         # Give a local user a moment to inspect the rendered report.

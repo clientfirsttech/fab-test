@@ -79,3 +79,34 @@ and does catch it.
   message instead of recording `pass`
 - Given a report with no visual errors, should continue to record `pass` as
   before once `rendered` fires on `document.body`
+
+## Give a delayed per-visual error a chance to overwrite a report-level `rendered`
+
+Listening on `document.body` (the requirement above) was still not enough
+on its own -- confirmed against `Not Working Visuals` staying falsely
+`pass` across two more live runs with the identical broken visual visible
+in every screenshot. Diagnostic event-log capture
+(`window.__pbiEventLog`, one entry per SDK event with a `performance.now()`
+timestamp) caught the real cause directly: `error` fired twice at
+t≈26782ms and t≈26785ms with the correct `Missing_References` detail, then
+`rendered` fired at t≈26841ms -- about 59ms later -- and its handler
+unconditionally overwrote `window.__pbiRenderResult` back to `'rendered'`.
+The two SDK events are not mutually exclusive on this report; whichever
+handler happens to run *last* clobbers the other's result. The grace-window
+polling requirement below is a second, independent layer of defense (an
+`error` genuinely arriving well after `rendered` should still win) -- the
+handler-level fix is what actually closes the observed failure.
+
+**Requirements**:
+- Given the `rendered` handler fires and `window.__pbiRenderResult` already
+  holds an `'error:...'` value, should leave it untouched rather than
+  overwriting it with `'rendered'`
+- Given the `error` handler fires at any time, including after `rendered`,
+  should always record it -- an error is authoritative regardless of order
+- Given `window.__pbiRenderResult` reads `'error:...'` at any point, should
+  return that result immediately -- an error is always terminal
+- Given `window.__pbiRenderResult` reads `'rendered'`, should keep polling
+  for a bounded grace period (`PLAYWRIGHT_VISUAL_ERROR_GRACE_MS`, default
+  5000) in case a per-visual `error` still arrives and overwrites it
+- Given the grace period elapses with no `error` overwrite, should return
+  `'rendered'` as a genuine pass
