@@ -30,9 +30,10 @@ _RULES = "C901,PLR0911,PLR0912,PLR0913,PLR0915"
 
 # Measured 2026-08-24. The Complexity and Coverage refactor took the report
 # from 45 to 31; Review Cleanup task 5 took it to 29; Complexity Cleanup
-# (write_results, the envelope builders, resolve_executable) took it to 21.
+# (write_results, the envelope builders, resolve_executable, run_inspector,
+# validate_environments_yaml, _run_one_artifact) took it to 13.
 # A ratchet: down, never up.
-COMPLEXITY_CEILING = 21
+COMPLEXITY_CEILING = 13
 
 
 @pytest.fixture(scope="module")

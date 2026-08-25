@@ -36,7 +36,7 @@ TEST_HARD = 900
 # test_complexity_budget.py.
 EXEMPTIONS: dict[str, tuple[int, str]] = {
     "src/fabric_ci_cd_dataops/scripts/fab_test.py": (
-        2875,
+        2928,
         (
             "2026-08-23: the CLI entry point outgrew the hard budget years before "
             "this ratchet existed. Its tests were split first (Test Module Split "
@@ -45,7 +45,9 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
             "tasks/fab-test-module-split-epic.md for the follow-up epic filed "
             "to split it. 2026-08-24: +8 lines adding the `playwright` "
             "subcommand's --pages/--roles discovery flags (Playwright Test "
-            "Matrix Discovery epic)."
+            "Matrix Discovery epic). 2026-08-24: +53 lines splitting "
+            "_run_one_artifact into named per-concern helpers (Complexity "
+            "Cleanup epic) -- net more lines, fewer branches per function."
         ),
     ),
     "src/fabric_ci_cd_dataops/scripts/fab_test_summary.py": (

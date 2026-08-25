@@ -677,18 +677,10 @@ class _RunContext:
     telemetry: Any = None
 
 
-def _run_one_artifact(
-    name: str,
-    artifact: Path,
-    args: argparse.Namespace,
-    output_dir: Path,
-    ctx: _RunContext,
-    index: int,
-    total: int,
-) -> tuple[str, int]:
-    """Run one analyzer against one artifact. Returns (stem, exit_code)."""
-    output_format = getattr(args, "output_format", "text")
-    display_name = "." if _is_repository_scoped(name) else artifact.stem
+def _announce_artifact_run(
+    name: str, display_name: str, index: int, total: int, ctx: "_RunContext", output_format: str
+) -> None:
+    """Narrate which artifact is about to run, in the "N of total" banner."""
     if total > 1:
         if ctx.in_ci:
             narrate(
@@ -698,23 +690,30 @@ def _run_one_artifact(
         else:
             narrate(f"  artifact {index} of {total}", output_format=output_format)
     narrate(f"\n  ▶ fab-test {name}  →  {display_name}", output_format=output_format)
-    cmd = _build_command(name, artifact, args, output_dir)
-    # Under --format json, capture the child's stdout instead of inheriting it
-    # (it would otherwise land in the middle of the JSON document) and
-    # re-emit it as narration. --format text keeps today's direct inheritance
-    # so there is no added buffering latency.
-    capture_stdout = output_format == "json"
 
-    def _reemit(text: str | None) -> None:
-        if not text:
-            return
-        for line in text.splitlines():
-            clean = _clean_annotation(line)
-            if clean.strip():
-                narrate(f"  {clean}", output_format=output_format)
 
+def _reemit_lines(text: str | None, output_format: str) -> None:
+    """Re-narrate a captured stream, one cleaned annotation line at a time."""
+    if not text:
+        return
+    for line in text.splitlines():
+        clean = _clean_annotation(line)
+        if clean.strip():
+            narrate(f"  {clean}", output_format=output_format)
+
+
+def _run_artifact_process(
+    cmd: list[str],
+    ctx: "_RunContext",
+    capture_stdout: bool,
+    output_format: str,
+    name: str,
+    display_name: str,
+) -> "subprocess.CompletedProcess | tuple[str, int]":
+    """Run the analyzer subprocess. Returns the completed process, or a
+    ``(display_name, exit_code)`` result already handled on timeout."""
     try:
-        proc = subprocess.run(
+        return subprocess.run(
             cmd,
             stdout=subprocess.PIPE if capture_stdout else None,
             # Piped in every mode, CI included. Inheriting it there sent the
@@ -735,7 +734,7 @@ def _run_one_artifact(
             output_format=output_format,
         )
         if capture_stdout:
-            _reemit(exc.stdout)
+            _reemit_lines(exc.stdout, output_format)
         if ctx.manifest is not None:
             ctx.manifest.record_artifact(
                 name, display_name, "timeout", None, 0, 0,
@@ -743,8 +742,13 @@ def _run_one_artifact(
             )
         return (display_name, 1)
 
+
+def _emit_process_output(
+    proc: subprocess.CompletedProcess, capture_stdout: bool, ctx: "_RunContext", output_format: str
+) -> None:
+    """Re-narrate stdout (if captured) and stderr from a finished analyzer run."""
     if capture_stdout:
-        _reemit(proc.stdout)
+        _reemit_lines(proc.stdout, output_format)
 
     if proc.stderr:
         if ctx.in_ci:
@@ -752,33 +756,47 @@ def _run_one_artifact(
             # stripped prefix is a lost annotation.
             print(proc.stderr, end="", file=sys.stderr)
         else:
-            for line in proc.stderr.splitlines():
-                clean = _clean_annotation(line)
-                if clean.strip():
-                    narrate(f"  {clean}", output_format=output_format)
+            _reemit_lines(proc.stderr, output_format)
 
-    # Read the envelope and apply the error/warning threshold ourselves so
-    # warnings never fail the build.
+
+def _load_artifact_envelope(
+    output_dir: Path, name: str, artifact: Path, returncode: int
+) -> tuple[dict[str, Any], bool]:
+    """Read the analyzer's envelope, or synthesize one when it wrote none.
+
+    Returns ``(envelope, aborted)``. ``aborted`` is set only when the
+    analyzer produced no envelope and no clean exit -- its stderr is then
+    the only record of why.
+    """
     envelope = _read_artifact_envelope(output_dir, name, artifact.stem)
-    aborted = False
-    if envelope is None and proc.returncode == 0:
-        envelope = {
+    if envelope is not None:
+        return envelope, False
+    if returncode == 0:
+        return {
             "status": "passed",
             "findings": [],
             "artifact_path": str(artifact),
             "analyzer": name,
-        }
-    elif envelope is None:
-        # Nothing to read: the analyzer aborted before it could write one, so
-        # its stderr is the only record of the reason. `detail` below carries it.
-        aborted = True
-        envelope = {
-            "status": "failed",
-            "findings": [],
-            "artifact_path": str(artifact),
-            "analyzer": name,
-        }
+        }, False
+    return {
+        "status": "failed",
+        "findings": [],
+        "artifact_path": str(artifact),
+        "analyzer": name,
+    }, True
 
+
+def _finalize_artifact_run(
+    name: str,
+    artifact: Path,
+    args: argparse.Namespace,
+    ctx: "_RunContext",
+    proc: subprocess.CompletedProcess,
+    envelope: dict[str, Any],
+    aborted: bool,
+    output_dir: Path,
+) -> int:
+    """Apply the error/warning threshold, send telemetry, and record the manifest."""
     artifact_code = _artifact_exit_code(proc.returncode, envelope)
 
     errors, warnings = severity_counts(envelope.get("findings", []))
@@ -800,6 +818,41 @@ def _run_one_artifact(
             detail=_stderr_detail(proc.stderr) if aborted else None,
         )
 
+    return artifact_code
+
+
+def _run_one_artifact(
+    name: str,
+    artifact: Path,
+    args: argparse.Namespace,
+    output_dir: Path,
+    ctx: _RunContext,
+    index: int,
+    total: int,
+) -> tuple[str, int]:
+    """Run one analyzer against one artifact. Returns (stem, exit_code)."""
+    output_format = getattr(args, "output_format", "text")
+    display_name = "." if _is_repository_scoped(name) else artifact.stem
+    _announce_artifact_run(name, display_name, index, total, ctx, output_format)
+
+    cmd = _build_command(name, artifact, args, output_dir)
+    # Under --format json, capture the child's stdout instead of inheriting it
+    # (it would otherwise land in the middle of the JSON document) and
+    # re-emit it as narration. --format text keeps today's direct inheritance
+    # so there is no added buffering latency.
+    capture_stdout = output_format == "json"
+
+    result = _run_artifact_process(cmd, ctx, capture_stdout, output_format, name, display_name)
+    if isinstance(result, tuple):
+        return result
+    proc = result
+
+    _emit_process_output(proc, capture_stdout, ctx, output_format)
+
+    # Read the envelope and apply the error/warning threshold ourselves so
+    # warnings never fail the build.
+    envelope, aborted = _load_artifact_envelope(output_dir, name, artifact, proc.returncode)
+    artifact_code = _finalize_artifact_run(name, artifact, args, ctx, proc, envelope, aborted, output_dir)
     return (artifact.stem, artifact_code)
 
 
