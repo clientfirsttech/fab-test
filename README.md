@@ -4,13 +4,15 @@
   <img src="https://raw.githubusercontent.com/kerski/fab-test/main/docs/images/fab-test-logo.png" alt="fab-test logo" width="200">
 </p>
 
+**The Power BI tooling ecosystem is scattered: Tabular Editor's BPA, PBIR Inspector, DAX tests, Playwright, each with its own install, its own invocation, its own output format.** `fab-test` brings them together behind one CLI and one result contract, so it doesn't matter who's asking: a developer running a quick local check, a CI/CD build agent gating a deployment, or an AI coding agent that needs a single command and a machine-readable verdict it can act on. Point it at a `.pbip`-format artifact and get the same validation everywhere: Best Practice Analyzer rules, PBIR report structure, DAX tests, and rendered-report checks, all through one command with a pass/fail answer trustworthy for human and machine alike.
+
 Metadata-driven CI/CD and validation framework for Microsoft Fabric artifacts.
 
 This package provides the `fab-test` CLI and supporting analyzer wrappers used by the [fabric-ci-cd-dataops](https://github.com/kerski/fabric-ci-cd-dataops) reference implementation.
 
 ## Install
 
-### From PyPI — not yet
+### From PyPI (not yet)
 
 `pip install fab-test` does not work today. The name is unregistered on PyPI, so
 that command finds nothing. Until the first final release, use TestPyPI below, a
@@ -22,7 +24,7 @@ The current pre-release is `1.0.0.0.dev1`. Two things about the command below ar
 not optional:
 
 - **`--extra-index-url https://pypi.org/simple`.** TestPyPI does not carry
-  `pql-test==0.1.12` or a current `fabric-cicd` — it has 0.1.11 and 0.1.7. Without
+  `pql-test==0.1.12` or a current `fabric-cicd`; it has 0.1.11 and 0.1.7. Without
   the production index alongside it, the install fails to resolve dependencies,
   not because anything is wrong with `fab-test`.
 - **The exact pin.** `1.0.0.0.dev1` is a PEP 440 dev release, and pip skips
@@ -41,7 +43,7 @@ pip install \
 fab-test --version
 ```
 
-TestPyPI is a rehearsal index, not a distribution channel — treat anything
+TestPyPI is a rehearsal index, not a distribution channel; treat anything
 installed from it as disposable.
 
 ### From source in editable mode (developers)
@@ -98,8 +100,8 @@ Sales.Report/
 ### Where fab-test looks
 
 Discovery starts at the directory you run the command in and walks down.
-A folder is an artifact because its name ends in a Fabric type suffix —
-`Sales.SemanticModel`, `Sales.Report` — at any depth, whether or not a
+A folder is an artifact because its name ends in a Fabric type suffix:
+`Sales.SemanticModel`, `Sales.Report`, at any depth, whether or not a
 `.pbip` sits beside it. That last part matters for artifacts committed for
 CI rather than opened in Desktop: `deployed/Sales.SemanticModel` on its own
 is found.
@@ -116,13 +118,13 @@ eight artifacts where three are real.
 
 One consequence is worth knowing: run `fab-test` from a folder that holds
 *repositories* rather than artifacts and it finds nothing, because every
-candidate below it is a nested checkout. It tells you so and names the fix —
+candidate below it is a nested checkout. It tells you so and names the fix:
 `cd` into a repository, or point at one:
 
 ```console
 $ fab-test pbir
   ⚠ fab-test pbir: no *.Report artifacts found under C:\Users\jkers\Git
-    9 git checkouts below this root were skipped — a scan does not
+    9 git checkouts below this root were skipped; a scan does not
     descend into a nested repository. cd into one, or name it directly:
       --artifact-dir C:\Users\jkers\Git\fab-test
 ```
@@ -137,21 +139,21 @@ Every analyzer is built on that assumption:
 | Analyzer | Discovers | Reads on disk | Format it requires |
 |----------|-----------|---------------|--------------------|
 | `bpa` (Tabular Editor) | `*.SemanticModel` | `definition/` | TMDL |
-| `pql-test`, `pql-lint` | `*.SemanticModel` | `definition/` | TMDL |
+| `pql-test` | `*.SemanticModel` | `definition/` | TMDL |
 | `pbir` (PBIR Inspector) | `*.Report` | `definition/` | PBIR |
-| `playwright` | `*.Report` | — (renders the deployed report) | folder naming only |
+| `playwright` | `*.Report` | none (renders the deployed report) | folder naming only |
 
 Deployment and dependency discovery read the report's `definition.pbir` to resolve which semantic model it points at, so that file is what pairs a report with its model.
 
-Power BI Desktop writes this layout when you **Save as** a `.pbip` project with the TMDL and enhanced report format (PBIR) options turned on — under **File → Options and settings → Options → Preview features** in the versions where they are still preview.
+Power BI Desktop writes this layout when you **Save as** a `.pbip` project with the TMDL and enhanced report format (PBIR) options turned on, under **File → Options and settings → Options → Preview features** in the versions where they are still preview.
 
-Discovery matches on folder suffix (`*.SemanticModel`, `*.Report`), not on folder contents, so a project saved in the legacy format is still picked up — it fails inside the analyzer that cannot read it rather than being reported as an unsupported format. A bare `.pbix` is not a supported input at all.
+Discovery matches on folder suffix (`*.SemanticModel`, `*.Report`), not on folder contents, so a project saved in the legacy format is still picked up; it fails inside the analyzer that cannot read it rather than being reported as an unsupported format. A bare `.pbix` is not a supported input at all.
 
 ## Run manual tests locally
 
 ### Local Desktop workflow (no cloud required)
 
-The fastest path to real findings: a `.pbip` open in Power BI Desktop, no `.fabric/artifacts` layout, no Fabric workspace, no service principal. The project has to be saved in TMDL and PBIR — see [Assumed project format](#assumed-project-format).
+The fastest path to real findings: a `.pbip` open in Power BI Desktop, no `.fabric/artifacts` layout, no Fabric workspace, no service principal. The project has to be saved in TMDL and PBIR; see [Assumed project format](#assumed-project-format).
 
 ```bash
 fab-test doctor --local     # what's ready, and what fab-test local will run
@@ -235,7 +237,7 @@ fab-test playwright --artifact "Not Working Visuals"
 `--workspace-id`, `FABRIC_WORKSPACE_ID`, or `workspace:` in `fab-test.yml` --
 a repository that already pins its workspace there keeps working unchanged.
 
-A run with 5 report x page x bookmark cases and 1 real failure now says so —
+A run with 5 report x page x bookmark cases and 1 real failure now says so:
 `envelope.json`'s `test_results` carries one row per case with that case's own
 real outcome, so `findings` names only the case that actually failed instead of
 tagging all 5 identically. Each row also points at that case's own evidence
@@ -248,7 +250,7 @@ renders those as links right in the table, and the same paths are in
 
 `fab-test playwright` discovers a report's pages, each page's own bookmarks,
 and (when RLS is enabled) the semantic model's roles, and tests the full
-matrix — not just whichever tab opens first. Discovery needs `Report.Read.All`
+matrix, not just whichever tab opens first. Discovery needs `Report.Read.All`
 and `SemanticModel.Read.All` on the service principal in addition to what
 embedding already required; a missing grant logs a warning and falls back to
 testing the one default page rather than failing the run. Turn a dimension off
@@ -270,7 +272,7 @@ Every analyzer subcommand takes an optional target. Omit it and `fab-test` disco
 |--------|-------|
 | *(omitted)* | Discover every matching artifact under `--artifact-dir` (default: the working directory) |
 | `Sales` | The artifact named `Sales`; the analyzer's own glob picks the type |
-| `Sales.SemanticModel` | That name **and** type — `Sales.Report` is not selected |
+| `Sales.SemanticModel` | That name **and** type; `Sales.Report` is not selected |
 | `./src/Sales.SemanticModel` | Exactly that folder, wherever it lives (not confined to `--artifact-dir`) |
 | `local/Sales` | The copy open in a running Power BI Desktop instance |
 | `"Sales Dev.Workspace/Sales.SemanticModel"` | A deployed item in the named Fabric workspace |
@@ -282,18 +284,18 @@ fab-test pql-test "Sales Dev.Workspace/Sales.SemanticModel"   # a deployed model
 fab-test all local/Sales                                  # everything that can run locally
 ```
 
-Not every analyzer accepts every form — `bpa` reads files on disk and cannot fetch a deployed item. Run `fab-test list` for the Scopes column, and see the [targeting reference](https://github.com/kerski/fab-test/blob/main/.github/skills/fab-test/SKILL.md#targeting) for the rules. `--artifact STEM` still works as a deprecated alias.
+Not every analyzer accepts every form: `bpa` reads files on disk and cannot fetch a deployed item. Run `fab-test list` for the Scopes column, and see the [targeting reference](https://github.com/kerski/fab-test/blob/main/.github/skills/fab-test/SKILL.md#targeting) for the rules. `--artifact STEM` still works as a deprecated alias.
 
 ### Credentials
 
-**`fab-test` stores no credentials** — no token, no cache, no credential file. It reads what your environment already provides and delegates sign-in to the tool that owns the credential, so there is no `fab-test` token cache to look for.
+**`fab-test` stores no credentials**: no token, no cache, no credential file. It reads what your environment already provides and delegates sign-in to the tool that owns the credential, so there is no `fab-test` token cache to look for.
 
 ```bash
 fab-test auth status        # which identity would be used, verified for real
 fab-test auth login         # delegates to `pql-test auth login`
 ```
 
-`auth status` resolves in the same order that actually authenticates — environment variables, then `.env`, then an ambient Azure credential (`az login`, managed identity, VS Code sign-in). It exits `0` when verified, `127` when nothing resolves, and `1` when credentials work but a named workspace is unreachable.
+`auth status` resolves in the same order that actually authenticates: environment variables, then `.env`, then an ambient Azure credential (`az login`, managed identity, VS Code sign-in). It exits `0` when verified, `127` when nothing resolves, and `1` when credentials work but a named workspace is unreachable.
 
 `fab-test doctor` uses the same chain but never acquires a token, so it reports an ambient credential as `unverified` and points at `auth status`. That is expected.
 
@@ -307,7 +309,7 @@ The result envelopes are the machine contract. To see *what actually failed* wit
 fab-test all --report
 ```
 
-Reports are **opt-in** — nothing is written without the flag, so no existing run gets slower. Add `report: true` to `fab-test.yml` to turn them on for good.
+Reports are **opt-in**: nothing is written without the flag, so no existing run gets slower. Add `report: true` to `fab-test.yml` to turn them on for good.
 
 Each artifact gets a self-contained HTML page beside its envelope, and `fab-test all --report` also writes `fab-test-results/index.html` linking them all, so one run means one page to open:
 
@@ -327,11 +329,11 @@ Each artifact gets a self-contained HTML page beside its envelope, and `fab-test
   Index:  fab-test-results/index.html
 ```
 
-PBIR Inspector writes its own `TestRun.html` and it appears **with or without** `--report` — it is richer than anything generated from the envelope, so `fab-test` never overwrites it. Two upstream asset paths in it are repaired in place, both by inlining as base64 so nothing 404s once the report is copied out of the tool's install directory: the favicon link, and every per-object screenshot. Tabular Editor emits TRX and `pql-test` emits JSON, so those two get a generated `report.html`.
+PBIR Inspector writes its own `TestRun.html` and it appears **with or without** `--report`; it is richer than anything generated from the envelope, so `fab-test` never overwrites it. Two upstream asset paths in it are repaired in place, both by inlining as base64 so nothing 404s once the report is copied out of the tool's install directory: the favicon link, and every per-object screenshot. Tabular Editor emits TRX and `pql-test` emits JSON, so those two get a generated `report.html`.
 
-Every analyzer's envelope also records **every test conducted, not only the failures** — pass, fail, warning, and skip. The two generated reports show that as a table with an All / Errors / Warnings / Passed filter, so a passing run no longer reads as an empty page; PBIR Inspector's own report keeps its own UI, so for that one the full list is there for telemetry to read rather than for the filter to show.
+Every analyzer's envelope also records **every test conducted, not only the failures**: pass, fail, warning, and skip. The two generated reports show that as a table with an All / Errors / Warnings / Passed filter, so a passing run no longer reads as an empty page; PBIR Inspector's own report keeps its own UI, so for that one the full list is there for telemetry to read rather than for the filter to show.
 
-That table also has a **search box and sortable column headers**: type to narrow to a rule, test, or object by name, or click a header to sort by that column (click again to reverse) — the sorted column shows a ▲/▼ arrow so it's obvious which column and direction is active, and the arrow moves to whichever column you click next. Both work together with the status filter. The report stays fully offline and self-contained — the small script behind search and sort never fetches or links to anything outside the page itself.
+That table also has a **search box and sortable column headers**: type to narrow to a rule, test, or object by name, or click a header to sort by that column (click again to reverse); the sorted column shows a ▲/▼ arrow so it's obvious which column and direction is active, and the arrow moves to whichever column you click next. Both work together with the status filter. The report stays fully offline and self-contained; the small script behind search and sort never fetches or links to anything outside the page itself.
 
 The index also shows when the run happened and, in CI, who ran it and from which branch/commit (falling back to local `git`, or an em-dash outside a git checkout).
 
@@ -344,11 +346,11 @@ Status and non-zero counts are coloured in a terminal. Colour is off when output
 ```bash
 fab-test doctor --format json          # 1. is each analyzer's tool/credential ready?
 fab-test list --format json            # 2. what subcommands exist, and how many artifacts match?
-fab-test bpa --format json             # 3. run it — stdout is exactly one JSON document
+fab-test bpa --format json             # 3. run it; stdout is exactly one JSON document
 cat fab-test-results/run.json          # 4. read the manifest instead of globbing result dirs
 ```
 
-`--format json` guarantees stdout carries nothing but the payload — narration goes to stderr. When a run fails, `run.json` says why without a second file: an artifact whose analyzer aborted before writing an envelope carries the remediation message in its `detail` field (`"Pass --env, set FABRIC_ENVIRONMENT, ..."`), so uploading the manifest alone is enough to diagnose a red build. See the [Agent Contract](https://github.com/kerski/fab-test/blob/main/.github/skills/fab-test/SKILL.md#agent-contract) for exit codes, the JSON stdout guarantee, and the `run.json` schema.
+`--format json` guarantees stdout carries nothing but the payload; narration goes to stderr. When a run fails, `run.json` says why without a second file: an artifact whose analyzer aborted before writing an envelope carries the remediation message in its `detail` field (`"Pass --env, set FABRIC_ENVIRONMENT, ..."`), so uploading the manifest alone is enough to diagnose a red build. See the [Agent Contract](https://github.com/kerski/fab-test/blob/main/.github/skills/fab-test/SKILL.md#agent-contract) for exit codes, the JSON stdout guarantee, and the `run.json` schema.
 
 Full CLI reference: [`.github/skills/fab-test/SKILL.md`](https://github.com/kerski/fab-test/blob/main/.github/skills/fab-test/SKILL.md).
 
@@ -356,7 +358,7 @@ See [`docs/QUICK-VALIDATION.md`](https://github.com/kerski/fab-test/blob/main/do
 
 ## Configuration
 
-`fab-test.yml` at the repository root is an entirely optional config-file front door — no file at all means every setting behaves exactly as it always has.
+`fab-test.yml` at the repository root is an entirely optional config-file front door; no file at all means every setting behaves exactly as it always has.
 
 ```bash
 fab-test init                # scaffold a commented fab-test.yml and .env.example
@@ -373,7 +375,7 @@ Precedence, for every setting:
 | 3 | `fab-test.yml` (or `[tool.fab-test]` in `pyproject.toml`) | `jobs: 4` |
 | 4 (lowest) | Packaged default | `200` seconds |
 
-`fab-test.yml` is meant to be committed — it holds no credentials, only settings and rule overlays (tune one BPA/PBIR Inspector rule without forking the packaged rules file). Credentials belong in a `.env` file (auto-discovered, gitignored) or a pipeline's own secrets store. See the [Configuration section of the fab-test skill](https://github.com/kerski/fab-test/blob/main/.github/skills/fab-test/SKILL.md#configuration) for the full settings list and rule-overlay keys.
+`fab-test.yml` is meant to be committed; it holds no credentials, only settings and rule overlays (tune one BPA/PBIR Inspector rule without forking the packaged rules file). Credentials belong in a `.env` file (auto-discovered, gitignored) or a pipeline's own secrets store. See the [Configuration section of the fab-test skill](https://github.com/kerski/fab-test/blob/main/.github/skills/fab-test/SKILL.md#configuration) for the full settings list and rule-overlay keys.
 
 ### Telemetry (optional)
 
@@ -381,7 +383,7 @@ Precedence, for every setting:
 runs, branches, and people land somewhere queryable. It is off until you give it an
 address, and it never fails a build.
 
-**Configuring a destination is what turns it on** — there is no separate switch:
+**Configuring a destination is what turns it on**: there is no separate switch:
 
 ```yaml
 # fab-test.yml
@@ -403,8 +405,8 @@ functions own the transform and a new payload field is a new key rather than a
 table alteration. `fabric_dynamic_analysis` receives `pql-test` records;
 everything else goes to `fabric_static_analysis`.
 
-If your credential may ingest but not create tables — a normal arrangement for a
-governed cluster — the run says so and hands you the KQL to run yourself:
+If your credential may ingest but not create tables (a normal arrangement for a
+governed cluster), the run says so and hands you the KQL to run yourself:
 
 ```kusto
 .create-merge table fabric_static_analysis (Data: dynamic)
@@ -413,12 +415,12 @@ governed cluster — the run says so and hands you the KQL to run yourself:
 ```
 
 That mapping is not decoration. Without it Kusto maps by column name, finds
-nothing called `analyzer` or `status`, and stores empty rows *successfully* — which
+nothing called `analyzer` or `status`, and stores empty rows *successfully*, which
 is why `fab-test` checks for it rather than assuming a table that exists is usable.
 
 Three more things to know before the first run:
 
-- **Install the extra.** The Kusto ingest client is not in the base package —
+- **Install the extra.** The Kusto ingest client is not in the base package:
   `pip install 'fab-test[telemetry]'`. Shipping an egress-capable client to
   everyone who only reads files on a laptop is not a default worth having.
 - **It reuses your existing credentials.** The same `FABRIC_TENANT_ID`,
@@ -435,30 +437,30 @@ Three more things to know before the first run:
 | See where it would go, and what it would send | `fab-test bpa --dry-run` |
 | Turn it off for one run | `fab-test bpa --no-telemetry` |
 | Turn it off everywhere | `ENABLE_EVENTHOUSE_LOGGING=false` |
-| Check readiness | `fab-test doctor` — the `telemetry` row |
+| Check readiness | `fab-test doctor` (the `telemetry` row) |
 | Override the address per environment | `EVENTHOUSE_URI` / `EVENTHOUSE_DATABASE` |
 
 `--telemetry` with no destination configured is an error (exit `2`) naming the config
 key and the environment variable, rather than a run that quietly sends nothing. When
 a send fails, the run's own exit code is unchanged, one warning is printed for the
-whole run, and `run.json` records the reason in `telemetry_error` — so a pipeline
+whole run, and `run.json` records the reason in `telemetry_error`, so a pipeline
 that uploads only the manifest can still tell a run whose telemetry landed from one
 whose records were dropped. Credential values never reach the payload, the log, or
 the manifest.
 
 **What each record identifies.** `actor` carries the git email (`git config
-user.email`, or `GITHUB_ACTOR` in a pipeline) as-is, so you can ask who ran what —
+user.email`, or `GITHUB_ACTOR` in a pipeline) as-is, so you can ask who ran what;
 the same address the repository already stores on every commit. File paths are
 recorded relative to the repository root, never absolute: an absolute path on a
 laptop is `C:\Users\<name>\…`, which shipped the operating-system username in every
 record until it was found by reading rows in a real Eventhouse. If you would rather
-not record a person at all, unset `user.email` for the repository — an unresolvable
+not record a person at all, unset `user.email` for the repository; an unresolvable
 actor is stored as an empty string, not as a placeholder.
 
 ### Where metadata lives
 
 Rulesets, the analyzer registry, the artifact map, and `environments.yml` all resolve the
-same way — `.fab-test/metadata/` first, then `.github/metadata/`, then the copy packaged in
+same way: `.fab-test/metadata/` first, then `.github/metadata/`, then the copy packaged in
 the wheel:
 
 ```
@@ -471,7 +473,7 @@ the wheel:
 ```
 
 `.fab-test/metadata/` is the directory to create. `.github/metadata/` still resolves and is
-kept only so existing repositories keep working — `.github/` belongs to GitHub, not to this
+kept only so existing repositories keep working; `.github/` belongs to GitHub, not to this
 tool. Anything you don't override comes from the wheel, so a `pip install` works with no
 metadata of your own at all.
 

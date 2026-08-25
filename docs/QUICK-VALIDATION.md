@@ -76,7 +76,6 @@ pytest -m analyzers     # all contract-tier analyzer tests
 pytest -m bpa           # BPA wrapper only
 pytest -m pbir          # PBIR Inspector wrapper only
 pytest -m pql_test      # pql-test wrapper only
-pytest -m pql_lint      # Power Query lint wrapper only
 ```
 
 > **Note:** Some wrapper contract tests launch the installed console scripts (`tabular-editor-bpa`, `fab-test`, etc.) as subprocesses. Those scripts must be on `PATH`, so always activate the virtual environment before running `pytest`.
@@ -114,8 +113,6 @@ fab-test pbir --inspector-path "/path/to/PBIRInspectorCLI"
 fab-test pql-test --env DEV
 ```
 
-`pql-lint` is hidden from `--help`, `list`, and `doctor` for now, but still runs if you invoke it directly (`fab-test pql-lint`), and `fab-test local` still includes it.
-
 ### Isolate one artifact
 
 ```bash
@@ -138,7 +135,7 @@ Every analyzer subcommand takes an optional target. Omit it and `fab-test` disco
 | `local/Sales` | The copy open in a running Power BI Desktop instance |
 | `"Sales Dev.Workspace/Sales.SemanticModel"` | A deployed item in the named Fabric workspace |
 
-Not every analyzer accepts every form. `fab-test list` has a Scopes column; `bpa`, `pbir`, and `pql-lint` refuse a workspace target because reading a deployed item would mean exporting it first. `fab-test all` skips an analyzer that cannot honor the target rather than failing the batch.
+Not every analyzer accepts every form. `fab-test list` has a Scopes column; `bpa` and `pbir` refuse a workspace target because reading a deployed item would mean exporting it first. `fab-test all` skips an analyzer that cannot honor the target rather than failing the batch.
 
 ### Check which identity you are using
 
@@ -459,7 +456,7 @@ table alongside each payload.
     path: fab-test-results/run.json
 ```
 
-The difference from running it on a laptop: no Power BI Desktop instance is open in CI, so `pql-test`'s DAX tests connect to nothing and degrade to a `skipped` status on that artifact (never a failure — see vision.md's "platform gaps degrade to skips") rather than binding to a `desktop` port. `pql-lint`, BPA, and PBIR Inspector are unaffected — they don't depend on Desktop at all.
+The difference from running it on a laptop: no Power BI Desktop instance is open in CI, so `pql-test`'s DAX tests connect to nothing and degrade to a `skipped` status on that artifact (never a failure — see vision.md's "platform gaps degrade to skips") rather than binding to a `desktop` port. BPA and PBIR Inspector are unaffected — they don't depend on Desktop at all.
 
 ## Clean up
 
