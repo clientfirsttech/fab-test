@@ -9,7 +9,7 @@ name = "fab-test"
 # Read from fabric_ci_cd_dataops.__version__ -- see [tool.setuptools.dynamic].
 dynamic = ["version"]
 requires-python = ">=3.12"
-description = "Metadata-driven CI/CD and validation framework for Microsoft Fabric artifacts"
+description = "Metadata-driven test and validation CLI for Microsoft Fabric artifacts"
 readme = "README.md"
 # SPDX expression, not the `{ text = ... }` table: setuptools>=77
 # deprecates the table form, and declaring a `License ::` classifier
