@@ -18,6 +18,7 @@ import pytest
 
 from fabric_ci_cd_dataops.scripts._analyzer_envelope import (
     ENVELOPE_OPTIONAL_KEYS,
+    EnvelopeIdentity,
     Timer,
     build_envelope,
 )
@@ -62,7 +63,7 @@ def test_started_at_is_an_optional_envelope_key():
 @pytest.mark.fab_test
 def test_started_at_is_omitted_when_not_supplied():
     """Optional means absent, consistent with the HTML path key."""
-    envelope = build_envelope(analyzer="bpa", artifact_path="x", status="passed")
+    envelope = build_envelope(EnvelopeIdentity("bpa", "x"), status="passed")
 
     assert "started_at" not in envelope
 
@@ -70,8 +71,7 @@ def test_started_at_is_omitted_when_not_supplied():
 @pytest.mark.fab_test
 def test_started_at_is_carried_when_supplied():
     envelope = build_envelope(
-        analyzer="bpa",
-        artifact_path="x",
+        EnvelopeIdentity("bpa", "x"),
         status="passed",
         started_at="2026-08-20T12:00:00+00:00",
     )
@@ -87,8 +87,7 @@ def test_started_at_is_carried_when_supplied():
 @pytest.mark.fab_test
 def test_report_shows_the_run_time_and_duration():
     envelope = build_envelope(
-        analyzer="bpa",
-        artifact_path="Sales.SemanticModel",
+        EnvelopeIdentity("bpa", "Sales.SemanticModel"),
         status="passed",
         started_at="2026-08-20T12:00:00+00:00",
         duration_ms=1500,
@@ -104,7 +103,7 @@ def test_report_shows_the_run_time_and_duration():
 def test_report_labels_the_time_as_utc():
     """A bare timestamp invites the reader to assume local time."""
     envelope = build_envelope(
-        analyzer="bpa", artifact_path="x", status="passed",
+        EnvelopeIdentity("bpa", "x"), status="passed",
         started_at="2026-08-20T12:00:00+00:00",
     )
 
@@ -114,7 +113,7 @@ def test_report_labels_the_time_as_utc():
 @pytest.mark.fab_test
 def test_a_report_without_a_timestamp_still_renders():
     """Envelopes predating this key must not break the renderer."""
-    html = render_report(build_envelope(analyzer="bpa", artifact_path="x", status="passed"))
+    html = render_report(build_envelope(EnvelopeIdentity("bpa", "x"), status="passed"))
 
     assert "<!DOCTYPE html>" in html
 
@@ -123,7 +122,7 @@ def test_a_report_without_a_timestamp_still_renders():
 def test_rendering_stays_deterministic_with_a_timestamp():
     """The time comes from the envelope, so re-rendering cannot drift."""
     envelope = build_envelope(
-        analyzer="bpa", artifact_path="x", status="passed",
+        EnvelopeIdentity("bpa", "x"), status="passed",
         started_at="2026-08-20T12:00:00+00:00",
     )
 

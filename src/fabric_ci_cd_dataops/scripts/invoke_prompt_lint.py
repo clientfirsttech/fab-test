@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from ._analyzer_envelope import (
+    EnvelopeIdentity,
     Timer,
     build_envelope,
     envelope_path,
@@ -73,8 +74,7 @@ def write_results(
 ) -> None:
     """Write standardized prompt-lint envelope JSON."""
     env = build_envelope(
-        analyzer="prompt_lint",
-        artifact_path=str(artifact_path),
+        EnvelopeIdentity("prompt_lint", str(artifact_path)),
         status=status,
         message=message,
         findings=findings,

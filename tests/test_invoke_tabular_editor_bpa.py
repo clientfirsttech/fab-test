@@ -9,7 +9,7 @@ from unittest import mock
 import pytest
 
 import fabric_ci_cd_dataops.scripts.invoke_tabular_editor_bpa as invoke_tabular_editor_bpa
-from fabric_ci_cd_dataops.scripts._analyzer_envelope import ENVELOPE_REQUIRED_KEYS
+from fabric_ci_cd_dataops.scripts._analyzer_envelope import ENVELOPE_REQUIRED_KEYS, WrapperResult
 from fabric_ci_cd_dataops.scripts.invoke_tabular_editor_bpa import (
     _format_bpa_message,
     _parse_vstest_counters,
@@ -90,12 +90,8 @@ class TestWriteResults:
         rules_path = tmp_path / "rules.json"
         findings = [{"rule": "TestRule"}]
         write_results(
-            output_path=output_path,
-            status="passed",
-            findings=findings,
-            artifact_path=artifact_path,
-            rules_path=rules_path,
-            message="OK",
+            WrapperResult(output_path, "passed", findings, artifact_path, message="OK"),
+            rules_path,
         )
         data = json.loads(output_path.read_text(encoding="utf-8"))
         assert data["status"] == "passed"
@@ -107,12 +103,8 @@ class TestWriteResults:
         """Envelope contains every required key from the shared schema."""
         output_path = tmp_path / "envelope.json"
         write_results(
-            output_path=output_path,
-            status="passed",
-            findings=[],
-            artifact_path=tmp_path / "model",
-            rules_path=tmp_path / "rules.json",
-            message="OK",
+            WrapperResult(output_path, "passed", [], tmp_path / "model", message="OK"),
+            tmp_path / "rules.json",
         )
         data = json.loads(output_path.read_text(encoding="utf-8"))
         missing = ENVELOPE_REQUIRED_KEYS - data.keys()
