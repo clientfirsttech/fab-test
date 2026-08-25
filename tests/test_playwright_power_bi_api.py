@@ -9,6 +9,7 @@ import pytest
 from fabric_ci_cd_dataops.scripts.playwright_validation.config import PlaywrightValidationConfig
 from fabric_ci_cd_dataops.scripts.playwright_validation.power_bi_api import (
     PowerBiApiError,
+    ReportIdentity,
     _api_root_for,
     _authority_for,
     generate_embed_token,
@@ -113,7 +114,7 @@ def test_generate_embed_token_success() -> None:
         "fabric_ci_cd_dataops.scripts.playwright_validation.power_bi_api.requests.post",
         return_value=mock_response,
     ):
-        token = generate_embed_token("token", "ws-1", "rpt-1", "ds-1")
+        token = generate_embed_token("token", ReportIdentity("ws-1", "rpt-1", "ds-1"))
 
     assert token == "embed-token-1"
 
@@ -130,9 +131,7 @@ def test_generate_embed_token_includes_rls_identity() -> None:
     ) as mock_post:
         generate_embed_token(
             "token",
-            "ws-1",
-            "rpt-1",
-            "ds-1",
+            ReportIdentity("ws-1", "rpt-1", "ds-1"),
             use_rls=True,
             user_name="u1",
             role="Viewer",
@@ -156,9 +155,7 @@ def test_generate_embed_token_omits_identity_when_rls_disabled() -> None:
     ) as mock_post:
         generate_embed_token(
             "token",
-            "ws-1",
-            "rpt-1",
-            "ds-1",
+            ReportIdentity("ws-1", "rpt-1", "ds-1"),
             use_rls=False,
             user_name="u1",
             role="Viewer",
@@ -181,7 +178,7 @@ def test_generate_embed_token_raises_on_http_error() -> None:
         ),
         pytest.raises(PowerBiApiError) as exc_info,
     ):
-        generate_embed_token("token", "ws-1", "rpt-1", "ds-1")
+        generate_embed_token("token", ReportIdentity("ws-1", "rpt-1", "ds-1"))
 
     assert exc_info.value.status_code == 400
 

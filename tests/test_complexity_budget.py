@@ -28,12 +28,13 @@ import pytest
 _ROOT = Path(__file__).resolve().parent.parent
 _RULES = "C901,PLR0911,PLR0912,PLR0913,PLR0915"
 
-# Measured 2026-08-24. The Complexity and Coverage refactor took the report
-# from 45 to 31; Review Cleanup task 5 took it to 29; Complexity Cleanup
-# (write_results, the envelope builders, resolve_executable, run_inspector,
-# validate_environments_yaml, _run_one_artifact) took it to 13.
-# A ratchet: down, never up.
-COMPLEXITY_CEILING = 13
+# Measured 2026-08-25. The Complexity and Coverage refactor took the report
+# from 45 to 31; Review Cleanup task 5 took it to 29; Complexity Cleanup took
+# it to 6 -- every addressable finding except deploy.py and
+# check_promotion_safety.py, deliberately left out of scope pending the
+# dead-code audit in plan.md's "Audit what the pipeline deletion stranded"
+# task. A ratchet: down, never up.
+COMPLEXITY_CEILING = 6
 
 
 @pytest.fixture(scope="module")
