@@ -178,6 +178,35 @@ def _platform_specific(
     return tool_install.get(key) or None
 
 
+def _usable(path: Path) -> bool:
+    return path.exists() and path.is_file()
+
+
+def _local_candidates(
+    tool_install: dict[str, Any], repo_root: Path, explicit_path: str | None
+) -> list[tuple[str, Path]]:
+    """Ordered non-download candidates: CLI argument, env var, default path."""
+    env_var = tool_install.get("env_var", "")
+    default_path = tool_install.get("default_path", "")
+    candidates: list[tuple[str, Path]] = []
+    if explicit_path:
+        candidates.append(("CLI argument", Path(explicit_path)))
+    if env_var and _env(env_var).strip():
+        candidates.append((f"env var {env_var}", Path(_env(env_var).strip())))
+    if default_path and default_path.strip():
+        candidates.append(("default path", repo_root / default_path.strip()))
+    return candidates
+
+
+def _resolve_install_url(tool_install: dict[str, Any], platform: str) -> str:
+    """Return the install URL to use: env var override, else the committed one."""
+    install_url_env_var = tool_install.get("install_url_env_var", "")
+    env_url = _env(install_url_env_var, "") if install_url_env_var else ""
+    if env_url:
+        return env_url
+    return _platform_specific(tool_install, "install_url", platform) or ""
+
+
 def load_analyzer_config(metadata_path: Path, analyzer_name: str) -> dict[str, Any] | None:
     """Load the analyzer registry entry from ``analyzers.json``."""
     if not metadata_path.exists():
@@ -215,7 +244,6 @@ def probe_executable(
     config = load_analyzer_config(metadata_path, analyzer_name) or {}
     tool_install = config.get("tool_install") or {}
     env_var = tool_install.get("env_var", "")
-    default_path = tool_install.get("default_path", "")
     install_url_env_var = tool_install.get("install_url_env_var", "")
 
     platform = _current_platform()
@@ -233,18 +261,7 @@ def probe_executable(
 
     committed_install_url = _platform_specific(tool_install, "install_url", platform)
 
-    def _usable(path: Path) -> bool:
-        return path.exists() and path.is_file()
-
-    candidates: list[tuple[str, Path]] = []
-    if explicit_path:
-        candidates.append(("CLI argument", Path(explicit_path)))
-    if env_var and _env(env_var).strip():
-        candidates.append((f"env var {env_var}", Path(_env(env_var).strip())))
-    if default_path and default_path.strip():
-        candidates.append(("default path", repo_root / default_path.strip()))
-
-    for source, path in candidates:
+    for source, path in _local_candidates(tool_install, repo_root, explicit_path):
         if _usable(path):
             return {
                 "ready": True,
@@ -319,40 +336,12 @@ def resolve_executable(
     """
     config = load_analyzer_config(metadata_path, analyzer_name) or {}
     tool_install = config.get("tool_install") or {}
-    env_var = tool_install.get("env_var", "")
-    default_path = tool_install.get("default_path", "")
-    install_url_env_var = tool_install.get("install_url_env_var", "")
     archive_type = tool_install.get("archive_type", "zip")
 
     platform = _current_platform()
-    requires_platform = tool_install.get("requires_platform")
-    if requires_platform and platform != requires_platform:
-        raise UnsupportedPlatformError(
-            f"Analyzer '{analyzer_name}' is not supported on {platform}. "
-            f"Supported platform: {requires_platform}. "
-            f"Set {env_var}=<path> to use a manually provided executable."
-        )
+    _require_supported_platform(analyzer_name, tool_install, platform)
 
-    committed_install_url = _platform_specific(
-        tool_install, "install_url", platform
-    )
-    executable_subpath = _platform_specific(
-        tool_install, "executable_subpath", platform
-    )
-
-    def _usable(path: Path) -> bool:
-        return path.exists() and path.is_file()
-
-    candidates: list[tuple[str, Path]] = []
-
-    if explicit_path:
-        candidates.append(("CLI argument", Path(explicit_path)))
-    if env_var and _env(env_var).strip():
-        candidates.append((f"env var {env_var}", Path(_env(env_var).strip())))
-    if default_path and default_path.strip():
-        candidates.append(("default path", repo_root / default_path.strip()))
-
-    for source, path in candidates:
+    for _source, path in _local_candidates(tool_install, repo_root, explicit_path):
         if _usable(path):
             return path.resolve()
 
@@ -361,40 +350,71 @@ def resolve_executable(
     if cached:
         return cached.resolve()
 
-    install_url = _env(install_url_env_var, "") if install_url_env_var else ""
-    if not install_url:
-        install_url = committed_install_url or ""
+    install_url = _resolve_install_url(tool_install, platform)
     if install_url and archive_type.lower() == "zip":
-        source_name = install_url_env_var if _env(install_url_env_var, "") else "analyzers.json"
-        print(
-            f"::notice::{analyzer_name}: executable not found; downloading from "
-            f"{source_name}"
-        )
-        expected_sha256 = _platform_specific(tool_install, "install_sha256", platform)
-        with tempfile.TemporaryDirectory() as tmp:
-            tmp_path = Path(tmp)
-            zip_name = _clean_url_filename(install_url)
-            zip_path = tmp_path / zip_name
-            _download(install_url, zip_path)
-            if expected_sha256:
-                _verify_checksum(zip_path, expected_sha256, analyzer_name)
-            extract_dir = cache_dir / "extracted"
-            _extract_zip(zip_path, extract_dir)
-            executable = _find_executable(extract_dir, executable_subpath or "")
-            if executable is None:
-                raise RuntimeError(
-                    f"Could not locate executable for {analyzer_name} inside "
-                    f"{extract_dir} (expected subpath: {executable_subpath!r})."
-                )
-            executable = executable.resolve()
-            _write_marker(cache_dir, executable)
-            print(f"::notice::{analyzer_name}: resolved executable at {executable}")
-            return executable
+        return _download_and_cache(analyzer_name, tool_install, install_url, cache_dir, platform)
 
-    # Build a helpful error message.
-    lines = [
-        f"Could not resolve executable for analyzer '{analyzer_name}'."
-    ]
+    raise RuntimeError(
+        _unresolved_message(analyzer_name, tool_install, explicit_path, platform)
+    )
+
+
+def _require_supported_platform(
+    analyzer_name: str, tool_install: dict[str, Any], platform: str
+) -> None:
+    """Raise ``UnsupportedPlatformError`` when ``requires_platform`` doesn't match."""
+    requires_platform = tool_install.get("requires_platform")
+    if requires_platform and platform != requires_platform:
+        env_var = tool_install.get("env_var", "")
+        raise UnsupportedPlatformError(
+            f"Analyzer '{analyzer_name}' is not supported on {platform}. "
+            f"Supported platform: {requires_platform}. "
+            f"Set {env_var}=<path> to use a manually provided executable."
+        )
+
+
+def _download_and_cache(
+    analyzer_name: str,
+    tool_install: dict[str, Any],
+    install_url: str,
+    cache_dir: Path,
+    platform: str,
+) -> Path:
+    """Download ``install_url``, verify, extract, cache, and return the executable."""
+    install_url_env_var = tool_install.get("install_url_env_var", "")
+    source_name = install_url_env_var if _env(install_url_env_var, "") else "analyzers.json"
+    print(f"::notice::{analyzer_name}: executable not found; downloading from {source_name}")
+    expected_sha256 = _platform_specific(tool_install, "install_sha256", platform)
+    executable_subpath = _platform_specific(tool_install, "executable_subpath", platform)
+    with tempfile.TemporaryDirectory() as tmp:
+        zip_path = Path(tmp) / _clean_url_filename(install_url)
+        _download(install_url, zip_path)
+        if expected_sha256:
+            _verify_checksum(zip_path, expected_sha256, analyzer_name)
+        extract_dir = cache_dir / "extracted"
+        _extract_zip(zip_path, extract_dir)
+        executable = _find_executable(extract_dir, executable_subpath or "")
+        if executable is None:
+            raise RuntimeError(
+                f"Could not locate executable for {analyzer_name} inside "
+                f"{extract_dir} (expected subpath: {executable_subpath!r})."
+            )
+        executable = executable.resolve()
+        _write_marker(cache_dir, executable)
+        print(f"::notice::{analyzer_name}: resolved executable at {executable}")
+        return executable
+
+
+def _unresolved_message(
+    analyzer_name: str, tool_install: dict[str, Any], explicit_path: str | None, platform: str
+) -> str:
+    """Build the ``RuntimeError`` message when no resolution source worked."""
+    env_var = tool_install.get("env_var", "")
+    install_url_env_var = tool_install.get("install_url_env_var", "")
+    committed_install_url = _platform_specific(tool_install, "install_url", platform)
+    executable_subpath = _platform_specific(tool_install, "executable_subpath", platform)
+
+    lines = [f"Could not resolve executable for analyzer '{analyzer_name}'."]
     if explicit_path:
         lines.append(f"  CLI path: {explicit_path}")
     if env_var:
@@ -412,7 +432,7 @@ def resolve_executable(
         "  Executable subpath inside zip: "
         f"{executable_subpath or '(any executable)'!r}"
     )
-    raise RuntimeError("\n".join(lines))
+    return "\n".join(lines)
 
 
 def print_resolution_help(analyzer_name: str, metadata_path: Path) -> None:

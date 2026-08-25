@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts._analyzer_envelope import build_envelope
+from fabric_ci_cd_dataops.scripts._analyzer_envelope import EnvelopeIdentity, build_envelope
 from fabric_ci_cd_dataops.scripts._analyzer_report import AnalyzerReporter, _resolve_verbosity
 
 # pytest markers that belong to the analyzer contract tier.
@@ -320,7 +320,8 @@ def _envelope(findings=None, **overrides):
         "findings": findings if findings is not None else [],
     }
     base.update(overrides)
-    return build_envelope(**base)
+    identity = EnvelopeIdentity(base.pop("analyzer"), base.pop("artifact_path"))
+    return build_envelope(identity, **base)
 
 
 def _envelope_with_test_results(test_results, **overrides):

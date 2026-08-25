@@ -26,7 +26,9 @@ from typing import Any
 from tabulate import tabulate
 
 from ._analyzer_envelope import (
+    EnvelopeIdentity,
     Timer,
+    WrapperResult,
     build_envelope,
     envelope_path,
     native_output_path,
@@ -252,41 +254,31 @@ def _print_findings_table(findings: list[dict[str, Any]]) -> None:
 
 
 def write_results(
-    output_path: Path,
-    status: str,
-    findings: list[dict[str, Any]],
-    artifact_path: Path,
+    result: WrapperResult,
     rules_path: Path,
-    message: str = "",
-    native_out: Path | None = None,
-    duration_ms: int = 0,
-    started_at: str = "",
-    test_summary: dict[str, int] | None = None,
-    test_results: list[dict[str, Any]] | None = None,
 ) -> None:
     """Write standardized BPA envelope JSON (replaces legacy flat JSON)."""
     env = build_envelope(
-        analyzer="tabular_editor_bpa",
-        artifact_path=str(artifact_path),
-        status=status,
-        message=message,
-        findings=findings,
-        native_output_path_str=str(native_out) if native_out else "",
-        started_at=started_at,
-        duration_ms=duration_ms,
+        EnvelopeIdentity("tabular_editor_bpa", str(result.artifact_path)),
+        status=result.status,
+        message=result.message,
+        findings=result.findings,
+        native_output_path_str=str(result.native_out) if result.native_out else "",
+        started_at=result.started_at,
+        duration_ms=result.duration_ms,
     )
     # Keep legacy keys so existing unit tests that read the flat schema still pass.
     env["rules_file"] = str(rules_path)
-    if test_summary is not None:
-        env["test_summary"] = test_summary
+    if result.test_summary is not None:
+        env["test_summary"] = result.test_summary
     # Additive: every rule TE2 evaluated, passed or failed -- `findings`
     # stays violations-only for the callers already reading that meaning.
-    env["test_results"] = test_results or []
+    env["test_results"] = result.test_results or []
     # Tabular Editor emits TRX, which is not something a person wants to
     # read, so the report is rendered from the envelope. No-op unless
     # --report was passed.
-    attach_report(env, output_path)
-    write_envelope(output_path, env)
+    attach_report(env, result.output_path)
+    write_envelope(result.output_path, env)
 
 
 def _resolve_te2_model_path(path: Path) -> Path:
@@ -584,13 +576,8 @@ def run_bpa(args: argparse.Namespace) -> int:
         )
     if outcome.failed:
         write_results(
-            output_path,
-            outcome.status,
-            [],
-            tmdl_path,
+            WrapperResult(output_path, outcome.status, [], tmdl_path, message=outcome.message, native_out=native_out),
             bpa_rules_path,
-            message=outcome.message,
-            native_out=native_out,
         )
         print(f"::error::{outcome.message}", file=sys.stderr)
         return 1
@@ -626,17 +613,19 @@ def run_bpa(args: argparse.Namespace) -> int:
     if not findings:
         message = "Tabular Editor BPA passed with no violations"
         write_results(
-            output_path=output_path,
-            status="passed",
-            findings=[],
-            artifact_path=tmdl_path,
-            rules_path=bpa_rules_path,
-            message=message,
-            native_out=native_out,
-            duration_ms=timer.elapsed_ms,
-            started_at=timer.started_at,
-            test_summary=test_summary,
-            test_results=test_results,
+            WrapperResult(
+                output_path,
+                "passed",
+                [],
+                tmdl_path,
+                message=message,
+                native_out=native_out,
+                duration_ms=timer.elapsed_ms,
+                started_at=timer.started_at,
+                test_summary=test_summary,
+                test_results=test_results,
+            ),
+            bpa_rules_path,
         )
         if level >= _VERBOSITY_LEVELS["default"]:
             log(f"✅ {message}")
@@ -647,17 +636,19 @@ def run_bpa(args: argparse.Namespace) -> int:
     message = _format_bpa_message(findings, test_summary, proc.returncode)
     status = "failed" if has_errors else "warning"
     write_results(
-        output_path=output_path,
-        status=status,
-        findings=findings,
-        artifact_path=tmdl_path,
-        rules_path=bpa_rules_path,
-        message=message,
-        native_out=native_out,
-        duration_ms=timer.elapsed_ms,
-        started_at=timer.started_at,
-        test_summary=test_summary,
-        test_results=test_results,
+        WrapperResult(
+            output_path,
+            status,
+            findings,
+            tmdl_path,
+            message=message,
+            native_out=native_out,
+            duration_ms=timer.elapsed_ms,
+            started_at=timer.started_at,
+            test_summary=test_summary,
+            test_results=test_results,
+        ),
+        bpa_rules_path,
     )
 
     _narrate_outcome(findings, test_summary, proc.stderr, message, has_errors=has_errors)
