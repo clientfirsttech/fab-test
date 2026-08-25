@@ -41,6 +41,9 @@ def git_context() -> dict[str, str]:
         "actor": os.getenv("GITHUB_ACTOR", ""),
         "workflow_run_id": os.getenv("GITHUB_RUN_ID", ""),
     }
+    if not ctx["repository"]:
+        remote = git_command_output(["git", "remote", "get-url", "origin"])
+        ctx["repository"] = _repository_from_remote(remote)
     if not ctx["commit"]:
         ctx["commit"] = git_command_output(["git", "rev-parse", "HEAD"])
     if not ctx["branch"]:
@@ -48,3 +51,20 @@ def git_context() -> dict[str, str]:
     if not ctx["actor"]:
         ctx["actor"] = git_command_output(["git", "config", "user.email"])
     return ctx
+
+
+def _repository_from_remote(remote_url: str) -> str:
+    """Return ``owner/repo`` parsed from a git remote URL, or "" if it doesn't parse.
+
+    Handles both the HTTPS (``https://github.com/owner/repo.git``) and SSH
+    (``git@github.com:owner/repo.git``) forms a local ``origin`` remote may
+    take, by normalizing the SSH colon to a slash and reading the last two
+    path segments -- so the host and protocol in front of them don't matter.
+    """
+    trimmed = remote_url.strip().removesuffix(".git").rstrip("/")
+    if not trimmed:
+        return ""
+    segments = trimmed.replace(":", "/").rsplit("/", 2)[-2:]
+    if len(segments) != 2 or not all(segments):
+        return ""
+    return "/".join(segments)
