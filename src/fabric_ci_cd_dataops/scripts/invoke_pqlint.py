@@ -103,34 +103,24 @@ def write_results(
     write_envelope(output_path, env)
 
 
-def run_pqlint(args: argparse.Namespace) -> int:
-    """Run pqlint and return an exit code."""
-    artifact_path = validate_path(args.artifact_path, "Artifact path")
+def _log_pqlint_header(level: int, artifact_path: Path, output_path: Path, nat_out: Path) -> None:
+    """Print the pre-run banner, once verbosity clears the default threshold."""
+    if level < _VERBOSITY_LEVELS["default"]:
+        return
+    log("================================")
+    log(f"pqlint  →  {artifact_path.stem}")
+    log("================================")
+    log(f"📋 Artifact: {artifact_path}")
+    log(f"📊 Envelope: {output_path}")
+    log(f"📄 Native:   {nat_out}")
+    log("")
 
-    _env_out = envelope_path("pqlint", artifact_path.stem)
-    _nat_out = native_output_path("pqlint", artifact_path.stem, "json")
-    output_path = Path(args.output_path) if args.output_path else _env_out
-    nat_out = _nat_out
 
-    level = _verbosity()
-    if level >= _VERBOSITY_LEVELS["default"]:
-        log("================================")
-        log(f"pqlint  →  {artifact_path.stem}")
-        log("================================")
-        log(f"📋 Artifact: {artifact_path}")
-        log(f"📊 Envelope: {output_path}")
-        log(f"📄 Native:   {nat_out}")
-        log("")
-
-    command = build_command(artifact_path=artifact_path, output_path=nat_out)
-    if level >= _VERBOSITY_LEVELS["debug"]:
-        log(f"Executing: {' '.join(command)}")
-        log("")
-
-    executable = shutil.which(command[0])
-    if not executable and command[0] == "pqlint":
-        command = [sys.executable, "-m", "pqlint", *command[1:]]
-
+def _run_pqlint_process(
+    command: list[str], output_path: Path, artifact_path: Path, nat_out: Path
+) -> "tuple[subprocess.CompletedProcess, int] | int":
+    """Run pqlint, timed. Returns ``(proc, elapsed_ms)`` on success, or writes a
+    failure envelope and returns an exit code if it could not run."""
     with Timer() as timer:
         try:
             proc = subprocess.run(command, capture_output=True, text=True, timeout=300, check=False)
@@ -149,6 +139,44 @@ def run_pqlint(args: argparse.Namespace) -> int:
             write_results(output_path, "error", [], artifact_path, message=message, native_out=nat_out)
             print(f"::error::{message}", file=sys.stderr)
             return 1
+    return proc, timer.elapsed_ms
+
+
+def _log_pqlint_findings(findings: list[dict[str, Any]], level: int) -> None:
+    """Print one line per finding, once verbosity clears the verbose threshold."""
+    if level < _VERBOSITY_LEVELS["verbose"]:
+        return
+    for f in findings:
+        rule = f.get("rule") or "?"
+        sev = f.get("severity") or ""
+        log(f"  • {rule}  sev={sev}")
+
+
+def run_pqlint(args: argparse.Namespace) -> int:
+    """Run pqlint and return an exit code."""
+    artifact_path = validate_path(args.artifact_path, "Artifact path")
+
+    output_path = (
+        Path(args.output_path) if args.output_path else envelope_path("pqlint", artifact_path.stem)
+    )
+    nat_out = native_output_path("pqlint", artifact_path.stem, "json")
+
+    level = _verbosity()
+    _log_pqlint_header(level, artifact_path, output_path, nat_out)
+
+    command = build_command(artifact_path=artifact_path, output_path=nat_out)
+    if level >= _VERBOSITY_LEVELS["debug"]:
+        log(f"Executing: {' '.join(command)}")
+        log("")
+
+    executable = shutil.which(command[0])
+    if not executable and command[0] == "pqlint":
+        command = [sys.executable, "-m", "pqlint", *command[1:]]
+
+    result = _run_pqlint_process(command, output_path, artifact_path, nat_out)
+    if isinstance(result, int):
+        return result
+    proc, elapsed_ms = result
 
     if level >= _VERBOSITY_LEVELS["debug"] and (proc.stdout or proc.stderr):
         log("--- stdout ---")
@@ -164,7 +192,7 @@ def run_pqlint(args: argparse.Namespace) -> int:
         message = "pqlint passed with no findings"
         write_results(
             output_path, "passed", [], artifact_path,
-            message=message, native_out=nat_out, duration_ms=timer.elapsed_ms,
+            message=message, native_out=nat_out, duration_ms=elapsed_ms,
         )
         if level >= _VERBOSITY_LEVELS["default"]:
             log(f"✅ {message}")
@@ -174,15 +202,11 @@ def run_pqlint(args: argparse.Namespace) -> int:
     message = f"pqlint found {len(findings)} finding(s)"
     write_results(
         output_path, "failed", findings, artifact_path,
-        message=message, native_out=nat_out, duration_ms=timer.elapsed_ms,
+        message=message, native_out=nat_out, duration_ms=elapsed_ms,
     )
     if level >= _VERBOSITY_LEVELS["default"]:
         log(f"📁 Envelope: {output_path}")
-    if level >= _VERBOSITY_LEVELS["verbose"]:
-        for f in findings:
-            rule = f.get("rule") or "?"
-            sev = f.get("severity") or ""
-            log(f"  • {rule}  sev={sev}")
+    _log_pqlint_findings(findings, level)
     if proc.stderr:
         print(f"::error::{proc.stderr}", file=sys.stderr)
     print(f"::error::{message}", file=sys.stderr)

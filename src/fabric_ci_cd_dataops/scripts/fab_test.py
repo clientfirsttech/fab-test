@@ -1429,51 +1429,7 @@ class _FabTestParser(argparse.ArgumentParser):
         )
 
 
-def build_parser() -> argparse.ArgumentParser:
-    parser = _FabTestParser(
-        prog="fab-test",
-        description=(
-            "Run Fabric artifact analyzers locally.\n\n"
-            "fab-test tests your .fabric artifacts — it is NOT pytest.\n"
-            "  pytest -m bpa      tests the BPA wrapper (always green)\n"
-            "  fab-test bpa       runs BPA against your actual .fabric artifacts"
-        ),
-        epilog=(
-            "Exit codes:\n"
-            "  0    All artifacts passed (warnings do not fail the build)\n"
-            "  1    An analyzer found error-level findings, or the analyzer process crashed\n"
-            "  2    Invalid CLI arguments (no analyzer was invoked)\n"
-            "  126  Analyzer unsupported on this platform (see message for the supported OS)\n"
-            "  127  Required external tool could not be resolved (see message for the fix)\n\n"
-            f"Version: {_FAB_TEST_VERSION} | "
-            "Docs: https://github.com/kerski/fab-test/blob/main/docs/QUICK-VALIDATION.md"
-        ),
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-    )
-    parser.add_argument(
-        "--version",
-        "-V",
-        action="version",
-        version=f"%(prog)s {_FAB_TEST_VERSION}",
-        help="Show fab-test version and exit",
-    )
-    parser.add_argument(
-        "--print-completion",
-        choices=["bash", "zsh"],
-        action=_PrintCompletionAction,
-        help="Print a shell completion script for bash or zsh and exit",
-    )
-    parser.add_argument(
-        "--config",
-        default=None,
-        metavar="PATH",
-        help=f"Path to a config file (default: discover {CONFIG_FILENAME} at the repository root)",
-    )
-
-    subs = parser.add_subparsers(dest="analyzer", metavar="ANALYZER")
-    subs.required = True
-
-    # --- bpa ---
+def _add_bpa_subparser(subs: argparse._SubParsersAction) -> None:
     bpa_p = subs.add_parser(
         "bpa",
         help="Tabular Editor Best Practice Analyzer (SemanticModel artifacts)",
@@ -1497,7 +1453,7 @@ def build_parser() -> argparse.ArgumentParser:
         help=f"BPA rules JSON file [default: {_DEFAULT_BPA_RULES}]",
     )
 
-    # --- pbir ---
+def _add_pbir_subparser(subs: argparse._SubParsersAction) -> None:
     pbir_p = subs.add_parser(
         "pbir",
         help="PBIR Inspector — static report analysis (Report artifacts)",
@@ -1521,7 +1477,7 @@ def build_parser() -> argparse.ArgumentParser:
         help=f"PBIR Inspector rules JSON [default: {_DEFAULT_PBIR_RULES}]",
     )
 
-    # --- pql-test ---
+def _add_pql_test_subparser(subs: argparse._SubParsersAction) -> None:
     pql_test_p = subs.add_parser(
         "pql-test",
         aliases=["pql_test"],
@@ -1544,7 +1500,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Environment label (e.g. DEV, PROD, ANY) [env: FABRIC_ENVIRONMENT]",
     )
 
-    # --- pql-lint ---
+def _add_pql_lint_subparser(subs: argparse._SubParsersAction) -> None:
     pql_lint_p = subs.add_parser(
         "pql-lint",
         aliases=["pql_lint"],
@@ -1556,7 +1512,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _add_common_flags(pql_lint_p)
 
-    # --- playwright ---
+
+def _add_playwright_subparser(subs: argparse._SubParsersAction) -> None:
     playwright_p = subs.add_parser(
         "playwright",
         help="Playwright visual/error validation (Report artifacts)",
@@ -1620,7 +1577,7 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
 
-    # --- playwright-impact ---
+def _add_playwright_impact_subparser(subs: argparse._SubParsersAction) -> None:
     impact_p = subs.add_parser(
         "playwright-impact",
         aliases=["playwright_impact"],
@@ -1664,7 +1621,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Environment label (e.g. DEV, PROD, ANY) [env: FABRIC_ENVIRONMENT]",
     )
 
-    # --- dependencies ---
+def _add_dependencies_subparser(subs: argparse._SubParsersAction) -> None:
     deps_p = subs.add_parser(
         "dependencies",
         help="Discover reports that depend on a deployed semantic model",
@@ -1707,7 +1664,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Environment label (e.g. DEV, PROD, ANY) [env: FABRIC_ENVIRONMENT]",
     )
 
-    # --- all ---
+def _add_all_subparser(subs: argparse._SubParsersAction) -> None:
     all_p = subs.add_parser("all", help="Run all analyzers in sequence")
     _add_common_flags(all_p)
     all_p.add_argument(
@@ -1755,7 +1712,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Path to .env file for Playwright validation",
     )
 
-    # --- auth ---
+def _add_auth_subparser(subs: argparse._SubParsersAction) -> None:
     auth_p = subs.add_parser(
         "auth",
         help="Report or acquire Fabric credentials (fab-test stores none of its own)",
@@ -1808,7 +1765,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Output format (default: text)",
     )
 
-    # --- local ---
+def _add_local_subparser(subs: argparse._SubParsersAction) -> None:
     local_p = subs.add_parser(
         "local",
         help=(
@@ -1834,7 +1791,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--rules-path", default=_DEFAULT_PBIR_RULES, dest="rules_path", metavar="PATH",
     )
 
-    # --- clean-tools ---
+def _add_clean_tools_subparser(subs: argparse._SubParsersAction) -> None:
     clean_tools_p = subs.add_parser(
         "clean-tools",
         help="Remove or inspect the .fab-test-tools downloaded-binary cache",
@@ -1845,7 +1802,8 @@ def build_parser() -> argparse.ArgumentParser:
         help="List what would be removed without deleting anything",
     )
 
-    # --- doctor ---
+
+def _add_doctor_subparser(subs: argparse._SubParsersAction) -> None:
     doctor_p = subs.add_parser(
         "doctor",
         help="Check whether each analyzer's prerequisites are ready to run",
@@ -1870,7 +1828,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Check prerequisites for the local Desktop workflow (fab-test local)",
     )
 
-    # --- config ---
+def _add_config_subparser(subs: argparse._SubParsersAction) -> None:
     config_p = subs.add_parser(
         "config",
         help="Show effective configuration and where each setting came from",
@@ -1893,7 +1851,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Output format for the settings report (default: text)",
     )
 
-    # --- init ---
+def _add_init_subparser(subs: argparse._SubParsersAction) -> None:
     init_p = subs.add_parser(
         "init",
         help="Scaffold a commented fab-test.yml and .env.example",
@@ -1911,7 +1869,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Report what would be created without writing anything",
     )
 
-    # --- list ---
+def _add_list_subparser(subs: argparse._SubParsersAction) -> None:
     list_p = subs.add_parser(
         "list",
         help="List available analyzers with their artifact glob, matched count, and required tool",
@@ -1930,7 +1888,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Output format for the capability report (default: text)",
     )
 
-    # --- explain ---
+def _add_explain_subparser(subs: argparse._SubParsersAction) -> None:
     explain_p = subs.add_parser(
         "explain",
         help="Show the resolved command for one analyzer without running it",
@@ -1973,7 +1931,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Output format for the explanation (default: text)",
     )
 
-    # --- help ---
+def _add_help_subparser(subs: argparse._SubParsersAction) -> None:
     help_p = subs.add_parser(
         "help",
         help="Show this help, or one analyzer's help (fab-test help bpa)",
@@ -1985,6 +1943,76 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="ANALYZER",
         help="Analyzer or command to show help for (e.g. bpa, doctor)",
     )
+
+
+# One function per subcommand group, in the order each appears in --help.
+_SUBPARSER_BUILDERS = (
+    _add_bpa_subparser,
+    _add_pbir_subparser,
+    _add_pql_test_subparser,
+    _add_pql_lint_subparser,
+    _add_playwright_subparser,
+    _add_playwright_impact_subparser,
+    _add_dependencies_subparser,
+    _add_all_subparser,
+    _add_auth_subparser,
+    _add_local_subparser,
+    _add_clean_tools_subparser,
+    _add_doctor_subparser,
+    _add_config_subparser,
+    _add_init_subparser,
+    _add_list_subparser,
+    _add_explain_subparser,
+    _add_help_subparser,
+)
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = _FabTestParser(
+        prog="fab-test",
+        description=(
+            "Run Fabric artifact analyzers locally.\n\n"
+            "fab-test tests your .fabric artifacts — it is NOT pytest.\n"
+            "  pytest -m bpa      tests the BPA wrapper (always green)\n"
+            "  fab-test bpa       runs BPA against your actual .fabric artifacts"
+        ),
+        epilog=(
+            "Exit codes:\n"
+            "  0    All artifacts passed (warnings do not fail the build)\n"
+            "  1    An analyzer found error-level findings, or the analyzer process crashed\n"
+            "  2    Invalid CLI arguments (no analyzer was invoked)\n"
+            "  126  Analyzer unsupported on this platform (see message for the supported OS)\n"
+            "  127  Required external tool could not be resolved (see message for the fix)\n\n"
+            f"Version: {_FAB_TEST_VERSION} | "
+            "Docs: https://github.com/kerski/fab-test/blob/main/docs/QUICK-VALIDATION.md"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument(
+        "--version",
+        "-V",
+        action="version",
+        version=f"%(prog)s {_FAB_TEST_VERSION}",
+        help="Show fab-test version and exit",
+    )
+    parser.add_argument(
+        "--print-completion",
+        choices=["bash", "zsh"],
+        action=_PrintCompletionAction,
+        help="Print a shell completion script for bash or zsh and exit",
+    )
+    parser.add_argument(
+        "--config",
+        default=None,
+        metavar="PATH",
+        help=f"Path to a config file (default: discover {CONFIG_FILENAME} at the repository root)",
+    )
+
+    subs = parser.add_subparsers(dest="analyzer", metavar="ANALYZER")
+    subs.required = True
+
+    for add_subparser in _SUBPARSER_BUILDERS:
+        add_subparser(subs)
 
     # Read back from the subparser table rather than maintained by hand, so
     # a new subcommand cannot be added without the error message learning

@@ -42,6 +42,20 @@ class EmbedContext:
     dataset_id: str
 
 
+@dataclass(frozen=True)
+class ReportIdentity:
+    """Which workspace, report, and dataset an embed token is scoped to.
+
+    Grouped because every caller of ``generate_embed_token`` passes all
+    three together -- there is no call that supplies one without the
+    other two.
+    """
+
+    workspace_id: str
+    report_id: str
+    dataset_id: str
+
+
 class PowerBiApiError(Exception):
     """Raised when a Power BI REST API call fails."""
 
@@ -130,9 +144,7 @@ def get_report_embed_url(
 
 def generate_embed_token(
     access_token: str,
-    workspace_id: str,
-    report_id: str,
-    dataset_id: str,
+    identity: ReportIdentity,
     *,
     use_rls: bool = False,
     user_name: str = "",
@@ -145,9 +157,9 @@ def generate_embed_token(
     url = f"{api_root}/v1.0/myorg/GenerateToken"
 
     payload: dict[str, Any] = {
-        "reports": [{"id": report_id}],
-        "datasets": [{"id": dataset_id}],
-        "targetWorkspaces": [{"id": workspace_id}],
+        "reports": [{"id": identity.report_id}],
+        "datasets": [{"id": identity.dataset_id}],
+        "targetWorkspaces": [{"id": identity.workspace_id}],
         "accessLevel": "View",
     }
 
@@ -156,7 +168,7 @@ def generate_embed_token(
             {
                 "username": user_name,
                 "roles": [role],
-                "datasets": [dataset_id],
+                "datasets": [identity.dataset_id],
             }
         ]
 
@@ -197,9 +209,7 @@ def get_embed_context(config: PlaywrightValidationConfig) -> EmbedContext:
     )
     embed_token = generate_embed_token(
         access_token,
-        config.workspace_id,
-        config.report_id,
-        config.dataset_id,
+        ReportIdentity(config.workspace_id, config.report_id, config.dataset_id),
         use_rls=config.use_rls,
         user_name=config.user_name,
         role=config.role,

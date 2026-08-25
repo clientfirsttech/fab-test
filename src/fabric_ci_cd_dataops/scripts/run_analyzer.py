@@ -42,6 +42,32 @@ _ANALYZER_RULES_FILE: dict[str, Path] = {
 }
 
 
+def _log_outcome(
+    success: bool,
+    analyzer_name: str,
+    artifact_name: str,
+    proc: subprocess.CompletedProcess,
+    terse: bool,
+) -> None:
+    """Print/terse-log whether the analyzer passed or failed."""
+    if success:
+        terse_print(terse, "OK", f"analyzer.{analyzer_name}", f"{artifact_name} passed")
+        if not terse:
+            print(f"✅ {analyzer_name}: PASSED")
+            if proc.stdout:
+                print(f"Output:\n{proc.stdout}")
+        return
+
+    terse_print(
+        terse, "FAIL", f"analyzer.{analyzer_name}",
+        f"{artifact_name} failed (exit {proc.returncode})",
+    )
+    if not terse:
+        print(f"❌ {analyzer_name}: FAILED (exit code {proc.returncode})")
+        if proc.stderr:
+            print(f"Error output:\n{proc.stderr}")
+
+
 class AnalyzerRunner:
     """Execute analyzers based on metadata configuration."""
 
@@ -192,21 +218,7 @@ class AnalyzerRunner:
                 'stderr': proc.stderr
             })
 
-            if success:
-                terse_print(terse, "OK", f"analyzer.{analyzer_name}", f"{artifact_name} passed")
-                if not terse:
-                    print(f"✅ {analyzer_name}: PASSED")
-                    if proc.stdout:
-                        print(f"Output:\n{proc.stdout}")
-            else:
-                terse_print(
-                    terse, "FAIL", f"analyzer.{analyzer_name}",
-                    f"{artifact_name} failed (exit {proc.returncode})",
-                )
-                if not terse:
-                    print(f"❌ {analyzer_name}: FAILED (exit code {proc.returncode})")
-                    if proc.stderr:
-                        print(f"Error output:\n{proc.stderr}")
+            _log_outcome(success, analyzer_name, artifact_name, proc, terse)
 
         except subprocess.TimeoutExpired:
             result.update({
