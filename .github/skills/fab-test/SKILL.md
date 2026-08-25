@@ -26,8 +26,6 @@ Discovery matches on folder suffix (`*.SemanticModel`, `*.Report`), never on con
 | `fab-test pbir` | Do my reports pass PBIR Inspector rules? (requires PBIR Inspector binary) |
 | `pytest -m pql_test` | Is the pql-test wrapper code correct? (mocked, always green) |
 | `fab-test pql-test` | Do my semantic model DAX tests pass? (requires Power BI Desktop open) |
-| `pytest -m pql_lint` | Is the pqlint wrapper code correct? (always green, no tools needed) |
-| `fab-test pql-lint` | Do my semantic models pass Power Query lint rules? |
 | `pytest -m playwright` | Is the Playwright wrapper code correct? (mocked contract tests) |
 | `fab-test playwright` | Do my Power BI reports render without visual-load errors? (requires service-principal credentials) |
 
@@ -181,11 +179,7 @@ Per-artifact `status` is one of `passed` / `failed` / `skipped` / `timeout` / `p
  fab-test clean-tools      — Remove or inspect the .fab-test-tools downloaded-binary cache
 ```
 
-### Hidden subcommands
-
-`pql-lint` is **hidden from the advertised surface**: it is absent from `--help`, `fab-test list`, and the default `doctor` report. It remains fully invocable — `fab-test pql-lint`, its `pql_lint` alias, `fab-test pql-lint --help`, `fab-test explain pql_lint`, and `fab-test doctor --analyzer pql_lint` all work exactly as before. `fab-test local` no longer includes it, though: a bundle should not run what the CLI does not offer. Hiding is a visibility state, never a removal: the backward-compatibility constraint in [vision.md](../../../vision.md) means existing commands keep working.
-
-Underscore spellings (`pql_test`, `pql_lint`, `playwright_impact`) still work silently as aliases —
+Underscore spellings (`pql_test`, `playwright_impact`) still work silently as aliases —
 existing scripts and muscle memory keep working. Result directories under `fab-test-results/`
 use the original underscore names regardless of which spelling you invoke.
 
@@ -210,7 +204,7 @@ Run `fab-test list` for this table at any time — it has a Scopes column.
 
 | Analyzer | path / name | `local/` | `WORKSPACE.Workspace/` |
 |----------|-------------|----------|------------------------|
-| `bpa`, `pbir`, `pql-lint` | yes | yes | **no** |
+| `bpa`, `pbir` | yes | yes | **no** |
 | `pql-test` | yes | yes | yes |
 | `playwright`, `playwright-impact`, `dependencies` | yes | **no** | yes |
 
@@ -362,7 +356,6 @@ fab-test all --report --no-report   # invalid: mutually exclusive, exits 2
 | `pbir` | Upstream `native.json/TestRun.html` | PBIR Inspector produces its own, richer than anything rendered from the envelope. **Appears with or without `--report`.** |
 | `bpa` | Generated `report.html` | Tabular Editor emits TRX (Visual Studio TeamTest XML); there is no HTML to wrap. |
 | `pql-test` | Generated `report.html` | `pql-test` emits JSON and CI log annotations only. |
-| `pql-lint` | None | Currently hidden from the advertised surface, so a report would have no reader. |
 
 The generated report never overwrites an upstream one: `attach_report` is a no-op when the envelope already carries `native_html_output_path`. PBIR's own `TestRun.html` also has two upstream asset paths repaired in place, both by inlining as base64 data URIs rather than leaving a relative path for the browser to resolve: the favicon (`fix_favicon_link`) -- FabInspCLI ships it relative to the tool's *install* directory, which 404s once the report lands under `fab-test-results/` -- and each per-object screenshot (`fix_screenshot_images`) -- the template builds that `src` as `PBIInspectorPNG\<Id>.png`, a Windows-style relative path with the same problem. An object whose screenshot file genuinely isn't in that folder is left as it was; only the images that exist but couldn't resolve get fixed.
 
@@ -682,10 +675,6 @@ For local runs, `pql-test` connects to a locally-open Power BI Desktop instance 
 
 `desktop` is absent from the envelope when nothing is bound (no Desktop instance running, or more than one running — `fab-test` never guesses which one). Passing `--workspace-id` skips this Desktop-matching step entirely and uses the remote XMLA path instead.
 
-### pql-lint
-
-No additional flags beyond the global ones.
-
 ### playwright
 
 Playwright validation can run in three modes: static `.env` mode, service-resolved mode, or impact-manifest mode.
@@ -852,9 +841,9 @@ Current default list:
 }
 ```
 
-`pql-lint` and `playwright` are excluded from `fab-test all` by default but remain available as direct subcommands.
+`playwright` is excluded from `fab-test all` by default but remains available as a direct subcommand.
 
-Accepts the union of flags from `bpa`, `pbir`, `pql-test`, and `pql-lint`, plus `--playwright-env-file` for Playwright support.
+Accepts the union of flags from `bpa`, `pbir`, and `pql-test`, plus `--playwright-env-file` for Playwright support.
 
 ```bash
 fab-test all \
@@ -908,9 +897,6 @@ fab-test-results/
       envelope.json
       native.json     ← full pql-test JSON (model_path, passed, failed, results[])
       report.html     ← generated, only with --report
-  pql_lint/
-    <artifact-stem>/
-      envelope.json
   playwright/
     <artifact-stem-or-report-name>/
       envelope.json
