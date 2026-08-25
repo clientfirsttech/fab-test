@@ -10,7 +10,7 @@ import pytest
 pytestmark = [pytest.mark.pql_test, pytest.mark.analyzers]
 
 
-from fabric_ci_cd_dataops.scripts._analyzer_envelope import ENVELOPE_REQUIRED_KEYS
+from fabric_ci_cd_dataops.scripts._analyzer_envelope import ENVELOPE_REQUIRED_KEYS, WrapperResult
 from fabric_ci_cd_dataops.scripts.invoke_pql_test import (
     _parse_native_output,
     build_command,
@@ -215,12 +215,14 @@ class TestWriteResults:
         artifact_path = tmp_path / "SalesModel.SemanticModel"
         artifact_path.mkdir()
         write_results(
-            output_path=output_path,
-            status="passed",
-            findings=[],
-            test_results=[{"name": "TestOne", "passed": True}],
-            artifact_path=artifact_path,
-            message="OK",
+            WrapperResult(
+                output_path,
+                "passed",
+                [],
+                artifact_path,
+                message="OK",
+                test_results=[{"name": "TestOne", "passed": True}],
+            ),
         )
 
         data = json.loads(output_path.read_text(encoding="utf-8"))
@@ -233,13 +235,7 @@ class TestWriteResults:
     def test_envelope_shape(self, tmp_path: Path):
         """Envelope contains every required key from the shared schema."""
         output_path = tmp_path / "envelope.json"
-        write_results(
-            output_path=output_path,
-            status="passed",
-            findings=[],
-            artifact_path=tmp_path / "model",
-            message="OK",
-        )
+        write_results(WrapperResult(output_path, "passed", [], tmp_path / "model", message="OK"))
         data = json.loads(output_path.read_text(encoding="utf-8"))
         missing = ENVELOPE_REQUIRED_KEYS - data.keys()
         assert not missing, f"Envelope missing keys: {missing}"
@@ -248,12 +244,14 @@ class TestWriteResults:
         """Given a test_summary, envelope should include it."""
         output_path = tmp_path / "envelope.json"
         write_results(
-            output_path=output_path,
-            status="failed",
-            findings=[],
-            artifact_path=tmp_path / "model",
-            message="fail",
-            test_summary={"total": 10, "passed": 8, "failed": 1, "skipped": 1},
+            WrapperResult(
+                output_path,
+                "failed",
+                [],
+                tmp_path / "model",
+                message="fail",
+                test_summary={"total": 10, "passed": 8, "failed": 1, "skipped": 1},
+            ),
         )
         data = json.loads(output_path.read_text(encoding="utf-8"))
         assert data["test_summary"] == {
@@ -267,11 +265,7 @@ class TestWriteResults:
         """A bound Desktop instance's port and model name land in the envelope."""
         output_path = tmp_path / "envelope.json"
         write_results(
-            output_path=output_path,
-            status="passed",
-            findings=[],
-            artifact_path=tmp_path / "model",
-            message="OK",
+            WrapperResult(output_path, "passed", [], tmp_path / "model", message="OK"),
             desktop_port=51234,
             desktop_model_name="SampleModel",
         )
@@ -281,13 +275,7 @@ class TestWriteResults:
     def test_envelope_omits_desktop_key_when_not_bound(self, tmp_path: Path):
         """No Desktop binding means no 'desktop' key at all -- not a null placeholder."""
         output_path = tmp_path / "envelope.json"
-        write_results(
-            output_path=output_path,
-            status="passed",
-            findings=[],
-            artifact_path=tmp_path / "model",
-            message="OK",
-        )
+        write_results(WrapperResult(output_path, "passed", [], tmp_path / "model", message="OK"))
         data = json.loads(output_path.read_text(encoding="utf-8"))
         assert "desktop" not in data
 

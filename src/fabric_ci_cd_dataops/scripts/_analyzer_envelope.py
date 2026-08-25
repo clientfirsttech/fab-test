@@ -18,6 +18,7 @@ promotion gates) can assert the schema they expect via ``ENVELOPE_SCHEMA_VERSION
 
 import json
 import time
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -183,32 +184,27 @@ def normalize_test_results(test_results: list[dict]) -> tuple[str, list[tuple]]:
     return "rules", rows
 
 
+_SEVERITY_TEXT_RANK: dict[str, int] = {
+    **dict.fromkeys(("error", "errors", "critical", "fatal", "failure", "failed"), 3),
+    **dict.fromkeys(("warning", "warnings", "warn"), 2),
+    **dict.fromkeys(("information", "info", "notice", "note"), 1),
+}
+
+
 def severity_rank(severity: Any) -> int:
     """Return a numeric severity rank for sorting (higher = more severe).
 
     Supports numeric values (int/float/strings like "3") and common text
     labels such as Error, Warning, and Information.
     """
-    if severity is None:
-        return 0
-    if isinstance(severity, bool):
+    if severity is None or isinstance(severity, bool):
         return 0
     if isinstance(severity, (int, float)):
         return int(severity)
     text = str(severity).strip().lower()
-    if not text:
-        return 0
-    try:
+    if text.lstrip("-").isdigit():
         return int(text)
-    except ValueError:
-        pass
-    if text in {"error", "errors", "critical", "fatal", "failure", "failed"}:
-        return 3
-    if text in {"warning", "warnings", "warn"}:
-        return 2
-    if text in {"information", "info", "notice", "note"}:
-        return 1
-    return 0
+    return _SEVERITY_TEXT_RANK.get(text, 0)
 
 
 def _is_error_severity(severity: Any) -> bool:
@@ -266,10 +262,21 @@ def envelope_path(analyzer: str, artifact_stem: str) -> Path:
     return results_dir(analyzer, artifact_stem) / "envelope.json"
 
 
+@dataclass(frozen=True)
+class EnvelopeIdentity:
+    """Which analyzer produced an envelope, and for which artifact.
+
+    Every ``build_envelope`` call passes these two together; grouping them
+    is what kept the function under the argument budget.
+    """
+
+    analyzer: str
+    artifact_path: str
+
+
 def build_envelope(
+    identity: EnvelopeIdentity,
     *,
-    analyzer: str,
-    artifact_path: str,
     status: str,
     message: str = "",
     findings: list[dict[str, Any]] | None = None,
@@ -288,8 +295,8 @@ def build_envelope(
         "schema_version": ENVELOPE_SCHEMA_VERSION,
         "status": status,
         "message": message,
-        "analyzer": analyzer,
-        "artifact_path": artifact_path,
+        "analyzer": identity.analyzer,
+        "artifact_path": identity.artifact_path,
         "findings": findings if findings is not None else [],
         "native_output_path": native_output_path_str,
         "duration_ms": duration_ms,
@@ -299,6 +306,29 @@ def build_envelope(
     if started_at:
         envelope["started_at"] = started_at
     return envelope
+
+
+@dataclass(frozen=True)
+class WrapperResult:
+    """Fields ``write_results`` needs from every analyzer wrapper.
+
+    Each of the three wrappers grew its own ``write_results`` past the
+    argument budget one flag at a time; this is the part they shared.
+    An analyzer-specific extra (``rules_path``, desktop identity) stays a
+    parameter of that wrapper's own ``write_results`` rather than living
+    here.
+    """
+
+    output_path: Path
+    status: str
+    findings: list[dict[str, Any]]
+    artifact_path: Path
+    message: str = ""
+    native_out: "Path | None" = None
+    duration_ms: int = 0
+    started_at: str = ""
+    test_summary: "dict[str, int] | None" = None
+    test_results: "list[dict[str, Any]] | None" = None
 
 
 def write_envelope(path: Path, envelope: dict[str, Any]) -> None:

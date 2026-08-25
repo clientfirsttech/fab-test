@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from ._analyzer_envelope import (
+    EnvelopeIdentity,
     Timer,
     build_envelope,
     envelope_path,
@@ -92,8 +93,7 @@ def write_results(
 ) -> None:
     """Write standardized pqlint envelope JSON."""
     env = build_envelope(
-        analyzer="pqlint",
-        artifact_path=str(artifact_path),
+        EnvelopeIdentity("pqlint", str(artifact_path)),
         status=status,
         message=message,
         findings=findings,

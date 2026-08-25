@@ -17,7 +17,9 @@ from pathlib import Path
 from typing import Any
 
 from ._analyzer_envelope import (
+    EnvelopeIdentity,
     Timer,
+    WrapperResult,
     build_envelope,
     envelope_path,
     native_output_path,
@@ -155,39 +157,29 @@ def parse_findings(raw_text: str) -> list[dict[str, Any]]:
 
 
 def write_results(
-    output_path: Path,
-    status: str,
-    findings: list[dict[str, Any]],
-    artifact_path: Path,
-    test_results: "list[dict[str, Any]] | None" = None,
-    message: str = "",
-    native_out: "Path | None" = None,
-    duration_ms: int = 0,
-    started_at: str = "",
-    test_summary: "dict[str, int] | None" = None,
+    result: WrapperResult,
     desktop_port: "int | None" = None,
     desktop_model_name: str = "",
 ) -> None:
     """Write standardized pql-test envelope JSON."""
     env = build_envelope(
-        analyzer="pql_test",
-        artifact_path=str(artifact_path),
-        status=status,
-        message=message,
-        findings=findings,
-        native_output_path_str=str(native_out) if native_out else "",
-        started_at=started_at,
-        duration_ms=duration_ms,
+        EnvelopeIdentity("pql_test", str(result.artifact_path)),
+        status=result.status,
+        message=result.message,
+        findings=result.findings,
+        native_output_path_str=str(result.native_out) if result.native_out else "",
+        started_at=result.started_at,
+        duration_ms=result.duration_ms,
     )
-    env["test_results"] = test_results or []
-    if test_summary is not None:
-        env["test_summary"] = test_summary
+    env["test_results"] = result.test_results or []
+    if result.test_summary is not None:
+        env["test_summary"] = result.test_summary
     if desktop_port is not None:
         env["desktop"] = {"port": desktop_port, "model_name": desktop_model_name}
     # pql-test emits JSON only, so the readable report is rendered from the
     # envelope. No-op unless --report was passed.
-    attach_report(env, output_path)
-    write_envelope(output_path, env)
+    attach_report(env, result.output_path)
+    write_envelope(result.output_path, env)
 
 
 def _resolve_pql_command(command: list[str]) -> list[str]:
@@ -351,9 +343,9 @@ def run_pql_test(args: argparse.Namespace) -> int:
         )
     if outcome.failed:
         write_results(
-            output_path, outcome.status, [], artifact_path,
-            message=outcome.message, native_out=nat_out,
-            desktop_port=desktop_port, desktop_model_name=desktop_model_name,
+            WrapperResult(output_path, outcome.status, [], artifact_path, message=outcome.message, native_out=nat_out),
+            desktop_port=desktop_port,
+            desktop_model_name=desktop_model_name,
         )
         print(f"::error::{outcome.message}", file=sys.stderr)
         return 1
@@ -382,16 +374,18 @@ def run_pql_test(args: argparse.Namespace) -> int:
     # and exit code. `findings if status == "failed" else []` covers both --
     # a passed or skipped run has nothing to report as a finding.
     write_results(
-        output_path,
-        status,
-        findings if status == "failed" else [],
-        artifact_path,
-        test_results=test_results,
-        test_summary=test_summary,
-        message=message,
-        native_out=nat_out,
-        duration_ms=timer.elapsed_ms,
-        started_at=timer.started_at,
+        WrapperResult(
+            output_path,
+            status,
+            findings if status == "failed" else [],
+            artifact_path,
+            message=message,
+            native_out=nat_out,
+            duration_ms=timer.elapsed_ms,
+            started_at=timer.started_at,
+            test_summary=test_summary,
+            test_results=test_results,
+        ),
         desktop_port=desktop_port,
         desktop_model_name=desktop_model_name,
     )

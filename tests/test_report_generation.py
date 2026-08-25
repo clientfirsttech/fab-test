@@ -20,7 +20,7 @@ import sys
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts._analyzer_envelope import build_envelope
+from fabric_ci_cd_dataops.scripts._analyzer_envelope import EnvelopeIdentity, build_envelope
 from fabric_ci_cd_dataops.scripts._report_html import attach_report, report_enabled
 
 _FINDING = {"rule": "R1", "severity": "warning", "object": "o", "message": "m"}
@@ -34,7 +34,8 @@ def _envelope(**overrides):
         "findings": [_FINDING],
     }
     base.update(overrides)
-    return build_envelope(**base)
+    identity = EnvelopeIdentity(base.pop("analyzer"), base.pop("artifact_path"))
+    return build_envelope(identity, **base)
 
 
 def _run_cli(*argv, env=None):

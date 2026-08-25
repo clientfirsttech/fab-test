@@ -27,7 +27,9 @@ from typing import Any
 from tabulate import tabulate
 
 from ._analyzer_envelope import (
+    EnvelopeIdentity,
     Timer,
+    WrapperResult,
     build_envelope,
     envelope_path,
     native_output_path,
@@ -214,26 +216,18 @@ def fix_screenshot_images(report_path: Path) -> None:
 
 
 def write_results(
-    output_path: Path,
-    status: str,
-    findings: list[dict[str, Any]],
-    artifact_path: Path,
+    result: WrapperResult,
     rules_path: Path,
-    message: str = "",
-    native_out: "Path | None" = None,
     native_html_out: "Path | None" = None,
-    duration_ms: int = 0,
-    test_results: list[dict[str, Any]] | None = None,
 ) -> None:
     """Write standardized PBIR Inspector envelope JSON."""
     env = build_envelope(
-        analyzer="pbir_inspector",
-        artifact_path=str(artifact_path),
-        status=status,
-        message=message,
-        findings=findings,
-        native_output_path_str=str(native_out) if native_out else "",
-        duration_ms=duration_ms,
+        EnvelopeIdentity("pbir_inspector", str(result.artifact_path)),
+        status=result.status,
+        message=result.message,
+        findings=result.findings,
+        native_output_path_str=str(result.native_out) if result.native_out else "",
+        duration_ms=result.duration_ms,
     )
     env["rules_file"] = str(rules_path)
     if native_html_out is not None:
@@ -241,8 +235,8 @@ def write_results(
     # Additive: every rule PBIR Inspector evaluated, passed or failed --
     # `findings` stays violations-only for callers already reading that
     # meaning. Mirrors BPA's `test_results` (HTML Report Format epic).
-    env["test_results"] = test_results or []
-    write_envelope(output_path, env)
+    env["test_results"] = result.test_results or []
+    write_envelope(result.output_path, env)
 
 
 def parse_findings(raw_text: str) -> list[dict[str, Any]]:
@@ -500,39 +494,24 @@ def run_inspector(args: argparse.Namespace) -> int:
                 f"PBIR Inspector timed out after {INSPECTOR_TIMEOUT_SECONDS} seconds"
             )
             write_results(
-                output_path,
-                "timeout",
-                [],
-                artifact_path,
+                WrapperResult(output_path, "timeout", [], artifact_path, message=message, native_out=native_out),
                 rules_path,
-                message=message,
-                native_out=native_out,
             )
             print(f"::error::{message}", file=sys.stderr)
             return 1
         except FileNotFoundError:
             message = f"PBIR Inspector binary not found: {inspector_path}"
             write_results(
-                output_path,
-                "error",
-                [],
-                artifact_path,
+                WrapperResult(output_path, "error", [], artifact_path, message=message, native_out=native_out),
                 rules_path,
-                message=message,
-                native_out=native_out,
             )
             print(f"::error::{message}", file=sys.stderr)
             return 1
         except Exception as exc:  # noqa: BLE001 - catch-all for wrapper safety
             message = f"Unexpected error running PBIR Inspector: {exc}"
             write_results(
-                output_path,
-                "error",
-                [],
-                artifact_path,
+                WrapperResult(output_path, "error", [], artifact_path, message=message, native_out=native_out),
                 rules_path,
-                message=message,
-                native_out=native_out,
             )
             print(f"::error::{message}", file=sys.stderr)
             return 1
@@ -587,16 +566,18 @@ def run_inspector(args: argparse.Namespace) -> int:
     if not findings:
         message = "PBIR Inspector passed with no findings"
         write_results(
-            output_path=output_path,
-            status="passed",
-            findings=[],
-            artifact_path=artifact_path,
-            rules_path=rules_path,
-            message=message,
-            native_out=native_out,
+            WrapperResult(
+                output_path,
+                "passed",
+                [],
+                artifact_path,
+                message=message,
+                native_out=native_out,
+                duration_ms=timer.elapsed_ms,
+                test_results=test_results,
+            ),
+            rules_path,
             native_html_out=native_html_out,
-            duration_ms=timer.elapsed_ms,
-            test_results=test_results,
         )
         if level >= _VERBOSITY_LEVELS["default"]:
             log(f"✅ {message}")
@@ -613,16 +594,18 @@ def run_inspector(args: argparse.Namespace) -> int:
     )
     status = "failed" if has_errors else "warning"
     write_results(
-        output_path=output_path,
-        status=status,
-        findings=findings,
-        artifact_path=artifact_path,
-        rules_path=rules_path,
-        message=message,
-        native_out=native_out,
+        WrapperResult(
+            output_path,
+            status,
+            findings,
+            artifact_path,
+            message=message,
+            native_out=native_out,
+            duration_ms=timer.elapsed_ms,
+            test_results=test_results,
+        ),
+        rules_path,
         native_html_out=native_html_out,
-        duration_ms=timer.elapsed_ms,
-        test_results=test_results,
     )
 
     if level >= _VERBOSITY_LEVELS["default"]:
