@@ -1,6 +1,6 @@
 # Complexity Cleanup Epic
 
-**Status**: 📋 PLANNED
+**Status**: ✅ COMPLETED (2026-08-25)
 **Goal**: Shrink the complexity ratchet in `tests/test_complexity_budget.py` below its current ceiling of 29, the way Complexity and Coverage (45 → 31) and Review Cleanup (31 → 29) already did twice.
 
 ## Overview
@@ -100,6 +100,35 @@ Over both PLR0912 and PLR0915, but `pql-lint` is currently hidden from
 **Requirements**:
 - Given the feature's own visibility is unsettled, should confirm pql-lint's status (stays hidden, gets restored, or gets removed) before investing in its internal structure
 - Given it is refactored, should follow the same split-by-concern approach as the other wrappers rather than a bespoke pattern
+
+---
+
+## What changed
+
+All ten tasks landed. `run_pqlint`'s status was confirmed with the user before
+touching it: `pql-lint` stays hidden from `--help`/`list`/`doctor` but keeps
+running when invoked directly, so its internals were still worth cleaning up
+rather than left to rot behind the hidden flag.
+
+Report went from 29 findings to 6 — every one addressed except the six in
+`deploy.py`/`check_promotion_safety.py`, confirmed still out of scope pending
+the dead-code audit in plan.md's "Audit what the pipeline deletion stranded"
+task. `COMPLEXITY_CEILING` in `tests/test_complexity_budget.py` now reads 6.
+
+Shape of the fix, repeated across every task: pull the interleaved concerns
+(subprocess call, output parsing, envelope writing, argument bundles) into
+named single-purpose functions, verify byte-identical behavior (error
+messages, `--help` output, envelope schema), then move on. Two module-budget
+exemptions moved as a direct, expected consequence: `fab_test.py`'s line count
+grew from 2875 to 2956 lines across the `_run_one_artifact` and `build_parser`
+splits — more named functions and docstrings, each one far simpler than the
+function it replaced.
+
+**1413 passed** throughout, coverage held. `_run_one_artifact`'s split was
+verified through the installed console script (`fab-test bpa` in both text
+and `--format json` mode against a real downloaded Tabular Editor), and
+`build_parser`'s split was verified with a byte-for-byte `--help` diff, both
+top-level and per-subcommand, before and after.
 
 ---
 
