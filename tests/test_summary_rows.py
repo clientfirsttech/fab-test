@@ -18,7 +18,7 @@ import json
 import pytest
 
 from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
-from fabric_ci_cd_dataops.scripts._analyzer_envelope import build_envelope
+from fabric_ci_cd_dataops.scripts._analyzer_envelope import EnvelopeIdentity, build_envelope
 from fabric_ci_cd_dataops.scripts.fab_test_summary import (
     _artifact_status,
     build_all_summary_rows,
@@ -81,8 +81,7 @@ def _write_envelope(output_dir, analyzer, stem, findings=()):
     (path / "envelope.json").write_text(
         json.dumps(
             build_envelope(
-                analyzer=analyzer,
-                artifact_path=stem,
+                EnvelopeIdentity(analyzer, stem),
                 status="passed",
                 findings=list(findings),
             )
@@ -145,8 +144,7 @@ def test_rows_carry_the_report_path_when_the_envelope_has_one(tmp_path):
     (path / "envelope.json").write_text(
         json.dumps(
             build_envelope(
-                analyzer="pbir",
-                artifact_path="Sales",
+                EnvelopeIdentity("pbir", "Sales"),
                 status="passed",
                 native_html_output_path_str="results/pbir/Sales/TestRun.html",
             )

@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Any
 
 from ._analyzer_envelope import (
+    EnvelopeIdentity,
     Timer,
     build_envelope,
     envelope_path,
@@ -478,8 +479,7 @@ def _write_embed_error_envelope(
         else []
     )
     env = build_envelope(
-        analyzer="playwright",
-        artifact_path=str(report_name),
+        EnvelopeIdentity("playwright", str(report_name)),
         status="error",
         message=message,
         findings=findings,
@@ -597,8 +597,7 @@ def _run_single_report(
     findings = _findings_from_test_results(test_results)
 
     env_out = build_envelope(
-        analyzer="playwright",
-        artifact_path=str(report_name),
+        EnvelopeIdentity("playwright", str(report_name)),
         status="passed" if success else "failed",
         message=message,
         findings=findings,

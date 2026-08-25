@@ -143,15 +143,13 @@ def _summary_args(artifact_dir, output_dir, output_format="text"):
 
 
 def _envelope_with(output_dir, analyzer, stem, findings):
-    from fabric_ci_cd_dataops.scripts._analyzer_envelope import build_envelope
+    from fabric_ci_cd_dataops.scripts._analyzer_envelope import EnvelopeIdentity, build_envelope
 
     path = output_dir / analyzer / stem
     path.mkdir(parents=True, exist_ok=True)
     (path / "envelope.json").write_text(
         json.dumps(
-            build_envelope(
-                analyzer=analyzer, artifact_path=stem, status="passed", findings=findings
-            )
+            build_envelope(EnvelopeIdentity(analyzer, stem), status="passed", findings=findings)
         ),
         encoding="utf-8",
     )

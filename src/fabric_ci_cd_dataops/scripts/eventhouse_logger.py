@@ -280,6 +280,27 @@ def load_payload(payload_path: Path, terse: bool = False) -> dict:
         sys.exit(1)
 
 
+# Table-specific fields required in addition to the common schema.
+_TABLE_REQUIRED_FIELDS: dict[str, tuple[str, ...]] = {
+    "fabric_static_analysis": ("results",),
+    "fabric_dynamic_analysis": ("results", "environment"),
+    "fabric_deployments": ("environment",),
+    "fabric_testbed_runs": ("results",),
+}
+
+
+def _missing_table_fields(payload: dict, table_name: str) -> list[str]:
+    """Return the table-specific required fields missing from ``payload``."""
+    return [field for field in _TABLE_REQUIRED_FIELDS.get(table_name, ()) if field not in payload]
+
+
+def _table_field_error(missing: list[str], table_name: str) -> str:
+    """Build the "'x' and 'y' field(s) required for TABLE" message."""
+    quoted = " and ".join(f"'{field}'" for field in missing)
+    noun = "field" if len(missing) == 1 else "fields"
+    return f"{quoted} {noun} required for {table_name}"
+
+
 def validate_payload_schema(payload: dict, table_name: str, terse: bool = False) -> bool:
     """
     Validate payload matches expected schema for target table.
@@ -315,34 +336,12 @@ def validate_payload_schema(payload: dict, table_name: str, terse: bool = False)
         return False
 
     # Table-specific validation
-    if table_name == "fabric_static_analysis":
-        if "results" not in payload:
-            terse_print(terse, "ERROR", "eventhouse_schema", "'results' field required for fabric_static_analysis")
-            if not terse:
-                print("Error: 'results' field required for fabric_static_analysis", file=sys.stderr)
-            return False
-
-    elif table_name == "fabric_dynamic_analysis":
-        if "results" not in payload or "environment" not in payload:
-            terse_print(
-                terse, "ERROR", "eventhouse_schema",
-                "'results' and 'environment' fields required for fabric_dynamic_analysis",
-            )
-            if not terse:
-                print("Error: 'results' and 'environment' fields required for fabric_dynamic_analysis", file=sys.stderr)
-            return False
-
-    elif table_name == "fabric_deployments":
-        if "environment" not in payload:
-            terse_print(terse, "ERROR", "eventhouse_schema", "'environment' field required for fabric_deployments")
-            if not terse:
-                print("Error: 'environment' field required for fabric_deployments", file=sys.stderr)
-            return False
-
-    elif table_name == "fabric_testbed_runs" and "results" not in payload:
-        terse_print(terse, "ERROR", "eventhouse_schema", "'results' field required for fabric_testbed_runs")
+    missing_table_fields = _missing_table_fields(payload, table_name)
+    if missing_table_fields:
+        message = _table_field_error(missing_table_fields, table_name)
+        terse_print(terse, "ERROR", "eventhouse_schema", message)
         if not terse:
-            print("Error: 'results' field required for fabric_testbed_runs", file=sys.stderr)
+            print(f"Error: {message}", file=sys.stderr)
         return False
 
     return True

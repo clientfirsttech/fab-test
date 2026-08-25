@@ -78,6 +78,49 @@ class ValidationError:
         return f"  ❌  [{self.path}] {self.message}"
 
 
+def _validate_env_block(prefix: str, env_block: Any) -> list[ValidationError]:
+    """Check one environment's required keys, branch list, booleans, and window."""
+    if not isinstance(env_block, dict):
+        return [ValidationError(prefix, "Must be a mapping")]
+
+    errors: list[ValidationError] = [
+        ValidationError(f"{prefix}.{key}", "Missing required key")
+        for key in REQUIRED_ENV_KEYS
+        if key not in env_block
+    ]
+
+    # allowed_branches must be a list
+    if "allowed_branches" in env_block:
+        if not isinstance(env_block["allowed_branches"], list):
+            errors.append(ValidationError(f"{prefix}.allowed_branches", "Must be a list"))
+        elif not env_block["allowed_branches"]:
+            errors.append(ValidationError(f"{prefix}.allowed_branches", "Must not be empty"))
+
+    # boolean fields
+    errors.extend(
+        ValidationError(f"{prefix}.{bool_key}", "Must be a boolean")
+        for bool_key in ("requires_validation", "requires_security_scan", "requires_ai_validation")
+        if bool_key in env_block and not isinstance(env_block[bool_key], bool)
+    )
+
+    # deployment_window — optional but validated when present
+    dw = env_block.get("deployment_window")
+    if dw is not None:
+        if not isinstance(dw, dict):
+            errors.append(ValidationError(f"{prefix}.deployment_window", "Must be a mapping"))
+        else:
+            errors.extend(
+                ValidationError(
+                    f"{prefix}.deployment_window.{dw_key}",
+                    "Missing required deployment_window key",
+                )
+                for dw_key in DEPLOYMENT_WINDOW_KEYS
+                if dw_key not in dw
+            )
+
+    return errors
+
+
 def validate(config: dict[str, Any]) -> list[ValidationError]:
     errors: list[ValidationError] = []
 
@@ -110,46 +153,7 @@ def validate(config: dict[str, Any]) -> list[ValidationError]:
         return errors
 
     for env_name, env_block in environments.items():
-        prefix = f"environments.{env_name}"
-
-        if not isinstance(env_block, dict):
-            errors.append(ValidationError(prefix, "Must be a mapping"))
-            continue
-
-        errors.extend(
-            ValidationError(f"{prefix}.{key}", "Missing required key")
-            for key in REQUIRED_ENV_KEYS
-            if key not in env_block
-        )
-
-        # allowed_branches must be a list
-        if "allowed_branches" in env_block:
-            if not isinstance(env_block["allowed_branches"], list):
-                errors.append(ValidationError(f"{prefix}.allowed_branches", "Must be a list"))
-            elif not env_block["allowed_branches"]:
-                errors.append(ValidationError(f"{prefix}.allowed_branches", "Must not be empty"))
-
-        # boolean fields
-        errors.extend(
-            ValidationError(f"{prefix}.{bool_key}", "Must be a boolean")
-            for bool_key in ("requires_validation", "requires_security_scan", "requires_ai_validation")
-            if bool_key in env_block and not isinstance(env_block[bool_key], bool)
-        )
-
-        # deployment_window — optional but validated when present
-        dw = env_block.get("deployment_window")
-        if dw is not None:
-            if not isinstance(dw, dict):
-                errors.append(ValidationError(f"{prefix}.deployment_window", "Must be a mapping"))
-            else:
-                errors.extend(
-                    ValidationError(
-                        f"{prefix}.deployment_window.{dw_key}",
-                        "Missing required deployment_window key",
-                    )
-                    for dw_key in DEPLOYMENT_WINDOW_KEYS
-                    if dw_key not in dw
-                )
+        errors.extend(_validate_env_block(f"environments.{env_name}", env_block))
 
     # --- promotion_chain ---
     chain = config.get("promotion_chain", [])

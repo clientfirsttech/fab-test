@@ -23,6 +23,7 @@ import pytest
 from fabric_ci_cd_dataops.scripts._analyzer_envelope import (
     ENVELOPE_OPTIONAL_KEYS,
     ENVELOPE_REQUIRED_KEYS,
+    EnvelopeIdentity,
     build_envelope,
 )
 from fabric_ci_cd_dataops.scripts.fab_test_summary import _report_path_for
@@ -35,7 +36,8 @@ def _envelope(**overrides):
         "status": "passed",
     }
     base.update(overrides)
-    return build_envelope(**base)
+    identity = EnvelopeIdentity(base.pop("analyzer"), base.pop("artifact_path"))
+    return build_envelope(identity, **base)
 
 
 def _run_cli(*argv):
@@ -260,13 +262,11 @@ def test_summary_json_exposes_the_report_path_separately(tmp_path):
 
 
 def _envelope_on_disk(output_dir, analyzer, stem, **extra):
-    from fabric_ci_cd_dataops.scripts._analyzer_envelope import build_envelope
-
     path = output_dir / analyzer / stem
     path.mkdir(parents=True, exist_ok=True)
     (path / "envelope.json").write_text(
         json.dumps(
-            build_envelope(analyzer=analyzer, artifact_path=stem, status="passed", **extra)
+            build_envelope(EnvelopeIdentity(analyzer, stem), status="passed", **extra)
         ),
         encoding="utf-8",
     )
@@ -390,8 +390,7 @@ def test_local_still_names_its_reports(tmp_path):
     (path / "envelope.json").write_text(
         json.dumps(
             build_envelope(
-                analyzer="pql_lint",
-                artifact_path="Sales",
+                EnvelopeIdentity("pql_lint", "Sales"),
                 status="passed",
                 native_html_output_path_str=str(path / "report.html"),
             )
