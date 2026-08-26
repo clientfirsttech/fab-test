@@ -230,12 +230,75 @@ def _build_env_for_pytest(
     return env
 
 
+_PYTEST_OUTCOME_MARKERS = ("PASSED", "FAILED", "ERROR", "SKIPPED", "XFAIL", "XPASS")
+
+
+def _is_pytest_outcome_line(line: str) -> bool:
+    """True for a pytest -v per-test result line, false for setup/collection noise."""
+    return any(marker in line for marker in _PYTEST_OUTCOME_MARKERS)
+
+
+def _stream_subprocess(
+    command: list[str],
+    *,
+    cwd: Path,
+    env: dict[str, str],
+    verbose: bool = False,
+) -> subprocess.CompletedProcess[str]:
+    """Run ``command``, echoing output the moment it arrives.
+
+    A caller that buffers everything until the child exits is
+    indistinguishable from a hang once the child runs long enough --
+    exactly what a multi-case Playwright run does (each case can take up
+    to a minute in a real browser). stdout and stderr are merged onto one
+    stream so interleaved output prints in the order the child actually
+    produced it, and every line is also collected so ``.stdout`` still
+    holds the full transcript for callers that parse it after the fact.
+
+    Without ``verbose``, only pytest's per-test outcome lines are echoed --
+    enough to show the run is progressing, not a full pytest -v transcript
+    on every default invocation.
+    """
+    stream_env = dict(env)
+    # Unbuffered so the child's own line-by-line progress reaches the pipe
+    # as each line is written, rather than sitting in a block-buffered
+    # stdout until the process exits (Python defaults to block buffering
+    # once stdout is not a tty, which a pipe never is).
+    stream_env["PYTHONUNBUFFERED"] = "1"
+
+    proc = subprocess.Popen(
+        command,
+        cwd=cwd,
+        env=stream_env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        bufsize=1,
+    )
+    if proc.stdout is None:
+        raise RuntimeError("Popen with stdout=PIPE must provide a stdout stream.")
+
+    lines: list[str] = []
+    for line in proc.stdout:
+        stripped = line.rstrip("\n")
+        if verbose or _is_pytest_outcome_line(stripped):
+            log(stripped)
+        lines.append(line)
+    returncode = proc.wait()
+
+    return subprocess.CompletedProcess(
+        command, returncode, stdout="".join(lines), stderr=""
+    )
+
+
 def _run_pytest(
     env: dict[str, str],
     *,
     verbosity: int = 0,
 ) -> subprocess.CompletedProcess[str]:
-    """Run the Playwright pytest spec with the prepared environment."""
+    """Run the Playwright pytest spec, streaming its output live."""
     repo_root = _repo_root()
     spec_path = repo_root / _SPEC_PATH
 
@@ -257,16 +320,7 @@ def _run_pytest(
     elif verbosity >= 1:
         command.append("-v")
 
-    return subprocess.run(
-        command,
-        cwd=repo_root,
-        env=env,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        check=False,
-    )
+    return _stream_subprocess(command, cwd=repo_root, env=env, verbose=verbosity >= 1)
 
 
 def _require_service_principal(config: PlaywrightValidationConfig) -> None:
@@ -548,8 +602,11 @@ def _run_single_report(
         )
 
     level = args.verbose
-    if level >= 1:
-        _log_run_header(report_name, output_path, cases, pages, distinct_roles)
+    # Always shown, not just under --verbose: acquiring embed tokens and
+    # running each case in a real browser can take minutes with nothing
+    # else printed in between, so this is the only sign of life a caller
+    # gets before the first pytest line streams in below.
+    _log_run_header(report_name, output_path, cases, pages, distinct_roles)
 
     try:
         embed_configs_by_role = acquire_embed_configs(config, distinct_roles or [""])
@@ -606,11 +663,6 @@ def _run_single_report(
     )
     env_out["test_results"] = test_results
     _write_playwright_envelope(output_path, env_out)
-
-    if level >= 1:
-        log(proc.stdout or "")
-    if not success and proc.stderr:
-        log(proc.stderr)
 
     log(message)
     return 0 if success else 1

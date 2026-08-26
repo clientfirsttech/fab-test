@@ -5,7 +5,7 @@ from __future__ import annotations
 import subprocess
 import tomllib
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -17,6 +17,7 @@ from fabric_ci_cd_dataops.scripts.invoke_playwright import (
     _build_config_from_args,
     _build_env_for_pytest,
     _parse_pytest_summary,
+    _stream_subprocess,
     _write_findings,
     main,
     parse_args,
@@ -146,6 +147,101 @@ def test_build_env_for_pytest_sets_expected_vars(
     assert env["PLAYWRIGHT_TIMEOUT_MS"] == "60000"
     assert env["PLAYWRIGHT_HEADLESS"] == "true"
     assert env["PLAYWRIGHT_RESULTS_ROOT"] == str(tmp_path.resolve())
+
+
+def test_stream_subprocess_verbose_echoes_every_line_as_it_arrives(tmp_path: Path) -> None:
+    """A caller that only sees output after the child exits cannot tell a
+    long-running case matrix from a hang. Given verbose=True, `_stream_subprocess`
+    must emit each line through `log` as the child produces it, not just at the end."""
+    import sys
+
+    seen: list[str] = []
+    command = [
+        sys.executable,
+        "-c",
+        (
+            "import sys, time\n"
+            "print('line one'); sys.stdout.flush()\n"
+            "print('line two'); sys.stdout.flush()\n"
+        ),
+    ]
+
+    with patch(
+        "fabric_ci_cd_dataops.scripts.invoke_playwright.log",
+        side_effect=seen.append,
+    ):
+        result = _stream_subprocess(command, cwd=tmp_path, env={}, verbose=True)
+
+    assert seen == ["line one", "line two"]
+    assert result.returncode == 0
+    assert result.stdout == "line one\nline two\n"
+
+
+def test_stream_subprocess_terse_by_default_only_logs_pytest_outcome_lines(
+    tmp_path: Path,
+) -> None:
+    """Given verbose is left at its default (False), should log only pytest's
+    per-test outcome lines (PASSED/FAILED/etc.) and suppress everything else,
+    so a caller still sees progress -- proving the run has not hung -- without
+    the full pytest -v transcript flooding every default run."""
+    import sys
+
+    seen: list[str] = []
+    script = (
+        "print('==== test session starts ====')\n"
+        "print('tests/spec.py::test_a PASSED')\n"
+        "print('collecting more stuff')\n"
+        "print('tests/spec.py::test_b FAILED')\n"
+    )
+    command = [sys.executable, "-c", script]
+
+    with patch(
+        "fabric_ci_cd_dataops.scripts.invoke_playwright.log",
+        side_effect=seen.append,
+    ):
+        result = _stream_subprocess(command, cwd=tmp_path, env={})
+
+    assert seen == [
+        "tests/spec.py::test_a PASSED",
+        "tests/spec.py::test_b FAILED",
+    ]
+    assert result.stdout == (
+        "==== test session starts ====\n"
+        "tests/spec.py::test_a PASSED\n"
+        "collecting more stuff\n"
+        "tests/spec.py::test_b FAILED\n"
+    )
+
+
+def test_stream_subprocess_reports_a_nonzero_exit_code(tmp_path: Path) -> None:
+    """A failing child's exit code must reach the returned CompletedProcess
+    so the caller's success/failure decision still works."""
+    import sys
+
+    command = [sys.executable, "-c", "import sys; sys.exit(3)"]
+
+    with patch("fabric_ci_cd_dataops.scripts.invoke_playwright.log"):
+        result = _stream_subprocess(command, cwd=tmp_path, env={})
+
+    assert result.returncode == 3
+
+
+def test_stream_subprocess_raises_if_child_has_no_stdout_pipe(tmp_path: Path) -> None:
+    """Given a Popen that unexpectedly has no stdout stream, should raise a
+    RuntimeError naming the cause rather than relying on a bare assert --
+    which ruff's S101 forbids in production code and which disappears
+    entirely under `python -O`."""
+    fake_proc = MagicMock(stdout=None)
+    fake_proc.wait.return_value = 0
+
+    with (
+        patch(
+            "fabric_ci_cd_dataops.scripts.invoke_playwright.subprocess.Popen",
+            return_value=fake_proc,
+        ),
+        pytest.raises(RuntimeError, match="stdout"),
+    ):
+        _stream_subprocess([], cwd=tmp_path, env={})
 
 
 def test_parse_pytest_summary_extracts_short_summary() -> None:

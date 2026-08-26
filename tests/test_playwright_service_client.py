@@ -197,6 +197,46 @@ def test_get_report_bookmarks_parses_pbir_bookmark_files(
     ]
 
 
+def test_get_report_bookmarks_parses_a_bom_prefixed_pbir_bookmark_file(
+    client: FabricRestClient,
+) -> None:
+    """PBIR JSON parts are often written with a UTF-8 BOM (Power BI Desktop
+    / git export tooling); a bookmark file with one must still decode
+    instead of silently disappearing from discovery."""
+    import base64
+    import json
+
+    payload = base64.b64encode(
+        b"\xef\xbb\xbf"
+        + json.dumps(
+            {
+                "name": "bmk1",
+                "displayName": "Bookmark One",
+                "explorationState": {"activeSection": "page1"},
+            }
+        ).encode("utf-8")
+    ).decode("utf-8")
+    data = {
+        "definition": {
+            "parts": [
+                {
+                    "path": "definition/bookmarks/bmk1.bookmark.json",
+                    "payload": payload,
+                },
+            ]
+        }
+    }
+    with patch(
+        "fabric_ci_cd_dataops.scripts.playwright_validation.service_client.requests.request",
+        return_value=_mock_response(data),
+    ):
+        bookmarks = client.get_report_bookmarks("ws-1", "rpt-1")
+
+    assert bookmarks == [
+        {"bookmark_id": "bmk1", "bookmark_name": "Bookmark One", "page_id": "page1"},
+    ]
+
+
 def test_get_report_bookmarks_skips_a_pbir_group_files_own_part(
     client: FabricRestClient,
 ) -> None:
@@ -256,6 +296,115 @@ def test_get_semantic_model_roles_reads_role_file_names(
         roles = client.get_semantic_model_roles("ws-1", "sm-1")
 
     assert roles == ["Manager", "Analyst"]
+
+
+def test_get_report_bookmarks_calls_the_fabric_getdefinition_endpoint(
+    client: FabricRestClient,
+) -> None:
+    """Report bookmarks must be read from the Fabric REST API's item-based
+    ``getDefinition`` (``api.fabric.microsoft.com/v1/workspaces/.../reports/
+    .../getDefinition``), not the legacy Power BI ``/v1.0/myorg/groups/...``
+    surface -- that surface has no ``getDefinition`` route for reports and
+    404s outright, which silently emptied bookmark discovery for every
+    report (masked because the caller only treats a 404 as "no bookmarks")."""
+    data = {"definition": {"parts": []}}
+    with patch(
+        "fabric_ci_cd_dataops.scripts.playwright_validation.service_client.requests.request",
+        return_value=_mock_response(data),
+    ) as mock_request:
+        client.get_report_bookmarks("ws-1", "rpt-1")
+
+    called_url = mock_request.call_args.args[1]
+    assert called_url == (
+        "https://api.fabric.microsoft.com/v1/workspaces/ws-1"
+        "/reports/rpt-1/getDefinition"
+    )
+
+
+def test_request_polls_a_long_running_operation_to_completion(
+    client: FabricRestClient,
+) -> None:
+    """Fabric's ``getDefinition`` endpoints only ever answer with HTTP 202
+    plus a ``Location`` to poll -- never the definition inline. Without
+    following that operation to ``Succeeded`` and then fetching
+    ``{operation}/result``, every getDefinition call got back an empty body
+    (``None``), which crashed ``get_semantic_model_roles`` outright and was
+    silently swallowed into "no bookmarks" for ``get_report_bookmarks``."""
+    accepted = MagicMock()
+    accepted.status_code = 202
+    accepted.headers = {
+        "Location": "https://api.fabric.microsoft.com/v1/operations/op-1",
+        "Retry-After": "0",
+    }
+    accepted.text = ""
+
+    running = MagicMock()
+    running.status_code = 200
+    running.json.return_value = {"status": "Running"}
+    running.headers = {"Retry-After": "0"}
+
+    succeeded = MagicMock()
+    succeeded.status_code = 200
+    succeeded.json.return_value = {"status": "Succeeded"}
+    succeeded.headers = {}
+
+    result = MagicMock()
+    result.status_code = 200
+    result.json.return_value = {"definition": {"parts": []}}
+
+    with (
+        patch(
+            "fabric_ci_cd_dataops.scripts.playwright_validation.service_client.requests.request",
+            return_value=accepted,
+        ),
+        patch(
+            "fabric_ci_cd_dataops.scripts.playwright_validation.service_client.requests.get",
+            side_effect=[running, succeeded, result],
+        ) as mock_get,
+        patch(
+            "fabric_ci_cd_dataops.scripts.playwright_validation.service_client.time.sleep"
+        ),
+    ):
+        data = client.get_report_bookmarks("ws-1", "rpt-1")
+
+    assert data == []
+    result_call_url = mock_get.call_args_list[-1].args[0]
+    assert result_call_url == "https://api.fabric.microsoft.com/v1/operations/op-1/result"
+
+
+def test_request_raises_when_long_running_operation_fails(
+    client: FabricRestClient,
+) -> None:
+    """A ``Failed`` operation status must surface as an error, not silently
+    resolve to an empty/None result."""
+    accepted = MagicMock()
+    accepted.status_code = 202
+    accepted.headers = {
+        "Location": "https://api.fabric.microsoft.com/v1/operations/op-1",
+        "Retry-After": "0",
+    }
+    accepted.text = ""
+
+    failed = MagicMock()
+    failed.status_code = 200
+    failed.json.return_value = {"status": "Failed", "error": "boom"}
+    failed.headers = {}
+
+    with (
+        patch(
+            "fabric_ci_cd_dataops.scripts.playwright_validation.service_client.requests.request",
+            return_value=accepted,
+        ),
+        patch(
+            "fabric_ci_cd_dataops.scripts.playwright_validation.service_client.requests.get",
+            return_value=failed,
+        ),
+        patch(
+            "fabric_ci_cd_dataops.scripts.playwright_validation.service_client.time.sleep"
+        ),
+        pytest.raises(ServiceClientError, match="boom"),
+    ):
+        client.get_semantic_model_roles("ws-1", "sm-1")
 
 
 def test_get_semantic_model_roles_returns_empty_on_404(
