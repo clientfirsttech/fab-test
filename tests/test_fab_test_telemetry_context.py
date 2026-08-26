@@ -101,6 +101,79 @@ def test_git_context_falls_back_to_local_git_user_email_for_actor(monkeypatch):
 
 
 @pytest.mark.fab_test
+def test_git_context_falls_back_to_local_git_remote_for_repository_https(monkeypatch):
+    """Outside GitHub Actions, repository is parsed from an HTTPS origin remote."""
+    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+
+    _clear_github_env(monkeypatch)
+    monkeypatch.setattr(
+        fab_test_module.subprocess,
+        "run",
+        _fake_git_run(
+            {
+                "remote get-url origin": "https://github.com/kerski/fab-test.git\n",
+            }
+        ),
+    )
+
+    ctx = _git_context()
+    assert ctx["repository"] == "kerski/fab-test"
+
+
+@pytest.mark.fab_test
+def test_git_context_falls_back_to_local_git_remote_for_repository_ssh(monkeypatch):
+    """Outside GitHub Actions, repository is parsed from an SSH origin remote."""
+    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+
+    _clear_github_env(monkeypatch)
+    monkeypatch.setattr(
+        fab_test_module.subprocess,
+        "run",
+        _fake_git_run(
+            {
+                "remote get-url origin": "git@github.com:kerski/fab-test.git\n",
+            }
+        ),
+    )
+
+    ctx = _git_context()
+    assert ctx["repository"] == "kerski/fab-test"
+
+
+@pytest.mark.fab_test
+def test_git_context_repository_empty_when_no_origin_remote(monkeypatch):
+    """No origin remote configured leaves repository empty, not crashing."""
+    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+
+    _clear_github_env(monkeypatch)
+    monkeypatch.setattr(
+        fab_test_module.subprocess, "run", _fake_git_run({})  # every command "fails"
+    )
+
+    ctx = _git_context()
+    assert ctx["repository"] == ""
+
+
+@pytest.mark.fab_test
+def test_git_context_repository_not_overridden_by_git_when_github_repository_set(monkeypatch):
+    """GITHUB_REPOSITORY wins over the local origin remote even if both resolve."""
+    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+
+    _clear_github_env(monkeypatch)
+    monkeypatch.setenv("GITHUB_REPOSITORY", "kerski/fab-test")
+    monkeypatch.setattr(
+        fab_test_module.subprocess,
+        "run",
+        _fake_git_run(
+            {"remote get-url origin": "https://github.com/someone-else/fork.git\n"}
+        ),
+    )
+
+    ctx = _git_context()
+    assert ctx["repository"] == "kerski/fab-test"
+
+
+@pytest.mark.fab_test
 def test_git_context_actor_empty_when_git_config_has_no_email(monkeypatch):
     """A git config with no user.email set leaves actor empty, not crashing."""
     from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module

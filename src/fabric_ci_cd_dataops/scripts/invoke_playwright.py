@@ -52,6 +52,7 @@ _EVIDENCE_FILENAMES = {
     "screenshot": "screenshot.png",
     "console": "console.json",
     "network": "network.json",
+    "event_log": "event_log.json",
 }
 
 # Relative path from repo root to the pytest spec.

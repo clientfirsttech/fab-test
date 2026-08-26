@@ -60,6 +60,7 @@ def _write_case_result(
     )
     if evidence:
         (case_dir / "screenshot.png").write_bytes(b"fake-png-bytes")
+        (case_dir / "event_log.json").write_text("[]", encoding="utf-8")
 
 
 def _run_main(tmp_path: Path, output_path: Path, test_cases_dir: Path):
@@ -176,6 +177,8 @@ def test_test_results_carry_the_cases_evidence_paths(tmp_path: Path):
     failed_evidence = by_case["SalesReport_page2_no-bookmark"]["evidence"]
     assert "screenshot" in failed_evidence
     assert failed_evidence["screenshot"].endswith("screenshot.png")
+    assert "event_log" in failed_evidence
+    assert failed_evidence["event_log"].endswith("event_log.json")
 
 
 def test_report_html_links_to_a_failed_cases_evidence(tmp_path: Path, monkeypatch):
