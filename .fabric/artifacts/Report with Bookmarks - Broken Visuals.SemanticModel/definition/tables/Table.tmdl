@@ -1,0 +1,43 @@
+table Table
+	lineageTag: 31d72149-eff6-4ef4-9125-732e64b46c48
+
+	measure 'Measure Rename' = SUM('Table'[Column A C]) + SUM('Table'[Column B])
+		formatString: 0
+		lineageTag: cdbc5834-33cf-48c7-bb55-cb26a59a6313
+
+	measure 'Measure C' = ```
+			1 
+			```
+		formatString: 0
+		lineageTag: e1fcf882-93ff-4251-b113-710b54f6f3ab
+
+	column 'Column A C'
+		dataType: int64
+		formatString: 0
+		lineageTag: 5017d976-1f22-45d1-a056-a9be16802a78
+		summarizeBy: sum
+		sourceColumn: Column A C
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Column B'
+		dataType: int64
+		formatString: 0
+		lineageTag: bda14d04-47c4-4ef0-92ff-b4db94437c9e
+		summarizeBy: sum
+		sourceColumn: Column B
+
+		annotation SummarizationSetBy = Automatic
+
+	partition Table = m
+		mode: import
+		source =
+				let
+				    Source = Table.FromRows(Json.Document(Binary.Decompress(Binary.FromText("i45WMlTSUTJSitWJVjIGskyUYmMB", BinaryEncoding.Base64), Compression.Deflate)), let _t = ((type nullable text) meta [Serialized.Text = true]) in type table [#"Column A" = _t, #"Column B" = _t]),
+				    #"Changed Type" = Table.TransformColumnTypes(Source,{{"Column A", Int64.Type}, {"Column B", Int64.Type}}),
+				    #"Renamed Columns" = Table.RenameColumns(#"Changed Type",{{"Column A", "Column A C"}})
+				in
+				    #"Renamed Columns"
+
+	annotation PBI_ResultType = Table
+
