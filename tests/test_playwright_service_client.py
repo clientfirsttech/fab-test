@@ -402,9 +402,9 @@ def test_request_raises_when_long_running_operation_fails(
         patch(
             "fabric_ci_cd_dataops.scripts.playwright_validation.service_client.time.sleep"
         ),
+        pytest.raises(ServiceClientError, match="boom"),
     ):
-        with pytest.raises(ServiceClientError, match="boom"):
-            client.get_semantic_model_roles("ws-1", "sm-1")
+        client.get_semantic_model_roles("ws-1", "sm-1")
 
 
 def test_get_semantic_model_roles_returns_empty_on_404(
