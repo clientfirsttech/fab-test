@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import base64
 import json
+import time
 from dataclasses import dataclass
 from typing import Any
 
@@ -48,9 +49,18 @@ def _api_headers(token: FabricToken) -> dict[str, str]:
 
 
 def _decode_payload(payload: str) -> dict[str, Any] | None:
-    """Base64-decode and JSON-parse a ``getDefinition`` part payload."""
+    """Base64-decode and JSON-parse a ``getDefinition`` part payload.
+
+    PBIR JSON parts (bookmark files included) are frequently written with a
+    UTF-8 BOM -- see the same fix in ``invoke_pbir_inspector.py``. Plain
+    ``.decode("utf-8")`` leaves the BOM in the string and ``json.loads``
+    raises, which this function swallows and returns ``None`` for -- so a
+    BOM-prefixed bookmark silently vanished from discovery with no warning
+    logged anywhere. ``utf-8-sig`` strips the BOM before ``json.loads`` sees
+    it, matching the non-BOM case exactly.
+    """
     try:
-        decoded = base64.b64decode(payload).decode("utf-8")
+        decoded = base64.b64decode(payload).decode("utf-8-sig")
         return json.loads(decoded)
     except (ValueError, UnicodeDecodeError, json.JSONDecodeError):
         return None
@@ -158,6 +168,8 @@ class FabricRestClient:
                 status_code=response.status_code,
                 body=response.text,
             )
+        if response.status_code == 202:
+            return self._poll_long_running_operation(response)
         try:
             return response.json()
         except ValueError as exc:
@@ -165,6 +177,82 @@ class FabricRestClient:
                 f"Non-JSON response from Fabric REST API: {url}",
                 status_code=response.status_code,
                 body=response.text,
+            ) from exc
+
+    def _poll_long_running_operation(
+        self, initial_response: requests.Response
+    ) -> dict[str, Any]:
+        """Poll a Fabric long-running operation (HTTP 202) to completion.
+
+        Fabric's ``getDefinition`` endpoints (reports and semantic models
+        alike) never return the definition inline -- a 202 with a
+        ``Location`` header and an empty body is the *only* response, with
+        ``Retry-After`` naming the poll interval. Without this, ``_request``
+        handed callers ``None`` for every getDefinition call: silently
+        emptying bookmark discovery (masked because ``get_report_bookmarks``
+        only catches 404s) and crashing ``get_semantic_model_roles`` outright
+        on ``None.get(...)``. Once the operation's own status reaches
+        ``Succeeded``, the actual payload lives at ``{operation}/result`` --
+        a second fetch, per the Fabric LRO contract.
+        """
+        operation_url = initial_response.headers.get("Location")
+        if not operation_url:
+            raise ServiceClientError(
+                "Long-running operation response had no Location header",
+                status_code=initial_response.status_code,
+                body=initial_response.text,
+            )
+        headers = _api_headers(self._token)
+        retry_after = float(initial_response.headers.get("Retry-After", "1"))
+        deadline = time.monotonic() + max(self._timeout * 4, 60)
+
+        while True:
+            time.sleep(retry_after)
+            status_response = requests.get(
+                operation_url, headers=headers, timeout=self._timeout
+            )
+            if status_response.status_code >= 400:
+                raise ServiceClientError(
+                    "Long-running operation status check failed "
+                    f"(HTTP {status_response.status_code}): {operation_url}",
+                    status_code=status_response.status_code,
+                    body=status_response.text,
+                )
+            status_data = status_response.json()
+            status = status_data.get("status", "")
+            if status == "Succeeded":
+                break
+            if status == "Failed":
+                raise ServiceClientError(
+                    f"Long-running operation failed: {status_data.get('error')}",
+                    status_code=status_response.status_code,
+                    body=status_response.text,
+                )
+            if time.monotonic() > deadline:
+                raise ServiceClientError(
+                    f"Long-running operation timed out: {operation_url}"
+                )
+            retry_after = float(
+                status_response.headers.get("Retry-After", retry_after)
+            )
+
+        result_response = requests.get(
+            f"{operation_url}/result", headers=headers, timeout=self._timeout
+        )
+        if result_response.status_code >= 400:
+            raise ServiceClientError(
+                "Fetching long-running operation result failed "
+                f"(HTTP {result_response.status_code}): {operation_url}/result",
+                status_code=result_response.status_code,
+                body=result_response.text,
+            )
+        try:
+            return result_response.json()
+        except ValueError as exc:
+            raise ServiceClientError(
+                f"Non-JSON result from long-running operation: {operation_url}/result",
+                status_code=result_response.status_code,
+                body=result_response.text,
             ) from exc
 
     def list_items(
@@ -225,11 +313,17 @@ class FabricRestClient:
         bookmark can be paired with the one page it belongs to instead of
         every page in the report. Falls back to an empty list when the
         definition or no bookmark parts are found.
+
+        Uses the Fabric REST API's item-based ``getDefinition`` (same root
+        and path shape as ``get_semantic_model_roles`` below), not the
+        legacy Power BI ``/v1.0/myorg/groups/...`` surface -- that surface
+        has no ``getDefinition`` route for reports and 404s outright.
         """
         try:
             data = self._request(
                 "POST",
-                f"/v1.0/myorg/groups/{workspace_id}/reports/{report_id}/getDefinition",
+                f"/v1/workspaces/{workspace_id}/reports/{report_id}/getDefinition",
+                api_root=_fabric_api_root_for(self._token.cloud),
             )
         except ServiceClientError as exc:
             if exc.status_code == 404:
