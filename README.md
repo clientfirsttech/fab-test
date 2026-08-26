@@ -6,8 +6,6 @@
 
 **The Power BI tooling ecosystem is scattered: Tabular Editor's BPA, PBIR Inspector, DAX tests, Playwright, each with its own install, its own invocation, its own output format.** `fab-test` brings them together behind one CLI and one result contract, so it doesn't matter who's asking: a developer running a quick local check, a CI/CD build agent gating a deployment, or an AI coding agent that needs a single command and a machine-readable verdict it can act on. Point it at a `.pbip`-format artifact and get the same validation everywhere: Best Practice Analyzer rules, PBIR report structure, DAX tests, and rendered-report checks, all through one command with a pass/fail answer trustworthy for human and machine alike.
 
-This package provides the `fab-test` CLI and supporting analyzer wrappers used by the [fabric-ci-cd-dataops](https://github.com/kerski/fabric-ci-cd-dataops) reference implementation.
-
 ## Install
 
 ### From PyPI (not yet)

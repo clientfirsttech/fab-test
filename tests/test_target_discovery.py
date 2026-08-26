@@ -348,4 +348,7 @@ def test_a_nested_checkout_does_not_multiply_this_repository():
     root = Path(__file__).resolve().parent.parent
     found = discover_artifacts(root, "*.SemanticModel", None, output_dir=RESULTS_ROOT)
 
-    assert [p.name for p in found] == ["SampleModel-PQLAssert.SemanticModel"]
+    assert [p.name for p in found] == [
+        "Report with Bookmarks - Broken Visuals.SemanticModel",
+        "SampleModel-PQLAssert.SemanticModel",
+    ]
