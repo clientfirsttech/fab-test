@@ -159,9 +159,11 @@ def test_stream_subprocess_verbose_echoes_every_line_as_it_arrives(tmp_path: Pat
     command = [
         sys.executable,
         "-c",
-        "import sys, time\n"
-        "print('line one'); sys.stdout.flush()\n"
-        "print('line two'); sys.stdout.flush()\n",
+        (
+            "import sys, time\n"
+            "print('line one'); sys.stdout.flush()\n"
+            "print('line two'); sys.stdout.flush()\n"
+        ),
     ]
 
     with patch(
