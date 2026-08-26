@@ -17,6 +17,7 @@ from fabric_ci_cd_dataops.scripts.invoke_playwright import (
     _build_config_from_args,
     _build_env_for_pytest,
     _parse_pytest_summary,
+    _stream_subprocess,
     _write_findings,
     main,
     parse_args,
@@ -146,6 +147,45 @@ def test_build_env_for_pytest_sets_expected_vars(
     assert env["PLAYWRIGHT_TIMEOUT_MS"] == "60000"
     assert env["PLAYWRIGHT_HEADLESS"] == "true"
     assert env["PLAYWRIGHT_RESULTS_ROOT"] == str(tmp_path.resolve())
+
+
+def test_stream_subprocess_echoes_each_line_as_it_arrives(tmp_path: Path) -> None:
+    """A caller that only sees output after the child exits cannot tell a
+    long-running case matrix from a hang. `_stream_subprocess` must emit
+    each line through `log` as the child produces it, not just at the end."""
+    import sys
+
+    seen: list[str] = []
+    command = [
+        sys.executable,
+        "-c",
+        "import sys, time\n"
+        "print('line one'); sys.stdout.flush()\n"
+        "print('line two'); sys.stdout.flush()\n",
+    ]
+
+    with patch(
+        "fabric_ci_cd_dataops.scripts.invoke_playwright.log",
+        side_effect=seen.append,
+    ):
+        result = _stream_subprocess(command, cwd=tmp_path, env={})
+
+    assert seen == ["line one", "line two"]
+    assert result.returncode == 0
+    assert result.stdout == "line one\nline two\n"
+
+
+def test_stream_subprocess_reports_a_nonzero_exit_code(tmp_path: Path) -> None:
+    """A failing child's exit code must reach the returned CompletedProcess
+    so the caller's success/failure decision still works."""
+    import sys
+
+    command = [sys.executable, "-c", "import sys; sys.exit(3)"]
+
+    with patch("fabric_ci_cd_dataops.scripts.invoke_playwright.log"):
+        result = _stream_subprocess(command, cwd=tmp_path, env={})
+
+    assert result.returncode == 3
 
 
 def test_parse_pytest_summary_extracts_short_summary() -> None:
