@@ -230,13 +230,22 @@ def _build_env_for_pytest(
     return env
 
 
+_PYTEST_OUTCOME_MARKERS = ("PASSED", "FAILED", "ERROR", "SKIPPED", "XFAIL", "XPASS")
+
+
+def _is_pytest_outcome_line(line: str) -> bool:
+    """True for a pytest -v per-test result line, false for setup/collection noise."""
+    return any(marker in line for marker in _PYTEST_OUTCOME_MARKERS)
+
+
 def _stream_subprocess(
     command: list[str],
     *,
     cwd: Path,
     env: dict[str, str],
+    verbose: bool = False,
 ) -> subprocess.CompletedProcess[str]:
-    """Run ``command``, echoing each line of output the moment it arrives.
+    """Run ``command``, echoing output the moment it arrives.
 
     A caller that buffers everything until the child exits is
     indistinguishable from a hang once the child runs long enough --
@@ -245,6 +254,10 @@ def _stream_subprocess(
     stream so interleaved output prints in the order the child actually
     produced it, and every line is also collected so ``.stdout`` still
     holds the full transcript for callers that parse it after the fact.
+
+    Without ``verbose``, only pytest's per-test outcome lines are echoed --
+    enough to show the run is progressing, not a full pytest -v transcript
+    on every default invocation.
     """
     stream_env = dict(env)
     # Unbuffered so the child's own line-by-line progress reaches the pipe
@@ -264,10 +277,14 @@ def _stream_subprocess(
         errors="replace",
         bufsize=1,
     )
-    assert proc.stdout is not None
+    if proc.stdout is None:
+        raise RuntimeError("Popen with stdout=PIPE must provide a stdout stream.")
+
     lines: list[str] = []
     for line in proc.stdout:
-        log(line.rstrip("\n"))
+        stripped = line.rstrip("\n")
+        if verbose or _is_pytest_outcome_line(stripped):
+            log(stripped)
         lines.append(line)
     returncode = proc.wait()
 
@@ -303,7 +320,7 @@ def _run_pytest(
     elif verbosity >= 1:
         command.append("-v")
 
-    return _stream_subprocess(command, cwd=repo_root, env=env)
+    return _stream_subprocess(command, cwd=repo_root, env=env, verbose=verbosity >= 1)
 
 
 def _require_service_principal(config: PlaywrightValidationConfig) -> None:
