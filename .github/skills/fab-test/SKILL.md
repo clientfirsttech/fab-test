@@ -97,6 +97,33 @@ fab-test explain bpa                  # what command would `fab-test bpa` actual
 
 `doctor` and `list` both support `--format json`. `doctor --analyzer NAME` checks one analyzer; `list`'s matched-artifact counts respect `--artifact-dir`. `explain ANALYZER` never spawns a subprocess — it only shows the resolved command, tool path, rules path, and output path.
 
+Plain `fab-test doctor --format json` gives every analyzer entry the same five
+keys, `version` included — `null` for an analyzer with no wrapped tool of its
+own (`pql_test`, `playwright`, `dependencies`, `telemetry`), the resolved
+pinned version (from `analyzers.json`) for one that bootstraps a binary:
+
+```bash
+fab-test doctor --format json
+```
+```json
+{
+  "analyzers": [
+    {"analyzer": "bpa", "ready": true, "resolved_path": "C:\\...\\TabularEditor.exe", "reason": "resolved via cached download (version 2.28.0)", "remediation": null, "version": "2.28.0"},
+    {"analyzer": "pbir", "ready": true, "resolved_path": "C:\\...\\fab-inspector.exe", "reason": "resolved via cached download (version 3.4.0)", "remediation": null, "version": "3.4.0"},
+    {"analyzer": "pql_test", "ready": false, "resolved_path": null, "reason": "no workspace, credentials, or running Desktop instance", "remediation": "Set FABRIC_WORKSPACE_ID ...", "version": null}
+  ]
+}
+```
+
+The download cache is keyed by `version`, so bumping the pin in a `fab-test`
+upgrade downloads the new binary rather than reusing whatever an older
+checkout cached. If a local override (an env var or a `default_path` file) is
+shadowing the declared pin, `reason` names the variable or file and says the
+resolved tool will not receive automatic updates — a state a user in it can't
+fix by upgrading `fab-test` alone. See
+[docs/RELEASE.md](https://github.com/kerski/fab-test/blob/main/docs/RELEASE.md#bumping-a-wrapped-tools-pin)
+for how a pin gets bumped and delivered.
+
 `doctor --local` checks Python version, whether a Desktop instance is running, the Desktop Bridge CLI's presence (path only — never invoked), and each of `fab-test local`'s four analyzers, then states exactly which ones would run:
 
 ```bash
@@ -106,11 +133,18 @@ fab-test doctor --local --format json
 {
   "checks": [
     {"check": "python", "ready": true, "reason": "3.12.10", "resolved_path": "/usr/bin/python3.12", "remediation": null},
-    {"check": "desktop", "ready": false, "reason": "no running instance detected", "resolved_path": null, "remediation": "Open a .pbip file in Power BI Desktop"}
+    {"check": "desktop", "ready": false, "reason": "no running instance detected", "resolved_path": null, "remediation": "Open a .pbip file in Power BI Desktop"},
+    {"check": "bpa", "ready": true, "reason": "resolved via cached download (version 2.28.0)", "resolved_path": "C:\\...\\TabularEditor.exe", "remediation": null, "version": "2.28.0"}
   ],
   "would_run": ["bpa", "pbir", "pql_test"]
 }
 ```
+
+Only the bootstrapped checks (`bpa`, `pbir`) carry `version` here — the
+Python/Desktop/Desktop-Bridge/`pql_test` checks under `--local` have no tool
+version of their own, so the key is simply absent rather than `null`. The
+plain (non-`--local`) `doctor` above is the one with the uniform five-key
+shape.
 
 ### The run manifest (`fab-test-results/run.json`)
 

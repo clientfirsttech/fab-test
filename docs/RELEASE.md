@@ -208,6 +208,59 @@ Keep `--artifact-dir` explicit in CI, and see
 [QUICK-VALIDATION.md](QUICK-VALIDATION.md#pipeline-snippet-doctor-as-a-gate-runjson-as-the-artifact)
 for why, plus what `run.json` carries when a build goes red.
 
+### Stay current on tool pins (`tool-currency.yml`)
+
+A wrapped tool's pin (Tabular Editor, PBIR Inspector) travels inside
+`analyzers.json`, so the only way a consuming pipeline receives a bump is by
+installing a newer `fab-test`. This job checks weekly and opens an issue when
+one is available, mirroring
+[`.github/workflows/check-tool-updates.yml`](../.github/workflows/check-tool-updates.yml)
+in this repository but scoped to the package itself rather than its
+dependencies:
+
+```yaml
+name: fab-test tool currency
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Compare the installed pin against the index
+        id: check
+        run: |
+          current=$(pip show fab-test | grep '^Version:' | cut -d' ' -f2)
+          latest=$(pip index versions fab-test 2>/dev/null | head -1 | grep -oE '[0-9][0-9a-zA-Z.]*' | head -1)
+          echo "current=$current" >> "$GITHUB_OUTPUT"
+          echo "latest=$latest" >> "$GITHUB_OUTPUT"
+
+      - name: Open an issue if a newer fab-test is available
+        if: steps.check.outputs.current != steps.check.outputs.latest
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = `fab-test update available: ${{ steps.check.outputs.current }} -> ${{ steps.check.outputs.latest }}`;
+            const open = await github.rest.issues.listForRepo({
+              owner: context.repo.owner, repo: context.repo.repo,
+              state: "open", labels: "tool-update",
+            });
+            if (open.data.some((issue) => issue.title === title)) return;
+            await github.rest.issues.create({
+              owner: context.repo.owner, repo: context.repo.repo,
+              title,
+              body: "A newer fab-test release may carry an updated tool pin. See https://github.com/kerski/fab-test/blob/main/docs/RELEASE.md",
+              labels: ["tool-update"],
+            });
+```
+
 ---
 
 ## For the agent

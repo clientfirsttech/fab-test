@@ -1,6 +1,6 @@
 # Tool Version Currency Epic
 
-**Status**: 🚧 IN-PROGRESS — 4 of 5 tasks done
+**Status**: ✅ COMPLETED — 5 of 5 tasks done
 **Goal**: Notice when a wrapped tool ships a new release, and make a released pin
 bump actually reach the machines running it.
 
@@ -383,7 +383,7 @@ the same for `dependabot.yml` — both parse as valid YAML. `__version__`
 bumped to `1.0.0.0.dev11` and reinstalled editable; full suite: **1481
 passed, 0 failed, 3 skipped**.
 
-## Stop the pin from being duplicated, and document all three callers
+## Stop the pin from being duplicated, and document all three callers  ✅
 
 `pql-test==0.1.12` is written in six places. Five of them are prose that a bump will
 miss, and nothing fails when they disagree.
@@ -403,6 +403,50 @@ miss, and nothing fails when they disagree.
   `tool-currency.yml` snippet
 - Given all three, should be changed together via the `document` skill so they cannot
   drift
+
+Done: `tests/test_pql_test_pin_consistency.py` (new) reads the canonical pin
+straight out of `pyproject.toml`'s `dependencies` list via `tomllib`, then
+scans each of the four documented callers line-by-line for anything claiming
+a version — two shapes cover every real occurrence: the literal
+`pql-test==X` restated in `README.md`, `docs/RELEASE.md`, and `SKILL.md`, and
+`publish-testpypi.yml`'s comment phrasing, "... vs the X we require". Every
+disagreement is collected and reported together (`file:line says X,
+pyproject.toml pins Y`), not just the first one found. Verified the test
+actually catches drift, not just that it exists: temporarily changed
+README.md's pin to a wrong value, watched the test fail naming the exact
+file and line, then reverted with `git checkout --` before touching anything
+else.
+
+`.github/skills/fab-test/SKILL.md`'s `doctor --format json` example now shows
+the real five-key shape (including `version`) captured from the actual CLI,
+and a second `doctor --local` example shows that the `--local` code path
+(`fab_test_admin.py`, a different function from `check_readiness`) only adds
+`version` to the two checks that bootstrap a binary (`bpa`, `pbir`) — Python/
+Desktop/Desktop-Bridge/`pql_test` there simply omit the key rather than
+carrying `null`. Both examples were captured by actually running `fab-test
+doctor` and `fab-test doctor --local` against this checkout's real cache,
+not written from memory of the code — the first draft claimed a uniform
+`version: null` for `--local` that the real output didn't support, caught by
+running the command rather than trusting the source read.
+
+`README.md` gained a "Tool versions" subsection under "Where metadata lives"
+explaining that `analyzers.json`'s `tool_install.version` pins each wrapped
+tool, that the cache is version-keyed so an upgrade is what delivers a bump,
+and linking to `docs/RELEASE.md`'s bump procedure and the weekly
+`check-tool-updates.yml` job.
+
+`docs/RELEASE.md` gained a "Stay current on tool pins (`tool-currency.yml`)"
+subsection under "For a pipeline that consumes `fab-test`": a copy-pasteable
+scheduled workflow a *consuming* repository can paste into its own CI,
+comparing its installed `fab-test` version against the index and opening a
+deduplicated issue when a newer one exists — the only lever a consumer has
+over a wrapped-tool pin, since the pin travels inside `analyzers.json` and
+is only ever delivered by upgrading the package.
+
+Full suite: **1482 passed**, 0 failed, 3 skipped after adding the new test
+file; `pytest -q tests/test_pql_test_pin_consistency.py tests/test_readiness.py
+tests/test_doctor.py` re-run in isolation to confirm the SKILL.md example
+correction didn't require any code change, only documentation.
 
 ---
 
