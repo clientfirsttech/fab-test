@@ -477,6 +477,19 @@ metadata of your own at all.
 baked into a release would aim a deployment at somewhere you never chose. If no layer supplies
 it, the command fails and names both places you could put it.
 
+### Tool versions
+
+`analyzers.json`'s `tool_install.version` field pins each wrapped tool (Tabular Editor,
+PBIR Inspector) to a specific release, and the download cache is keyed by that version, so
+a newer pin in a `fab-test` upgrade downloads the new binary rather than silently reusing
+whatever an older checkout had cached. `fab-test doctor` reports the resolved version
+alongside each tool's readiness, and names the environment variable or file path
+shadowing the pin if one is in play. See
+[docs/RELEASE.md](https://github.com/kerski/fab-test/blob/main/docs/RELEASE.md#bumping-a-wrapped-tools-pin)
+for the pin-bump procedure, and
+[.github/workflows/check-tool-updates.yml](https://github.com/kerski/fab-test/blob/main/.github/workflows/check-tool-updates.yml)
+for the weekly job that watches upstream for you.
+
 ## Usage
 
 `fab-test` discovers and analyzes artifacts under your working directory. It is the local equivalent of the CI artifact validation gate. See the [Run manual tests locally](#run-manual-tests-locally) section above for common commands, and [`.github/skills/fab-test/SKILL.md`](https://github.com/kerski/fab-test/blob/main/.github/skills/fab-test/SKILL.md) for the full CLI reference.
