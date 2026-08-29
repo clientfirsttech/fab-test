@@ -142,6 +142,47 @@ def test_dynamic_analysis_needs_an_environment_as_well():
     )
 
 
+@pytest.mark.telemetry
+def test_deployments_needs_an_environment():
+    """Given a fabric_deployments record missing environment, should refuse, naming it."""
+    payload = _payload()
+    del payload["results"]  # not required for this table
+
+    assert validate_payload_schema(payload, "fabric_deployments", terse=True) is False
+    assert validate_payload_schema(
+        _payload(environment="DEV"), "fabric_deployments", terse=True
+    ) is True
+
+
+@pytest.mark.telemetry
+def test_testbed_runs_needs_results():
+    """Given a fabric_testbed_runs record missing results, should refuse, naming it."""
+    payload = _payload()
+    del payload["results"]
+
+    assert validate_payload_schema(payload, "fabric_testbed_runs", terse=True) is False
+    assert validate_payload_schema(_payload(), "fabric_testbed_runs", terse=True) is True
+
+
+@pytest.mark.telemetry
+def test_terse_false_prints_the_human_readable_message(capsys):
+    """Given terse=False, should print the same message terse_print records.
+
+    Every existing call in this suite passes terse=True, so this path — the
+    ``Error: ...`` print `_run_pqlint_process`'s siblings also carry — has
+    never run under test.
+    """
+    payload = _payload()
+    del payload["results"]
+
+    result = validate_payload_schema(payload, "fabric_static_analysis", terse=False)
+
+    assert result is False
+    captured = capsys.readouterr()
+    assert "Error:" in captured.err
+    assert "results" in captured.err
+
+
 # --------------------------------------------------------------------------
 # Loading a payload file
 # --------------------------------------------------------------------------

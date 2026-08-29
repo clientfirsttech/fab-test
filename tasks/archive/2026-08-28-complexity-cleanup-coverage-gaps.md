@@ -1,6 +1,6 @@
 # Complexity Cleanup Coverage Gaps Epic
 
-**Status**: 📋 PLANNED
+**Status**: ✅ COMPLETED
 **Goal**: Add direct tests for the validation and error-handling branches the Complexity Cleanup epic isolated into named functions but did not itself add tests for.
 
 ## Overview
@@ -19,7 +19,7 @@ are fresh and named for exactly what to test.
 
 ---
 
-## `run_pqlint`'s subprocess failure paths
+## `run_pqlint`'s subprocess failure paths  ✅
 
 `invoke_pqlint.py`'s `_run_pqlint_process` has the same three-exception shape
 (`TimeoutExpired`, `FileNotFoundError`, generic) that `invoke_pbir_inspector.py`,
@@ -32,7 +32,7 @@ none of the three.
 - Given the pqlint executable is not found, should write an `"error"` envelope and exit 1, mirroring `test_run_missing_binary`
 - Given the subprocess raises an unexpected exception, should write an `"error"` envelope naming the exception rather than letting it escape
 
-## `validate_environments_schema.py`'s structural checks
+## `validate_environments_schema.py`'s structural checks  ✅
 
 `_validate_env_block` (added by Complexity Cleanup as an extraction, logic
 unchanged) has four branches with no direct test: `allowed_branches` present
@@ -45,7 +45,7 @@ but not a bool, and `deployment_window` present but not a mapping.
 - Given `requires_validation` (or either sibling boolean key) is a string instead of a boolean, should report "Must be a boolean"
 - Given `deployment_window` is present but not a mapping, should report "Must be a mapping"; given it is a mapping missing `enabled`, should report the missing key
 
-## `eventhouse_logger.py`'s table-specific field checks
+## `eventhouse_logger.py`'s table-specific field checks  ✅
 
 `validate_payload_schema` is tested for `fabric_static_analysis` and
 `fabric_dynamic_analysis` only (`tests/test_eventhouse_logger.py`);

@@ -36,7 +36,7 @@ TEST_HARD = 900
 # test_complexity_budget.py.
 EXEMPTIONS: dict[str, tuple[int, str]] = {
     "src/fabric_ci_cd_dataops/scripts/fab_test.py": (
-        2956,
+        1087,
         (
             "2026-08-23: the CLI entry point outgrew the hard budget years before "
             "this ratchet existed. Its tests were split first (Test Module Split "
@@ -50,7 +50,30 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
             "Cleanup epic) -- net more lines, fewer branches per function. "
             "2026-08-24: +28 lines splitting build_parser into one function "
             "per subcommand (Complexity Cleanup epic); --help output verified "
-            "byte-identical before and after."
+            "byte-identical before and after. 2026-08-28: -902 lines, the "
+            "argument parser (build_parser and its subparser builders) moved "
+            "to fab_test_parser.py (Fab-Test Module Split epic, task 2 of 6); "
+            "shared path/config constants moved to _fab_test_context.py. "
+            "2026-08-28: -342 lines, telemetry readiness/payload/delivery moved "
+            "to fab_test_telemetry.py, under its own 400-line soft budget (task "
+            "3 of 6). 2026-08-28: -625 lines, per-artifact execution (discovery, "
+            "subprocess, envelope, summary dispatch) moved to "
+            "fab_test_execution.py (task 4 of 6), 685 lines -- over the 400 soft "
+            "budget but under the 800 hard one, no exemption needed. Still over "
+            "hard -- admin subcommands and the local bundle are the remaining "
+            "extractions."
+        ),
+    ),
+    "src/fabric_ci_cd_dataops/scripts/fab_test_parser.py": (
+        911,
+        (
+            "2026-08-28: born over the hard budget by the move itself -- "
+            "build_parser's 17 subparser builders were, together, larger than "
+            "most modules this split produces even before the move (see "
+            "tasks/fab-test-module-split-epic.md, 'Extract the argument "
+            "parser'). One function per subcommand keeps each piece small; "
+            "splitting the module further would cut across that seam rather "
+            "than with it. Revisit if it keeps growing."
         ),
     ),
     "src/fabric_ci_cd_dataops/scripts/fab_test_summary.py": (

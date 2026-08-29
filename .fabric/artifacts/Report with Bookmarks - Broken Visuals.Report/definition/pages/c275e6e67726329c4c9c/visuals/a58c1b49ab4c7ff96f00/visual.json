@@ -1,0 +1,66 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.12.0/schema.json",
+  "name": "a58c1b49ab4c7ff96f00",
+  "position": {
+    "x": 16,
+    "y": 0,
+    "z": 0,
+    "height": 720,
+    "width": 1264,
+    "tabOrder": 0
+  },
+  "visual": {
+    "visualType": "clusteredColumnChart",
+    "query": {
+      "queryState": {
+        "Y": {
+          "projections": [
+            {
+              "field": {
+                "Aggregation": {
+                  "Expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Table (3)"
+                        }
+                      },
+                      "Property": "Column Z"
+                    }
+                  },
+                  "Function": 0
+                }
+              },
+              "queryRef": "Sum(Table (3).Column Z)",
+              "nativeQueryRef": "Sum of Column Z"
+            }
+          ]
+        }
+      }
+    },
+    "drillFilterOtherVisuals": true
+  },
+  "filterConfig": {
+    "filters": [
+      {
+        "name": "8d63d3c04c6df3706c02",
+        "field": {
+          "Aggregation": {
+            "Expression": {
+              "Column": {
+                "Expression": {
+                  "SourceRef": {
+                    "Entity": "Table (3)"
+                  }
+                },
+                "Property": "Column Z"
+              }
+            },
+            "Function": 0
+          }
+        },
+        "type": "Advanced"
+      }
+    ]
+  }
+}

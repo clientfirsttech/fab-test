@@ -35,8 +35,9 @@ def test_output_dir_packaged_default_is_fab_test_results(monkeypatch):
     which is how the rename went unverified by the suite.
     """
     from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fabric_ci_cd_dataops.scripts import fab_test_parser
 
-    monkeypatch.setattr(fab_test_module, "_PYPROJECT_CONFIG", {})
+    monkeypatch.setattr(fab_test_parser, "_PYPROJECT_CONFIG", {})
     parser = fab_test_module.build_parser()
     ns = parser.parse_args(["bpa", "--dry-run"])
     assert ns.output_dir == str(fab_test_module.RESULTS_ROOT)
@@ -47,9 +48,13 @@ def test_output_dir_packaged_default_is_fab_test_results(monkeypatch):
 def test_common_flags_use_pyproject_config_as_default(monkeypatch):
     """--jobs/--format/--artifact-dir/--output-dir default from [tool.fab-test]."""
     from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fabric_ci_cd_dataops.scripts import fab_test_parser
 
+    # build_parser (and _add_common_flags) live in fab_test_parser since the
+    # Fab-Test Module Split epic; that module's own binding of
+    # _PYPROJECT_CONFIG is what the parser defaults actually close over.
     monkeypatch.setattr(
-        fab_test_module,
+        fab_test_parser,
         "_PYPROJECT_CONFIG",
         {
             "jobs": 4,
@@ -70,8 +75,9 @@ def test_common_flags_use_pyproject_config_as_default(monkeypatch):
 def test_common_flags_cli_overrides_pyproject_config(monkeypatch):
     """An explicit CLI flag still wins over the config file default."""
     from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fabric_ci_cd_dataops.scripts import fab_test_parser
 
-    monkeypatch.setattr(fab_test_module, "_PYPROJECT_CONFIG", {"jobs": 4})
+    monkeypatch.setattr(fab_test_parser, "_PYPROJECT_CONFIG", {"jobs": 4})
     parser = fab_test_module.build_parser()
     ns = parser.parse_args(["bpa", "--dry-run", "--jobs", "8"])
     assert ns.jobs == 8

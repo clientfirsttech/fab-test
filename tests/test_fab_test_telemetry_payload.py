@@ -171,17 +171,17 @@ def test_validate_telemetry_payload_drops_malformed_optional_field():
 @pytest.mark.fab_test
 def test_send_telemetry_skips_and_warns_on_invalid_payload(monkeypatch, capsys):
     """_send_telemetry skips sending and warns, without raising, on invalid payload."""
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fabric_ci_cd_dataops.scripts import fab_test_telemetry
 
-    monkeypatch.setattr(fab_test_module, "_telemetry_enabled", lambda args: True)
+    monkeypatch.setattr(fab_test_telemetry, "_telemetry_enabled", lambda args: True)
     monkeypatch.setattr(
-        fab_test_module,
+        fab_test_telemetry,
         "_build_telemetry_payload",
         lambda *a, **k: _valid_telemetry_payload(status=""),  # falsy -> "missing"
     )
     calls = []
     monkeypatch.setattr(
-        fab_test_module,
+        fab_test_telemetry,
         "publish_analyzer_telemetry",
         lambda *a, **k: calls.append(a),
     )
@@ -196,17 +196,17 @@ def test_send_telemetry_skips_and_warns_on_invalid_payload(monkeypatch, capsys):
 @pytest.mark.fab_test
 def test_send_telemetry_sends_valid_payload(monkeypatch):
     """A valid payload still reaches publish_analyzer_telemetry as before."""
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fabric_ci_cd_dataops.scripts import fab_test_telemetry
 
-    monkeypatch.setattr(fab_test_module, "_telemetry_enabled", lambda args: True)
+    monkeypatch.setattr(fab_test_telemetry, "_telemetry_enabled", lambda args: True)
     monkeypatch.setattr(
-        fab_test_module,
+        fab_test_telemetry,
         "_build_telemetry_payload",
         lambda *a, **k: _valid_telemetry_payload(),
     )
     calls = []
     monkeypatch.setattr(
-        fab_test_module,
+        fab_test_telemetry,
         "publish_analyzer_telemetry",
         lambda *a, **k: calls.append(a),
     )
@@ -228,7 +228,7 @@ def test_dry_run_with_telemetry_prints_payload_preview_not_sent(tmp_path, monkey
     Uses the default --format json, so the preview is narrated to stderr,
     while stdout carries only the dry-run JSON summary (CLI Agent Ergonomics).
     """
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fabric_ci_cd_dataops.scripts import fab_test_telemetry
 
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
@@ -236,7 +236,7 @@ def test_dry_run_with_telemetry_prints_payload_preview_not_sent(tmp_path, monkey
 
     calls = []
     monkeypatch.setattr(
-        fab_test_module,
+        fab_test_telemetry,
         "publish_analyzer_telemetry",
         lambda *a, **k: calls.append(a),
     )
@@ -302,6 +302,7 @@ def test_dry_run_no_telemetry_flag_suppresses_preview_even_with_env(
 def test_telemetry_sent_normally_when_not_dry_run(tmp_path, monkeypatch):
     """--telemetry with ENABLE_EVENTHOUSE_LOGGING=true still sends for real runs."""
     from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fabric_ci_cd_dataops.scripts import fab_test_telemetry
 
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
@@ -313,7 +314,7 @@ def test_telemetry_sent_normally_when_not_dry_run(tmp_path, monkeypatch):
     )
     calls = []
     monkeypatch.setattr(
-        fab_test_module,
+        fab_test_telemetry,
         "publish_analyzer_telemetry",
         lambda *a, **k: calls.append(a),
     )
@@ -381,6 +382,7 @@ def test_telemetry_send_network_failure_does_not_affect_analyzer_exit_code(
 ):
     """A telemetry network failure is swallowed; the analyzer's own exit code stands."""
     from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fabric_ci_cd_dataops.scripts import fab_test_telemetry
 
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
@@ -403,7 +405,7 @@ def test_telemetry_send_network_failure_does_not_affect_analyzer_exit_code(
     monkeypatch.setenv("ENABLE_EVENTHOUSE_LOGGING", "true")
     monkeypatch.setattr(fab_test_module.subprocess, "run", _stub_subprocess_run)
     monkeypatch.setattr(
-        fab_test_module,
+        fab_test_telemetry,
         "publish_analyzer_telemetry",
         lambda *a, **k: (_ for _ in ()).throw(ConnectionError("network unreachable")),
     )
