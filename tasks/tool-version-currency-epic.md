@@ -1,6 +1,6 @@
 # Tool Version Currency Epic
 
-**Status**: 🚧 IN-PROGRESS — 3 of 5 tasks done
+**Status**: 🚧 IN-PROGRESS — 4 of 5 tasks done
 **Goal**: Notice when a wrapped tool ships a new release, and make a released pin
 bump actually reach the machines running it.
 
@@ -304,7 +304,7 @@ after the change, not just the one that prompted it: `doctor`,
 `pbir --dry-run`, `all --dry-run`, `local --dry-run`, all confirmed correct
 before and after a real cache clear/rebuild cycle.
 
-## Watch upstream on a schedule, and write the bump down
+## Watch upstream on a schedule, and write the bump down  ✅
 
 The command nobody remembers to run is not a process. A weekly job turns drift into
 an issue, and `dependabot.yml` covers the packaged dependencies that
@@ -327,6 +327,61 @@ do two of.
 - Given `.github/dependabot.yml`, should cover both `pip` and `github-actions`
 - Given [docs/RELEASE.md](../docs/RELEASE.md), should carry the pin-bump procedure
   including recording `install_sha256` per platform
+
+Done: [`.github/workflows/check-tool-updates.yml`](../.github/workflows/check-tool-updates.yml)
+runs `tools/check_tool_updates.py --format json` on `cron: "0 6 * * 1"` and
+`workflow_dispatch`, with `permissions: {contents: read, issues: write}`. The
+check step carries `continue-on-error: true` deliberately — the script itself
+already degrades an unreachable tool to `status: "unknown"` and exits 0, so a
+red run here would only ever mean the *workflow* broke, never that upstream
+did; a second `actions/github-script@v7` step (`if: always()`) reads the JSON,
+filters to `status === "update-available"`, and does nothing when that list is
+empty (no issue, no failed step either way). Its header comment states the
+workflow is `tools/check_tool_updates.py`'s only caller and should be deleted
+alongside it, matching the fate of the eight `scripts/` modules named in
+plan.md's Standalone Tasks. The opened issue is deduplicated by exact title
+(`listForRepo` filtered to `state: "open", labels: "tool-update"`) before
+`issues.create` runs, so a second Monday with the same drift does not pile up
+a second issue.
+
+`tests/test_workflow_triggers.py` gained the new filename to
+`_EXPECTED_WORKFLOWS` (its exact-set assertion means an added workflow fails
+loudly, by design, until named there) plus five dedicated tests: schedule and
+`workflow_dispatch` both present, `permissions.issues == "write"`,
+`continue-on-error: true` on the step that calls the script, and
+`--format json` present in that step's `run:`. Generalized
+`test_the_scripts_the_workflows_call_exist` into a matching
+`test_the_tools_the_workflows_call_exist` so a `tools/` path referenced by any
+workflow is checked for existence the same way `.github/scripts/` paths
+already are.
+
+[`.github/dependabot.yml`](../.github/dependabot.yml) (new) declares
+`package-ecosystem: pip` and `package-ecosystem: github-actions`, both
+`directory: "/"`, both weekly — the two ecosystems this repository can
+actually drift in (pinned Python dependencies, and the third-party Actions
+pinned by tag in `.github/workflows/*.yml`). A new
+`test_dependabot_watches_pip_and_github_actions` asserts the ecosystem set
+exactly, the same exact-set discipline used for `_EXPECTED_WORKFLOWS`.
+
+`docs/RELEASE.md` gained a "Bumping a wrapped tool's pin" section between "For
+the agent" and "When a publish fails": edit `tool_install.version` in
+`analyzers.json`, hash each platform's downloaded asset with `sha256sum` into
+`install_sha256`/`install_sha256s`, verify locally that `fab-test doctor`
+reports the tool as not-yet-downloaded against the old cache and then
+resolves cleanly after a fresh download (the version-keyed cache from Task 3
+is what makes that the correct expected behavior), run the full suite, and
+commit with a message naming the tool and version. Also documents that
+`pql_test` deliberately carries no `version` field in `analyzers.json` — it
+tracks `pyproject.toml`'s pin instead — pointing at the same "Bump the
+version" section already above it rather than duplicating the explanation.
+
+Verified: `pytest -q tests/test_workflow_triggers.py` — 19 passed (up from
+14, the five new check-tool-updates tests, the `test_the_tools_the_workflows_
+call_exist` generalization, and the dependabot test). `python -c "import
+yaml; yaml.safe_load(open('.github/workflows/check-tool-updates.yml'))"` and
+the same for `dependabot.yml` — both parse as valid YAML. `__version__`
+bumped to `1.0.0.0.dev11` and reinstalled editable; full suite: **1481
+passed, 0 failed, 3 skipped**.
 
 ## Stop the pin from being duplicated, and document all three callers
 

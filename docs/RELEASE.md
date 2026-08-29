@@ -218,6 +218,52 @@ agent reads them from its skill rather than from this file.
 
 ---
 
+## Bumping a wrapped tool's pin
+
+`fab-test` wraps four external tools (`pbir_inspector`, `tabular_editor_bpa`,
+`pql_test`, and whichever others `analyzers.json` lists), each pinned by a
+`tool_install.version` field so `doctor` and the cache can tell a stale binary
+from a current one. [`.github/workflows/check-tool-updates.yml`](../.github/workflows/check-tool-updates.yml)
+runs weekly, and opens an issue labeled `tool-update` naming any tool whose
+upstream has moved past the pin — that issue is normally what starts this
+procedure, though `python tools/check_tool_updates.py` can be run by hand too.
+
+1. **Edit the pin** in
+   [`src/fabric_ci_cd_dataops/metadata/analyzers.json`](../src/fabric_ci_cd_dataops/metadata/analyzers.json):
+   bump `tool_install.version` to the new release.
+2. **Record a fresh checksum per platform.** Download each platform's asset for
+   the new version and hash it:
+
+   ```bash
+   sha256sum <downloaded-asset>
+   ```
+
+   Write the result into `tool_install.install_sha256` (one hash) or
+   `install_sha256s` (`{"linux": ..., "win32": ..., "darwin": ...}`), matching
+   whichever key the tool's existing entry already uses. A pin without a
+   matching hash is worse than no pin — it lets a corrupted or substituted
+   download through silently.
+3. **Verify locally**, from a checkout with the analyzer's old cache still on
+   disk, that `fab-test doctor` reports the tool as not-yet-downloaded (the
+   version-keyed cache directory means the new pin cannot resolve the old
+   binary), then let it download and confirm the new version resolves cleanly:
+
+   ```bash
+   fab-test doctor --local
+   ```
+4. **Run the full test suite** — `analyzers.json` changes are covered by
+   `tests/test_fab_test_tool_bootstrap.py` and `tests/test_readiness.py`, among
+   others.
+5. **Commit** the `analyzers.json` change with a message naming the tool and
+   the version, e.g. `chore(tools): bump tabular_editor_bpa to 2.29.0`.
+
+`pql_test`'s entry deliberately carries no `version` field — it tracks the
+`pql-test==` pin in `pyproject.toml` instead, via `release_source.version_source
+== "pyproject.toml"`, so that version has exactly one place to change (see
+"Bump the version" above; the same file, different reason).
+
+---
+
 ## When a publish fails
 
 | Symptom | Cause |
