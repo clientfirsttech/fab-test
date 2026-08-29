@@ -50,3 +50,6 @@ fab-test-results/
 
 # Claude Code worktrees
 .claude/worktrees/
+
+# Power BI cache files (any folder level)
+**/cache.abf
