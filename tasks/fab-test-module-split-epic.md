@@ -1,6 +1,6 @@
 # Fab-Test Module Split Epic
 
-**Status**: 🚧 IN-PROGRESS — 4 of 6 tasks done
+**Status**: ✅ COMPLETED — 6 of 6 tasks done
 **Goal**: No file under `src/` over its 800-line hard budget; `fab_test.py` split into behavior-named modules the way its tests already were.
 
 ## Overview
@@ -170,21 +170,8 @@ tightened accordingly. 187 tests passed across every touched file; full
 `fab_test`-marker suite 923 passed (1 pre-existing exemption-ceiling test
 updated as part of this task, not a regression); `fab-test --help` and
 `bpa --dry-run` reconfirmed unchanged.
-  after the move, not only the one this epic touches first
 
-## Extract admin subcommands
-
-`_doctor`, `_doctor_local`, `_init`, `_config_show`, `_config_validate`,
-`_list_analyzers`, `_explain_analyzer`, `_auth`/`_auth_status`/`_auth_login`,
-and `_clean_tools` are reporting/config commands, not analyzer runs.
-
-**Requirements**:
-- Given admin subcommands move to `fab_test_admin.py`, should keep each
-  dispatched the same way from `main()`
-- Given `doctor` and `list` both call artifact discovery, should verify both
-  after the move per the Blast Radius table in vision.md, not just one
-
-## Extract the `local` bundle
+## Extract the `local` bundle  ✅
 
 `_local_readiness`, `_build_local_plan`, `_narrate_local_plan`, and
 `_run_local` are the no-cloud analyzer bundle from Local Desktop First Run,
@@ -196,7 +183,71 @@ already a distinct surface from the cloud-facing subcommands.
 - Given the split is done, should keep `doctor --local`'s readiness report
   unchanged
 
-## Ratchet the result
+Done: `_LOCAL_ANALYZERS`, `_pql_lint_path`, `_local_readiness`,
+`_project_matches_glob`, `_build_local_plan`, `_narrate_local_plan`, and
+`_run_local` all moved to the new `fab_test_local.py` (188 lines, well under
+the 400-line soft budget). Done *before* admin subcommands, reordering the
+epic's own stated sequence: `_doctor_local` (admin) calls `_local_readiness`
+and `_LOCAL_ANALYZERS` (local bundle), and extracting admin first would have
+made `fab_test_admin.py` import back from `fab_test.py` while `fab_test.py`
+also imports `_dispatch_admin_command`'s handlers from `fab_test_admin.py` --
+a circular import. Moving the local bundle first let admin import
+`_local_readiness`/`_LOCAL_ANALYZERS` from `.fab_test_local` cleanly, one
+direction only. `fab_test.py`: 1,087 → 926 lines, verified via
+`fab-test local --dry-run` and `doctor --local` byte-unchanged. Fixed
+monkeypatches in
+`test_local_command.py` and `test_run_manifest.py` that targeted
+`fab_test_module.{_local_readiness, _run_analyzer}` -- both callers moved to
+`fab_test_local.py`, so both needed retargeting; `test_doctor.py`'s
+`_local_readiness` patch (for `_doctor_local`, not yet moved at this point)
+correctly needed no change yet.
+
+## Extract admin subcommands  ✅
+
+`_doctor`, `_doctor_local`, `_init`, `_config_show`, `_config_validate`,
+`_list_analyzers`, `_explain_analyzer`, `_auth`/`_auth_status`/`_auth_login`,
+and `_clean_tools` are reporting/config commands, not analyzer runs.
+
+**Requirements**:
+- Given admin subcommands move to `fab_test_admin.py`, should keep each
+  dispatched the same way from `main()`
+- Given `doctor` and `list` both call artifact discovery, should verify both
+  after the move per the Blast Radius table in vision.md, not just one
+
+Done: `_print_help`, `_all_analyzers`, `_clean_tools`, `_is_secret_key`,
+`_config_validate`, `_ruleset_rows`, `_config_show`, `_init` (with its three
+template strings), `_doctor_local`, `_doctor`, `_list_analyzers`,
+`_explain_analyzer`, `_verify_ambient_credential`,
+`_check_workspace_reachable`, `_auth_status`, `_auth_login`, and `_auth` all
+moved to the new `fab_test_admin.py` (648 lines -- over the 400 soft budget,
+under the 800 hard one, no exemption needed). `_ADMIN_COMMAND_HANDLERS` and
+`_dispatch_admin_command` stayed in `fab_test.py` exactly as the epic's
+Ratchet task specifies, now importing the seven handlers from
+`fab_test_admin.py`. `fab_test.py`: 926 → **320 lines** -- the module this
+whole epic was about is now an order of magnitude under its own 800-line
+hard budget.
+
+Two blast-radius fixes discovered only by running the real CLI (`doctor`,
+`list`, `config --show`, `explain`, `auth status`) and by the test suite,
+not by inspection: `fab_test.py` had silently stopped importing `subprocess`
+and `shutil` once admin was the last consumer of both, which broke every
+test that patched `fab_test_module.subprocess`/`.shutil` across
+`test_auth.py`, `test_list_explain.py`, and (from the execution task)
+`test_fab_test_execution.py`, `test_fab_test_exit_codes.py`,
+`test_fab_test_output_contract.py`, `test_fab_test_telemetry_context.py`,
+`test_fab_test_telemetry_payload.py`, `test_run_manifest.py`,
+`test_local_command.py` -- the "shared module object" reasoning from the
+telemetry task only holds when *some* still-live import keeps the attribute
+on the module; once fab_test.py's own import disappeared, `fab_test_module.
+subprocess` raised `AttributeError` outright, and each patch needed
+retargeting to whichever module (`fab_test_execution`, `fab_test_admin`, or
+`_git_context` for the git-based tests) actually calls it now. Also missed
+by the first import rewrite: `_load_fab_test_all_analyzers` and
+`RESULTS_ROOT`, imported directly by `test_fab_test_discovery.py`,
+`test_scan.py`, and `test_target_discovery.py` but not re-exported --
+restored with `# noqa: F401`.
+
+## Ratchet the result  ✅
 
 **Requirements**:
 - Given every extraction is done, should remove `fab_test.py`'s exemption
@@ -208,6 +259,20 @@ already a distinct surface from the cloud-facing subcommands.
 - Given the whole suite ran before this epic started, should collect and
   pass the same count afterward, with coverage over
   `src/fabric_ci_cd_dataops` no lower than the recorded baseline
+
+Done: `fab_test.py`'s `EXEMPTIONS` entry removed entirely from
+`tests/test_module_budget.py` (320 lines, comfortably within the 800-line
+hard budget -- `test_every_exemption_still_needs_one` flagged it as dead
+weight the moment the file dropped under budget). `main()`, `_dispatch_run`,
+and `_dispatch_admin_command` all still live in `fab_test.py`. Final numbers
+against the 2026-08-28 baseline (2,956 lines, 1439 passed/3 skipped, 85%
+coverage): **fab_test.py is 320 lines** (a 89% reduction), five new modules
+(`_fab_test_context.py` 37, `fab_test_parser.py` 911, `fab_test_telemetry.py`
+381, `fab_test_execution.py` 685, `fab_test_local.py` 188,
+`fab_test_admin.py` 648), full suite **1439 passed, 3 skipped, coverage 86%**
+(up one point, floor 80%), `fab-test --help` and `bpa --dry-run` verified
+byte-identical throughout (save the version-bump line, unrelated to this
+epic) via the installed console script, not just the test suite.
 
 ---
 

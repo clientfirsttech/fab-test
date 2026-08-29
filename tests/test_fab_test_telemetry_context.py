@@ -32,7 +32,7 @@ from tests.conftest import _clear_github_env, _fake_git_run
 @pytest.mark.fab_test
 def test_git_context_prefers_github_env_vars(monkeypatch):
     """GitHub Actions env vars are used as-is when present."""
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fabric_ci_cd_dataops.scripts import _git_context as _git_context_module
 
     monkeypatch.setenv("GITHUB_REPOSITORY", "kerski/fab-test")
     monkeypatch.setenv("GITHUB_REF_NAME", "main")
@@ -40,7 +40,7 @@ def test_git_context_prefers_github_env_vars(monkeypatch):
     monkeypatch.setenv("GITHUB_ACTOR", "ci-bot")
     monkeypatch.setenv("GITHUB_RUN_ID", "42")
     monkeypatch.setattr(
-        fab_test_module.subprocess,
+        _git_context_module.subprocess,
         "run",
         lambda *a, **k: (_ for _ in ()).throw(AssertionError("git should not run")),
     )
@@ -58,11 +58,11 @@ def test_git_context_prefers_github_env_vars(monkeypatch):
 @pytest.mark.fab_test
 def test_git_context_falls_back_to_local_git_branch_and_commit(monkeypatch):
     """Outside GitHub Actions, branch and commit come from local git."""
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fabric_ci_cd_dataops.scripts import _git_context as _git_context_module
 
     _clear_github_env(monkeypatch)
     monkeypatch.setattr(
-        fab_test_module.subprocess,
+        _git_context_module.subprocess,
         "run",
         _fake_git_run(
             {
@@ -81,11 +81,11 @@ def test_git_context_falls_back_to_local_git_branch_and_commit(monkeypatch):
 @pytest.mark.fab_test
 def test_git_context_falls_back_to_local_git_user_email_for_actor(monkeypatch):
     """When GITHUB_ACTOR is unset, the actor falls back to git config user.email."""
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fabric_ci_cd_dataops.scripts import _git_context as _git_context_module
 
     _clear_github_env(monkeypatch)
     monkeypatch.setattr(
-        fab_test_module.subprocess,
+        _git_context_module.subprocess,
         "run",
         _fake_git_run(
             {
@@ -103,11 +103,11 @@ def test_git_context_falls_back_to_local_git_user_email_for_actor(monkeypatch):
 @pytest.mark.fab_test
 def test_git_context_falls_back_to_local_git_remote_for_repository_https(monkeypatch):
     """Outside GitHub Actions, repository is parsed from an HTTPS origin remote."""
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fabric_ci_cd_dataops.scripts import _git_context as _git_context_module
 
     _clear_github_env(monkeypatch)
     monkeypatch.setattr(
-        fab_test_module.subprocess,
+        _git_context_module.subprocess,
         "run",
         _fake_git_run(
             {
@@ -123,11 +123,11 @@ def test_git_context_falls_back_to_local_git_remote_for_repository_https(monkeyp
 @pytest.mark.fab_test
 def test_git_context_falls_back_to_local_git_remote_for_repository_ssh(monkeypatch):
     """Outside GitHub Actions, repository is parsed from an SSH origin remote."""
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fabric_ci_cd_dataops.scripts import _git_context as _git_context_module
 
     _clear_github_env(monkeypatch)
     monkeypatch.setattr(
-        fab_test_module.subprocess,
+        _git_context_module.subprocess,
         "run",
         _fake_git_run(
             {
@@ -143,11 +143,11 @@ def test_git_context_falls_back_to_local_git_remote_for_repository_ssh(monkeypat
 @pytest.mark.fab_test
 def test_git_context_repository_empty_when_no_origin_remote(monkeypatch):
     """No origin remote configured leaves repository empty, not crashing."""
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fabric_ci_cd_dataops.scripts import _git_context as _git_context_module
 
     _clear_github_env(monkeypatch)
     monkeypatch.setattr(
-        fab_test_module.subprocess, "run", _fake_git_run({})  # every command "fails"
+        _git_context_module.subprocess, "run", _fake_git_run({})  # every command "fails"
     )
 
     ctx = _git_context()
@@ -157,12 +157,12 @@ def test_git_context_repository_empty_when_no_origin_remote(monkeypatch):
 @pytest.mark.fab_test
 def test_git_context_repository_not_overridden_by_git_when_github_repository_set(monkeypatch):
     """GITHUB_REPOSITORY wins over the local origin remote even if both resolve."""
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fabric_ci_cd_dataops.scripts import _git_context as _git_context_module
 
     _clear_github_env(monkeypatch)
     monkeypatch.setenv("GITHUB_REPOSITORY", "kerski/fab-test")
     monkeypatch.setattr(
-        fab_test_module.subprocess,
+        _git_context_module.subprocess,
         "run",
         _fake_git_run(
             {"remote get-url origin": "https://github.com/someone-else/fork.git\n"}
@@ -176,11 +176,11 @@ def test_git_context_repository_not_overridden_by_git_when_github_repository_set
 @pytest.mark.fab_test
 def test_git_context_actor_empty_when_git_config_has_no_email(monkeypatch):
     """A git config with no user.email set leaves actor empty, not crashing."""
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fabric_ci_cd_dataops.scripts import _git_context as _git_context_module
 
     _clear_github_env(monkeypatch)
     monkeypatch.setattr(
-        fab_test_module.subprocess, "run", _fake_git_run({})  # every command "fails"
+        _git_context_module.subprocess, "run", _fake_git_run({})  # every command "fails"
     )
 
     ctx = _git_context()
@@ -192,11 +192,11 @@ def test_git_context_actor_empty_when_git_config_has_no_email(monkeypatch):
 @pytest.mark.fab_test
 def test_git_context_returns_empty_strings_when_git_is_unavailable(monkeypatch):
     """If git itself is missing, _git_context degrades to empty fields, no crash."""
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fabric_ci_cd_dataops.scripts import _git_context as _git_context_module
 
     _clear_github_env(monkeypatch)
     monkeypatch.setattr(
-        fab_test_module.subprocess,
+        _git_context_module.subprocess,
         "run",
         lambda *a, **k: (_ for _ in ()).throw(FileNotFoundError("git not found")),
     )
@@ -214,12 +214,12 @@ def test_git_context_returns_empty_strings_when_git_is_unavailable(monkeypatch):
 @pytest.mark.fab_test
 def test_git_context_actor_not_overridden_by_git_when_github_actor_set(monkeypatch):
     """GITHUB_ACTOR wins over the local git user.email even if both are set."""
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fabric_ci_cd_dataops.scripts import _git_context as _git_context_module
 
     _clear_github_env(monkeypatch)
     monkeypatch.setenv("GITHUB_ACTOR", "ci-bot")
     monkeypatch.setattr(
-        fab_test_module.subprocess,
+        _git_context_module.subprocess,
         "run",
         _fake_git_run({"config user.email": "dev@example.com\n"}),
     )

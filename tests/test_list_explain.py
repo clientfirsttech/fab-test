@@ -125,7 +125,7 @@ class _ExplainArgs:
 @pytest.mark.fab_test
 def test_explain_bpa_never_spawns_a_subprocess(tmp_path, monkeypatch):
     """explain builds the resolved command but never executes it."""
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fabric_ci_cd_dataops.scripts import fab_test_admin
 
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
@@ -133,10 +133,10 @@ def test_explain_bpa_never_spawns_a_subprocess(tmp_path, monkeypatch):
     def _fail_if_called(*_a, **_k):
         raise AssertionError("explain must never spawn a subprocess")
 
-    monkeypatch.setattr(fab_test_module.subprocess, "run", _fail_if_called)
+    monkeypatch.setattr(fab_test_admin.subprocess, "run", _fail_if_called)
 
     args = _ExplainArgs("bpa", artifact_dir, tmp_path / "results")
-    code = fab_test_module._explain_analyzer(args)
+    code = fab_test_admin._explain_analyzer(args)
 
     assert code == 0
 
@@ -196,17 +196,17 @@ def test_explain_unknown_analyzer_exits_2_and_lists_valid_names():
 @pytest.mark.fab_test
 def test_explain_rules_path_falls_back_to_default_when_not_overridden(tmp_path, capsys):
     """rules_path reports the real default the command uses, not null."""
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fabric_ci_cd_dataops.scripts import fab_test_admin
 
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
 
     args = _ExplainArgs("bpa", artifact_dir, tmp_path / "results")
-    fab_test_module._explain_analyzer(args)
+    fab_test_admin._explain_analyzer(args)
     captured = capsys.readouterr()
 
     payload = json.loads(captured.out)
-    assert payload["rules_path"] == fab_test_module._DEFAULT_BPA_RULES
+    assert payload["rules_path"] == fab_test_admin._DEFAULT_BPA_RULES
     assert payload["rules_path"] in payload["command"]
 
 

@@ -73,7 +73,6 @@ def test_bpa_help_shows_timeout_flag():
 @pytest.mark.fab_test
 def test_run_analyzer_passes_resolved_timeout_to_subprocess(tmp_path, monkeypatch):
     """_run_analyzer forwards the resolved timeout to subprocess.run."""
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
     from fabric_ci_cd_dataops.scripts import fab_test_execution
 
     artifact_dir = tmp_path / "artifacts"
@@ -89,7 +88,7 @@ def test_run_analyzer_passes_resolved_timeout_to_subprocess(tmp_path, monkeypatc
         captured_timeouts.append(kwargs.get("timeout"))
         return subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
 
-    monkeypatch.setattr(fab_test_module.subprocess, "run", _fake_subprocess)
+    monkeypatch.setattr(fab_test_execution.subprocess, "run", _fake_subprocess)
 
     args = _RunAnalyzerArgs(artifact_dir, output_dir, artifact="SampleModel", timeout=45)
     code = _run_analyzer("pql_lint", args, output_dir)
@@ -125,7 +124,6 @@ def test_run_analyzer_default_jobs_runs_artifacts_sequentially(tmp_path, monkeyp
     import threading
     import time
 
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
     from fabric_ci_cd_dataops.scripts import fab_test_execution
 
     artifact_dir = tmp_path / "artifacts"
@@ -149,7 +147,7 @@ def test_run_analyzer_default_jobs_runs_artifacts_sequentially(tmp_path, monkeyp
             active -= 1
         return subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
 
-    monkeypatch.setattr(fab_test_module.subprocess, "run", _fake_subprocess)
+    monkeypatch.setattr(fab_test_execution.subprocess, "run", _fake_subprocess)
 
     args = _RunAnalyzerArgs(artifact_dir, output_dir, jobs=1)
     code = _run_analyzer("pql_lint", args, output_dir)
@@ -163,7 +161,6 @@ def test_run_analyzer_jobs_n_runs_artifacts_concurrently(tmp_path, monkeypatch):
     """--jobs 3 runs up to 3 artifacts of the same analyzer in parallel."""
     import threading
 
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
     from fabric_ci_cd_dataops.scripts import fab_test_execution
 
     artifact_dir = tmp_path / "artifacts"
@@ -181,7 +178,7 @@ def test_run_analyzer_jobs_n_runs_artifacts_concurrently(tmp_path, monkeypatch):
         barrier.wait()
         return subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
 
-    monkeypatch.setattr(fab_test_module.subprocess, "run", _fake_subprocess)
+    monkeypatch.setattr(fab_test_execution.subprocess, "run", _fake_subprocess)
 
     args = _RunAnalyzerArgs(artifact_dir, output_dir, jobs=3)
     code = _run_analyzer("pql_lint", args, output_dir)
@@ -192,7 +189,6 @@ def test_run_analyzer_jobs_n_runs_artifacts_concurrently(tmp_path, monkeypatch):
 @pytest.mark.fab_test
 def test_run_analyzer_parallel_writes_one_envelope_per_artifact(tmp_path, monkeypatch):
     """Each artifact still writes its own envelope; the summary waits for all."""
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
     from fabric_ci_cd_dataops.scripts import fab_test_execution
 
     artifact_dir = tmp_path / "artifacts"
@@ -214,7 +210,7 @@ def test_run_analyzer_parallel_writes_one_envelope_per_artifact(tmp_path, monkey
         )
         return subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
 
-    monkeypatch.setattr(fab_test_module.subprocess, "run", _fake_subprocess)
+    monkeypatch.setattr(fab_test_execution.subprocess, "run", _fake_subprocess)
 
     args = _RunAnalyzerArgs(artifact_dir, output_dir, jobs=3)
     code = _run_analyzer("pql_lint", args, output_dir)
@@ -234,7 +230,6 @@ def test_run_analyzer_parallel_writes_one_envelope_per_artifact(tmp_path, monkey
 @pytest.mark.fab_test
 def test_progress_shown_non_ci_multiple_artifacts(tmp_path, monkeypatch, capsys):
     """A non-CI run with multiple artifacts shows 'artifact N of M'."""
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
     from fabric_ci_cd_dataops.scripts import fab_test_execution
 
     artifact_dir = tmp_path / "artifacts"
@@ -244,7 +239,7 @@ def test_progress_shown_non_ci_multiple_artifacts(tmp_path, monkeypatch, capsys)
 
     monkeypatch.setattr(fab_test_execution, "_is_ci", lambda: False)
     monkeypatch.setattr(fab_test_execution, "_send_telemetry", lambda *a, **k: None)
-    monkeypatch.setattr(fab_test_module.subprocess, "run", _stub_subprocess_run)
+    monkeypatch.setattr(fab_test_execution.subprocess, "run", _stub_subprocess_run)
 
     args = _RunAnalyzerArgs(artifact_dir, output_dir, output_format="text")
     code = _run_analyzer("pql_lint", args, output_dir)
@@ -259,7 +254,6 @@ def test_progress_shown_non_ci_multiple_artifacts(tmp_path, monkeypatch, capsys)
 @pytest.mark.fab_test
 def test_progress_not_shown_for_single_artifact(tmp_path, monkeypatch, capsys):
     """A single-artifact run shows no 'N of 1' progress noise."""
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
     from fabric_ci_cd_dataops.scripts import fab_test_execution
 
     artifact_dir = tmp_path / "artifacts"
@@ -268,7 +262,7 @@ def test_progress_not_shown_for_single_artifact(tmp_path, monkeypatch, capsys):
 
     monkeypatch.setattr(fab_test_execution, "_is_ci", lambda: False)
     monkeypatch.setattr(fab_test_execution, "_send_telemetry", lambda *a, **k: None)
-    monkeypatch.setattr(fab_test_module.subprocess, "run", _stub_subprocess_run)
+    monkeypatch.setattr(fab_test_execution.subprocess, "run", _stub_subprocess_run)
 
     args = _RunAnalyzerArgs(artifact_dir, output_dir, output_format="text")
     code = _run_analyzer("pql_lint", args, output_dir)
@@ -281,7 +275,6 @@ def test_progress_not_shown_for_single_artifact(tmp_path, monkeypatch, capsys):
 @pytest.mark.fab_test
 def test_progress_emitted_as_ci_notice(tmp_path, monkeypatch, capsys):
     """In CI (GITHUB_ACTIONS), progress is a ::notice:: annotation, not plain text."""
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
     from fabric_ci_cd_dataops.scripts import fab_test_execution
 
     artifact_dir = tmp_path / "artifacts"
@@ -292,7 +285,7 @@ def test_progress_emitted_as_ci_notice(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(fab_test_execution, "_is_ci", lambda: True)
     monkeypatch.setattr(fab_test_execution, "_send_telemetry", lambda *a, **k: None)
     monkeypatch.setattr(fab_test_execution, "emit_workflow_annotations", lambda *a, **k: None)
-    monkeypatch.setattr(fab_test_module.subprocess, "run", _stub_subprocess_run)
+    monkeypatch.setattr(fab_test_execution.subprocess, "run", _stub_subprocess_run)
 
     args = _RunAnalyzerArgs(artifact_dir, output_dir, output_format="text")
     code = _run_analyzer("pql_lint", args, output_dir)
@@ -308,7 +301,6 @@ def test_progress_emitted_as_ci_notice(tmp_path, monkeypatch, capsys):
 @pytest.mark.fab_test
 def test_artifact_start_line_still_printed_alongside_progress(tmp_path, monkeypatch, capsys):
     """The per-artifact '▶ fab-test ... → stem' line still prints as artifacts start."""
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
     from fabric_ci_cd_dataops.scripts import fab_test_execution
 
     artifact_dir = tmp_path / "artifacts"
@@ -317,7 +309,7 @@ def test_artifact_start_line_still_printed_alongside_progress(tmp_path, monkeypa
 
     monkeypatch.setattr(fab_test_execution, "_is_ci", lambda: False)
     monkeypatch.setattr(fab_test_execution, "_send_telemetry", lambda *a, **k: None)
-    monkeypatch.setattr(fab_test_module.subprocess, "run", _stub_subprocess_run)
+    monkeypatch.setattr(fab_test_execution.subprocess, "run", _stub_subprocess_run)
 
     args = _RunAnalyzerArgs(artifact_dir, output_dir, output_format="text")
     args.verbose = 1
@@ -355,7 +347,6 @@ def _make_warning_envelope(output_dir: Path, analyzer: str, stem: str) -> None:
 @pytest.mark.fab_test
 def test_run_analyzer_warning_no_name_error_outside_ci(tmp_path, monkeypatch):
     """Regression: warning-level findings must not raise NameError outside CI."""
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
     from fabric_ci_cd_dataops.scripts import fab_test_execution
 
     artifact_dir = tmp_path / "artifacts"
@@ -366,7 +357,7 @@ def test_run_analyzer_warning_no_name_error_outside_ci(tmp_path, monkeypatch):
     monkeypatch.setattr(fab_test_execution, "_is_ci", lambda: False)
     monkeypatch.setattr(fab_test_execution, "_send_telemetry", lambda *a, **k: None)
     monkeypatch.setattr(
-        fab_test_module.subprocess,
+        fab_test_execution.subprocess,
         "run",
         lambda *a, **k: subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr=""),
     )
@@ -379,7 +370,6 @@ def test_run_analyzer_warning_no_name_error_outside_ci(tmp_path, monkeypatch):
 @pytest.mark.fab_test
 def test_run_analyzer_warning_emits_pr_review_comment_in_ci(tmp_path, monkeypatch):
     """Warning-level findings trigger PR review comments when running in CI."""
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
     from fabric_ci_cd_dataops.scripts import fab_test_execution
 
     artifact_dir = tmp_path / "artifacts"
@@ -401,7 +391,7 @@ def test_run_analyzer_warning_emits_pr_review_comment_in_ci(tmp_path, monkeypatc
         lambda *a, **k: calls.append("pr_comment"),
     )
     monkeypatch.setattr(
-        fab_test_module.subprocess,
+        fab_test_execution.subprocess,
         "run",
         lambda *a, **k: subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr=""),
     )
@@ -418,7 +408,6 @@ def test_run_analyzer_playwright_with_impact_manifest_is_repository_scoped(
     tmp_path, monkeypatch
 ):
     """Playwright with --impact-manifest runs once, not per local Report artifact."""
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
     from fabric_ci_cd_dataops.scripts import fab_test_execution
 
     artifact_dir = tmp_path / "artifacts"
@@ -437,7 +426,7 @@ def test_run_analyzer_playwright_with_impact_manifest_is_repository_scoped(
         commands.append(list(args[0]))
         return subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
 
-    monkeypatch.setattr(fab_test_module.subprocess, "run", _fake_subprocess)
+    monkeypatch.setattr(fab_test_execution.subprocess, "run", _fake_subprocess)
 
     args = _RunAnalyzerArgs(
         artifact_dir,
@@ -454,7 +443,6 @@ def test_run_analyzer_playwright_with_impact_manifest_is_repository_scoped(
 @pytest.mark.fab_test
 def test_run_analyzer_error_does_not_emit_pr_review_comment(tmp_path, monkeypatch):
     """Error-level findings are annotations only; PR comments are reserved for warnings."""
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
     from fabric_ci_cd_dataops.scripts import fab_test_execution
 
     artifact_dir = tmp_path / "artifacts"
@@ -488,7 +476,7 @@ def test_run_analyzer_error_does_not_emit_pr_review_comment(tmp_path, monkeypatc
         lambda *a, **k: calls.append("pr_comment"),
     )
     monkeypatch.setattr(
-        fab_test_module.subprocess,
+        fab_test_execution.subprocess,
         "run",
         lambda *a, **k: subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr=""),
     )
