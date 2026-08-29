@@ -28,7 +28,6 @@ def test_json_format_real_run_has_no_narration_on_stdout(tmp_path, monkeypatch, 
     """A real (non-dry-run) analyzer run under --format json narrates only to
     stderr; stdout carries just the final JSON summary from _print_summary.
     """
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
     from fabric_ci_cd_dataops.scripts import fab_test_execution
 
     artifact_dir = tmp_path / "artifacts"
@@ -38,7 +37,7 @@ def test_json_format_real_run_has_no_narration_on_stdout(tmp_path, monkeypatch, 
 
     monkeypatch.setattr(fab_test_execution, "_is_ci", lambda: False)
     monkeypatch.setattr(fab_test_execution, "_send_telemetry", lambda *a, **k: None)
-    monkeypatch.setattr(fab_test_module.subprocess, "run", _stub_subprocess_run)
+    monkeypatch.setattr(fab_test_execution.subprocess, "run", _stub_subprocess_run)
 
     args = _RunAnalyzerArgs(artifact_dir, output_dir, output_format="json")
     code = _run_analyzer("pql_lint", args, output_dir)
@@ -54,7 +53,6 @@ def test_json_format_real_run_has_no_narration_on_stdout(tmp_path, monkeypatch, 
 @pytest.mark.fab_test
 def test_text_format_narration_still_on_stdout(tmp_path, monkeypatch, capsys):
     """--format text keeps narration on stdout exactly as before (regression)."""
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
     from fabric_ci_cd_dataops.scripts import fab_test_execution
 
     artifact_dir = tmp_path / "artifacts"
@@ -63,7 +61,7 @@ def test_text_format_narration_still_on_stdout(tmp_path, monkeypatch, capsys):
 
     monkeypatch.setattr(fab_test_execution, "_is_ci", lambda: False)
     monkeypatch.setattr(fab_test_execution, "_send_telemetry", lambda *a, **k: None)
-    monkeypatch.setattr(fab_test_module.subprocess, "run", _stub_subprocess_run)
+    monkeypatch.setattr(fab_test_execution.subprocess, "run", _stub_subprocess_run)
 
     args = _RunAnalyzerArgs(artifact_dir, output_dir, output_format="text")
     code = _run_analyzer("pql_lint", args, output_dir)
@@ -101,7 +99,6 @@ def test_missing_artifacts_warning_narrated_by_format(tmp_path, capsys):
 @pytest.mark.fab_test
 def test_json_format_passes_stdout_pipe_to_subprocess(tmp_path, monkeypatch):
     """--format json captures the analyzer subprocess's stdout via PIPE."""
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
     from fabric_ci_cd_dataops.scripts import fab_test_execution
 
     artifact_dir = tmp_path / "artifacts"
@@ -116,7 +113,7 @@ def test_json_format_passes_stdout_pipe_to_subprocess(tmp_path, monkeypatch):
         captured_kwargs.update(kwargs)
         return subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
 
-    monkeypatch.setattr(fab_test_module.subprocess, "run", _fake_subprocess)
+    monkeypatch.setattr(fab_test_execution.subprocess, "run", _fake_subprocess)
 
     args = _RunAnalyzerArgs(artifact_dir, output_dir, output_format="json")
     _run_analyzer("pql_lint", args, output_dir)
@@ -127,7 +124,6 @@ def test_json_format_passes_stdout_pipe_to_subprocess(tmp_path, monkeypatch):
 @pytest.mark.fab_test
 def test_text_format_does_not_capture_subprocess_stdout(tmp_path, monkeypatch):
     """--format text leaves subprocess stdout inherited: no capture, no added latency."""
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
     from fabric_ci_cd_dataops.scripts import fab_test_execution
 
     artifact_dir = tmp_path / "artifacts"
@@ -142,7 +138,7 @@ def test_text_format_does_not_capture_subprocess_stdout(tmp_path, monkeypatch):
         captured_kwargs.update(kwargs)
         return subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
 
-    monkeypatch.setattr(fab_test_module.subprocess, "run", _fake_subprocess)
+    monkeypatch.setattr(fab_test_execution.subprocess, "run", _fake_subprocess)
 
     args = _RunAnalyzerArgs(artifact_dir, output_dir, output_format="text")
     _run_analyzer("pql_lint", args, output_dir)
@@ -155,7 +151,6 @@ def test_json_format_reemits_captured_subprocess_stdout_to_stderr(tmp_path, monk
     """The analyzer's own stdout banner is re-emitted on stderr under --format json,
     leaving stdout as a single parseable JSON document.
     """
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
     from fabric_ci_cd_dataops.scripts import fab_test_execution
 
     artifact_dir = tmp_path / "artifacts"
@@ -164,7 +159,7 @@ def test_json_format_reemits_captured_subprocess_stdout_to_stderr(tmp_path, monk
 
     monkeypatch.setattr(fab_test_execution, "_send_telemetry", lambda *a, **k: None)
     monkeypatch.setattr(
-        fab_test_module.subprocess,
+        fab_test_execution.subprocess,
         "run",
         lambda cmd, **k: subprocess.CompletedProcess(
             args=[], returncode=0, stdout="Tabular Editor BPA banner\n", stderr=""
@@ -184,7 +179,6 @@ def test_json_format_reemits_captured_subprocess_stdout_to_stderr(tmp_path, monk
 @pytest.mark.fab_test
 def test_json_format_verbose_still_narrates_and_stdout_stays_valid(tmp_path, monkeypatch, capsys):
     """--format json -v still narrates captured output to stderr; stdout still parses."""
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
     from fabric_ci_cd_dataops.scripts import fab_test_execution
 
     artifact_dir = tmp_path / "artifacts"
@@ -193,7 +187,7 @@ def test_json_format_verbose_still_narrates_and_stdout_stays_valid(tmp_path, mon
 
     monkeypatch.setattr(fab_test_execution, "_send_telemetry", lambda *a, **k: None)
     monkeypatch.setattr(
-        fab_test_module.subprocess,
+        fab_test_execution.subprocess,
         "run",
         lambda cmd, **k: subprocess.CompletedProcess(
             args=[], returncode=0, stdout="debug banner\n", stderr=""
@@ -216,7 +210,6 @@ def test_json_format_timeout_reemits_captured_stdout_before_timeout(
     tmp_path, monkeypatch, capsys
 ):
     """A subprocess timeout still re-emits whatever stdout was captured before it fired."""
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
     from fabric_ci_cd_dataops.scripts import fab_test_execution
 
     artifact_dir = tmp_path / "artifacts"
@@ -228,7 +221,7 @@ def test_json_format_timeout_reemits_captured_stdout_before_timeout(
     def _fake_subprocess(cmd, **kwargs):
         raise subprocess.TimeoutExpired(cmd=cmd, timeout=1, output="partial banner\n")
 
-    monkeypatch.setattr(fab_test_module.subprocess, "run", _fake_subprocess)
+    monkeypatch.setattr(fab_test_execution.subprocess, "run", _fake_subprocess)
 
     args = _RunAnalyzerArgs(
         artifact_dir, output_dir, output_format="json", timeout=1
@@ -248,7 +241,6 @@ def test_json_format_timeout_reemits_captured_stdout_before_timeout(
 @pytest.mark.fab_test
 def test_json_format_sets_analyzer_output_mode_env_for_subprocess(tmp_path, monkeypatch):
     """--format json sets ANALYZER_OUTPUT_MODE=json in the subprocess environment."""
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
     from fabric_ci_cd_dataops.scripts import fab_test_execution
 
     artifact_dir = tmp_path / "artifacts"
@@ -263,7 +255,7 @@ def test_json_format_sets_analyzer_output_mode_env_for_subprocess(tmp_path, monk
         captured_kwargs.update(kwargs)
         return subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
 
-    monkeypatch.setattr(fab_test_module.subprocess, "run", _fake_subprocess)
+    monkeypatch.setattr(fab_test_execution.subprocess, "run", _fake_subprocess)
 
     args = _RunAnalyzerArgs(artifact_dir, output_dir, output_format="json")
     _run_analyzer("pql_lint", args, output_dir)
@@ -274,7 +266,6 @@ def test_json_format_sets_analyzer_output_mode_env_for_subprocess(tmp_path, monk
 @pytest.mark.fab_test
 def test_text_format_leaves_analyzer_output_mode_env_unset(tmp_path, monkeypatch):
     """--format text does not set ANALYZER_OUTPUT_MODE, matching direct invocation."""
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
     from fabric_ci_cd_dataops.scripts import fab_test_execution
 
     artifact_dir = tmp_path / "artifacts"
@@ -289,7 +280,7 @@ def test_text_format_leaves_analyzer_output_mode_env_unset(tmp_path, monkeypatch
         captured_kwargs.update(kwargs)
         return subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
 
-    monkeypatch.setattr(fab_test_module.subprocess, "run", _fake_subprocess)
+    monkeypatch.setattr(fab_test_execution.subprocess, "run", _fake_subprocess)
 
     args = _RunAnalyzerArgs(artifact_dir, output_dir, output_format="text")
     _run_analyzer("pql_lint", args, output_dir)

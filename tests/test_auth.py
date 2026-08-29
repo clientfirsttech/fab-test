@@ -22,6 +22,7 @@ import sys
 import pytest
 
 from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+from fabric_ci_cd_dataops.scripts import fab_test_admin
 from fabric_ci_cd_dataops.scripts._credentials import CredentialStatus
 
 _GUID = "33333333-3333-3333-3333-333333333333"
@@ -76,7 +77,7 @@ def _run_cli(*argv, env=None, cwd=None):
 @pytest.mark.fab_test
 def test_status_exits_zero_when_credentials_resolve(monkeypatch, capsys):
     """The happy path: a verified identity is reported and the command succeeds."""
-    monkeypatch.setattr(fab_test_module, "probe_credentials", lambda **kw: _resolved())
+    monkeypatch.setattr(fab_test_admin, "probe_credentials", lambda **kw: _resolved())
 
     assert fab_test_module._auth(_args()) == 0
     assert "environment" in capsys.readouterr().out
@@ -86,7 +87,7 @@ def test_status_exits_zero_when_credentials_resolve(monkeypatch, capsys):
 def test_status_exits_127_when_nothing_resolves(monkeypatch, capsys):
     """No credentials is a missing prerequisite, the established 127."""
     monkeypatch.setattr(
-        fab_test_module,
+        fab_test_admin,
         "probe_credentials",
         lambda **kw: CredentialStatus(
             source=None,
@@ -105,11 +106,11 @@ def test_status_exits_127_when_nothing_resolves(monkeypatch, capsys):
 def test_status_verifies_an_unverified_ambient_credential(monkeypatch, capsys):
     """The §7 probe defers to here; here it actually acquires a token."""
     monkeypatch.setattr(
-        fab_test_module,
+        fab_test_admin,
         "probe_credentials",
         lambda **kw: _resolved(source="ambient:DefaultAzureCredential", verified=False),
     )
-    monkeypatch.setattr(fab_test_module, "_verify_ambient_credential", lambda: None)
+    monkeypatch.setattr(fab_test_admin, "_verify_ambient_credential", lambda: None)
 
     assert fab_test_module._auth(_args()) == 0
     assert "verified" in capsys.readouterr().out.lower()
@@ -123,11 +124,11 @@ def test_status_reports_why_an_ambient_credential_failed(monkeypatch, capsys):
         raise RuntimeError("DefaultAzureCredential found no usable credential")
 
     monkeypatch.setattr(
-        fab_test_module,
+        fab_test_admin,
         "probe_credentials",
         lambda **kw: _resolved(source="ambient:DefaultAzureCredential", verified=False),
     )
-    monkeypatch.setattr(fab_test_module, "_verify_ambient_credential", _fail)
+    monkeypatch.setattr(fab_test_admin, "_verify_ambient_credential", _fail)
 
     assert fab_test_module._auth(_args()) == 127
     assert "no usable credential" in capsys.readouterr().out
@@ -136,8 +137,8 @@ def test_status_reports_why_an_ambient_credential_failed(monkeypatch, capsys):
 @pytest.mark.fab_test
 def test_status_reports_workspace_reachability(monkeypatch, capsys):
     """Moved here from §7: reachability needs a network call the probe cannot make."""
-    monkeypatch.setattr(fab_test_module, "probe_credentials", lambda **kw: _resolved())
-    monkeypatch.setattr(fab_test_module, "_check_workspace_reachable", lambda ws, args: True)
+    monkeypatch.setattr(fab_test_admin, "probe_credentials", lambda **kw: _resolved())
+    monkeypatch.setattr(fab_test_admin, "_check_workspace_reachable", lambda ws, args: True)
 
     assert fab_test_module._auth(_args(workspace_id=_GUID)) == 0
     assert "reachable" in capsys.readouterr().out.lower()
@@ -146,8 +147,8 @@ def test_status_reports_workspace_reachability(monkeypatch, capsys):
 @pytest.mark.fab_test
 def test_status_exits_1_when_the_workspace_is_unreachable(monkeypatch):
     """Credentials work but the workspace does not: a real failure, not a missing tool."""
-    monkeypatch.setattr(fab_test_module, "probe_credentials", lambda **kw: _resolved())
-    monkeypatch.setattr(fab_test_module, "_check_workspace_reachable", lambda ws, args: False)
+    monkeypatch.setattr(fab_test_admin, "probe_credentials", lambda **kw: _resolved())
+    monkeypatch.setattr(fab_test_admin, "_check_workspace_reachable", lambda ws, args: False)
 
     assert fab_test_module._auth(_args(workspace_id=_GUID)) == 1
 
@@ -155,12 +156,12 @@ def test_status_exits_1_when_the_workspace_is_unreachable(monkeypatch):
 @pytest.mark.fab_test
 def test_status_makes_no_network_call_without_a_workspace(monkeypatch):
     """Nothing to reach means nothing is reached."""
-    monkeypatch.setattr(fab_test_module, "probe_credentials", lambda **kw: _resolved())
+    monkeypatch.setattr(fab_test_admin, "probe_credentials", lambda **kw: _resolved())
 
     def _fail(ws, args):
         raise AssertionError("must not check reachability with no workspace")
 
-    monkeypatch.setattr(fab_test_module, "_check_workspace_reachable", _fail)
+    monkeypatch.setattr(fab_test_admin, "_check_workspace_reachable", _fail)
 
     assert fab_test_module._auth(_args()) == 0
 
@@ -168,7 +169,7 @@ def test_status_makes_no_network_call_without_a_workspace(monkeypatch):
 @pytest.mark.fab_test
 def test_status_json_is_one_document(monkeypatch, capsys):
     """--format json emits a single parseable document."""
-    monkeypatch.setattr(fab_test_module, "probe_credentials", lambda **kw: _resolved())
+    monkeypatch.setattr(fab_test_admin, "probe_credentials", lambda **kw: _resolved())
 
     fab_test_module._auth(_args(output_format="json"))
 
@@ -231,7 +232,7 @@ def test_status_redacts_a_live_secret_that_reaches_the_output(monkeypatch, capsy
     """
     monkeypatch.setenv("FABRIC_SERVICE_PRINCIPAL_SECRET", _SECRET)
     monkeypatch.setattr(
-        fab_test_module,
+        fab_test_admin,
         "probe_credentials",
         lambda **kw: _resolved(detail=f"service principal ({_SECRET})"),
     )
@@ -246,7 +247,7 @@ def test_status_redacts_a_live_secret_that_reaches_the_output(monkeypatch, capsy
 @pytest.mark.fab_test
 def test_status_json_reports_an_absent_workspace_as_null(monkeypatch, capsys):
     """A consumer tests one thing rather than a missing key."""
-    monkeypatch.setattr(fab_test_module, "probe_credentials", lambda **kw: _resolved())
+    monkeypatch.setattr(fab_test_admin, "probe_credentials", lambda **kw: _resolved())
 
     fab_test_module._auth(_args(output_format="json"))
 
@@ -261,14 +262,14 @@ def test_status_json_reports_an_absent_workspace_as_null(monkeypatch, capsys):
 @pytest.mark.fab_test
 def test_login_delegates_to_pql_test_and_propagates_its_exit_code(monkeypatch, capsys):
     """fab-test owns no credential store; the underlying tool does the login."""
-    monkeypatch.setattr(fab_test_module.shutil, "which", lambda name: f"/usr/bin/{name}")
+    monkeypatch.setattr(fab_test_admin.shutil, "which", lambda name: f"/usr/bin/{name}")
     recorded = {}
 
     def _fake_run(cmd, **kwargs):
         recorded["cmd"] = cmd
         return subprocess.CompletedProcess(cmd, 3)
 
-    monkeypatch.setattr(fab_test_module.subprocess, "run", _fake_run)
+    monkeypatch.setattr(fab_test_admin.subprocess, "run", _fake_run)
 
     assert fab_test_module._auth(_args(auth_command="login")) == 3
     assert recorded["cmd"][:3] == ["/usr/bin/pql-test", "auth", "login"]
@@ -278,9 +279,9 @@ def test_login_delegates_to_pql_test_and_propagates_its_exit_code(monkeypatch, c
 @pytest.mark.fab_test
 def test_login_prints_the_command_before_running_it(monkeypatch, capsys):
     """The caller can reproduce the login without fab-test in the loop."""
-    monkeypatch.setattr(fab_test_module.shutil, "which", lambda name: f"/usr/bin/{name}")
+    monkeypatch.setattr(fab_test_admin.shutil, "which", lambda name: f"/usr/bin/{name}")
     monkeypatch.setattr(
-        fab_test_module.subprocess, "run", lambda cmd, **kw: subprocess.CompletedProcess(cmd, 0)
+        fab_test_admin.subprocess, "run", lambda cmd, **kw: subprocess.CompletedProcess(cmd, 0)
     )
 
     fab_test_module._auth(_args(auth_command="login"))
@@ -291,14 +292,14 @@ def test_login_prints_the_command_before_running_it(monkeypatch, capsys):
 @pytest.mark.fab_test
 def test_login_passes_the_cloud_through(monkeypatch):
     """--cloud selects a sovereign cloud and reaches the delegated tool."""
-    monkeypatch.setattr(fab_test_module.shutil, "which", lambda name: f"/usr/bin/{name}")
+    monkeypatch.setattr(fab_test_admin.shutil, "which", lambda name: f"/usr/bin/{name}")
     recorded = {}
 
     def _fake_run(cmd, **kwargs):
         recorded["cmd"] = cmd
         return subprocess.CompletedProcess(cmd, 0)
 
-    monkeypatch.setattr(fab_test_module.subprocess, "run", _fake_run)
+    monkeypatch.setattr(fab_test_admin.subprocess, "run", _fake_run)
 
     fab_test_module._auth(_args(auth_command="login", cloud="USGov"))
 
@@ -309,7 +310,7 @@ def test_login_passes_the_cloud_through(monkeypatch):
 @pytest.mark.fab_test
 def test_login_without_a_delegable_tool_names_the_alternative(monkeypatch, capsys):
     """No pql-test: say what to run instead rather than failing silently."""
-    monkeypatch.setattr(fab_test_module.shutil, "which", lambda name: None)
+    monkeypatch.setattr(fab_test_admin.shutil, "which", lambda name: None)
 
     assert fab_test_module._auth(_args(auth_command="login")) == 127
     output = capsys.readouterr().out
@@ -320,9 +321,9 @@ def test_login_without_a_delegable_tool_names_the_alternative(monkeypatch, capsy
 @pytest.mark.fab_test
 def test_login_writes_no_credential_file(monkeypatch, tmp_path):
     """The whole point of delegating: fab-test never becomes a credential store."""
-    monkeypatch.setattr(fab_test_module.shutil, "which", lambda name: f"/usr/bin/{name}")
+    monkeypatch.setattr(fab_test_admin.shutil, "which", lambda name: f"/usr/bin/{name}")
     monkeypatch.setattr(
-        fab_test_module.subprocess, "run", lambda cmd, **kw: subprocess.CompletedProcess(cmd, 0)
+        fab_test_admin.subprocess, "run", lambda cmd, **kw: subprocess.CompletedProcess(cmd, 0)
     )
     monkeypatch.chdir(tmp_path)
 

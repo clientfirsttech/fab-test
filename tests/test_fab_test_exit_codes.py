@@ -169,7 +169,7 @@ def test_run_analyzer_bpa_on_unsupported_platform_fails_fast(tmp_path, monkeypat
 
     Tabular Editor is Windows-only (requires_platform: win32 in analyzers.json).
     """
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fabric_ci_cd_dataops.scripts import fab_test_execution
 
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
@@ -177,7 +177,7 @@ def test_run_analyzer_bpa_on_unsupported_platform_fails_fast(tmp_path, monkeypat
 
     calls = []
     monkeypatch.setattr(
-        fab_test_module.subprocess, "run", lambda *a, **k: calls.append(a) or None
+        fab_test_execution.subprocess, "run", lambda *a, **k: calls.append(a) or None
     )
     monkeypatch.setattr(sys, "platform", "linux")
 

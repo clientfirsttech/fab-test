@@ -54,16 +54,16 @@ def _local_args(tmp_path, output_dir):
 @pytest.mark.fab_test
 def test_local_runs_every_analyzer_when_all_are_ready(tmp_path, monkeypatch):
     """Every analyzer in _LOCAL_ANALYZERS runs when its prerequisite is met."""
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fabric_ci_cd_dataops.scripts import fab_test_local
 
     called = []
     monkeypatch.setattr(
-        fab_test_module,
+        fab_test_local,
         "_local_readiness",
         lambda name, args: {"ready": True, "reason": "", "remediation": None},
     )
     monkeypatch.setattr(
-        fab_test_module,
+        fab_test_local,
         "_run_analyzer",
         lambda name, args, output_dir, manifest, telemetry=None: called.append(name) or 0,
     )
@@ -78,7 +78,7 @@ def test_local_runs_every_analyzer_when_all_are_ready(tmp_path, monkeypatch):
 @pytest.mark.fab_test
 def test_local_skips_analyzer_with_missing_prerequisite_without_failing(tmp_path, monkeypatch):
     """A missing prerequisite is skipped, not run, and doesn't fail the exit code."""
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fabric_ci_cd_dataops.scripts import fab_test_local
 
     def _readiness(name, _args):
         if name == "bpa":
@@ -86,9 +86,9 @@ def test_local_skips_analyzer_with_missing_prerequisite_without_failing(tmp_path
         return {"ready": True, "reason": "", "remediation": None}
 
     called = []
-    monkeypatch.setattr(fab_test_module, "_local_readiness", _readiness)
+    monkeypatch.setattr(fab_test_local, "_local_readiness", _readiness)
     monkeypatch.setattr(
-        fab_test_module,
+        fab_test_local,
         "_run_analyzer",
         lambda name, args, output_dir, manifest, telemetry=None: called.append(name) or 0,
     )
@@ -104,15 +104,15 @@ def test_local_skips_analyzer_with_missing_prerequisite_without_failing(tmp_path
 @pytest.mark.fab_test
 def test_local_exit_code_is_one_when_any_analyzer_fails(tmp_path, monkeypatch):
     """A real finding (nonzero exit from a ran analyzer) fails the run."""
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fabric_ci_cd_dataops.scripts import fab_test_local
 
     monkeypatch.setattr(
-        fab_test_module,
+        fab_test_local,
         "_local_readiness",
         lambda name, args: {"ready": True, "reason": "", "remediation": None},
     )
     monkeypatch.setattr(
-        fab_test_module,
+        fab_test_local,
         "_run_analyzer",
         lambda name, args, output_dir, manifest, telemetry=None: 1 if name == "pql_test" else 0,
     )
@@ -126,10 +126,10 @@ def test_local_exit_code_is_one_when_any_analyzer_fails(tmp_path, monkeypatch):
 @pytest.mark.fab_test
 def test_local_exit_code_is_zero_when_every_analyzer_is_skipped(tmp_path, monkeypatch):
     """Every prerequisite missing degrades to a clean, successful no-op."""
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fabric_ci_cd_dataops.scripts import fab_test_local
 
     monkeypatch.setattr(
-        fab_test_module,
+        fab_test_local,
         "_local_readiness",
         lambda name, args: {"ready": False, "reason": "not installed", "remediation": None},
     )
@@ -137,7 +137,7 @@ def test_local_exit_code_is_zero_when_every_analyzer_is_skipped(tmp_path, monkey
     def _fail_if_called(*_a, **_k):
         raise AssertionError("_run_analyzer must not run a skipped analyzer")
 
-    monkeypatch.setattr(fab_test_module, "_run_analyzer", _fail_if_called)
+    monkeypatch.setattr(fab_test_local, "_run_analyzer", _fail_if_called)
 
     output_dir = tmp_path / "results"
     exit_code = _run_local(_local_args(tmp_path, output_dir))
@@ -148,14 +148,14 @@ def test_local_exit_code_is_zero_when_every_analyzer_is_skipped(tmp_path, monkey
 @pytest.mark.fab_test
 def test_local_writes_run_manifest(tmp_path, monkeypatch):
     """fab-test local still writes fab-test-results/run.json."""
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fabric_ci_cd_dataops.scripts import fab_test_local
 
     monkeypatch.setattr(
-        fab_test_module,
+        fab_test_local,
         "_local_readiness",
         lambda name, args: {"ready": True, "reason": "", "remediation": None},
     )
-    monkeypatch.setattr(fab_test_module, "_run_analyzer", lambda name, args, output_dir, manifest, telemetry=None: 0)
+    monkeypatch.setattr(fab_test_local, "_run_analyzer", lambda name, args, output_dir, manifest, telemetry=None: 0)
 
     output_dir = tmp_path / "results"
     _run_local(_local_args(tmp_path, output_dir))
@@ -197,11 +197,11 @@ def test_local_dry_run_exits_zero_with_no_projects(tmp_path):
 @pytest.mark.fab_test
 def test_local_dry_run_plan_lists_projects_and_ready_analyzers(tmp_path, monkeypatch):
     """The plan lists which projects were discovered and which analyzers would run."""
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fabric_ci_cd_dataops.scripts import fab_test_local
 
     _write_pbip_project(tmp_path, "SampleModel")
     monkeypatch.setattr(
-        fab_test_module,
+        fab_test_local,
         "_local_readiness",
         lambda name, args: {"ready": True, "reason": "", "remediation": None},
     )
@@ -218,7 +218,7 @@ def test_local_dry_run_plan_lists_projects_and_ready_analyzers(tmp_path, monkeyp
 @pytest.mark.fab_test
 def test_local_dry_run_emits_single_json_plan(tmp_path, monkeypatch, capsys):
     """--format json emits exactly one JSON document describing the plan."""
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fabric_ci_cd_dataops.scripts import fab_test_local
 
     _write_pbip_project(tmp_path, "SampleModel")
 
@@ -227,7 +227,7 @@ def test_local_dry_run_emits_single_json_plan(tmp_path, monkeypatch, capsys):
             return {"ready": False, "reason": "Tabular Editor not found", "remediation": "install it"}
         return {"ready": True, "reason": "", "remediation": None}
 
-    monkeypatch.setattr(fab_test_module, "_local_readiness", _readiness)
+    monkeypatch.setattr(fab_test_local, "_local_readiness", _readiness)
 
     args = _local_args(tmp_path, tmp_path / "results")
     args.dry_run = True
@@ -251,11 +251,12 @@ def test_local_dry_run_emits_single_json_plan(tmp_path, monkeypatch, capsys):
 @pytest.mark.fab_test
 def test_local_dry_run_never_spawns_a_subprocess(tmp_path, monkeypatch):
     """--dry-run never spawns a subprocess for any analyzer."""
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fabric_ci_cd_dataops.scripts import fab_test_execution
+    from fabric_ci_cd_dataops.scripts import fab_test_local
 
     _write_pbip_project(tmp_path, "SampleModel")
     monkeypatch.setattr(
-        fab_test_module,
+        fab_test_local,
         "_local_readiness",
         lambda name, args: {"ready": True, "reason": "", "remediation": None},
     )
@@ -263,7 +264,7 @@ def test_local_dry_run_never_spawns_a_subprocess(tmp_path, monkeypatch):
     def _fail_if_called(*_a, **_k):
         raise AssertionError("dry-run must never spawn a subprocess")
 
-    monkeypatch.setattr(fab_test_module.subprocess, "run", _fail_if_called)
+    monkeypatch.setattr(fab_test_execution.subprocess, "run", _fail_if_called)
 
     args = _local_args(tmp_path, tmp_path / "results")
     args.dry_run = True

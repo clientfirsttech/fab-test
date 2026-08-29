@@ -301,8 +301,7 @@ def test_dry_run_no_telemetry_flag_suppresses_preview_even_with_env(
 @pytest.mark.fab_test
 def test_telemetry_sent_normally_when_not_dry_run(tmp_path, monkeypatch):
     """--telemetry with ENABLE_EVENTHOUSE_LOGGING=true still sends for real runs."""
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
-    from fabric_ci_cd_dataops.scripts import fab_test_telemetry
+    from fabric_ci_cd_dataops.scripts import fab_test_execution, fab_test_telemetry
 
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
@@ -310,7 +309,7 @@ def test_telemetry_sent_normally_when_not_dry_run(tmp_path, monkeypatch):
 
     monkeypatch.setenv("ENABLE_EVENTHOUSE_LOGGING", "true")
     monkeypatch.setattr(
-        fab_test_module.subprocess, "run", _stub_subprocess_run
+        fab_test_execution.subprocess, "run", _stub_subprocess_run
     )
     calls = []
     monkeypatch.setattr(
@@ -334,11 +333,11 @@ def test_telemetry_sent_normally_when_not_dry_run(tmp_path, monkeypatch):
 @pytest.mark.fab_test
 def test_git_context_mocked_local_git_returns_branch_and_actor(monkeypatch):
     """A mocked local git environment yields both branch and actor via git."""
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fabric_ci_cd_dataops.scripts import _git_context as _git_context_module
 
     _clear_github_env(monkeypatch)
     monkeypatch.setattr(
-        fab_test_module.subprocess,
+        _git_context_module.subprocess,
         "run",
         _fake_git_run(
             {
@@ -356,13 +355,13 @@ def test_git_context_mocked_local_git_returns_branch_and_actor(monkeypatch):
 @pytest.mark.fab_test
 def test_git_context_github_actions_env_preferred_over_local_git(monkeypatch):
     """GitHub Actions env vars win over local git output when both are present."""
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fabric_ci_cd_dataops.scripts import _git_context as _git_context_module
 
     _clear_github_env(monkeypatch)
     monkeypatch.setenv("GITHUB_REF_NAME", "main")
     monkeypatch.setenv("GITHUB_ACTOR", "ci-bot")
     monkeypatch.setattr(
-        fab_test_module.subprocess,
+        _git_context_module.subprocess,
         "run",
         _fake_git_run(
             {
@@ -381,8 +380,7 @@ def test_telemetry_send_network_failure_does_not_affect_analyzer_exit_code(
     tmp_path, monkeypatch, capsys
 ):
     """A telemetry network failure is swallowed; the analyzer's own exit code stands."""
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
-    from fabric_ci_cd_dataops.scripts import fab_test_telemetry
+    from fabric_ci_cd_dataops.scripts import fab_test_execution, fab_test_telemetry
 
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
@@ -403,7 +401,7 @@ def test_telemetry_send_network_failure_does_not_affect_analyzer_exit_code(
     )
 
     monkeypatch.setenv("ENABLE_EVENTHOUSE_LOGGING", "true")
-    monkeypatch.setattr(fab_test_module.subprocess, "run", _stub_subprocess_run)
+    monkeypatch.setattr(fab_test_execution.subprocess, "run", _stub_subprocess_run)
     monkeypatch.setattr(
         fab_test_telemetry,
         "publish_analyzer_telemetry",
