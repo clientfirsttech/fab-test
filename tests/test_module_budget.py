@@ -56,12 +56,16 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
         ),
     ),
     "src/fabric_ci_cd_dataops/scripts/fab_test_registry.py": (
-        817,
+        829,
         (
             "2026-08-23: 11 lines over hard, same story as fab_test_summary.py -- "
             "small drift from other epics, not yet worth a forced split. "
             "2026-08-24: +6 lines forwarding --pages/--roles to "
-            "invoke_playwright (Playwright Test Matrix Discovery epic)."
+            "invoke_playwright (Playwright Test Matrix Discovery epic). "
+            "2026-08-29: +12 lines splitting check_readiness's dict-merge into "
+            "_readiness_without_version so every readiness branch (including "
+            "_cloud_readiness's five returns) gets a uniform `version` key from "
+            "one place, not five (Tool Version Currency epic)."
         ),
     ),
 }

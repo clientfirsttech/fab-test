@@ -44,6 +44,24 @@ def _cache_root(repo_root: Path) -> Path:
     return repo_root / ".fab-test-tools"
 
 
+def _cache_dir(
+    repo_root: Path, analyzer_name: str, platform: str, tool_install: dict[str, Any]
+) -> Path:
+    """Return this tool's cache directory, keyed by platform and, when declared,
+    version.
+
+    A ``tool_install.version`` bump changes this path, so a newer pin in
+    analyzers.json is a cache miss rather than a silent reuse of the old
+    binary -- the defect this module exists to fix. An entry with no
+    ``version`` keeps the pre-existing unversioned (but still
+    platform-keyed) path, so an override that predates this field keeps
+    resolving exactly as it did before.
+    """
+    base = _cache_root(repo_root) / analyzer_name / platform
+    version = tool_install.get("version")
+    return (base / str(version)) if version else base
+
+
 def _marker_path(cache_dir: Path) -> Path:
     return cache_dir / "resolved-executable.txt"
 
@@ -222,6 +240,33 @@ def load_analyzer_config(metadata_path: Path, analyzer_name: str) -> dict[str, A
     return config
 
 
+def _shadow_note(source: str, tool_install: dict[str, Any]) -> tuple[str, str | None]:
+    """Return a (reason suffix, remediation) pair when a local candidate shadows
+    a declared pin.
+
+    A CLI argument is a per-invocation choice, not a silent trap, so it never
+    gets this note -- only an env var or a ``default_path`` file, which sit
+    unnoticed indefinitely and never receive a version bump shipped in
+    ``analyzers.json``.
+    """
+    version = tool_install.get("version")
+    if not version or source == "CLI argument":
+        return "", None
+    if source.startswith("env var "):
+        var_name = source[len("env var "):]
+        return (
+            f" (shadows pinned {version}; won't receive automatic updates)",
+            f"Unset {var_name} to use the pinned {version} instead.",
+        )
+    if source == "default path":
+        default_path = tool_install.get("default_path", "")
+        return (
+            f" (shadows pinned {version}; won't receive automatic updates)",
+            f"Remove or move {default_path} to use the pinned {version} instead.",
+        )
+    return "", None
+
+
 def probe_executable(
     analyzer_name: str,
     metadata_path: Path,
@@ -240,11 +285,15 @@ def probe_executable(
       resolved_path: str | None -- an already-usable path, if one exists
       reason: str               -- human explanation of the ready/not-ready state
       remediation: str | None   -- what to do (or what would happen) when not ready
+      version: str | None       -- the declared version this result corresponds
+                                    to, or None when unknown (e.g. a local
+                                    candidate shadowing the pin)
     """
     config = load_analyzer_config(metadata_path, analyzer_name) or {}
     tool_install = config.get("tool_install") or {}
     env_var = tool_install.get("env_var", "")
     install_url_env_var = tool_install.get("install_url_env_var", "")
+    pinned_version = tool_install.get("version")
 
     platform = _current_platform()
     requires_platform = tool_install.get("requires_platform")
@@ -257,43 +306,55 @@ def probe_executable(
                 f"Supported platform: {requires_platform}. "
                 f"Set {env_var}=<path> to use a manually provided executable."
             ),
+            "version": None,
         }
 
     committed_install_url = _platform_specific(tool_install, "install_url", platform)
 
     for source, path in _local_candidates(tool_install, repo_root, explicit_path):
         if _usable(path):
+            suffix, remediation = _shadow_note(source, tool_install)
             return {
                 "ready": True,
                 "resolved_path": str(path.resolve()),
-                "reason": f"resolved via {source}",
-                "remediation": None,
+                "reason": f"resolved via {source}{suffix}",
+                "remediation": remediation,
+                "version": None,
             }
 
-    cache_dir = _cache_root(repo_root) / analyzer_name / platform
+    cache_dir = _cache_dir(repo_root, analyzer_name, platform, tool_install)
     cached = _read_marker(cache_dir)
     if cached:
+        reason = "resolved via cached download"
+        if pinned_version:
+            reason += f" (version {pinned_version})"
         return {
             "ready": True,
             "resolved_path": str(cached.resolve()),
-            "reason": "resolved via cached download",
+            "reason": reason,
             "remediation": None,
+            "version": pinned_version,
         }
 
     install_url = _env(install_url_env_var, "") if install_url_env_var else ""
     if not install_url:
         install_url = committed_install_url or ""
     if install_url:
+        remediation = f"Would download from {install_url} on first run."
+        if pinned_version:
+            remediation = f"Would download version {pinned_version} from {install_url} on first run."
         return {
             "ready": False,
             "resolved_path": None,
             "reason": "not yet downloaded",
-            "remediation": f"Would download from {install_url} on first run.",
+            "remediation": remediation,
+            "version": None,
         }
 
     return {
         "ready": False,
         "resolved_path": None,
+        "version": None,
         "reason": "no executable found and no install URL configured",
         "remediation": (
             f"Set {env_var}=<path> to a manually provided executable."
@@ -345,7 +406,7 @@ def resolve_executable(
         if _usable(path):
             return path.resolve()
 
-    cache_dir = _cache_root(repo_root) / analyzer_name / platform
+    cache_dir = _cache_dir(repo_root, analyzer_name, platform, tool_install)
     cached = _read_marker(cache_dir)
     if cached:
         return cached.resolve()

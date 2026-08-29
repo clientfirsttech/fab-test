@@ -19,7 +19,7 @@ import pytest
 from fabric_ci_cd_dataops.scripts.fab_test_registry import visible_analyzers
 from fabric_ci_cd_dataops.scripts.fab_test_summary import _print_doctor
 
-_DOCTOR_KEYS = {"analyzer", "ready", "reason", "resolved_path", "remediation"}
+_DOCTOR_KEYS = {"analyzer", "ready", "reason", "resolved_path", "remediation", "version"}
 
 
 @pytest.mark.fab_test

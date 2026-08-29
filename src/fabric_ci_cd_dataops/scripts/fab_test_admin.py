@@ -96,21 +96,55 @@ def _all_analyzers() -> tuple[str, ...]:
     return _load_fab_test_all_analyzers(metadata_path(ANALYZERS, REPO_ROOT))
 
 
+def _cache_entry_labels(cache_dir: Path) -> list[str]:
+    """Return an `analyzer/platform[/version]` label for each cached tool.
+
+    Derived from where a resolved-executable marker or an ``extracted/``
+    directory actually lives, so it works for both the version-keyed cache
+    layout and the older unversioned one -- no assumption about how many
+    path segments sit above it. Reporting these by name is what turns
+    `clean-tools`'s confirmation into something a maintainer can match
+    against `analyzers.json`, instead of one generic "removed .fab-test-
+    tools" line that doesn't say what was actually in it.
+    """
+    labels = set()
+    for marker in cache_dir.rglob("resolved-executable.txt"):
+        labels.add(marker.parent.relative_to(cache_dir).as_posix())
+    for extracted in cache_dir.rglob("extracted"):
+        if extracted.is_dir():
+            labels.add(extracted.parent.relative_to(cache_dir).as_posix())
+    return sorted(labels)
+
+
 def _clean_tools(repo_root: Path, dry_run: bool) -> int:
-    """Remove (or preview removing) the .fab-test-tools cache directory."""
+    """Remove (or preview removing) the .fab-test-tools cache directory.
+
+    Always a full wipe -- clean-tools is the "start over" command, not a
+    selective prune. A version bump in analyzers.json already makes an old
+    cached version unreachable on its own (see `_analyzer_tool_bootstrap.
+    _cache_dir`); this just clears the cache directory entirely and names
+    what was in it.
+    """
     cache_dir = repo_root / ".fab-test-tools"
     if not cache_dir.exists():
         print("  ✓ fab-test clean-tools: nothing to clean (.fab-test-tools does not exist)")
         return 0
 
+    entries = _cache_entry_labels(cache_dir)
+
     if dry_run:
-        files = sorted(p for p in cache_dir.rglob("*") if p.is_file())
         print(f"fab-test clean-tools — dry run, would remove {cache_dir}:")
-        for f in files:
-            print(f"  • {f.relative_to(cache_dir)}")
+        if entries:
+            for label in entries:
+                print(f"  • {label}")
+        else:
+            for f in sorted(p for p in cache_dir.rglob("*") if p.is_file()):
+                print(f"  • {f.relative_to(cache_dir)}")
         return 0
 
     shutil.rmtree(cache_dir)
+    for label in entries:
+        print(f"  ✓ fab-test clean-tools: removed {label}")
     print(f"  ✓ fab-test clean-tools: removed {cache_dir}")
     return 0
 

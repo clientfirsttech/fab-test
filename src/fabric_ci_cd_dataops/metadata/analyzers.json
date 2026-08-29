@@ -38,6 +38,23 @@
           "linux": "linux-x64/FabInspCLI/fab-inspector",
           "win32": "win-x64/FabInspCLI/fab-inspector.exe",
           "darwin": "osx-x64/FabInspCLI/fab-inspector"
+        },
+        "version": "3.4.0",
+        "install_sha256s": {
+          "linux": "f4f6ed53cf092e235084c8049f394720c8fe52c63479638646079644b191f25e",
+          "win32": "c6f468b1ab1cab5643e490fad0793a8c075e8c94a44388d50b12f7c366fd90bc",
+          "darwin": "d3001d41a4c6c9d085c6aff53c9b8e56bce078f7a5c24cffcdf2b5dba2755ceb"
+        },
+        "release_source": {
+          "type": "github_release",
+          "repo": "NatVanG/fab-inspector",
+          "asset_prefixes": {
+            "linux": "linux-x64",
+            "win32": "win-x64",
+            "darwin": "osx-x64"
+          },
+          "asset_suffix": "-FabInspCLI.zip",
+          "allow_prerelease": false
         }
       }
     },
@@ -65,7 +82,12 @@
         "install_url_env_var": "PQL_TEST_INSTALL_URL",
         "archive_type": "zip",
         "requires_platform": null,
-        "executable_subpath": ""
+        "executable_subpath": "",
+        "release_source": {
+          "type": "pypi",
+          "package": "pql-test",
+          "version_source": "pyproject.toml"
+        }
       }
     },
     "playwright": {
@@ -101,7 +123,15 @@
         "install_url": "https://cdn.tabulareditor.com/files/TabularEditor.2.28.0.zip",
         "archive_type": "zip",
         "requires_platform": "win32",
-        "executable_subpath": "TabularEditor.exe"
+        "executable_subpath": "TabularEditor.exe",
+        "version": "2.28.0",
+        "install_sha256": "ba85f4653c850b06687e6e0b3c8af3d7c951921ec281deb5df615b2ce43d4ef2",
+        "install_url_template": "https://cdn.tabulareditor.com/files/TabularEditor.{version}.zip",
+        "release_source": {
+          "type": "url_template",
+          "repo": "TabularEditor/TabularEditor",
+          "version_line": "2"
+        }
       }
     }
   },

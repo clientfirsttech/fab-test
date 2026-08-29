@@ -205,10 +205,10 @@ def test_check_readiness_non_bootstrapped_analyzer_is_always_ready():
 
 @pytest.mark.fab_test
 def test_check_readiness_returns_same_shape_for_every_analyzer():
-    """Every analyzer's readiness dict has the same four keys (stable for `doctor`)."""
+    """Every analyzer's readiness dict has the same five keys (stable for `doctor`)."""
     from fabric_ci_cd_dataops.scripts.fab_test_registry import ANALYZER_REGISTRY
 
-    expected_keys = {"ready", "resolved_path", "reason", "remediation"}
+    expected_keys = {"ready", "resolved_path", "reason", "remediation", "version"}
     for name in ANALYZER_REGISTRY:
         result = check_readiness(name, None)
         assert set(result.keys()) == expected_keys, f"{name} readiness shape mismatch"
@@ -429,7 +429,7 @@ def test_readiness_never_echoes_a_credential_value(monkeypatch):
 
 
 @pytest.mark.fab_test
-def test_cloud_analyzer_readiness_keeps_the_stable_four_keys(monkeypatch):
+def test_cloud_analyzer_readiness_keeps_the_stable_five_keys(monkeypatch):
     """A not-ready cloud row has the same shape as every other row (JSON consumers)."""
     from fabric_ci_cd_dataops.scripts import fab_test_registry as registry
 
@@ -438,7 +438,7 @@ def test_cloud_analyzer_readiness_keeps_the_stable_four_keys(monkeypatch):
 
     result = registry.check_readiness("pql_test", None)
 
-    assert set(result.keys()) == {"ready", "resolved_path", "reason", "remediation"}
+    assert set(result.keys()) == {"ready", "resolved_path", "reason", "remediation", "version"}
 
 
 @pytest.mark.fab_test
