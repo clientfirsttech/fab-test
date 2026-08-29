@@ -762,7 +762,19 @@ def check_readiness(name: str, args: argparse.Namespace | None) -> dict[str, Any
     is probed by ``_cloud_readiness``; one needing neither a binary nor a
     workspace (pql_lint) is always ready; the rest resolve an external
     tool -- see ``probe_executable`` for that shape.
+
+    Every branch's dict gets a ``version`` key here rather than in each of
+    them, so the doctor row shape stays uniform (only ``probe_executable``'s
+    bootstrapped-tool path ever has one to report) without touching
+    `_cloud_readiness`'s five return statements for a field that never
+    applies to them.
     """
+    result = _readiness_without_version(name, args)
+    result.setdefault("version", None)
+    return result
+
+
+def _readiness_without_version(name: str, args: argparse.Namespace | None) -> dict[str, Any]:
     if name in _CLOUD_ANALYZERS:
         return _cloud_readiness(name, args)
 

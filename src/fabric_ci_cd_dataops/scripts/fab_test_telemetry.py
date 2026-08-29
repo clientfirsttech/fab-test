@@ -75,6 +75,7 @@ def _telemetry_readiness(args: argparse.Namespace) -> dict[str, Any]:
             "reason": reason,
             "remediation": remediation,
             "resolved_path": resolved_path,
+            "version": None,
         }
 
     eventhouse = _telemetry_decision(args).eventhouse

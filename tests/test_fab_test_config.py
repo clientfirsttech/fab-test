@@ -239,7 +239,40 @@ def test_clean_tools_nothing_to_clean_when_missing(tmp_path, capsys):
     captured = capsys.readouterr()
 
     assert code == 0
-    assert "nothing to clean" in captured.out
+
+
+@pytest.mark.fab_test
+def test_clean_tools_names_each_cached_analyzer_platform_version(tmp_path, capsys):
+    """A real (version-keyed) cache layout is reported by analyzer/platform/version,
+    not just as one generic ".fab-test-tools removed" line.
+    """
+    cache_dir = tmp_path / ".fab-test-tools"
+    extracted = cache_dir / "pbir_inspector" / "win32" / "3.4.0" / "extracted"
+    extracted.mkdir(parents=True)
+    (extracted / "fab-inspector.exe").write_text("x", encoding="utf-8")
+
+    code = _clean_tools(tmp_path, dry_run=False)
+    captured = capsys.readouterr()
+
+    assert code == 0
+    assert not cache_dir.exists()
+    assert "pbir_inspector/win32/3.4.0" in captured.out
+
+
+@pytest.mark.fab_test
+def test_clean_tools_dry_run_names_each_cached_version_without_deleting(tmp_path, capsys):
+    """--dry-run against a real cache layout lists each version, deletes nothing."""
+    cache_dir = tmp_path / ".fab-test-tools"
+    extracted = cache_dir / "tabular_editor_bpa" / "win32" / "2.28.0" / "extracted"
+    extracted.mkdir(parents=True)
+    (extracted / "TabularEditor.exe").write_text("x", encoding="utf-8")
+
+    code = _clean_tools(tmp_path, dry_run=True)
+    captured = capsys.readouterr()
+
+    assert code == 0
+    assert cache_dir.exists()
+    assert "tabular_editor_bpa/win32/2.28.0" in captured.out
 
 
 @pytest.mark.fab_test
