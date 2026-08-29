@@ -191,6 +191,64 @@ class TestRunPqlint:
         assert data["status"] == "failed"
         assert len(data["findings"]) == 1
 
+    @mock.patch("fabric_ci_cd_dataops.scripts.invoke_pqlint.subprocess.run")
+    def test_run_timeout(self, mock_run, tmp_path: Path):
+        """A pqlint subprocess timeout writes a timeout envelope and exits 1."""
+        import subprocess
+
+        artifact = tmp_path / "SalesModel.SemanticModel"
+        artifact.mkdir()
+        output = tmp_path / "out.json"
+        mock_run.side_effect = subprocess.TimeoutExpired(cmd=["pqlint"], timeout=300)
+
+        class Args:
+            artifact_path = str(artifact)
+            output_path = str(output)
+            subscription_key = ""
+
+        exit_code = run_pqlint(Args())
+        assert exit_code == 1
+        data = json.loads(output.read_text(encoding="utf-8"))
+        assert data["status"] == "timeout"
+
+    @mock.patch("fabric_ci_cd_dataops.scripts.invoke_pqlint.subprocess.run")
+    def test_run_missing_binary(self, mock_run, tmp_path: Path):
+        """A missing pqlint executable writes an error envelope and exits 1."""
+        artifact = tmp_path / "SalesModel.SemanticModel"
+        artifact.mkdir()
+        output = tmp_path / "out.json"
+        mock_run.side_effect = FileNotFoundError(2, "No such file")
+
+        class Args:
+            artifact_path = str(artifact)
+            output_path = str(output)
+            subscription_key = ""
+
+        exit_code = run_pqlint(Args())
+        assert exit_code == 1
+        data = json.loads(output.read_text(encoding="utf-8"))
+        assert data["status"] == "error"
+        assert "not found" in data["message"]
+
+    @mock.patch("fabric_ci_cd_dataops.scripts.invoke_pqlint.subprocess.run")
+    def test_run_unexpected_exception(self, mock_run, tmp_path: Path):
+        """An unexpected exception is named in the error envelope rather than escaping."""
+        artifact = tmp_path / "SalesModel.SemanticModel"
+        artifact.mkdir()
+        output = tmp_path / "out.json"
+        mock_run.side_effect = RuntimeError("boom")
+
+        class Args:
+            artifact_path = str(artifact)
+            output_path = str(output)
+            subscription_key = ""
+
+        exit_code = run_pqlint(Args())
+        assert exit_code == 1
+        data = json.loads(output.read_text(encoding="utf-8"))
+        assert data["status"] == "error"
+        assert "boom" in data["message"]
+
 
 class TestMain:
     """Tests for main entry point."""

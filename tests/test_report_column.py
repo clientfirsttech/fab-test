@@ -326,6 +326,7 @@ def test_all_suppresses_the_per_analyzer_report_line(tmp_path, monkeypatch):
     really runs the analyzers and would overwrite any fixture envelope.
     """
     from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fabric_ci_cd_dataops.scripts import fab_test_execution
 
     seen: dict[str, bool] = {}
 
@@ -333,9 +334,9 @@ def test_all_suppresses_the_per_analyzer_report_line(tmp_path, monkeypatch):
         seen[name] = kwargs.get("show_reports", True)
         return 0
 
-    monkeypatch.setattr(fab_test_module, "_print_summary", _spy)
-    monkeypatch.setattr(fab_test_module, "_preflight", lambda *a, **k: None)
-    monkeypatch.setattr(fab_test_module, "_run_one_artifact", lambda *a, **k: ("Sales", 0))
+    monkeypatch.setattr(fab_test_execution, "_print_summary", _spy)
+    monkeypatch.setattr(fab_test_execution, "_preflight", lambda *a, **k: None)
+    monkeypatch.setattr(fab_test_execution, "_run_one_artifact", lambda *a, **k: ("Sales", 0))
     (tmp_path / "Sales.SemanticModel").mkdir()
 
     import argparse
@@ -354,14 +355,15 @@ def test_all_suppresses_the_per_analyzer_report_line(tmp_path, monkeypatch):
 def test_a_standalone_run_keeps_the_per_analyzer_report_line(tmp_path, monkeypatch):
     """One analyzer has no aggregate listing, so the line is the only mention."""
     from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fabric_ci_cd_dataops.scripts import fab_test_execution
 
     seen: dict[str, bool] = {}
     monkeypatch.setattr(
-        fab_test_module, "_print_summary",
+        fab_test_execution, "_print_summary",
         lambda name, results, **kw: (seen.setdefault(name, kw.get("show_reports", True)) and 0) or 0,
     )
-    monkeypatch.setattr(fab_test_module, "_preflight", lambda *a, **k: None)
-    monkeypatch.setattr(fab_test_module, "_run_one_artifact", lambda *a, **k: ("Sales", 0))
+    monkeypatch.setattr(fab_test_execution, "_preflight", lambda *a, **k: None)
+    monkeypatch.setattr(fab_test_execution, "_run_one_artifact", lambda *a, **k: ("Sales", 0))
     (tmp_path / "Sales.SemanticModel").mkdir()
 
     import argparse

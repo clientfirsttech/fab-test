@@ -207,6 +207,7 @@ def test_manifest_covers_every_analyzer_in_all_run(tmp_path, monkeypatch):
     not just the last one in the loop.
     """
     from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fabric_ci_cd_dataops.scripts import fab_test_execution
 
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
@@ -214,8 +215,8 @@ def test_manifest_covers_every_analyzer_in_all_run(tmp_path, monkeypatch):
     output_dir = tmp_path / "fab-test-results"
 
     monkeypatch.setattr(fab_test_module, "_all_analyzers", lambda: ("bpa", "pbir"))
-    monkeypatch.setattr(fab_test_module, "_send_telemetry", lambda *a, **k: None)
-    monkeypatch.setattr(fab_test_module, "_preflight_error", lambda *a, **k: None)
+    monkeypatch.setattr(fab_test_execution, "_send_telemetry", lambda *a, **k: None)
+    monkeypatch.setattr(fab_test_execution, "_preflight_error", lambda *a, **k: None)
     monkeypatch.setattr(
         fab_test_module.subprocess,
         "run",
@@ -246,13 +247,14 @@ def test_manifest_records_preflight_failure_with_exit_code(tmp_path, monkeypatch
     failure reason and the exit code preflight_error returned.
     """
     from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fabric_ci_cd_dataops.scripts import fab_test_execution
 
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
     output_dir = tmp_path / "fab-test-results"
 
     monkeypatch.setattr(
-        fab_test_module, "_preflight_error", lambda name, args: ("tool not found", 127)
+        fab_test_execution, "_preflight_error", lambda name, args: ("tool not found", 127)
     )
     monkeypatch.setattr(
         sys,

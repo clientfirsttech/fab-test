@@ -318,10 +318,10 @@ def test_machine_context_includes_platform_python_and_fab_test_version():
 @pytest.mark.fab_test
 def test_machine_context_omits_platform_when_undetectable(monkeypatch):
     """If the OS platform can't be read, the field is omitted, not a crash."""
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fabric_ci_cd_dataops.scripts import fab_test_telemetry
 
     monkeypatch.setattr(
-        fab_test_module,
+        fab_test_telemetry,
         "_current_os_platform",
         lambda: (_ for _ in ()).throw(RuntimeError("no platform")),
     )
@@ -366,10 +366,10 @@ def test_build_telemetry_payload_records_the_actor_as_given(monkeypatch):
     paths inside the embedded `results` envelope, which the redaction never
     touched. See tests/test_telemetry_identity.py.
     """
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fabric_ci_cd_dataops.scripts import fab_test_telemetry
 
     monkeypatch.setattr(
-        fab_test_module, "_git_context", lambda: {"actor": "dev@example.com"}
+        fab_test_telemetry, "_git_context", lambda: {"actor": "dev@example.com"}
     )
     payload = _build_telemetry_payload(
         "bpa",
@@ -383,9 +383,9 @@ def test_build_telemetry_payload_records_the_actor_as_given(monkeypatch):
 @pytest.mark.fab_test
 def test_build_telemetry_payload_actor_unchanged_when_not_email(monkeypatch):
     """A non-email actor (e.g. GITHUB_ACTOR) passes through unredacted."""
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fabric_ci_cd_dataops.scripts import fab_test_telemetry
 
-    monkeypatch.setattr(fab_test_module, "_git_context", lambda: {"actor": "ci-bot"})
+    monkeypatch.setattr(fab_test_telemetry, "_git_context", lambda: {"actor": "ci-bot"})
     payload = _build_telemetry_payload(
         "bpa",
         Path("SampleModel.SemanticModel"),

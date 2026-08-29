@@ -1,6 +1,6 @@
 # TestPyPI Release Epic
 
-**Status**: 🚧 IN-PROGRESS — 8 of 9 tasks done. What remains needs a human with the `jkerski` TestPyPI account: the pending trusted publisher has to be registered before any upload can succeed, and nothing has been published yet, so the install cannot be verified. The fields to enter are recorded verbatim in [docs/RELEASE.md](../docs/RELEASE.md).
+**Status**: ✅ COMPLETED — 9 of 9 tasks done. `fab-test==1.0.0.0.dev4` is published on TestPyPI and the install verified from a clean venv outside this checkout (see the last task below).
 **Goal**: Publish `fab-test` 1.0.0.0.dev1 to TestPyPI as an installable package, and document the install for all three callers.
 
 ## Overview
@@ -82,7 +82,7 @@ Separate the rehearsal path from the production path in the publish workflows.
 
 ---
 
-## Install From TestPyPI Is Verified, Not Assumed  ⛔ BLOCKED — needs the trusted publisher registered by hand first
+## Install From TestPyPI Is Verified, Not Assumed  ✅
 
 Prove the published artifact installs and runs, rather than trusting that it uploaded.
 
@@ -90,6 +90,16 @@ Prove the published artifact installs and runs, rather than trusting that it upl
 - Given a clean venv and only the TestPyPI index, should fail to resolve — `pql-test==0.1.12` and current `fabric-cicd` exist only on production PyPI, which carries 0.1.11 and 0.1.7
 - Given the documented install command, should carry `--extra-index-url https://pypi.org/simple` so those dependencies resolve
 - Given a fresh install from TestPyPI, should verify through the real entry point: `fab-test --help`, `fab-test doctor --local`, and a `bpa` run reaching the packaged rules — from the installed console script, outside any checkout
+
+Verified 2026-08-28 against `fab-test==1.0.0.0.dev4` in a clean venv outside this
+checkout (`%TEMP%\fab-test-verify`): install resolved with both index flags,
+`--version`/`--help`/`doctor --local` all ran correctly, `config --show` named
+`rules.bpa`/`rules.pbir` as resolved from the **packaged** copies under
+`site-packages` (not a checkout path), and a real `bpa` run invoked Tabular
+Editor against real `.SemanticModel` artifacts using the packaged
+`BPARules.json`, producing genuine pass/fail counts. An empty directory ran
+`bpa` cleanly with a "no artifacts found" warning rather than erroring on a
+missing rules file.
 
 ---
 

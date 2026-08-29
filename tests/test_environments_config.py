@@ -117,6 +117,70 @@ class TestValidateEnvironmentsSchema:
             assert exc_info.value.code == 0
 
 
+class TestValidateEnvBlock:
+    """Tests for _validate_env_block's structural branches."""
+
+    BASE_BLOCK = {
+        "description": "Development",
+        "workspace_id": "ws-dev",
+        "allowed_branches": ["develop"],
+        "promotion_target": "test",
+        "requires_validation": True,
+        "requires_security_scan": True,
+        "requires_ai_validation": False,
+    }
+
+    def test_allowed_branches_not_a_list(self):
+        """A string allowed_branches is reported as needing a list."""
+        from fabric_ci_cd_dataops.scripts.validate_environments_schema import _validate_env_block
+
+        block = {**self.BASE_BLOCK, "allowed_branches": "develop"}
+        errors = _validate_env_block("environments.dev", block)
+        assert any(e.path == "environments.dev.allowed_branches" and "Must be a list" in e.message for e in errors)
+
+    def test_allowed_branches_empty(self):
+        """An empty allowed_branches list is reported as must-not-be-empty."""
+        from fabric_ci_cd_dataops.scripts.validate_environments_schema import _validate_env_block
+
+        block = {**self.BASE_BLOCK, "allowed_branches": []}
+        errors = _validate_env_block("environments.dev", block)
+        assert any(
+            e.path == "environments.dev.allowed_branches" and "Must not be empty" in e.message for e in errors
+        )
+
+    def test_boolean_field_not_a_bool(self):
+        """A non-boolean requires_validation is reported as needing a boolean."""
+        from fabric_ci_cd_dataops.scripts.validate_environments_schema import _validate_env_block
+
+        block = {**self.BASE_BLOCK, "requires_validation": "true"}
+        errors = _validate_env_block("environments.dev", block)
+        assert any(
+            e.path == "environments.dev.requires_validation" and "Must be a boolean" in e.message for e in errors
+        )
+
+    def test_deployment_window_not_a_mapping(self):
+        """A non-mapping deployment_window is reported as needing a mapping."""
+        from fabric_ci_cd_dataops.scripts.validate_environments_schema import _validate_env_block
+
+        block = {**self.BASE_BLOCK, "deployment_window": "always"}
+        errors = _validate_env_block("environments.prod", block)
+        assert any(
+            e.path == "environments.prod.deployment_window" and "Must be a mapping" in e.message for e in errors
+        )
+
+    def test_deployment_window_missing_enabled(self):
+        """A deployment_window mapping missing 'enabled' names the missing key."""
+        from fabric_ci_cd_dataops.scripts.validate_environments_schema import _validate_env_block
+
+        block = {**self.BASE_BLOCK, "deployment_window": {"allowed_days": ["Mon"], "allowed_hours_utc": "9-17"}}
+        errors = _validate_env_block("environments.prod", block)
+        assert any(
+            e.path == "environments.prod.deployment_window.enabled"
+            and "Missing required deployment_window key" in e.message
+            for e in errors
+        )
+
+
 class TestGenerateFabricCicdConfig:
     """Tests for generate_fabric_cicd_config."""
 
