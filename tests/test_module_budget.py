@@ -97,13 +97,17 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
         ),
     ),
     "src/fabric_ci_cd_dataops/scripts/invoke_playwright.py": (
-        820,
+        867,
         (
             "2026-08-30: born over the hard budget adding configurable "
             "pytest-xdist worker resolution (--workers/PLAYWRIGHT_XDIST_WORKERS "
             "> packaged default) -- a small, cohesive addition to an already "
             "large file, not worth a forced split for ~20 lines. Revisit if "
-            "it keeps growing."
+            "it keeps growing. "
+            "2026-08-30: +47 lines adding _report_deep_link and threading "
+            "cloud through _test_results_rows/_write_embed_error_envelope, so "
+            "the HTML report can link back to the report page/bookmark a "
+            "Playwright case validated (Report Page Deep Link work)."
         ),
     ),
 }

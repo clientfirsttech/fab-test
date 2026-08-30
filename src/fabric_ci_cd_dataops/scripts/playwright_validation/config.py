@@ -72,6 +72,25 @@ def _api_root_for(cloud: str) -> str:
     return mapping.get(cloud.lower(), mapping["public"])
 
 
+def _app_root_for(cloud: str) -> str:
+    """Return the interactive Power BI app root URL for the named cloud.
+
+    Distinct from ``_api_root_for``: this is the host a person's browser
+    opens (``app.powerbi.com``), not the REST API host (``api.powerbi.com``).
+    Used to build a deep link from a Playwright test case straight back to
+    the report page/bookmark it validated.
+    """
+    mapping = {
+        "public": "https://app.powerbi.com",
+        "germany": "https://app.powerbi.de",
+        "china": "https://app.powerbi.cn",
+        "usgov": "https://app.powerbigov.us",
+        "usgovhigh": "https://app.powerbigov.us",
+        "usgovdod": "https://app.powerbigov.us",
+    }
+    return mapping.get(cloud.lower(), mapping["public"])
+
+
 def _fabric_api_root_for(cloud: str) -> str:
     """Return the Fabric REST API root URL for the named cloud.
 

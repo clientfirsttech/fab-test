@@ -181,6 +181,39 @@ def test_test_results_carry_the_cases_evidence_paths(tmp_path: Path):
     assert failed_evidence["event_log"].endswith("event_log.json")
 
 
+def test_test_results_carry_a_deep_link_to_the_report_page(tmp_path: Path):
+    """Each row should link straight back to the report page it validated."""
+    output_path = tmp_path / "envelope.json"
+    test_cases_dir = tmp_path / "test-cases"
+    test_cases_dir.mkdir()
+    _write_case_result(test_cases_dir, "SalesReport_page1_no-bookmark", "pass")
+    _write_case_result(test_cases_dir, "SalesReport_page2_no-bookmark", "pass")
+
+    _code, data = _run_main(tmp_path, output_path, test_cases_dir)
+
+    by_case = {r["test_name"]: r for r in data["test_results"]}
+    link = by_case["SalesReport_page1_no-bookmark"]["report_link"]
+    assert link["href"] == "https://app.powerbi.com/groups/ws-1/reports/rpt-1/page1"
+    assert link["label"] == "page1"
+
+
+def test_report_html_links_to_the_reports_own_page(tmp_path: Path, monkeypatch):
+    """--report should produce a page whose Report Page column links to the live report."""
+    monkeypatch.setenv("ANALYZER_REPORT", "1")
+    output_path = tmp_path / "envelope.json"
+    test_cases_dir = tmp_path / "test-cases"
+    test_cases_dir.mkdir()
+    _write_case_result(test_cases_dir, "SalesReport_page1_no-bookmark", "pass")
+    _write_case_result(test_cases_dir, "SalesReport_page2_no-bookmark", "pass")
+
+    _code, data = _run_main(tmp_path, output_path, test_cases_dir)
+
+    report_path = Path(data["native_html_output_path"])
+    html = report_path.read_text(encoding="utf-8")
+    assert "Report Page" in html
+    assert 'href="https://app.powerbi.com/groups/ws-1/reports/rpt-1/page1"' in html
+
+
 def test_report_html_links_to_a_failed_cases_evidence(tmp_path: Path, monkeypatch):
     """--report should produce a page whose evidence column links to the real file."""
     monkeypatch.setenv("ANALYZER_REPORT", "1")
