@@ -16,6 +16,8 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import shutil
+import subprocess
 import sys
 import tempfile
 import zipfile
@@ -26,6 +28,11 @@ from urllib.request import Request, urlopen
 
 _READER_CHUNK_SIZE = 8192
 _USER_AGENT = "fabric-ci-cd-dataops-fab-test/1.0"
+
+# npm install can fetch a nontrivial dependency tree on a cold cache; build is
+# just tsc over a small source tree and finishes in seconds once deps exist.
+_NPM_INSTALL_TIMEOUT_SECONDS = 300
+_NPM_BUILD_TIMEOUT_SECONDS = 120
 
 
 class UnsupportedPlatformError(RuntimeError):
@@ -267,6 +274,47 @@ def _shadow_note(source: str, tool_install: dict[str, Any]) -> tuple[str, str | 
     return "", None
 
 
+def _probe_pending_install(
+    tool_install: dict[str, Any], install_url: str, pinned_version: str | None
+) -> dict[str, Any]:
+    """Return the not-ready-yet result for a tool with a resolvable install URL.
+
+    Split out of ``probe_executable`` to keep its own return-statement count
+    under the complexity ratchet -- the ``npm_build`` toolchain checks
+    (Node/npm each reported as a distinct missing prerequisite) would
+    otherwise push it over.
+    """
+    archive_type = tool_install.get("archive_type", "zip").lower()
+    if archive_type == "npm_build":
+        if shutil.which("node") is None:
+            return {
+                "ready": False,
+                "resolved_path": None,
+                "reason": "Node.js not found on PATH",
+                "remediation": "Install Node.js >= 18 (https://nodejs.org), then re-run.",
+                "version": None,
+            }
+        if shutil.which("npm") is None:
+            return {
+                "ready": False,
+                "resolved_path": None,
+                "reason": "npm not found on PATH",
+                "remediation": "Node.js is present but npm is missing; reinstall Node.js "
+                "(https://nodejs.org, >= 18) with npm included.",
+                "version": None,
+            }
+        action = f"build version {pinned_version} from source at" if pinned_version else "build from source at"
+    else:
+        action = f"download version {pinned_version} from" if pinned_version else "download from"
+    return {
+        "ready": False,
+        "resolved_path": None,
+        "reason": "not yet built" if archive_type == "npm_build" else "not yet downloaded",
+        "remediation": f"Would {action} {install_url} on first run.",
+        "version": None,
+    }
+
+
 def probe_executable(
     analyzer_name: str,
     metadata_path: Path,
@@ -340,16 +388,7 @@ def probe_executable(
     if not install_url:
         install_url = committed_install_url or ""
     if install_url:
-        remediation = f"Would download from {install_url} on first run."
-        if pinned_version:
-            remediation = f"Would download version {pinned_version} from {install_url} on first run."
-        return {
-            "ready": False,
-            "resolved_path": None,
-            "reason": "not yet downloaded",
-            "remediation": remediation,
-            "version": None,
-        }
+        return _probe_pending_install(tool_install, install_url, pinned_version)
 
     return {
         "ready": False,
@@ -414,6 +453,8 @@ def resolve_executable(
     install_url = _resolve_install_url(tool_install, platform)
     if install_url and archive_type.lower() == "zip":
         return _download_and_cache(analyzer_name, tool_install, install_url, cache_dir, platform)
+    if install_url and archive_type.lower() == "npm_build":
+        return _download_build_and_cache(analyzer_name, tool_install, install_url, cache_dir)
 
     raise RuntimeError(
         _unresolved_message(analyzer_name, tool_install, explicit_path, platform)
@@ -464,6 +505,120 @@ def _download_and_cache(
         _write_marker(cache_dir, executable)
         print(f"::notice::{analyzer_name}: resolved executable at {executable}")
         return executable
+
+
+def _find_build_root(extract_dir: Path) -> Path:
+    """Return the directory holding ``package.json`` inside an extracted archive.
+
+    GitHub's tag-archive zip nests everything under a single
+    ``<repo>-<ref>/`` folder whose exact name isn't known in advance.
+    """
+    package_json = next(extract_dir.rglob("package.json"), None)
+    if package_json is None:
+        raise RuntimeError(f"No package.json found inside {extract_dir}")
+    return package_json.parent
+
+
+def _run_build_step(
+    analyzer_name: str, step_name: str, command: list[str], cwd: Path, timeout: int
+) -> None:
+    """Run one build step, raising a ``RuntimeError`` naming the step on failure."""
+    try:
+        subprocess.run(
+            command, cwd=cwd, capture_output=True, text=True, timeout=timeout, check=True
+        )
+    except FileNotFoundError as exc:
+        raise RuntimeError(
+            f"{analyzer_name}: '{step_name}' failed -- {command[0]} not found on PATH. "
+            "Install Node.js (https://nodejs.org, >= 18) and npm, "
+            "or set the tool's env var to a manually built executable."
+        ) from exc
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError(
+            f"{analyzer_name}: '{step_name}' timed out after {timeout}s."
+        ) from exc
+    except subprocess.CalledProcessError as exc:
+        detail = (exc.stderr or exc.stdout or "").strip()
+        raise RuntimeError(
+            f"{analyzer_name}: '{step_name}' failed (exit {exc.returncode}). {detail}"
+        ) from exc
+
+
+def _run_npm_build(analyzer_name: str, build_root: Path, tool_install: dict[str, Any]) -> None:
+    """Run ``npm install`` (plus any declared extra dependency) and ``npm run build``.
+
+    Each step is named in its own failure message, per the requirement that a
+    build failure says which step broke rather than surfacing a bare
+    traceback -- npm absence included, since ``subprocess.run`` raises
+    ``FileNotFoundError`` for a missing executable the same way it would for
+    a missing tool binary elsewhere in this module.
+    """
+    npm = shutil.which("npm")
+    if npm is None:
+        raise RuntimeError(
+            f"{analyzer_name}: npm not found on PATH. Install Node.js "
+            "(https://nodejs.org, >= 18) and npm, or set the tool's env var "
+            "to a manually built executable."
+        )
+    _run_build_step(
+        analyzer_name, "npm install", [npm, "install"], build_root, _NPM_INSTALL_TIMEOUT_SECONDS
+    )
+    extra_dependencies = tool_install.get("build_extra_dependencies") or []
+    if extra_dependencies:
+        _run_build_step(
+            analyzer_name,
+            f"npm install {' '.join(extra_dependencies)}",
+            [npm, "install", *extra_dependencies],
+            build_root,
+            _NPM_INSTALL_TIMEOUT_SECONDS,
+        )
+    _run_build_step(
+        analyzer_name, "npm run build", [npm, "run", "build"], build_root, _NPM_BUILD_TIMEOUT_SECONDS
+    )
+
+
+def _download_build_and_cache(
+    analyzer_name: str,
+    tool_install: dict[str, Any],
+    install_url: str,
+    cache_dir: Path,
+) -> Path:
+    """Download a source archive, build it with npm, cache, and return the entry point.
+
+    Mirrors ``_download_and_cache``'s download/verify/extract steps, then adds
+    a build step in place of directly locating a shipped binary. Never leaves
+    a partially built cache for a later run to trust: the extracted directory
+    is removed on any failure, and the marker (the only thing a later run
+    consults) is written only after a working entry point is located.
+    """
+    install_url_env_var = tool_install.get("install_url_env_var", "")
+    source_name = install_url_env_var if _env(install_url_env_var, "") else "analyzers.json"
+    print(f"::notice::{analyzer_name}: executable not found; building from source ({source_name})")
+    expected_sha256 = tool_install.get("install_sha256")
+    build_entrypoint = tool_install.get("build_entrypoint", "")
+    extract_dir = cache_dir / "extracted"
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            archive_path = Path(tmp) / _clean_url_filename(install_url)
+            _download(install_url, archive_path)
+            if expected_sha256:
+                _verify_checksum(archive_path, expected_sha256, analyzer_name)
+            _extract_zip(archive_path, extract_dir)
+            build_root = _find_build_root(extract_dir)
+            _run_npm_build(analyzer_name, build_root, tool_install)
+            entrypoint = _find_executable(extract_dir, build_entrypoint)
+            if entrypoint is None:
+                raise RuntimeError(
+                    f"Could not locate built entry point for {analyzer_name} inside "
+                    f"{extract_dir} (expected: {build_entrypoint!r})."
+                )
+    except Exception:
+        shutil.rmtree(extract_dir, ignore_errors=True)
+        raise
+    entrypoint = entrypoint.resolve()
+    _write_marker(cache_dir, entrypoint)
+    print(f"::notice::{analyzer_name}: built entry point at {entrypoint}")
+    return entrypoint
 
 
 def _unresolved_message(

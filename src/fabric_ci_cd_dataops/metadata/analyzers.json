@@ -58,6 +58,27 @@
         }
       }
     },
+    "pbir_a11y": {
+      "type": "static",
+      "implementation": "python",
+      "command": "python",
+      "args": ["scripts/invoke_pbir_a11y.py", "--artifact-path", "{artifact_path}", "--a11y-path", "./pbir-a11y/dist/cli.js", "--output-path", "{output_path}"],
+      "description": "Accessibility checks (contrast, alt text, tab order, target size, and more) for PBIR reports, via the pbir-a11y Node CLI",
+      "exit_code_success": 0,
+      "native_output": {"extension": "json", "format": "JSON"},
+      "reference": "https://github.com/Juls-BI/pbir-a11y",
+      "tool_install": {
+        "env_var": "PBIR_A11Y_PATH",
+        "default_path": "./pbir-a11y/dist/cli.js",
+        "install_url_env_var": "PBIR_A11Y_INSTALL_URL",
+        "install_url": "https://github.com/Juls-BI/pbir-a11y/archive/refs/tags/v0.3.2.zip",
+        "archive_type": "npm_build",
+        "build_entrypoint": "dist/cli.js",
+        "build_extra_dependencies": ["docx@^9.6.1"],
+        "version": "0.3.2",
+        "install_sha256": "403a2ab0ae1648d0b385201a3b5b57ae10a16d71eda7584cafd8391fe81d5e77"
+      }
+    },
     "prompt_lint": {
       "type": "static",
       "implementation": "python",
