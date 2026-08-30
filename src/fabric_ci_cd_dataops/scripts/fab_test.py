@@ -82,6 +82,7 @@ from .fab_test_registry import (
 from .fab_test_registry import (
     unsupported_type_error as _unsupported_type_error,
 )
+from .fab_test_skill import _skill
 
 # Re-exported: tests import this directly from `fab_test` rather than from
 # `fab_test_summary`, since that is where it lived before this split.
@@ -129,6 +130,7 @@ _ADMIN_COMMAND_HANDLERS: dict[str, Callable[[argparse.Namespace], int]] = {
     "explain": _explain_analyzer,
     "config": _config_show,
     "init": _init,
+    "skill": _skill,
 }
 
 

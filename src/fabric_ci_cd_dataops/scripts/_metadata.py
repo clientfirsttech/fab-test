@@ -50,6 +50,24 @@ _OVERRIDE_LAYERS: tuple[tuple[Path, str], ...] = (
 
 PACKAGED_ORIGIN = "packaged"
 
+PACKAGED_SKILL = Path(__file__).resolve().parent.parent / "skill" / "SKILL.md"
+
+# Unlike _OVERRIDE_LAYERS, each entry here is already the full file path, not
+# a directory joined with a relative name -- the skill resource has no
+# sibling files to address by a shared relative path the way rules/*.json
+# does. ".github/skills/fab-test/SKILL.md" is also this repository's own
+# hand-authored source (see tests/test_skill_resource.py), so running
+# fab-test from this checkout resolves its own edits instead of the
+# packaged copy -- the same "repo copy wins when present" rule as
+# resolve_metadata, just keyed on a fixed path instead of a directory.
+_SKILL_OVERRIDE_FILES: tuple[tuple[Path, str], ...] = (
+    (Path(".fab-test") / "skill" / "SKILL.md", ".fab-test/skill/SKILL.md"),
+    (
+        Path(".github") / "skills" / "fab-test" / "SKILL.md",
+        ".github/skills/fab-test/SKILL.md",
+    ),
+)
+
 # Named once here so the registry (which needs the path) and
 # `config --show` (which needs the origin too) cannot disagree about which
 # file they mean.
@@ -177,3 +195,18 @@ def resolve_environments_yml(repo_root: Path | None = None) -> ResolvedMetadata:
     return resolve_metadata(
         ENVIRONMENTS, repo_root if repo_root is not None else default_repo_root(), packaged=False
     )
+
+
+def resolve_skill_md(repo_root: Path | None = None) -> ResolvedMetadata:
+    """Return the fab-test skill content and the layer it came from.
+
+    Always has a packaged fallback -- unlike `environments.yml`, the skill
+    content carries no secrets or environment-specific state, so a wheel
+    install with no repo override still gets a working answer.
+    """
+    root = repo_root if repo_root is not None else default_repo_root()
+    for path, origin in _SKILL_OVERRIDE_FILES:
+        candidate = root / path
+        if candidate.is_file():
+            return ResolvedMetadata(candidate, origin)
+    return ResolvedMetadata(PACKAGED_SKILL, PACKAGED_ORIGIN)

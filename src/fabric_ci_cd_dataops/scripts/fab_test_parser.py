@@ -792,6 +792,45 @@ def _add_init_subparser(subs: argparse._SubParsersAction) -> None:
         help="Report what would be created without writing anything",
     )
 
+def _add_skill_subparser(subs: argparse._SubParsersAction) -> None:
+    skill_p = subs.add_parser(
+        "skill",
+        help="Print fab-test's own skill resource, or install it into an agent harness",
+    )
+    skill_p.add_argument(
+        "--install",
+        choices=["claude", "copilot"],
+        default=None,
+        help="Write/update this harness's copy of the skill content",
+    )
+    skill_p.add_argument(
+        "--show",
+        action="store_true",
+        help="Report install state (found/missing/version_mismatch) per harness",
+    )
+    skill_p.add_argument(
+        "--uninstall",
+        action="store_true",
+        help="Remove the file --install <harness> created, if fab-test owns it",
+    )
+    skill_p.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="With --install, report what would change without writing anything",
+    )
+    skill_p.add_argument(
+        "--force",
+        action="store_true",
+        help="With --install, overwrite an existing file that differs",
+    )
+    skill_p.add_argument(
+        "--format",
+        choices=["text", "json"],
+        default=_PYPROJECT_CONFIG.get("format", "text"),
+        dest="output_format",
+        help="Output format for the printed content or report (default: text)",
+    )
+
 def _add_list_subparser(subs: argparse._SubParsersAction) -> None:
     list_p = subs.add_parser(
         "list",
@@ -885,6 +924,7 @@ _SUBPARSER_BUILDERS = (
     _add_doctor_subparser,
     _add_config_subparser,
     _add_init_subparser,
+    _add_skill_subparser,
     _add_list_subparser,
     _add_explain_subparser,
     _add_help_subparser,
