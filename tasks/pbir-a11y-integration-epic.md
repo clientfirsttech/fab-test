@@ -383,7 +383,7 @@ complexity and module budgets re-confirmed clean.
 
 ---
 
-## Third-Party Notices
+## Third-Party Notices  ✅
 
 Add `THIRD-PARTY.md` documenting each wrapped tool, its license, and where the license text lives.
 
@@ -392,6 +392,42 @@ Add `THIRD-PARTY.md` documenting each wrapped tool, its license, and where the l
 - Given pbir-a11y's PolyForm Shield license, should state plainly that it is source-available with a non-compete restriction, and that `fab-test` wraps rather than redistributes it
 - Given a tool that is downloaded at run time rather than vendored, should say so, since nothing is bundled into the distributed package
 - Given a new wrapped tool added later, should have a stated place and format to record it so the file does not go stale
+
+Done: Verified each license against the real upstream source rather than
+assuming — `gh api repos/TabularEditor/TabularEditor`/`repos/NatVanG/
+fab-inspector` both confirm MIT (matching the SPDX field GitHub reports);
+pbir-a11y's `package.json` already confirmed PolyForm Shield 1.0.0 during
+Task 1's research. `THIRD-PARTY.md` (new, repo root) tables all three with
+a link to each repo's actual `LICENSE` file at its real default branch
+(`master` for TabularEditor/TabularEditor, `main` for the other two —
+checked individually rather than assumed uniform), states plainly that
+nothing is vendored (every tool is downloaded or built at runtime, cached
+under `.fab-test-tools/`, called as an external process), and gives
+PolyForm Shield its own section spelling out the can/cannot split in plain
+language plus why wrapping it as a subprocess call doesn't trigger the
+non-compete restriction. README's License section gained a two-sentence
+pointer to it, since a reader checking a repo's license normally starts
+there, not at a file they'd have to already know existed.
+
+`tests/test_third_party_notices.py` (new) is the "stated place and format"
+requirement made enforceable rather than just written down: it reads every
+`analyzer_registry` entry with a `tool_install` block straight out of the
+real `analyzers.json` and fails, naming which one, if `THIRD-PARTY.md`
+doesn't mention it — so a future wrapped tool added without a matching row
+fails a test instead of going stale silently, the same discipline
+`test_pql_test_pin_consistency.py` already applies to the `pql-test` pin.
+Also asserts the PolyForm Shield section reads as source-available (not
+blending in with the two MIT rows) and that README actually points at the
+file. Verified the drift-detection actually works, not just that the tests
+exist: temporarily redacted every "pbir-a11y" mention from the file,
+watched `test_every_tool_install_analyzer_is_named_in_third_party_md` fail
+naming exactly `pbir_a11y`, then restored the file and re-confirmed green
+(the redaction couldn't be `git checkout --`-reverted since the file was
+still untracked at that point — rewritten back to the verified-correct
+content directly rather than left corrupted).
+
+Full suite: **1537 passed, 0 failed, 3 skipped**, coverage held (floor 80%);
+complexity and module budgets re-confirmed clean.
 
 ---
 
