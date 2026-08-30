@@ -50,6 +50,12 @@ Reuse the `_init` idempotency pattern: detect existing harness config, never clo
 - Given `fab-test skill --uninstall --install claude`, should remove only the artifacts this command created
 - Given an unrecognized `--install` value, should list valid harness names and exit non-zero
 
+## Run `ruff check` before documentation
+
+Per [vision.md](../vision.md#definition-of-done--documentation), run `ruff check` over `src/` and fix anything it flags before the documentation-facing work in the task below.
+
+---
+
 ## Task: Retire the manual sync path
 
 Update the `document` skill and `aidd.agent.md`'s Definition of Done so "skill in sync" means "packaged copy in sync," not "repo copy in sync." Keep `.github/skills/fab-test/SKILL.md` as the checked-in *source* the packaging step in Task 1 pulls from, so authoring still happens in markdown.

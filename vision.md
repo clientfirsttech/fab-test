@@ -104,6 +104,8 @@ the command I was asked about" is the failure mode, not the verification.
 
 ## Definition of Done — Documentation
 
+Before documenting, run `ruff check` over `src/` and fix anything it flags. A build that fails lint after the code is "done" is not done — catching it here is cheaper than catching it in CI.
+
 Documentation follows the same three callers as the CLI itself. Shipping for one and not the others leaves the epic incomplete.
 
 | Caller | Deliverable | Where |
