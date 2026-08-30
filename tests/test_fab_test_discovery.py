@@ -180,8 +180,8 @@ def test_applicable_analyzers_for_semantic_model():
 
 @pytest.mark.fab_test
 def test_applicable_analyzers_for_report():
-    """A .Report folder is applicable to pbir and playwright."""
-    assert applicable_analyzers(Path("Foo.Report")) == ("pbir", "playwright")
+    """A .Report folder is applicable to pbir, a11y, and playwright."""
+    assert applicable_analyzers(Path("Foo.Report")) == ("pbir", "a11y", "playwright")
 
 
 @pytest.mark.fab_test

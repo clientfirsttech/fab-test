@@ -189,6 +189,40 @@ def test_check_readiness_bpa_delegates_to_probe(tmp_path, monkeypatch):
 
 
 @pytest.mark.fab_test
+def test_check_readiness_a11y_delegates_to_probe_via_its_own_flag(tmp_path):
+    """check_readiness('a11y', args) resolves via --a11y-path like bpa/pbir do."""
+    from fabric_ci_cd_dataops.scripts import fab_test_registry as registry
+
+    existing = tmp_path / "cli.js"
+    existing.write_text("// built", encoding="utf-8")
+
+    class _Args:
+        a11y_path = str(existing)
+
+    result = registry.check_readiness("a11y", _Args())
+
+    assert result["ready"] is True
+    assert result["resolved_path"] == str(existing.resolve())
+
+
+@pytest.mark.fab_test
+def test_a11y_is_hidden_from_the_advertised_surface_but_answers_directly():
+    """`a11y` is registered (doctor can answer about it) but not yet advertised --
+    its command builder/subparser don't exist until the wrapper is written.
+    """
+    from fabric_ci_cd_dataops.scripts.fab_test_registry import (
+        HIDDEN_ANALYZERS,
+        visible_analyzers,
+    )
+
+    assert "a11y" in HIDDEN_ANALYZERS
+    assert "a11y" not in visible_analyzers()
+    # But check_readiness (doctor's engine) still answers on direct request.
+    result = check_readiness("a11y", None)
+    assert set(result.keys()) == {"ready", "resolved_path", "reason", "remediation", "version"}
+
+
+@pytest.mark.fab_test
 def test_check_readiness_non_bootstrapped_analyzer_is_always_ready():
     """An analyzer with no external tool and no cloud dependency is always ready.
 
