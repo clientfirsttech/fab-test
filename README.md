@@ -196,6 +196,12 @@ fab-test bpa --tabular-editor-path "/path/to/TabularEditor.exe"
 # Run PBIR Inspector against Report artifacts
 fab-test pbir --inspector-path "/path/to/PBIRInspectorCLI"
 
+# Run pbir-a11y accessibility checks against Report artifacts (requires
+# Node.js >= 18 and npm the first time -- it's built from source, then
+# cached; see fab-test doctor --analyzer a11y). Not run by `fab-test all`
+# by default -- add "a11y" to fab_test_all in analyzers.json to opt in.
+fab-test a11y
+
 # Run pql-test DAX tests
 fab-test pql-test --env DEV
 

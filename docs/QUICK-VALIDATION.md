@@ -75,6 +75,7 @@ pytest -m fab_test      # fab-test CLI surface
 pytest -m analyzers     # all contract-tier analyzer tests
 pytest -m bpa           # BPA wrapper only
 pytest -m pbir          # PBIR Inspector wrapper only
+pytest -m a11y          # pbir-a11y wrapper only
 pytest -m pql_test      # pql-test wrapper only
 ```
 
@@ -102,6 +103,7 @@ The warning says how many checkouts it skipped and gives you the
 ```bash
 fab-test bpa --dry-run
 fab-test pbir --dry-run
+fab-test a11y --dry-run
 fab-test pql-test --dry-run
 ```
 
@@ -110,6 +112,7 @@ fab-test pql-test --dry-run
 ```bash
 fab-test bpa --tabular-editor-path "/path/to/TabularEditor.exe"
 fab-test pbir --inspector-path "/path/to/PBIRInspectorCLI"
+fab-test a11y                            # requires Node.js >= 18 + npm the first time (built from source, then cached)
 fab-test pql-test --env DEV
 ```
 
@@ -349,6 +352,42 @@ fails loudly instead of quietly analyzing nothing.
 ```
 
 This is the case where uploading `run.json` alone still tells you what to fix. It stays `null` when the analyzer *did* write an envelope — then `envelope_path` points at the findings, and those are the reason. Credential values are redacted out of `detail` on the way in, as they are from `command`.
+
+### Pipeline snippet: pbir-a11y accessibility checks (needs Node)
+
+Every other analyzer's CI job is just `fab-test <name>`; `a11y` is the one
+that needs a runtime installed first, since `fab-test` builds pbir-a11y
+from source on first use rather than downloading a pre-built binary:
+
+```yaml
+- name: Set up Node.js
+  uses: actions/setup-node@v4
+  with:
+    node-version: ">=18"
+
+- name: Check readiness (confirms Node/npm before building anything)
+  run: fab-test doctor --analyzer a11y --format json
+
+- name: Run pbir-a11y accessibility checks
+  run: fab-test a11y --format json --artifact-dir .fabric/artifacts
+
+- name: Upload run manifest
+  uses: actions/upload-artifact@v4
+  if: always()
+  with:
+    name: fab-test-a11y-manifest
+    path: fab-test-results/run.json
+```
+
+The first run builds and caches pbir-a11y under `.fab-test-tools/`; cache
+that directory (`actions/cache@v4`, keyed on the analyzers.json checksum)
+if the job runs often enough for the ~10s build to matter. `a11y` is not in
+`fab_test_all`, so this step is additive to an existing pipeline — nothing
+already green starts failing because this snippet was added elsewhere in
+the same workflow. See [THIRD-PARTY.md](../THIRD-PARTY.md) before using
+this in a commercial pipeline: pbir-a11y is PolyForm Shield-licensed
+(source-available, non-compete), not MIT like the other wrapped tools —
+running it via `fab-test` to check your own reports is a permitted use.
 
 ### Pipeline snippet: shipping telemetry to an Eventhouse
 
