@@ -525,6 +525,20 @@ def build_pql_lint_command(
     ]
 
 
+def playwright_test_cases_dir(output_dir: Path, artifact: Path) -> Path:
+    """Return the per-artifact directory `invoke_playwright.py` writes its
+    generated test-case list into.
+
+    A single source of truth for this path: `build_playwright_command`
+    passes it explicitly via `--test-cases-dir` so the child always writes
+    there (rather than the package's shared unversioned default, which two
+    concurrent artifacts under `--jobs` would collide on), and
+    `fab_test_execution.py`'s case-count-scaled timeout polls the same path
+    to learn how many cases were generated, without duplicating the string.
+    """
+    return output_dir / "playwright" / artifact.stem / "test-cases"
+
+
 def build_playwright_command(
     artifact: Path,
     args: argparse.Namespace,
@@ -540,6 +554,8 @@ def build_playwright_command(
         str(output),
         "--artifact",
         artifact.stem,
+        "--test-cases-dir",
+        str(playwright_test_cases_dir(output_dir, artifact)),
     ]
     env_file = getattr(args, "playwright_env_file", None)
     if env_file:

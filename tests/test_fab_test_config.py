@@ -115,21 +115,27 @@ def test_backward_compat_real_command_with_only_pyproject_config(tmp_path):
 def test_resolve_timeout_uses_config_when_no_cli_or_env(monkeypatch):
     """A config-file timeout is used when neither --timeout nor the env is set."""
     monkeypatch.delenv("ANALYZER_TIMEOUT", raising=False)
-    assert _resolve_timeout(_TimeoutArgs(timeout=None), config={"timeout": 300}) == 300
+    value, is_default = _resolve_timeout(_TimeoutArgs(timeout=None), config={"timeout": 300})
+    assert value == 300
+    assert is_default is False
 
 
 @pytest.mark.fab_test
 def test_resolve_timeout_env_overrides_config(monkeypatch):
     """ANALYZER_TIMEOUT still overrides a config-file timeout."""
     monkeypatch.setenv("ANALYZER_TIMEOUT", "60")
-    assert _resolve_timeout(_TimeoutArgs(timeout=None), config={"timeout": 300}) == 60
+    value, is_default = _resolve_timeout(_TimeoutArgs(timeout=None), config={"timeout": 300})
+    assert value == 60
+    assert is_default is False
 
 
 @pytest.mark.fab_test
 def test_resolve_timeout_cli_overrides_config_and_env(monkeypatch):
     """An explicit --timeout wins over both env var and config file."""
     monkeypatch.setenv("ANALYZER_TIMEOUT", "60")
-    assert _resolve_timeout(_TimeoutArgs(timeout=999), config={"timeout": 300}) == 999
+    value, is_default = _resolve_timeout(_TimeoutArgs(timeout=999), config={"timeout": 300})
+    assert value == 999
+    assert is_default is False
 
 
 @pytest.mark.fab_test

@@ -53,6 +53,13 @@ from .fab_test_registry import (
 from .fab_test_registry import (
     is_repository_scoped as _is_repository_scoped,
 )
+from ._playwright_timeout_scaling import (
+    Narration as PlaywrightNarration,
+)
+from ._playwright_timeout_scaling import run_playwright_with_scaled_timeout
+from .fab_test_registry import (
+    playwright_test_cases_dir as _playwright_test_cases_dir,
+)
 from .fab_test_registry import (
     preflight_error as _preflight_error,
 )
@@ -126,13 +133,19 @@ _resolve_report = resolve_report
 
 def _resolve_timeout(
     args: argparse.Namespace, config: dict[str, Any] | None = None
-) -> int:
+) -> tuple[int, bool]:
     """Resolve the per-artifact subprocess timeout via the centralized resolver.
 
     Precedence: --timeout > ANALYZER_TIMEOUT > config file > default.
+
+    Returns ``(value, is_default)``. ``is_default`` is True only when
+    nothing explicit was set anywhere -- the signal that lets playwright's
+    case-count-scaled timeout (Playwright Case Scaling epic) apply without
+    silently overriding a caller's own explicit choice, which stays an
+    override in every other analyzer's byte-identical existing behavior.
     """
     config = _PYPROJECT_CONFIG if config is None else config
-    value, _origin = resolve_setting(
+    value, origin = resolve_setting(
         "timeout",
         cli_value=getattr(args, "timeout", None),
         env_var="ANALYZER_TIMEOUT",
@@ -140,7 +153,7 @@ def _resolve_timeout(
         packaged_default=_DEFAULT_SUBPROCESS_TIMEOUT,
         cast=int,
     )
-    return value
+    return value, origin == "default"
 
 
 def _apply_environment_default(
@@ -189,6 +202,11 @@ class _RunContext:
     in_ci: bool
     sub_env: dict[str, str]
     timeout: int
+    # True when `timeout` came from the packaged default rather than an
+    # explicit --timeout/ANALYZER_TIMEOUT/config value -- see
+    # `_resolve_timeout`. Only in this state does playwright's case-count
+    # scaling apply.
+    timeout_is_default: bool = False
     manifest: RunManifest | None = None
     # One sink per run, drained once at the end. Ingesting inline would open
     # a queued-ingest client per artifact for one logical run.
@@ -227,9 +245,21 @@ def _run_artifact_process(
     output_format: str,
     name: str,
     display_name: str,
+    test_cases_path: Path | None = None,
 ) -> "subprocess.CompletedProcess | tuple[str, int]":
     """Run the analyzer subprocess. Returns the completed process, or a
     ``(display_name, exit_code)`` result already handled on timeout."""
+    if name == "playwright" and ctx.timeout_is_default and test_cases_path is not None:
+        return run_playwright_with_scaled_timeout(
+            cmd,
+            ctx,
+            capture_stdout,
+            output_format,
+            name,
+            display_name,
+            test_cases_path,
+            PlaywrightNarration(reemit_lines=_reemit_lines, narrate=narrate),
+        )
     try:
         return subprocess.run(
             cmd,
@@ -360,7 +390,16 @@ def _run_one_artifact(
     # so there is no added buffering latency.
     capture_stdout = output_format == "json"
 
-    result = _run_artifact_process(cmd, ctx, capture_stdout, output_format, name, display_name)
+    test_cases_path = None
+    if name == "playwright" and not getattr(args, "impact_manifest", None):
+        # --impact-manifest runs across multiple reports in one invocation --
+        # no single per-artifact cases file to poll for, so that mode keeps
+        # the flat outer timeout unchanged.
+        test_cases_path = _playwright_test_cases_dir(output_dir, artifact) / "test-cases.json"
+
+    result = _run_artifact_process(
+        cmd, ctx, capture_stdout, output_format, name, display_name, test_cases_path
+    )
     if isinstance(result, tuple):
         return result
     proc = result
@@ -651,10 +690,12 @@ def _run_analyzer(
         return preflight_exit_code
 
     verbosity = _verbosity_env(args)
+    timeout, timeout_is_default = _resolve_timeout(args)
     ctx = _RunContext(
         in_ci=_is_ci(),
         sub_env=_analyzer_sub_env(args, output_format),
-        timeout=_resolve_timeout(args),
+        timeout=timeout,
+        timeout_is_default=timeout_is_default,
         manifest=manifest,
         telemetry=telemetry,
     )

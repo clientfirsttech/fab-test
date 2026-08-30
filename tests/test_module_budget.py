@@ -36,7 +36,7 @@ TEST_HARD = 900
 # test_complexity_budget.py.
 EXEMPTIONS: dict[str, tuple[int, str]] = {
     "src/fabric_ci_cd_dataops/scripts/fab_test_parser.py": (
-        938,
+        941,
         (
             "2026-08-28: born over the hard budget by the move itself -- "
             "build_parser's 17 subparser builders were, together, larger than "
@@ -48,7 +48,10 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
             "2026-08-29: +27 lines adding _add_a11y_subparser (PBIR "
             "Accessibility Integration epic, Analyzer Registration and "
             "Targeting task) -- one more subcommand builder, same shape as "
-            "every other one already here."
+            "every other one already here. "
+            "2026-08-30: +3 lines noting in --timeout's help text that "
+            "playwright scales it automatically, and that setting this "
+            "flag overrides that (Playwright Case Scaling epic)."
         ),
     ),
     "src/fabric_ci_cd_dataops/scripts/fab_test_summary.py": (
@@ -60,7 +63,7 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
         ),
     ),
     "src/fabric_ci_cd_dataops/scripts/fab_test_registry.py": (
-        872,
+        888,
         (
             "2026-08-23: 11 lines over hard, same story as fab_test_summary.py -- "
             "small drift from other epics, not yet worth a forced split. "
@@ -80,7 +83,11 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
             "_DEFAULT_A11Y_PATH, and registering it in _COMMAND_BUILDERS, "
             "removing it from HIDDEN_ANALYZERS now that its command builder "
             "and subparser exist (PBIR Accessibility Integration epic, "
-            "Analyzer Registration and Targeting task)."
+            "Analyzer Registration and Targeting task). "
+            "2026-08-30: +16 lines adding playwright_test_cases_dir, the "
+            "single source of truth build_playwright_command and "
+            "fab_test_execution.py's case-count-scaled timeout both need to "
+            "agree on the same path (Playwright Case Scaling epic)."
         ),
     ),
 }

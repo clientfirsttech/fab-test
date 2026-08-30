@@ -29,7 +29,7 @@
     "timeout": {
       "type": "integer",
       "minimum": 1,
-      "description": "Per-artifact subprocess timeout in seconds [env: ANALYZER_TIMEOUT] (default: 200)."
+      "description": "Per-artifact subprocess timeout in seconds [env: ANALYZER_TIMEOUT] (default: 200). Setting this overrides fab-test's own case-count-scaled timeout for playwright, which otherwise raises the ceiling for a report with a large page/bookmark/role matrix instead of using this flat number."
     },
     "environment": {
       "type": "string",
