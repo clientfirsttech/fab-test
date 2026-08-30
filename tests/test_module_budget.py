@@ -36,7 +36,7 @@ TEST_HARD = 900
 # test_complexity_budget.py.
 EXEMPTIONS: dict[str, tuple[int, str]] = {
     "src/fabric_ci_cd_dataops/scripts/fab_test_parser.py": (
-        954,
+        994,
         (
             "2026-08-28: born over the hard budget by the move itself -- "
             "build_parser's 17 subparser builders were, together, larger than "
@@ -55,7 +55,11 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
             "2026-08-30: +13 lines adding --workers to the playwright "
             "subparser, so the pytest-xdist worker cap is configurable "
             "(e.g. higher on a VM that can run more concurrent browser "
-            "instances) rather than a fixed constant."
+            "instances) rather than a fixed constant. "
+            "2026-08-30: +40 lines adding _add_skill_subparser (`fab-test "
+            "skill --install/--show/--uninstall/--dry-run/--force`, fab-test "
+            "Skill Distribution epic) -- one more subcommand builder, same "
+            "shape as every other one already here."
         ),
     ),
     "src/fabric_ci_cd_dataops/scripts/fab_test_summary.py": (
