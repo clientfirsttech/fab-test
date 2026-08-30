@@ -335,7 +335,7 @@ complexity and module budgets re-confirmed clean.
 
 ---
 
-## Accessibility Findings in `--report`
+## Accessibility Findings in `--report`  ✅
 
 Include a11y results in the HTML report and its index alongside the other analyzers.
 
@@ -344,6 +344,42 @@ Include a11y results in the HTML report and its index alongside the other analyz
 - Given `fab-test all --report`, should list the a11y report in the index without duplicating any other analyzer's entry
 - Given findings across several categories, should group or filter them so a reader can isolate one category without reading the whole table
 - Given zero findings, should still write a report that says so rather than omitting the analyzer from the index
+
+Done: `_report_html.py`'s own docstring states the design this task fits
+into: "one renderer for every analyzer... computes no finding of its own."
+`invoke_pbir_a11y.py` was the only piece actually missing — it built an
+envelope but never called `attach_report`, unlike `bpa`/`pql_test`/
+`playwright`. One import plus one call in `write_results` (mirroring
+`invoke_tabular_editor_bpa.py`'s exact pattern) was the entire code change.
+
+The category-grouping requirement turned out to already be satisfied by
+existing, analyzer-agnostic machinery once traced through rather than
+needing new code: the report's search box (`_SEARCH_SORT_SCRIPT`) filters
+on `row.textContent`, matching against every column including "Message" —
+and Task 3's finding mapping already prefixes each message with
+`[category]` specifically so a reader could isolate one this way. Clicking
+a column header sorts alphabetically, which clusters same-category rows
+together for the same reason. Confirmed live, not just reasoned about:
+generated a real report against `ThinReport.Report`'s findings and grepped
+the actual HTML for `altText`/`pageTitles`/`visualTitles` — present and
+readable, not escaped away. The index requirement (`render_index`) was
+confirmed structurally rather than by adding a special case: it iterates
+whatever `rows` list the aggregate summary already built, with zero
+analyzer-specific branches — the same generic path `bpa`/`pbir`/`pql_test`
+already exercise, so there is no code path that *could* duplicate an
+entry regardless of which analyzer produced it.
+
+Verified against the **real CLI**, not only a unit test: `fab-test a11y
+"ThinReport.Report" --report` wrote `report.html` beside the envelope and
+printed `Report: fab-test-results\a11y\ThinReport\report.html` exactly once
+in the run summary. A new unit test
+(`test_run_writes_a_report_when_enabled_even_with_zero_findings`) pins the
+zero-findings case specifically, since that path has no findings to prove
+anything rendered correctly by eye — asserting the artifact's own name
+still appears in the written report.
+
+Full suite: **1532 passed, 0 failed, 3 skipped**, coverage held (floor 80%);
+complexity and module budgets re-confirmed clean.
 
 ---
 
