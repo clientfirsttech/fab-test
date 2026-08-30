@@ -206,18 +206,20 @@ def test_check_readiness_a11y_delegates_to_probe_via_its_own_flag(tmp_path):
 
 
 @pytest.mark.fab_test
-def test_a11y_is_hidden_from_the_advertised_surface_but_answers_directly():
-    """`a11y` is registered (doctor can answer about it) but not yet advertised --
-    its command builder/subparser don't exist until the wrapper is written.
+def test_a11y_is_a_fully_advertised_analyzer():
+    """`a11y` is a first-class analyzer: registered, visible, and answerable.
+
+    Hidden only briefly (Task 2, before its command builder/subparser
+    existed) -- Task 4 registered both, so it belongs on the advertised
+    surface the same as bpa/pbir, not tucked away like pql_lint.
     """
     from fabric_ci_cd_dataops.scripts.fab_test_registry import (
         HIDDEN_ANALYZERS,
         visible_analyzers,
     )
 
-    assert "a11y" in HIDDEN_ANALYZERS
-    assert "a11y" not in visible_analyzers()
-    # But check_readiness (doctor's engine) still answers on direct request.
+    assert "a11y" not in HIDDEN_ANALYZERS
+    assert "a11y" in visible_analyzers()
     result = check_readiness("a11y", None)
     assert set(result.keys()) == {"ready", "resolved_path", "reason", "remediation", "version"}
 

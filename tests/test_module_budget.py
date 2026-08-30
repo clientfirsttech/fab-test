@@ -36,7 +36,7 @@ TEST_HARD = 900
 # test_complexity_budget.py.
 EXEMPTIONS: dict[str, tuple[int, str]] = {
     "src/fabric_ci_cd_dataops/scripts/fab_test_parser.py": (
-        911,
+        938,
         (
             "2026-08-28: born over the hard budget by the move itself -- "
             "build_parser's 17 subparser builders were, together, larger than "
@@ -44,7 +44,11 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
             "tasks/fab-test-module-split-epic.md, 'Extract the argument "
             "parser'). One function per subcommand keeps each piece small; "
             "splitting the module further would cut across that seam rather "
-            "than with it. Revisit if it keeps growing."
+            "than with it. Revisit if it keeps growing. "
+            "2026-08-29: +27 lines adding _add_a11y_subparser (PBIR "
+            "Accessibility Integration epic, Analyzer Registration and "
+            "Targeting task) -- one more subcommand builder, same shape as "
+            "every other one already here."
         ),
     ),
     "src/fabric_ci_cd_dataops/scripts/fab_test_summary.py": (
@@ -56,7 +60,7 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
         ),
     ),
     "src/fabric_ci_cd_dataops/scripts/fab_test_registry.py": (
-        842,
+        872,
         (
             "2026-08-23: 11 lines over hard, same story as fab_test_summary.py -- "
             "small drift from other epics, not yet worth a forced split. "
@@ -71,7 +75,12 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
             "_BOOTSTRAPPED_ANALYZERS/_BOOTSTRAP_REGISTRY_NAME plus its explicit-path "
             "branch in resolve_tool and _readiness_without_version (PBIR "
             "Accessibility Integration epic, Node and pbir-a11y Readiness in "
-            "Doctor task)."
+            "Doctor task). "
+            "2026-08-29: +30 lines adding build_a11y_command and "
+            "_DEFAULT_A11Y_PATH, and registering it in _COMMAND_BUILDERS, "
+            "removing it from HIDDEN_ANALYZERS now that its command builder "
+            "and subparser exist (PBIR Accessibility Integration epic, "
+            "Analyzer Registration and Targeting task)."
         ),
     ),
 }

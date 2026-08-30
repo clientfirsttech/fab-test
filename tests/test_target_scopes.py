@@ -102,6 +102,16 @@ def test_workspace_target_is_refused_for_a_file_reading_analyzer():
 
 
 @pytest.mark.fab_test
+def test_workspace_target_is_refused_for_a11y():
+    """a11y reads Report files on disk; it cannot fetch a deployed item."""
+    message = unsupported_scope_error("a11y", parse_target(_WORKSPACE_TARGET))
+
+    assert message is not None
+    assert "a11y" in message
+    assert "cannot fetch a deployed item" in message
+
+
+@pytest.mark.fab_test
 def test_desktop_target_is_accepted_by_file_reading_analyzers():
     """local/Sales is just a name to bpa: the artifact is on disk either way.
 
@@ -197,6 +207,18 @@ def test_a_type_another_analyzer_reads_names_that_analyzer():
 
     assert message is not None
     assert "pbir" in message
+
+
+@pytest.mark.fab_test
+def test_a_semantic_model_target_names_a11y_does_not_read_it():
+    """a11y reads Report artifacts only; a SemanticModel target refuses cleanly."""
+    from fabric_ci_cd_dataops.scripts.fab_test_registry import unsupported_type_error
+
+    message = unsupported_type_error("a11y", parse_target("Sales.SemanticModel"))
+
+    assert message is not None
+    assert "Report" in message
+    assert "SemanticModel" in message
 
 
 @pytest.mark.fab_test

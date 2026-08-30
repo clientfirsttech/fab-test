@@ -58,6 +58,7 @@ _DEFAULT_TE_PATH = str(REPO_ROOT / "TabularEditor" / "TabularEditor.exe")
 # to the copy in the wheel. The repository copy still wins where one exists.
 _DEFAULT_BPA_RULES = str(metadata_path(BPA_RULES, REPO_ROOT))
 _DEFAULT_INSPECTOR_PATH = str(REPO_ROOT / "PBIR-Inspector" / "PBIRInspectorCLI")
+_DEFAULT_A11Y_PATH = str(REPO_ROOT / "pbir-a11y" / "dist" / "cli.js")
 _DEFAULT_PBIR_RULES = str(metadata_path(PBIR_RULES, REPO_ROOT))
 
 ANALYZERS_JSON = metadata_path(ANALYZERS, REPO_ROOT)
@@ -81,12 +82,7 @@ ANALYZER_REGISTRY: dict[str, tuple[str, str]] = {
 # state and never a removal. `doctor --analyzer <name>` still reports one
 # on request, because hiding a name from a menu should not refuse to
 # answer a direct question about it.
-#
-# "a11y" is hidden only until its command builder/subparser land (PBIR
-# Accessibility Integration epic, task 3): registering it early is what lets
-# `doctor --analyzer a11y` report readiness now, without exposing a
-# subcommand that argparse doesn't actually accept yet.
-HIDDEN_ANALYZERS: frozenset[str] = frozenset({"pql_lint", "a11y"})
+HIDDEN_ANALYZERS: frozenset[str] = frozenset({"pql_lint"})
 
 
 def visible_analyzers() -> tuple[str, ...]:
@@ -409,6 +405,39 @@ def build_pbir_command(
     return command
 
 
+def build_a11y_command(
+    artifact: Path,
+    args: argparse.Namespace,
+    output_dir: Path,
+) -> list[str]:
+    """Build the pbir-a11y command for ``artifact``.
+
+    Node resolution lives in the wrapper itself (``invoke_pbir_a11y.py``),
+    not here -- the resolved path this builder passes is always the CLI
+    entry point (``dist/cli.js``), the same shape ``resolve_executable``
+    already hands every other bootstrapped analyzer.
+    """
+    a11y_path = getattr(args, "_resolved_tool_path", None) or (
+        getattr(args, "a11y_path", None) or _env("PBIR_A11Y_PATH", _DEFAULT_A11Y_PATH)
+    )
+    output = output_dir / "a11y" / artifact.stem / "envelope.json"
+    command = [
+        sys.executable,
+        "-m",
+        _script_module("invoke_pbir_a11y"),
+        "--artifact-path",
+        str(artifact),
+        "--a11y-path",
+        str(a11y_path),
+        "--output-path",
+        str(output),
+    ]
+    fail_on = getattr(args, "fail_on", None)
+    if fail_on:
+        command += ["--fail-on", fail_on]
+    return command
+
+
 def bound_desktop_instance(artifact: Path):
     """Return the (port, model_name) of a Desktop instance with this artifact's
     .pbip open, or None when there's no pairing or no unambiguous match.
@@ -608,6 +637,7 @@ def build_dependencies_command(
 _COMMAND_BUILDERS: dict[str, Any] = {
     "bpa": build_bpa_command,
     "pbir": build_pbir_command,
+    "a11y": build_a11y_command,
     "pql_test": build_pql_test_command,
     "pql_lint": build_pql_lint_command,
     "playwright": build_playwright_command,

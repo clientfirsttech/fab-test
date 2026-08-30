@@ -261,7 +261,7 @@ re-confirmed clean.
 
 ---
 
-## Analyzer Registration and Targeting
+## Analyzer Registration and Targeting  ✅
 
 Register the analyzer so it is discoverable and targetable through the existing grammar rather than a special case.
 
@@ -274,6 +274,64 @@ Register the analyzer so it is discoverable and targetable through the existing 
 - Given `fab-test all`, should not run the analyzer, since it is deliberately left out of the configured `fab_test_all` list — a pipeline that passed before this epic passes after it
 - Given a team that wants it in `fab-test all`, should be able to add it by editing the `fab_test_all` list in `analyzers.json`, with that documented as the supported opt-in
 - Given a run with `--jobs N`, should parallelize per artifact like every other analyzer
+
+Done: `build_a11y_command` (mirrors `build_bpa_command`/`build_pbir_command`
+exactly) resolves the tool path from `args._resolved_tool_path` first
+(the real cached build, once `resolve_tool` has run), falling back to an
+explicit `--a11y-path`/`PBIR_A11Y_PATH` override or the packaged default,
+and forwards `--fail-on` only when the caller passed one. Registered in
+`_COMMAND_BUILDERS`, and a new `_add_a11y_subparser` (`fab_test_parser.py`)
+adds the real `fab-test a11y` subcommand with `--a11y-path`/`--fail-on`
+flags, following `_add_pbir_subparser`'s exact shape. Removed `"a11y"` from
+`HIDDEN_ANALYZERS` (added there temporarily in Task 2, before this task's
+command builder/subparser existed) — it is now a fully first-class,
+advertised analyzer, not tucked away like `pql_lint`. Added `"a11y":
+"pbir-a11y"` to `fab_test_admin.py`'s `_TOOL_DISPLAY_NAMES` so `fab-test
+list`'s "Required Tool" column reads `pbir-a11y` rather than `(none)`.
+
+Every requirement verified against the **real installed CLI**, not just
+unit tests: `fab-test a11y --help` shows the full flag set; `fab-test list`
+advertises `a11y` with its glob (`*.Report`) and description; `fab-test
+explain a11y` shows the resolved tool path, output path, and full command
+line; `fab-test a11y "WORKSPACE.Workspace/Foo.Report"` refuses with "a11y
+reads artifact files on disk and cannot fetch a deployed item", naming the
+forms that do work; `fab-test a11y "Sales.SemanticModel"` refuses naming
+both halves ("a11y reads Report artifacts; ... is a SemanticModel");
+`fab-test a11y --jobs 4` against 4 real artifacts completed in ~3.8s
+(parallelized, not run serially); a real end-to-end run against a fixture
+with real findings produced pure-JSON stdout under `--format json`
+(confirmed by piping `2>/dev/null` — an earlier same-terminal `2>&1` test
+had merged stderr narration into the stream and looked like a purity
+violation until re-tested correctly, a false alarm caught before it was
+recorded as a defect); and manually appending `"a11y"` to `analyzers.json`'s
+`fab_test_all` list made `fab-test all --dry-run` pick it up immediately,
+confirming the opt-in mechanism works as designed (reverted immediately
+after, via `git checkout --`, since the edit was for verification only —
+the accidental side effect of a Python `json.dump` rewriting the whole
+file's formatting was caught by `git diff --stat` before it was mistaken
+for legitimate work).
+
+Two pre-existing behaviors were confirmed unaffected by registering a
+visible `.Report`-glob analyzer, not newly broken by it:
+`applicable_analyzers()`'s per-artifact dry-run annotation for *other*
+analyzers now also lists `a11y` for every Report artifact (the same
+discovery-glob derivation `pql_lint` already exercises for `.SemanticModel`
+artifacts) — expected, not a regression, and `tests/test_fab_test_discovery.py`'s
+`test_applicable_analyzers_for_report`'s exact-tuple assertion was updated
+to include it. `tests/test_readiness.py`'s Task-2-era hidden-state test was
+rewritten to assert the opposite (visible, not hidden) now that this task
+completed the wiring it was waiting on. `tests/test_target_scopes.py` and
+`tests/test_fab_test_command_builders.py` each gained dedicated tests for
+`a11y`'s workspace refusal, type refusal, and command-building (default
+path, resolved-tool-path precedence, `--fail-on` forwarding).
+`tests/test_module_budget.py`: `fab_test_parser.py`'s exemption ceiling
+raised 911 → 938 (the new subparser), `fab_test_registry.py`'s raised
+842 → 872 (the command builder). Documenting `fab_test_all`'s opt-in path
+for a team that wants `a11y` running by default is carried by the
+Documentation task below, not repeated here.
+
+Full suite: **1531 passed, 0 failed, 3 skipped**, coverage held (floor 80%);
+complexity and module budgets re-confirmed clean.
 
 ---
 
