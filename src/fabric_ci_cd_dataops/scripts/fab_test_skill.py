@@ -36,6 +36,15 @@ _HARNESS_TARGETS: dict[str, Path] = {
 _OWNERSHIP_MARKER = "fab-test CLI reference for running Fabric artifact analyzers locally"
 
 
+class SkillContentError(Exception):
+    """Raised when a resolved SKILL.md cannot be adapted to a harness's shape.
+
+    Only ever raised for a repo-override file (`.fab-test/skill/SKILL.md` or
+    `.github/skills/fab-test/SKILL.md`) with no valid YAML frontmatter --
+    the packaged copy is guarded against this by test_skill_resource.py.
+    """
+
+
 def _content_for_harness(harness: str, skill_content: str) -> str:
     """Adapt the authored SKILL.md frontmatter to the target harness's shape.
 
@@ -45,12 +54,23 @@ def _content_for_harness(harness: str, skill_content: str) -> str:
     """
     if harness != "copilot":
         return skill_content
-    _, frontmatter, body = skill_content.split("---", 2)
-    description = next(
+    parts = skill_content.split("---", 2)
+    if len(parts) != 3:
+        raise SkillContentError(
+            "the resolved SKILL.md has no YAML frontmatter (expected two "
+            "'---' delimiters) -- cannot build a Copilot instructions file from it"
+        )
+    _, frontmatter, body = parts
+    descriptions = [
         line.split(":", 1)[1].strip()
         for line in frontmatter.splitlines()
         if line.startswith("description:")
-    )
+    ]
+    if not descriptions:
+        raise SkillContentError("the resolved SKILL.md's frontmatter has no 'description:' line")
+    # Interpolated into a double-quoted YAML scalar below -- an embedded "
+    # would otherwise close the string early and corrupt the frontmatter.
+    description = descriptions[0].replace('"', "'")
     return f'---\napplyTo: "**"\ndescription: "{description}"\n---\n{body}'
 
 
@@ -95,7 +115,11 @@ def _skill_show(output_format: str) -> int:
 
 def _skill_install(harness: str, resolved, *, output_format: str, dry_run: bool, force: bool) -> int:
     target = REPO_ROOT / _HARNESS_TARGETS[harness]
-    content = _content_for_harness(harness, resolved.path.read_text(encoding="utf-8"))
+    try:
+        content = _content_for_harness(harness, resolved.path.read_text(encoding="utf-8"))
+    except SkillContentError as exc:
+        narrate(f"fab-test skill --install {harness}: {exc}", output_format=output_format)
+        return 1
     existed_before = target.is_file()
 
     if existed_before and target.read_text(encoding="utf-8") == content:

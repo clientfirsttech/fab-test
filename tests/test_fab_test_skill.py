@@ -181,3 +181,30 @@ def test_uninstall_without_install_target_is_a_clear_error(capsys):
     exit_code = skill_module._skill(_args(uninstall=True))
 
     assert exit_code == 2
+
+
+def test_copilot_install_fails_cleanly_on_a_frontmatter_free_override(_repo_root):
+    override = _repo_root / ".github" / "skills" / "fab-test" / "SKILL.md"
+    override.parent.mkdir(parents=True)
+    override.write_text("no frontmatter here at all", encoding="utf-8")
+
+    exit_code = skill_module._skill(_args(install="copilot"))
+
+    assert exit_code == 1
+    assert not (_repo_root / ".github" / "instructions" / "fab-test.instructions.md").exists()
+
+
+def test_copilot_install_escapes_a_quote_in_the_description(_repo_root):
+    override = _repo_root / ".github" / "skills" / "fab-test" / "SKILL.md"
+    override.parent.mkdir(parents=True)
+    override.write_text(
+        '---\nname: fab-test\ndescription: uses "fab-test" quoted\n---\nbody\n',
+        encoding="utf-8",
+    )
+
+    exit_code = skill_module._skill(_args(install="copilot"))
+
+    assert exit_code == 0
+    target = _repo_root / ".github" / "instructions" / "fab-test.instructions.md"
+    content = target.read_text(encoding="utf-8")
+    assert content.splitlines()[2] == 'description: "uses \'fab-test\' quoted"'
