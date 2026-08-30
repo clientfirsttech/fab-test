@@ -1,6 +1,6 @@
 # fab-test Skill Distribution Epic
 
-**Status**: 📋 PLANNED
+**Status**: ✅ COMPLETED — 4 of 4 tasks done
 **Goal**: `fab-test` ships its own versioned skill and installs it to whatever harness is running, so the skill file can never drift from the installed CLI version.
 
 ## Overview
