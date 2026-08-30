@@ -42,19 +42,29 @@ docs/QUICK-VALIDATION.md
 
 ## Target Files and What to Update
 
-### 1. `.github/skills/fab-test/SKILL.md`
+### 1. `.github/skills/fab-test/` (main `SKILL.md` + `references/*.md`)
 
-Full reference for the `fab-test` CLI. Regenerate the entire content to match `fab_test.py`'s current argument parser. Key sections:
+Full reference for the `fab-test` CLI. Split (fab-test Skill Componentization
+epic) into a small main `SKILL.md` — intro, Agent Contract (written in
+[SudoLang](../aidd-sudolang-syntax/SKILL.md), not prose+tables), Subcommands,
+and a table of contents — plus `references/*.md` for everything else. Update
+whichever file(s) actually cover the changed behavior; regenerating the whole
+tree for a small change is not required. Key sections and where they live:
 
-- **Distinction from pytest** table — one row per subcommand showing pytest vs fab-test split
-- **Installation** — `pip install -e .`
-- **Subcommands** — derived from `_ANALYZER_REGISTRY` in `fab_test.py`
-- **Global flags** — from `_add_common_flags()`: `--artifact`, `--artifact-dir`, `--output-dir`, `--dry-run`
-- **Subcommand-specific flags** — from each `subs.add_parser()` block
-- **pql_test `--env` flag** — document that it maps to `PQL_TEST_ENV` env var
-- **Result locations** — `fab-test-results/<analyzer>/<stem>/envelope.json` and `native.json`
-- **Envelope schema keys** — from `ENVELOPE_REQUIRED_KEYS` in `_analyzer_envelope.py`
-- **Source files table** — map each script to its purpose
+- **Distinction from pytest** table (main) — one row per subcommand showing pytest vs fab-test split
+- **Installation** (main) — `pip install -e .`
+- **Agent Contract** (main, SudoLang) — exit codes, JSON stdout guarantee, discoverability, run manifest shape — derived from `fab_test.py`'s actual behavior, not restated as prose
+- **Subcommands** (main) — derived from `_ANALYZER_REGISTRY` in `fab_test.py`
+- **Global flags** (`references/flags.md`) — from `_add_common_flags()`: `--artifact`, `--artifact-dir`, `--output-dir`, `--dry-run`
+- **Subcommand-specific flags** (`references/flags.md`) — from each `subs.add_parser()` block
+- **pql_test `--env` flag** (`references/flags.md`) — document that it maps to `PQL_TEST_ENV` env var
+- **Targeting and discovery** (`references/targeting-and-discovery.md`)
+- **Credentials** (`references/credentials.md`)
+- **Reports** (`references/reports.md`)
+- **Configuration, telemetry, rule overlays** (`references/configuration.md`)
+- **Result locations, dry-run, verbosity, tool resolution** (`references/operations.md`) — `fab-test-results/<analyzer>/<stem>/envelope.json` and `native.json`
+- **Envelope schema keys** (`references/operations.md`) — from `ENVELOPE_REQUIRED_KEYS` in `_analyzer_envelope.py`
+- **Source files table** (`references/source-files.md`) — map each script to its purpose
 
 ### 2. `README.md`
 
@@ -83,13 +93,17 @@ Update only the **"Run analyzers locally before pushing"** section. Do not touch
 - Do not add speculative features — only document what exists in the code
 - After updating all three files, confirm what changed in a short summary
 
-## After editing `.github/skills/fab-test/SKILL.md`
+## After editing `.github/skills/fab-test/`
 
-That file is also fab-test's own packaged skill resource (fab-test Skill
-Distribution epic) — `src/fabric_ci_cd_dataops/skill/SKILL.md` must carry an
-identical copy, and its frontmatter `description` must name the current
-`__version__`. Copy the file and re-stamp the version by hand; do not diff the
-two side by side to eyeball whether they still match — `pytest
-tests/test_skill_resource.py` is the check, and it is what CI runs. To confirm
-an already-installed harness copy elsewhere is current, run `fab-test skill
---show` rather than opening the installed file to compare it manually.
+That directory is also fab-test's own packaged skill resource (fab-test Skill
+Distribution and Skill Componentization epics) — every file under
+`src/fabric_ci_cd_dataops/skill/` (`SKILL.md` and each `references/*.md`) must
+carry an identical copy of its authored counterpart, and the main `SKILL.md`'s
+frontmatter `description` must name the current `__version__`. Copy whichever
+files changed and re-stamp the version by hand; do not diff the two trees side
+by side to eyeball whether they still match — `pytest
+tests/test_skill_resource.py` is the check (it also fails if the main file
+loses its required SudoLang `Interfaces`/`Constraints` blocks), and it is what
+CI runs. To confirm an already-installed harness copy elsewhere is current,
+run `fab-test skill --show` rather than opening the installed files to compare
+them manually.

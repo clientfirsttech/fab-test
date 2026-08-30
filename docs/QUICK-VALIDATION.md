@@ -258,7 +258,7 @@ missing grant logs a warning and falls back to testing the single default
 page/role rather than failing the run. Add `--pages none --roles none` to the
 command above to keep the one-case-per-report shape every prior release had.
 
-See the [Configuration section of the fab-test skill](../.github/skills/fab-test/SKILL.md#configuration) for the full settings list and rule-overlay keys.
+See the [Configuration section of the fab-test skill](../.github/skills/fab-test/references/configuration.md#configuration) for the full settings list and rule-overlay keys.
 
 ### Pipeline snippet: a reviewable report as the build artifact
 

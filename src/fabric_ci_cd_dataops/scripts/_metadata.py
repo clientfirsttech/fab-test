@@ -50,22 +50,23 @@ _OVERRIDE_LAYERS: tuple[tuple[Path, str], ...] = (
 
 PACKAGED_ORIGIN = "packaged"
 
-PACKAGED_SKILL = Path(__file__).resolve().parent.parent / "skill" / "SKILL.md"
+PACKAGED_SKILL_DIR = Path(__file__).resolve().parent.parent / "skill"
 
-# Unlike _OVERRIDE_LAYERS, each entry here is already the full file path, not
-# a directory joined with a relative name -- the skill resource has no
-# sibling files to address by a shared relative path the way rules/*.json
-# does. ".github/skills/fab-test/SKILL.md" is also this repository's own
-# hand-authored source (see tests/test_skill_resource.py), so running
-# fab-test from this checkout resolves its own edits instead of the
-# packaged copy -- the same "repo copy wins when present" rule as
-# resolve_metadata, just keyed on a fixed path instead of a directory.
-_SKILL_OVERRIDE_FILES: tuple[tuple[Path, str], ...] = (
-    (Path(".fab-test") / "skill" / "SKILL.md", ".fab-test/skill/SKILL.md"),
-    (
-        Path(".github") / "skills" / "fab-test" / "SKILL.md",
-        ".github/skills/fab-test/SKILL.md",
-    ),
+# fab-test Skill Componentization split the one-file skill into a main
+# SKILL.md plus references/*.md (too many tokens to load as a single
+# file), so the resource resolved here is a directory, not a single path
+# the way _SKILL_OVERRIDE_FILES used to be keyed. ".github/skills/fab-test/"
+# is also this repository's own hand-authored source (see
+# tests/test_skill_resource.py), so running fab-test from this checkout
+# resolves its own edits instead of the packaged copy -- the same "repo
+# copy wins when present" rule as resolve_metadata, just keyed on a fixed
+# directory instead of a metadata sub-path. A directory only counts as an
+# override if it actually holds SKILL.md -- an empty or unrelated
+# `.github/skills/fab-test/` should not shadow the packaged copy with
+# nothing to serve.
+_SKILL_OVERRIDE_DIRS: tuple[tuple[Path, str], ...] = (
+    (Path(".fab-test") / "skill", ".fab-test/skill"),
+    (Path(".github") / "skills" / "fab-test", ".github/skills/fab-test"),
 )
 
 # Named once here so the registry (which needs the path) and
@@ -197,16 +198,18 @@ def resolve_environments_yml(repo_root: Path | None = None) -> ResolvedMetadata:
     )
 
 
-def resolve_skill_md(repo_root: Path | None = None) -> ResolvedMetadata:
-    """Return the fab-test skill content and the layer it came from.
+def resolve_skill_dir(repo_root: Path | None = None) -> ResolvedMetadata:
+    """Return the directory holding fab-test's own skill content, and its origin.
 
-    Always has a packaged fallback -- unlike `environments.yml`, the skill
-    content carries no secrets or environment-specific state, so a wheel
-    install with no repo override still gets a working answer.
+    The directory holds `SKILL.md` plus a `references/` folder (fab-test
+    Skill Componentization epic). Always has a packaged fallback -- unlike
+    `environments.yml`, the skill content carries no secrets or
+    environment-specific state, so a wheel install with no repo override
+    still gets a working answer.
     """
     root = repo_root if repo_root is not None else default_repo_root()
-    for path, origin in _SKILL_OVERRIDE_FILES:
-        candidate = root / path
-        if candidate.is_file():
+    for directory, origin in _SKILL_OVERRIDE_DIRS:
+        candidate = root / directory
+        if (candidate / "SKILL.md").is_file():
             return ResolvedMetadata(candidate, origin)
-    return ResolvedMetadata(PACKAGED_SKILL, PACKAGED_ORIGIN)
+    return ResolvedMetadata(PACKAGED_SKILL_DIR, PACKAGED_ORIGIN)
