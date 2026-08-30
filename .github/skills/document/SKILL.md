@@ -82,3 +82,14 @@ Update only the **"Run analyzers locally before pushing"** section. Do not touch
 - Keep examples concrete: use `SampleModel-PQLAssert` as the artifact stem in examples
 - Do not add speculative features — only document what exists in the code
 - After updating all three files, confirm what changed in a short summary
+
+## After editing `.github/skills/fab-test/SKILL.md`
+
+That file is also fab-test's own packaged skill resource (fab-test Skill
+Distribution epic) — `src/fabric_ci_cd_dataops/skill/SKILL.md` must carry an
+identical copy, and its frontmatter `description` must name the current
+`__version__`. Copy the file and re-stamp the version by hand; do not diff the
+two side by side to eyeball whether they still match — `pytest
+tests/test_skill_resource.py` is the check, and it is what CI runs. To confirm
+an already-installed harness copy elsewhere is current, run `fab-test skill
+--show` rather than opening the installed file to compare it manually.
