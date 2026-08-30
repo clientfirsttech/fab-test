@@ -192,8 +192,16 @@ def test_the_pipeline_author_is_told_to_pin_artifact_dir():
 @pytest.mark.fab_test
 def test_the_agent_skill_documents_the_type_source_and_the_exclusions():
     """An agent that does not know what is pruned cannot explain why an
-    artifact inside a worktree was not analyzed."""
-    text = (_ROOT / ".github" / "skills" / "fab-test" / "SKILL.md").read_text(encoding="utf-8")
+    artifact inside a worktree was not analyzed.
+
+    fab-test Skill Componentization split this fact out of SKILL.md into
+    references/*.md, so "the skill documents X" means the whole directory.
+    """
+    skill_dir = _ROOT / ".github" / "skills" / "fab-test"
+    text = "\n".join(
+        p.read_text(encoding="utf-8")
+        for p in [skill_dir / "SKILL.md", *sorted((skill_dir / "references").glob("*.md"))]
+    )
 
     assert "artifact-map.json" in text
     assert "node_modules" in text

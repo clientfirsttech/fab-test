@@ -34,6 +34,13 @@ REQUIRED = [
     "fabric_ci_cd_dataops/metadata/rules/pbi-inspector-custom-rules.json",
     "fabric_ci_cd_dataops/schemas/fab-test.schema.json",
     "fabric_ci_cd_dataops/skill/SKILL.md",
+    "fabric_ci_cd_dataops/skill/references/configuration.md",
+    "fabric_ci_cd_dataops/skill/references/credentials.md",
+    "fabric_ci_cd_dataops/skill/references/flags.md",
+    "fabric_ci_cd_dataops/skill/references/operations.md",
+    "fabric_ci_cd_dataops/skill/references/reports.md",
+    "fabric_ci_cd_dataops/skill/references/source-files.md",
+    "fabric_ci_cd_dataops/skill/references/targeting-and-discovery.md",
 ]
 
 # Repository internals, downloaded tools, and run output. None of it belongs

@@ -118,11 +118,12 @@ Brief task description
    docs, and the pipeline has a copy-pasteable YAML snippet. Any one missing means
    not done. Use the `document` command so the three cannot drift apart. See the
    Definition of Done table in [vision.md](../../vision.md). For the fab-test skill
-   itself specifically, "in sync" means the packaged copy
-   (`src/fabric_ci_cd_dataops/skill/SKILL.md`) matches the authored source
-   (`.github/skills/fab-test/SKILL.md`), guarded by
-   `tests/test_skill_resource.py` rather than a manual side-by-side diff (fab-test
-   Skill Distribution epic).
+   itself specifically, "in sync" means every file under the packaged copy
+   (`src/fabric_ci_cd_dataops/skill/` — `SKILL.md` and each `references/*.md`)
+   matches its authored counterpart (`.github/skills/fab-test/`), and the main
+   file's contract sections stay written in SudoLang — guarded by
+   `tests/test_skill_resource.py` rather than a manual side-by-side diff
+   (fab-test Skill Distribution and Skill Componentization/SudoLang epics).
 8. **Verify Through the Real Entry Point**: Confirm a change works the way a user
    invokes it — the installed console script, not just a test run that may resolve
    to a different source tree. A green suite against the wrong tree proves nothing.

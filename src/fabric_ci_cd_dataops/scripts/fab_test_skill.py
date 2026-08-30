@@ -2,9 +2,12 @@
 
 Ships the skill content inside the wheel (fab-test Skill Distribution
 epic) so a consumer's harness config can never drift from the installed
-CLI version by hand-copying a stale file. Follows `fab_test_admin._init`'s
-"idempotent, never clobber a differing local copy without --force,
---dry-run reports the plan" pattern rather than inventing a new one.
+CLI version by hand-copying a stale file. The resource is a directory --
+a main `SKILL.md` plus `references/*.md` (fab-test Skill Componentization
+epic split the original single 1065-line file, too many tokens to load
+for one subcommand's flags). Follows `fab_test_admin._init`'s "idempotent,
+never clobber a differing local copy without --force, --dry-run reports
+the plan" pattern rather than inventing a new one.
 """
 
 from __future__ import annotations
@@ -18,26 +21,33 @@ from fabric_ci_cd_dataops import __version__ as _FAB_TEST_VERSION
 
 from ._cli_utils import narrate
 from ._fab_test_context import REPO_ROOT
-from ._metadata import resolve_skill_md
+from ._metadata import resolve_skill_dir
 
-# Where each harness reads its own instructions from. Claude Code keeps
-# fab-test's own SKILL.md shape unchanged; Copilot has no "skill" concept,
-# so the closest one-file-per-topic equivalent is a scoped instructions
-# file (`.github/instructions/*.instructions.md`, `applyTo` glob instead
-# of `name`/`description`).
-_HARNESS_TARGETS: dict[str, Path] = {
-    "claude": Path(".claude") / "skills" / "fab-test" / "SKILL.md",
-    "copilot": Path(".github") / "instructions" / "fab-test.instructions.md",
+# Where each harness reads its own instructions from, and what its main
+# entry file is named. Claude Code keeps fab-test's own directory shape
+# (SKILL.md + references/) unchanged; Copilot has no "skill" concept, so
+# the closest one-entry-point equivalent is a scoped instructions file
+# (`.github/instructions/*.instructions.md`, `applyTo` glob instead of
+# `name`/`description`) with the same references/ alongside it.
+_HARNESS_BASE_DIRS: dict[str, Path] = {
+    "claude": Path(".claude") / "skills" / "fab-test",
+    "copilot": Path(".github") / "instructions" / "fab-test",
+}
+_MAIN_FILENAMES: dict[str, str] = {
+    "claude": "SKILL.md",
+    "copilot": "fab-test.instructions.md",
 }
 
 # Present in the shared description text regardless of harness, so
-# --uninstall can refuse to delete a file this command did not create
-# without needing a second, harness-specific marker.
+# --uninstall can refuse to delete a directory this command did not
+# create without needing a second, harness-specific marker. Checked only
+# against the main file -- reference files carry no frontmatter of their
+# own to mark.
 _OWNERSHIP_MARKER = "fab-test CLI reference for running Fabric artifact analyzers locally"
 
 
 class SkillContentError(Exception):
-    """Raised when a resolved SKILL.md cannot be adapted to a harness's shape.
+    """Raised when the resolved main SKILL.md cannot be adapted to a harness's shape.
 
     Only ever raised for a repo-override file (`.fab-test/skill/SKILL.md` or
     `.github/skills/fab-test/SKILL.md`) with no valid YAML frontmatter --
@@ -45,12 +55,22 @@ class SkillContentError(Exception):
     """
 
 
+def _component_relative_paths(resolved_dir: Path) -> list[Path]:
+    """Return SKILL.md plus every references/*.md, relative to resolved_dir."""
+    paths = [Path("SKILL.md")]
+    references_dir = resolved_dir / "references"
+    if references_dir.is_dir():
+        paths.extend(sorted(p.relative_to(resolved_dir) for p in references_dir.glob("*.md")))
+    return paths
+
+
 def _content_for_harness(harness: str, skill_content: str) -> str:
-    """Adapt the authored SKILL.md frontmatter to the target harness's shape.
+    """Adapt the main SKILL.md's frontmatter to the target harness's shape.
 
     Only Copilot needs a rewrite: its instructions files use `applyTo`
     instead of `name`, so the frontmatter is rebuilt around the same
     description and body rather than shipped as a Claude-shaped skill file.
+    Reference files carry no frontmatter and are never passed here.
     """
     if harness != "copilot":
         return skill_content
@@ -74,13 +94,25 @@ def _content_for_harness(harness: str, skill_content: str) -> str:
     return f'---\napplyTo: "**"\ndescription: "{description}"\n---\n{body}'
 
 
+def _target_path(harness: str, relative: Path) -> Path:
+    """Return the installed path for one component, relative to REPO_ROOT."""
+    base = _HARNESS_BASE_DIRS[harness]
+    if relative == Path("SKILL.md"):
+        return base / _MAIN_FILENAMES[harness]
+    return base / relative
+
+
+def _main_target_path(harness: str) -> Path:
+    return REPO_ROOT / _target_path(harness, Path("SKILL.md"))
+
+
 def _installed_version(content: str) -> str | None:
     match = re.search(r"\(fab-test ([^)\s]+)\)", content)
     return match.group(1) if match else None
 
 
 def _skill_status(harness: str) -> dict[str, str]:
-    target = REPO_ROOT / _HARNESS_TARGETS[harness]
+    target = _main_target_path(harness)
     if not target.is_file():
         return {"status": "missing", "path": str(target)}
     content = target.read_text(encoding="utf-8")
@@ -95,16 +127,26 @@ def _print_json(payload: dict) -> None:
 
 
 def _skill_print(output_format: str, resolved) -> int:
-    content = resolved.path.read_text(encoding="utf-8")
+    main_content = (resolved.path / "SKILL.md").read_text(encoding="utf-8")
     if output_format == "json":
-        _print_json({"version": _FAB_TEST_VERSION, "source_path": str(resolved.path), "content": content})
+        reference_paths = [
+            str(resolved.path / relative)
+            for relative in _component_relative_paths(resolved.path)
+            if relative != Path("SKILL.md")
+        ]
+        _print_json({
+            "version": _FAB_TEST_VERSION,
+            "source_path": str(resolved.path / "SKILL.md"),
+            "content": main_content,
+            "reference_paths": reference_paths,
+        })
     else:
-        print(content)
+        print(main_content)
     return 0
 
 
 def _skill_show(output_format: str) -> int:
-    rows = {harness: _skill_status(harness) for harness in _HARNESS_TARGETS}
+    rows = {harness: _skill_status(harness) for harness in _HARNESS_BASE_DIRS}
     if output_format == "json":
         _print_json(rows)
     else:
@@ -113,13 +155,8 @@ def _skill_show(output_format: str) -> int:
     return 0
 
 
-def _skill_install(harness: str, resolved, *, output_format: str, dry_run: bool, force: bool) -> int:
-    target = REPO_ROOT / _HARNESS_TARGETS[harness]
-    try:
-        content = _content_for_harness(harness, resolved.path.read_text(encoding="utf-8"))
-    except SkillContentError as exc:
-        narrate(f"fab-test skill --install {harness}: {exc}", output_format=output_format)
-        return 1
+def _install_one(harness: str, relative: Path, content: str, *, dry_run: bool, force: bool) -> dict:
+    target = REPO_ROOT / _target_path(harness, relative)
     existed_before = target.is_file()
 
     if existed_before and target.read_text(encoding="utf-8") == content:
@@ -133,12 +170,43 @@ def _skill_install(harness: str, resolved, *, output_format: str, dry_run: bool,
         target.write_text(content, encoding="utf-8")
         status = "updated" if existed_before else "created"
 
-    payload = {"harness": harness, "path": str(target), "status": status}
+    return {"relative": str(relative), "path": str(target), "status": status}
+
+
+def _skill_install(harness: str, resolved, *, output_format: str, dry_run: bool, force: bool) -> int:
+    try:
+        files = []
+        for relative in _component_relative_paths(resolved.path):
+            content = (resolved.path / relative).read_text(encoding="utf-8")
+            if relative == Path("SKILL.md"):
+                content = _content_for_harness(harness, content)
+            files.append(_install_one(harness, relative, content, dry_run=dry_run, force=force))
+    except SkillContentError as exc:
+        narrate(f"fab-test skill --install {harness}: {exc}", output_format=output_format)
+        return 1
+
+    statuses = {entry["status"] for entry in files}
+    if "differs" in statuses:
+        overall = "differs"
+    elif len(statuses) == 1:
+        overall = next(iter(statuses))
+    else:
+        overall = "mixed"
+    payload = {
+        "harness": harness,
+        "base_path": str(REPO_ROOT / _HARNESS_BASE_DIRS[harness]),
+        "status": overall,
+        "files": files,
+    }
     if output_format == "json":
         _print_json(payload)
     else:
-        narrate(f"  fab-test skill --install {harness}: {status} ({target})", output_format=output_format)
-    return 1 if status == "differs" else 0
+        for entry in files:
+            narrate(
+                f"  fab-test skill --install {harness}: {entry['status']} ({entry['path']})",
+                output_format=output_format,
+            )
+    return 1 if "differs" in statuses else 0
 
 
 def _skill_uninstall(harness: str | None, output_format: str) -> int:
@@ -149,31 +217,44 @@ def _skill_uninstall(harness: str | None, output_format: str) -> int:
         )
         return 2
 
-    target = REPO_ROOT / _HARNESS_TARGETS[harness]
-    if not target.is_file():
-        status = "missing"
-    elif _OWNERSHIP_MARKER not in target.read_text(encoding="utf-8"):
-        status = "not_fab_test_managed"
+    main_target = _main_target_path(harness)
+    if not main_target.is_file():
+        payload = {"harness": harness, "path": str(main_target), "status": "missing"}
+    elif _OWNERSHIP_MARKER not in main_target.read_text(encoding="utf-8"):
+        payload = {"harness": harness, "path": str(main_target), "status": "not_fab_test_managed"}
     else:
-        target.unlink()
-        status = "removed"
+        base = REPO_ROOT / _HARNESS_BASE_DIRS[harness]
+        removed = []
+        for path in sorted(base.rglob("*.md"), reverse=True):
+            path.unlink()
+            removed.append(str(path))
+        for directory in sorted(base.rglob("*"), reverse=True):
+            if directory.is_dir() and not any(directory.iterdir()):
+                directory.rmdir()
+        if base.is_dir() and not any(base.iterdir()):
+            base.rmdir()
+        payload = {"harness": harness, "path": str(base), "status": "removed", "removed": removed}
 
-    payload = {"harness": harness, "path": str(target), "status": status}
     if output_format == "json":
         _print_json(payload)
     else:
-        narrate(f"  fab-test skill --uninstall {harness}: {status} ({target})", output_format=output_format)
-    return 1 if status == "not_fab_test_managed" else 0
+        narrate(
+            f"  fab-test skill --uninstall {harness}: {payload['status']} ({payload['path']})",
+            output_format=output_format,
+        )
+    return 1 if payload["status"] == "not_fab_test_managed" else 0
 
 
 def _skill(args: argparse.Namespace) -> int:
     """`fab-test skill`: print the resolved skill content, or install it.
 
-    Bare, prints the repo-override-first resolved content (`--format
-    json` wraps it with version/source metadata). `--install <harness>`
-    writes or updates that harness's own copy; `--show` reports install
-    state per harness; `--uninstall` (paired with `--install <harness>`)
-    removes only a file this command's own marker text identifies as its.
+    Bare, prints the repo-override-first resolved main SKILL.md (`--format
+    json` wraps it with version/source metadata and the reference file
+    paths). `--install <harness>` writes or updates every component
+    (SKILL.md/instructions file plus references/*.md) for that harness;
+    `--show` reports install state per harness; `--uninstall` (paired
+    with `--install <harness>`) removes only a directory this command's
+    own marker text identifies as its.
     """
     output_format = getattr(args, "output_format", "text")
 
@@ -182,8 +263,8 @@ def _skill(args: argparse.Namespace) -> int:
     if getattr(args, "show", False):
         return _skill_show(output_format)
 
-    resolved = resolve_skill_md(REPO_ROOT)
-    if not resolved.path.is_file():
+    resolved = resolve_skill_dir(REPO_ROOT)
+    if not (resolved.path / "SKILL.md").is_file():
         narrate(
             f"fab-test skill: resource missing at {resolved.path} -- reinstall fab-test",
             output_format=output_format,

@@ -104,17 +104,18 @@ the command I was asked about" is the failure mode, not the verification.
 
 ## Definition of Done — Documentation
 
-Before documenting, run `ruff check` over `src/` and fix anything it flags. A build that fails lint after the code is "done" is not done — catching it here is cheaper than catching it in CI.
+Documentation follows the same three callers as the CLI itself. Shipping for one and not the others leaves the epic incomplete. Close an epic in this order — each step depends on the one before it, so doing them out of order means redoing one:
 
-Documentation follows the same three callers as the CLI itself. Shipping for one and not the others leaves the epic incomplete.
+1. **Ruff** — run `ruff check` over `src/` and fix anything it flags. A build that fails lint after the code is "done" is not done — catching it here is cheaper than catching it in CI.
+2. **Documentation** — update all three callers together with the `document` skill, so they never drift apart:
 
-| Caller | Deliverable | Where |
-|--------|-------------|-------|
-| **AI agent** | Skill created or updated with the new commands, flags, exit codes, and output shapes | `.github/skills/<name>/SKILL.md` |
-| **Human** | README and walkthrough updated so a reader can run the new capability without reading source | [README.md](README.md), [docs/](docs/) |
-| **Pipeline** | A copy-pasteable workflow snippet, or generation/scaffolding, so the YAML is not hand-derived | [docs/](docs/), workflow examples |
-
-Use the `document` skill to make these changes together, so the three never drift apart.
+   | Caller | Deliverable | Where |
+   |--------|-------------|-------|
+   | **Human** | README and walkthrough updated so a reader can run the new capability without reading source | [README.md](README.md), [docs/](docs/) |
+   | **Pipeline** | A copy-pasteable workflow snippet, or generation/scaffolding, so the YAML is not hand-derived | [docs/](docs/), workflow examples |
+   | **AI agent** | Skill created or updated with the new commands, flags, exit codes, and output shapes | `.github/skills/<name>/SKILL.md` |
+3. **Update the skill file** — for fab-test's own skill specifically, write the behavioral/contract content in [SudoLang](.github/skills/aidd-sudolang-syntax/SKILL.md) (`Interfaces`/`Constraints`/`fn` blocks), not prose-and-tables — plain markdown remains fine for flag tables and worked examples, which SudoLang doesn't compress usefully. This is checked by `tests/test_skill_resource.py`'s SudoLang-construct guard, not by review discipline alone, so a rewrite back into plain prose fails CI rather than drifting back silently.
+4. **Confirm it is part of the packaged fab-test skill** — the packaged copy (`src/fabric_ci_cd_dataops/skill/`) must carry every file identical to the authored source (`.github/skills/fab-test/`), guarded by the same test. Run `fab-test skill --show` to confirm an already-installed harness copy elsewhere picks up the change, rather than diffing files by hand.
 
 ## Non-Goals
 
