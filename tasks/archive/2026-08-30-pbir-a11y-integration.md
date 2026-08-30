@@ -1,6 +1,6 @@
 # PBIR Accessibility Integration Epic
 
-**Status**: 📋 PLANNED
+**Status**: ✅ COMPLETED — 7 of 7 tasks done
 **Goal**: Run `pbir-a11y` accessibility checks as a first-class `fab-test` analyzer, surfaced in `--report`, with third-party licenses documented.
 
 ## Overview
@@ -431,7 +431,7 @@ complexity and module budgets re-confirmed clean.
 
 ---
 
-## Documentation for Three Callers
+## Documentation for Three Callers  ✅
 
 Close out the epic against the Definition of Done in vision.md.
 
@@ -439,3 +439,54 @@ Close out the epic against the Definition of Done in vision.md.
 - Given an AI agent, should find the new subcommand, flags, exit codes, and envelope shape in the `fab-test` skill
 - Given a human, should find the analyzer, its Node prerequisite, and a worked example in README and docs
 - Given a pipeline author, should find a copy-pasteable workflow snippet that installs Node, installs the tool, and runs the check
+
+Done: **Agent** — `SKILL.md` gained `fab-test a11y` in the subcommand list
+(marked opt-in, not in `fab-test all`), `a11y` added to the scopes table
+next to `bpa`/`pbir`, a full `### a11y` section (flags, Node/npm
+prerequisite, a worked `--fail-on` example, and the exit-code/envelope-
+shape distinction: `status: "error"` for a tool error vs. `"failed"`/
+`"warning"` for an actual finding, plus the three additive
+`category`/`page`/`visual` keys no other analyzer's envelope carries), and
+a `### Node toolchain and the pbir-a11y build cache` section explaining why
+it is the one bootstrapped analyzer that builds from source instead of
+downloading a binary, and what a missing Node/npm or a run-time-only
+missing Node looks like in `doctor`.
+
+**Human** — README's "Run artifact analyzers with fab-test" section gained
+a worked `fab-test a11y` example noting the Node prerequisite and the
+`fab_test_all` opt-in inline; the License section now points at
+`THIRD-PARTY.md` and names pbir-a11y's license as the one that differs.
+`docs/QUICK-VALIDATION.md` gained `a11y` in the dry-run/single-analyzer
+examples and the `pytest -m a11y` marker.
+
+**Pipeline** — a new "Pipeline snippet: pbir-a11y accessibility checks
+(needs Node)" section in `docs/QUICK-VALIDATION.md`: `actions/setup-node@v4`
+pinned to `>=18`, a `doctor --analyzer a11y` readiness gate, the actual
+check, and a manifest upload — plus a note that the first run's build is
+cacheable and a pointer to `THIRD-PARTY.md`'s licensing note before using
+this in a commercial pipeline. Parsed with `yaml.safe_load` against all 10
+YAML blocks in the file (not just the new one) to confirm nothing else
+regressed.
+
+`tests/test_a11y_documentation.py` (new) makes the "three callers" contract
+enforceable rather than just written down, mirroring
+`test_cwd_default.py`'s existing pattern for a different cross-cutting
+change: every one of the three docs must mention `a11y` and the Node
+prerequisite; README must contain a literal `fab-test a11y` example;
+`docs/QUICK-VALIDATION.md` must contain both `setup-node` and a worked
+`fab-test a11y` command; `SKILL.md` must mention `category`/`visual` (the
+envelope shape) and `PBIR_A11Y_PATH`, and must mention `fab_test_all` (the
+opt-in). `__version__` bumped to `1.0.0.0.dev13` and reinstalled editable.
+Full suite: **1547 passed, 0 failed, 3 skipped, coverage 86%** (floor 80%,
+held); complexity and module budgets re-confirmed clean.
+
+---
+
+This closes the epic. All 7 tasks complete: the source-build bootstrap
+(and the version-keyed cache it inherited for free from the Tool Version
+Currency epic), Node/npm-aware `doctor` readiness, the wrapper (with two
+real defects found and fixed via live verification along the way — an
+upstream pbir-a11y packaging bug and a Windows subprocess encoding bug),
+full CLI registration and targeting, `--report`/index integration (mostly
+free from the existing analyzer-agnostic renderer), third-party licensing
+notices with a drift-guard test, and documentation for all three callers.

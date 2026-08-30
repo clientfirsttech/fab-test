@@ -195,6 +195,7 @@ Per-artifact `status` is one of `passed` / `failed` / `skipped` / `timeout` / `p
 ```
  fab-test bpa              — Tabular Editor Best Practice Analyzer (SemanticModel artifacts)
  fab-test pbir             — PBIR Inspector static report analysis (Report artifacts)
+ fab-test a11y             — pbir-a11y accessibility checks (Report artifacts) — opt-in, not run by `fab-test all`
  fab-test pql-test         — pql-test DAX/PQL test runner (SemanticModel artifacts) [alias: pql_test]
  fab-test playwright       — Playwright visual/error validation (Report artifacts)
  fab-test playwright-impact — Build impacted-report manifest from changed artifacts [alias: playwright_impact]
@@ -238,7 +239,7 @@ Run `fab-test list` for this table at any time — it has a Scopes column.
 
 | Analyzer | path / name | `local/` | `WORKSPACE.Workspace/` |
 |----------|-------------|----------|------------------------|
-| `bpa`, `pbir` | yes | yes | **no** |
+| `bpa`, `pbir`, `a11y` | yes | yes | **no** |
 | `pql-test` | yes | yes | yes |
 | `playwright`, `playwright-impact`, `dependencies` | yes | **no** | yes |
 
@@ -686,6 +687,32 @@ fab-test bpa
 |------|---------|---------|
 | `--inspector-path PATH` | `PBIR_INSPECTOR_PATH` | `PBIR-Inspector/PBIRInspectorCLI` |
 | `--rules-path PATH` | — | resolved via the metadata layers (`.fab-test/metadata/rules/pbi-inspector-custom-rules.json` > `.github/metadata/...` > packaged) |
+
+### a11y
+
+Accessibility checks for `.Report` artifacts — contrast, alt text, tab order, target size, page/visual titles, font scaling, and more — via [pbir-a11y](https://github.com/Juls-BI/pbir-a11y), a Node CLI built from source at a pinned ref rather than downloaded pre-built (see [Node toolchain and the pbir-a11y build cache](#node-toolchain-and-the-pbir-a11y-build-cache) below). **Requires Node.js >= 18 and npm** the first time it runs; `fab-test doctor --analyzer a11y` reports whether both are present before anything is built.
+
+**Deliberately not run by `fab-test all`** — it is not in the default `fab_test_all` list in `analyzers.json`, so an existing pipeline's behavior is unchanged by this analyzer's existence. Opting in is a one-line metadata edit: add `"a11y"` to `fab_test_all` in `analyzers.json`.
+
+| Flag | Env var | Default |
+|------|---------|---------|
+| `--a11y-path PATH` | `PBIR_A11Y_PATH` | `pbir-a11y/dist/cli.js`, or the cached build under `.fab-test-tools/pbir_a11y/` once one exists |
+| `--fail-on SEVERITY` | — | Forwarded to pbir-a11y's own `--fail-on` (`warn`\|`fail`; pbir-a11y's own default is `fail`, so a warning is reported but does not fail the run unless tightened) |
+
+```bash
+fab-test a11y                          # every discovered .Report artifact
+fab-test a11y SalesReport               # one artifact by name
+fab-test a11y --fail-on warn            # tighten: a warn-level finding now fails the run
+fab-test a11y --format json             # machine-readable
+```
+
+**Envelope status and exit code**: `pbir-a11y`'s own exit code decides the envelope's `status`, not a re-derivation from severities alone — `2` (a bad or unreadable project path) is a **tool error** (`status: "error"`), always distinct from `1` (a real accessibility finding at or above `--fail-on`'s threshold, `status: "failed"`) or `0` with findings still present below that threshold (`status: "warning"`). Findings carry the same four-column shape every analyzer's envelope does (`rule`/`severity`/`object`/`message`), plus three additive keys `pbir-a11y`'s output has and no other analyzer does — `category` (e.g. `altText`, `contrast`, `tabOrder`), `page`, and `visual` (`null` for a page-level finding) — useful to a caller filtering the raw envelope JSON; the shared summary table and `--report` HTML page read only the canonical four, with `category` folded into the `message` text (`[altText] Missing alt text: ...`) so a category is still findable there via the report's search box or by sorting the Message column.
+
+### Node toolchain and the pbir-a11y build cache
+
+Every other bootstrapped analyzer (`bpa`, `pbir`) downloads a pre-built binary and caches it. `a11y` is the one exception: pbir-a11y ships no pre-built release artifact, only source, so the first run clones its pinned tag, runs `npm install` and `npm run build` inside `.fab-test-tools/pbir_a11y/<platform>/<version>/`, and caches the resulting `dist/cli.js` — after that, resolution is instant and touches no network, exactly like the other two. A version bump in `analyzers.json` forces a fresh build the same way it forces a fresh download for `bpa`/`pbir`; nothing has to be cleared by hand (`fab-test clean-tools` still works if you want to).
+
+If `npm` or `node` is missing, `doctor` says which one distinctly (Node absent vs. npm absent are different remediations) rather than a generic "tool not found." If a build is already cached but the *current* machine running the check lacks `node` — a cache copied from elsewhere, or Node uninstalled after the fact — the wrapper reports a clear envelope error rather than a traceback, the same way a missing binary is handled for every other analyzer.
 
 ### pql-test
 
