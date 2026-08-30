@@ -1,6 +1,6 @@
 # Playwright Render Diagnostics Epic
 
-**Status**: 🔧 IN-PROGRESS
+**Status**: ✅ COMPLETED — 4 of 4 tasks done
 **Goal**: A `fab-test playwright` render timeout tells the caller *why* the report failed
 to render instead of a bare "did not render within Xms".
 

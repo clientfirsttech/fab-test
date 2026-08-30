@@ -284,7 +284,7 @@ See the [Configuration section of the fab-test skill](../.github/skills/fab-test
 
 `if: always()` matters: the run you most want to read is the one that failed. Colour is automatically off because stdout is not a terminal — set `FORCE_COLOR: "1"` if your CI log viewer renders ANSI and you want it back.
 
-The `test-cases/**` line matters specifically for `playwright`: its `report.html` links to each case's own `screenshot.png`/`console.json`/`network.json` under that directory, and a link to a file the upload never included opens to nothing once downloaded.
+The `test-cases/**` line matters specifically for `playwright`: its `report.html` links to each case's own `screenshot.png`/`console.json`/`network.json` under that directory (plus `event_log.json` and, on a render timeout with a visible error panel, `embed_error_details.txt`), and a link to a file the upload never included opens to nothing once downloaded.
 
 ### Pipeline snippet: targeting a deployed item by name
 
