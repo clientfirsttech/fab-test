@@ -29,7 +29,11 @@ from ._analyzer_envelope import (
     write_envelope,
 )
 from ._report_html import attach_report
-from .playwright_validation.config import PlaywrightValidationConfig, load_config
+from .playwright_validation.config import (
+    PlaywrightValidationConfig,
+    _app_root_for,
+    load_config,
+)
 from .playwright_validation.discovery import acquire_embed_configs, resolve_discovery
 from .playwright_validation.fabric_service_client import build_fabric_service_client
 from .playwright_validation.power_bi_api import PowerBiApiError
@@ -140,11 +144,35 @@ def _case_evidence(result_dir: Path) -> dict[str, str]:
     }
 
 
+def _report_deep_link(case: TestCase, cloud: str) -> dict[str, str]:
+    """Return ``{label, href}`` linking straight to the page/bookmark this case
+    validated, or ``{}`` when there is nothing to link to.
+
+    Paginated (RDL) reports use a different URL shape in the Fabric portal
+    and are not linked here -- see the paginated-report epic. A case with
+    no ``workspace_id``/``report_id`` (a crashed/never-reached case, or a
+    legacy static run with neither configured) gets no link rather than a
+    broken one.
+    """
+    if case.report_type == "paginated" or not case.workspace_id or not case.report_id:
+        return {}
+    href = f"{_app_root_for(cloud)}/groups/{case.workspace_id}/reports/{case.report_id}"
+    if case.page_id:
+        href += f"/{case.page_id}"
+    if case.bookmark_id:
+        href += f"?bookmarkGuid={case.bookmark_id}"
+    label = case.page_name or "Report"
+    if case.bookmark_name:
+        label += f" · {case.bookmark_name}"
+    return {"label": label, "href": href}
+
+
 def _test_results_rows(
     cases: list[TestCase],
     test_cases_dir: Path,
     *,
     overall_success: bool,
+    cloud: str = "public",
 ) -> list[dict[str, Any]]:
     """One row per generated case, using its own result.json when the spec wrote one.
 
@@ -170,6 +198,7 @@ def _test_results_rows(
                 "page_name": case.page_name,
                 "bookmark_name": case.bookmark_name,
                 "role": case.role,
+                "report_link": _report_deep_link(case, cloud),
             }
         )
     return rows
@@ -572,6 +601,7 @@ def _write_embed_error_envelope(
     cases: list[TestCase],
     message: str,
     test_cases_dir: Path | None = None,
+    cloud: str = "public",
 ) -> int:
     """Write an error envelope for an embed-context failure and return 1.
 
@@ -585,7 +615,7 @@ def _write_embed_error_envelope(
     """
     findings = _write_findings(cases, success=False, message=message)
     test_results = (
-        _test_results_rows(cases, test_cases_dir, overall_success=False)
+        _test_results_rows(cases, test_cases_dir, overall_success=False, cloud=cloud)
         if test_cases_dir is not None
         else []
     )
@@ -654,7 +684,12 @@ def _run_single_report(
             "before any embed token is minted, or pass --roles none."
         )
         return _write_embed_error_envelope(
-            output_path, report_name, cases, message, test_cases_dir=test_cases_dir
+            output_path,
+            report_name,
+            cases,
+            message,
+            test_cases_dir=test_cases_dir,
+            cloud=config.cloud,
         )
 
     level = args.verbose
@@ -671,12 +706,22 @@ def _run_single_report(
         if exc.status_code:
             message += f" (HTTP {exc.status_code})"
         return _write_embed_error_envelope(
-            output_path, report_name, cases, message, test_cases_dir=test_cases_dir
+            output_path,
+            report_name,
+            cases,
+            message,
+            test_cases_dir=test_cases_dir,
+            cloud=config.cloud,
         )
     except Exception as exc:  # noqa: BLE001 - process boundary: never a bare traceback
         message = f"Failed to acquire embed context: {exc}"
         return _write_embed_error_envelope(
-            output_path, report_name, cases, message, test_cases_dir=test_cases_dir
+            output_path,
+            report_name,
+            cases,
+            message,
+            test_cases_dir=test_cases_dir,
+            cloud=config.cloud,
         )
 
     base_embed_config = next(iter(embed_configs_by_role.values()))
@@ -709,7 +754,9 @@ def _run_single_report(
     if summary:
         message += f" ({summary})"
 
-    test_results = _test_results_rows(cases, test_cases_dir, overall_success=success)
+    test_results = _test_results_rows(
+        cases, test_cases_dir, overall_success=success, cloud=config.cloud
+    )
     findings = _findings_from_test_results(test_results)
 
     env_out = build_envelope(

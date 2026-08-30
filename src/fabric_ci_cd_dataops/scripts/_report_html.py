@@ -91,6 +91,8 @@ _RULE_HEADERS = ("Rule", "Severity", "Object", "Message")
 _RULE_STATUS_HEADERS = (*_RULE_HEADERS, "Status")
 _TEST_HEADERS = ("Test Suite", "Test", "Expected", "Actual", "Result")
 _TEST_EVIDENCE_HEADERS = (*_TEST_HEADERS, "Evidence")
+_TEST_REPORT_HEADERS = (*_TEST_HEADERS, "Report Page")
+_TEST_EVIDENCE_REPORT_HEADERS = (*_TEST_EVIDENCE_HEADERS, "Report Page")
 
 # Row classes drive severity colouring in CSS rather than inline styles, so
 # the markup stays readable and a finding's text is never mixed with markup.
@@ -217,6 +219,19 @@ def _evidence_link(label: str, path_str: str, base_dir: Path | None) -> str:
     return f'<a href="{escape(href)}">{escape(label)}</a>'
 
 
+def _report_link_cell(link: Any) -> str:
+    """Render a row's ``{label, href}`` deep link to the live report page/bookmark.
+
+    Unlike evidence (a sibling file on disk), ``href`` is an external,
+    already-absolute URL -- no ``base_dir``-relative resolution applies.
+    """
+    if not link or not link.get("href"):
+        return ""
+    href = escape(link["href"])
+    label = escape(link.get("label") or link["href"])
+    return f'<a href="{href}" target="_blank" rel="noopener noreferrer">{label}</a>'
+
+
 def _evidence_cell(evidence: Any, base_dir: Path | None) -> str:
     """Render a row's evidence dict (``{label: path}``) as space-joined links."""
     if not evidence:
@@ -235,6 +250,7 @@ def _table(
     status_index: int | None = None,
     msg_index: int | None = None,
     evidence_index: int | None = None,
+    report_link_index: int | None = None,
     base_dir: Path | None = None,
 ) -> str:
     """Render one findings table. ``class_index`` selects the severity cell.
@@ -246,6 +262,9 @@ def _table(
     renders that column's value (a ``{label: path}`` dict) as links
     instead of escaped text -- used only when a `test_results` row
     actually carries evidence (see `normalize_test_results`).
+    ``report_link_index``, when given, renders that column's value (a
+    ``{label, href}`` dict) as a single external link -- used only when a
+    `test_results` row actually carries a report deep link.
     """
     head = "".join(f"<th>{escape(h)}</th>" for h in headers)
     body = []
@@ -255,6 +274,9 @@ def _table(
         for index, value in enumerate(row):
             if index == evidence_index:
                 cells.append(f"<td>{_evidence_cell(value, base_dir)}</td>")
+                continue
+            if index == report_link_index:
+                cells.append(f"<td>{_report_link_cell(value)}</td>")
                 continue
             css = "sev" if index == class_index else ("msg" if index == row_msg_index else "")
             attr = f' class="{css}"' if css else ""
@@ -289,6 +311,7 @@ def _filterable_table(
     status_index: int,
     msg_index: int | None = None,
     evidence_index: int | None = None,
+    report_link_index: int | None = None,
     base_dir: Path | None = None,
 ) -> str:
     """A full test-result table with a status filter, search box, and column sort.
@@ -304,6 +327,7 @@ def _filterable_table(
         status_index=status_index,
         msg_index=msg_index,
         evidence_index=evidence_index,
+        report_link_index=report_link_index,
         base_dir=base_dir,
     )
     return (
@@ -315,6 +339,37 @@ def _filterable_table(
         f"{_SEARCH_SORT_SCRIPT}"
         "</div>"
     )
+
+
+def _render_test_results_table(rows: list[tuple], base_dir: Path | None) -> str:
+    """Render the full test-results table, with Evidence and Report Page as
+    independent additive columns (index 5 and 6 respectively).
+
+    Split out of ``render_report`` so its four evidence/report_link
+    combinations don't push that function's own branch count over budget --
+    each row always carries both fields (see ``normalize_test_results``);
+    only their presence across the whole table decides which columns show.
+    """
+    has_evidence = any(row[5] for row in rows)
+    has_report_link = any(row[6] for row in rows)
+    common = {"class_index": 4, "status_index": 4, "msg_index": 3, "base_dir": base_dir}
+
+    if has_evidence and has_report_link:
+        return _filterable_table(
+            _TEST_EVIDENCE_REPORT_HEADERS, rows, evidence_index=5, report_link_index=6, **common
+        )
+    if has_evidence:
+        return _filterable_table(
+            _TEST_EVIDENCE_HEADERS, [row[:6] for row in rows], evidence_index=5, **common
+        )
+    if has_report_link:
+        return _filterable_table(
+            _TEST_REPORT_HEADERS,
+            [row[:5] + row[6:] for row in rows],
+            report_link_index=5,
+            **common,
+        )
+    return _filterable_table(_TEST_HEADERS, [row[:5] for row in rows], class_index=4, status_index=4)
 
 
 def render_report(envelope: dict[str, Any], base_dir: Path | None = None) -> str:
@@ -343,24 +398,12 @@ def render_report(envelope: dict[str, Any], base_dir: Path | None = None) -> str
         # the findings-only table below, since findings is a subset of this.
         kind, rows = normalize_test_results(test_results)
         if kind == "tests":
-            if any(row[5] for row in rows):
-                body = _filterable_table(
-                    _TEST_EVIDENCE_HEADERS,
-                    rows,
-                    class_index=4,
-                    status_index=4,
-                    msg_index=3,
-                    evidence_index=5,
-                    base_dir=base_dir,
-                )
-            else:
-                # No row carries evidence (pql-test today) -- drop the
-                # column entirely rather than render an always-empty one,
-                # so this analyzer's report is unchanged from before
-                # evidence links existed.
-                body = _filterable_table(
-                    _TEST_HEADERS, [row[:5] for row in rows], class_index=4, status_index=4
-                )
+            # Evidence (index 5) and report_link (index 6) are both additive
+            # columns -- present only when some row actually carries one, so
+            # an analyzer with neither (pql-test today) renders exactly as
+            # it did before either column existed. See
+            # `_render_test_results_table` for the four combinations.
+            body = _render_test_results_table(rows, base_dir)
         else:
             body = _filterable_table(
                 _RULE_STATUS_HEADERS, rows, class_index=1, status_index=4, msg_index=3
