@@ -824,10 +824,31 @@ run's overall outcome only for a case the process never reached), so `findings`
 now names only the case that actually failed, with its own message -- a report
 with 5 pages and 1 real failure reports 1 finding, not 5 identical ones. Each row
 also carries an `evidence` map (`screenshot`/`console`/`network`, whichever files
-exist for that case); `--report`'s generated `report.html` renders those as links
-in an added column, and `--output-path`'s `envelope.json` -- what `output_path`
-in `--format json` output already points an agent at -- carries the same paths,
-so nothing beyond reading that one file is needed to reach the evidence.
+exist for that case) and a `report_link` (`{label, href}` back to the exact
+report page/bookmark/report the case validated, on `app.powerbi.com` -- omitted
+for paginated reports and for a case that never resolved a workspace/report id);
+`--report`'s generated `report.html` renders both as an Evidence column and a
+Report Page column (present only when at least one row actually carries that
+field), and `--output-path`'s `envelope.json` -- what `output_path` in
+`--format json` output already points an agent at -- carries the same paths and
+link, so nothing beyond reading that one file is needed to reach either.
+
+**A render timeout or a broken visual names the real cause, not just a bare
+timeout.** The spec races `rendered` against `error` by listening on
+`document.body` (not `report.on(...)` on the embed object, which never sees a
+per-visual error event) -- an `error` is always authoritative, and a `rendered`
+that arrives first still waits out a `PLAYWRIGHT_VISUAL_ERROR_GRACE_MS`
+(default `5000`) grace window in case a delayed per-visual `error` overwrites
+it. Every SDK event seen is written to that case's `event_log.json` regardless
+of outcome. When neither event ever fires (`result is None`), the spec makes a
+best-effort scan of every frame for Power BI's own "Something went wrong"
+panel, clicks "Show details" if present, and folds any text found into both
+the failure message and a new `embed_error_details.txt` -- with no such panel,
+it falls back to the plain "did not render within Xms" message and writes no
+extra file. The render-wait budget itself is `PLAYWRIGHT_TIMEOUT_SECONDS`
+(default `180`), sized under the per-artifact subprocess timeout (`--timeout`/
+`ANALYZER_TIMEOUT`, default `200`) so a genuinely slow render is not killed by
+the outer timeout before its own budget expires.
 
 Static `.env` mode uses workspace, report, dataset IDs directly from the env file:
 

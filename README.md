@@ -244,9 +244,18 @@ A run with 5 report x page x bookmark cases and 1 real failure now says so:
 real outcome, so `findings` names only the case that actually failed instead of
 tagging all 5 identically. Each row also points at that case's own evidence
 (`fab-test-results/playwright/test-cases/<case>/screenshot.png`, plus
-`console.json`/`network.json` when there's something to capture); `--report`
-renders those as links right in the table, and the same paths are in
+`console.json`/`network.json` when there's something to capture) and links
+straight back to the report page/bookmark it validated on `app.powerbi.com`;
+`--report` renders both as links right in the table, and the same paths are in
 `envelope.json` for a script or an agent to open directly.
+
+A render timeout or a broken visual now names the real cause. A failed race
+between Power BI's `rendered` and `error` events writes that case's full SDK
+event history to `event_log.json`, and a timeout with no event at all falls
+back to scanning the embedded frame for Power BI's own error panel, writing
+any text it finds to `embed_error_details.txt` and folding it into the
+failure message -- so `envelope.json` names a permissions/token-scope problem
+instead of restating "did not render within 180000ms".
 
 ### Playwright tests every page, bookmark, and role by default
 
