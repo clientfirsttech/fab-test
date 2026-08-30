@@ -511,3 +511,10 @@ print(metadata.joinpath("analyzers.json"))       # tool install URLs doctor read
 ## License
 
 MIT. See [LICENSE](https://github.com/kerski/fab-test/blob/main/LICENSE).
+
+`fab-test` wraps, but does not redistribute, several external tools it
+downloads or builds at runtime — Tabular Editor 2, fab-inspector, and
+pbir-a11y (the latter under the source-available PolyForm Shield 1.0.0
+license, not MIT). See
+[THIRD-PARTY.md](https://github.com/kerski/fab-test/blob/main/THIRD-PARTY.md)
+for what each permits.
