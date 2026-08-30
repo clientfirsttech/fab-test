@@ -174,7 +174,7 @@ failed, 3 skipped**, coverage held (floor 80%).
 
 ---
 
-## A11y Analyzer Wrapper
+## A11y Analyzer Wrapper  ✅
 
 Add `invoke_pbir_a11y.py`, wrapping `pbir-a11y check --json` and emitting a standard result envelope.
 
@@ -187,6 +187,77 @@ Add `invoke_pbir_a11y.py`, wrapping `pbir-a11y check --json` and emitting a stan
 - Given the CLI is missing or the run exceeds its timeout, should fail with the same preflight exit codes the other bootstrapped analyzers use (126/127) rather than a traceback
 - Given a finding, should map its rule, category, page, visual, and severity into the envelope finding shape so the summary table and report need no analyzer-specific branches
 - Given `--verbose`, should surface the invoked command and the tool's own output the way the other wrappers do
+
+Done: `invoke_pbir_a11y.py` mirrors `invoke_pbir_inspector.py`'s shape (the
+same `log`/`validate_path`/`Timer`/`build_envelope` primitives) with one
+structural difference the real tool forced: pbir-a11y writes its `--json`
+output to **stdout only** — there is no `-output`/`--output` flag the way
+PBIR Inspector has — so this wrapper, not the tool, is what persists
+`native.json`. The command is always built with `--json` (no human-format
+branch to parse) and forwards `--fail-on` only when the caller passes one;
+omitting it lets pbir-a11y's own default (`"fail"`, confirmed by reading
+`check.ts` directly) take over, which already matches the requirement's
+intent — warn/info findings are reported but don't fail the run unless a
+caller tightens it.
+
+Findings are flattened from the tool's page/visual-nested JSON
+(`pages[].issues[]` for page-level, `pages[].visuals[].issues[]` for
+visual-level) into the shared four-column schema (`rule`/`severity`/
+`object`/`message`), with `category`/`page`/`visual` added as additive
+extra keys — present for the `--report` task to group by, ignored by the
+shared table renderer that only reads the canonical four. Severity maps
+pbir-a11y's four-value vocabulary (`fail`/`warn`/`info`/`pass`) onto
+fab-test's three (`error`/`warning`/`info`); `pass` is handled defensively
+(mapped to `info`) though it never appears on a real reported issue in
+practice.
+
+Classification keys off **pbir-a11y's own exit code** rather than
+re-deriving fail/pass from severities alone — exit `2` (bad/unreadable
+path) always yields envelope `status: "error"`, distinct from `"failed"`
+(exit `1`, a real violation at/above the fail-on threshold) and `"warning"`
+(exit `0` with findings below the threshold) — proven with a dedicated test
+(`test_run_reports_tool_error_distinctly_from_findings`) rather than
+inferred from reading the code. `126`/`127` preflight exit codes were
+already delivered for free once Task 2 registered `a11y` into
+`_BOOTSTRAPPED_ANALYZERS` (unsupported-platform/missing-tool are caught
+before this wrapper ever spawns); a runtime-only failure discovered *after*
+a tool is already resolved and cached — the machine actually running the
+check lacks `node`, or `node` disappears mid-session — mirrors PBIR
+Inspector's own convention of returning 1 with a clear failure envelope
+rather than a traceback (`FileNotFoundError` from `subprocess.run`, same as
+every other wrapper's crash-boundary handling).
+
+Verified against the **real, live tool**, not a synthetic fixture, before
+writing a single test: resolved the real `pbir_a11y` build in this actual
+checkout (Task 1's bootstrap), then invoked the wrapper module directly
+against a real fab-test fixture (`ThinReport.Report`) — 4 real findings (1
+error, 3 warnings), correct envelope, exit code 1. This surfaced a second
+real, previously-unknown defect: `subprocess.run(..., text=True)` decodes
+Node's UTF-8 stdout using the OS default locale encoding, which corrupted
+the middle-dot character (`·`) in a real alt-text finding's message into
+mojibake on this Windows machine (`cp1252` decode of UTF-8 bytes) — the
+same class of encoding defect already on record elsewhere in this repo
+(`validate_environments_schema.py`'s emoji crash, `check_tool_updates.py`'s
+console symbols), but manifesting as silent corruption rather than a crash,
+so it would not have surfaced from a mocked-subprocess unit test alone.
+Fixed by passing `encoding="utf-8"` explicitly to `subprocess.run` rather
+than relying on `text=True`'s locale default; re-verified against the same
+real finding by reading its exact Unicode codepoints (`0xb7`, correct)
+rather than trusting a terminal's own rendering, since the terminal itself
+turned out to be an unreliable way to confirm this on this machine. A
+regression test (`test_run_uses_utf8_explicitly_for_subprocess_decoding`)
+pins the fix.
+
+`tests/test_invoke_pbir_a11y.py` (new, 32 tests) added a registered `a11y`
+pytest marker (`pytest.ini`) alongside the existing per-analyzer markers,
+covering: command building and `--fail-on` forwarding, severity mapping,
+finding extraction from a realistic nested fixture, all three classification
+branches (passed/warning/failed/error), missing artifact/tool path exits,
+node-absent-at-resolve-time and node-absent-at-run-time (two different
+failure points, both must degrade to a clear envelope), the UTF-8 fix, and
+`main()`'s `--verbose` plumbing. Full suite: **1525 passed, 0 failed, 3
+skipped**, coverage held (floor 80%); complexity and module budgets
+re-confirmed clean.
 
 ---
 
