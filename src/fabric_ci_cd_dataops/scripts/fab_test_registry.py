@@ -582,6 +582,9 @@ def build_playwright_command(
     roles = getattr(args, "roles", "auto")
     if roles != "auto":
         cmd += ["--roles", roles]
+    workers = getattr(args, "workers", None)
+    if workers is not None:
+        cmd += ["--workers", str(workers)]
     return cmd
 
 

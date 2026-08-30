@@ -486,6 +486,19 @@ def _add_playwright_subparser(subs: argparse._SubParsersAction) -> None:
             "(default: auto)"
         ),
     )
+    playwright_p.add_argument(
+        "--workers",
+        type=int,
+        default=None,
+        dest="workers",
+        metavar="N",
+        help=(
+            "Max pytest-xdist workers for running generated cases "
+            "concurrently [env: PLAYWRIGHT_XDIST_WORKERS, default: 4]. "
+            "Raise this on a machine that can safely run more concurrent "
+            "browser instances (e.g. a beefier VM)."
+        ),
+    )
 
 def _add_playwright_impact_subparser(subs: argparse._SubParsersAction) -> None:
     impact_p = subs.add_parser(

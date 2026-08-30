@@ -36,7 +36,7 @@ TEST_HARD = 900
 # test_complexity_budget.py.
 EXEMPTIONS: dict[str, tuple[int, str]] = {
     "src/fabric_ci_cd_dataops/scripts/fab_test_parser.py": (
-        941,
+        954,
         (
             "2026-08-28: born over the hard budget by the move itself -- "
             "build_parser's 17 subparser builders were, together, larger than "
@@ -51,7 +51,11 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
             "every other one already here. "
             "2026-08-30: +3 lines noting in --timeout's help text that "
             "playwright scales it automatically, and that setting this "
-            "flag overrides that (Playwright Case Scaling epic)."
+            "flag overrides that (Playwright Case Scaling epic). "
+            "2026-08-30: +13 lines adding --workers to the playwright "
+            "subparser, so the pytest-xdist worker cap is configurable "
+            "(e.g. higher on a VM that can run more concurrent browser "
+            "instances) rather than a fixed constant."
         ),
     ),
     "src/fabric_ci_cd_dataops/scripts/fab_test_summary.py": (
@@ -63,7 +67,7 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
         ),
     ),
     "src/fabric_ci_cd_dataops/scripts/fab_test_registry.py": (
-        888,
+        891,
         (
             "2026-08-23: 11 lines over hard, same story as fab_test_summary.py -- "
             "small drift from other epics, not yet worth a forced split. "
@@ -87,7 +91,19 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
             "2026-08-30: +16 lines adding playwright_test_cases_dir, the "
             "single source of truth build_playwright_command and "
             "fab_test_execution.py's case-count-scaled timeout both need to "
-            "agree on the same path (Playwright Case Scaling epic)."
+            "agree on the same path (Playwright Case Scaling epic). "
+            "2026-08-30: +3 lines forwarding --workers to invoke_playwright.py "
+            "when explicitly set on the outer CLI."
+        ),
+    ),
+    "src/fabric_ci_cd_dataops/scripts/invoke_playwright.py": (
+        820,
+        (
+            "2026-08-30: born over the hard budget adding configurable "
+            "pytest-xdist worker resolution (--workers/PLAYWRIGHT_XDIST_WORKERS "
+            "> packaged default) -- a small, cohesive addition to an already "
+            "large file, not worth a forced split for ~20 lines. Revisit if "
+            "it keeps growing."
         ),
     ),
 }

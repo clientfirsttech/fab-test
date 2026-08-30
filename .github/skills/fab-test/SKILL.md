@@ -750,6 +750,7 @@ Playwright validation can run in three modes: static `.env` mode, service-resolv
 | `--impact-manifest PATH` | Validate every report listed in the impacted-report manifest once, regardless of local `.Report` artifacts |
 | `--pages {auto,none}` | Discover every report page and its own bookmarks (default: `auto`); `none` tests only the default page |
 | `--roles {auto,none}` | Discover RLS/OLS roles from the semantic model and test the page matrix under each one when RLS is enabled (default: `auto`); `none` tests only `PLAYWRIGHT_ROLE` |
+| `--workers N` | Max `pytest-xdist` workers for running generated cases concurrently (default: `4`) [env: `PLAYWRIGHT_XDIST_WORKERS`] |
 
 **By default, `playwright` tests every page, every page's own bookmarks, and every
 RLS role — not just the default tab.** `--pages none`/`--roles none` (or `PLAYWRIGHT_PAGE_IDS`/
@@ -785,6 +786,18 @@ environment, in a .env file, or pass --env-file.
 a false green when only an ambient credential is available — `playwright-impact` and
 `dependencies`, which never call the embed-token API, are unaffected and accept
 ambient auth like every other cloud-backed analyzer.
+
+**Generated cases run concurrently, up to a bounded worker cap.** A report's
+page/bookmark/role matrix can generate many cases; they run across `pytest-xdist`
+workers (`-n`) rather than one after another, and the outer subprocess timeout scales
+with the real generated count instead of a flat number sized for one case (both
+transparent — nothing to configure to get them). The worker count itself defaults to
+`4` (each worker opens its own browser instance, so it isn't unconditionally maximal
+the way `pytest-xdist`'s own `-n auto` would be) and is the one part of this that is
+configurable: `--workers N` on the CLI, or `PLAYWRIGHT_XDIST_WORKERS` as an env var
+when you'd rather not pass a flag on every invocation — raise it on a machine (e.g. a
+CI runner or VM) that can safely hold more concurrent browser instances than a
+laptop.
 
 Any other exception while acquiring the embed context (a malformed tenant, an
 unreachable API) is also caught: it never reaches the console as a traceback. It

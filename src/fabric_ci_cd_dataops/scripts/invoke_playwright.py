@@ -295,18 +295,31 @@ def _stream_subprocess(
 
 # Each xdist worker opens its own browser instance -- unconditionally
 # maximal (e.g. pytest-xdist's own "-n auto", which sizes off CPU count)
-# risks exhausting local memory/CPU on a large matrix. A small, fixed cap
-# bounds concurrent browser instances regardless of how large a report's
-# case matrix gets.
+# risks exhausting local memory/CPU on a large matrix. This is the packaged
+# default only; --workers/PLAYWRIGHT_XDIST_WORKERS override it, e.g. on a
+# beefier VM that can safely run more concurrent browser instances.
 _XDIST_MAX_WORKERS = 4
 
 
-def _resolve_xdist_workers(case_count: int) -> int | None:
+def _resolve_max_workers(explicit: int | None) -> int:
+    """Resolve the worker-count cap: --workers > PLAYWRIGHT_XDIST_WORKERS > default."""
+    if explicit is not None:
+        return explicit
+    raw = os.environ.get("PLAYWRIGHT_XDIST_WORKERS", "")
+    if raw:
+        try:
+            return int(raw)
+        except ValueError:
+            pass
+    return _XDIST_MAX_WORKERS
+
+
+def _resolve_xdist_workers(case_count: int, max_workers: int = _XDIST_MAX_WORKERS) -> int | None:
     """Return the `-n` worker count for a run generating `case_count` cases,
     or None to omit `-n` entirely -- a single case has nothing to parallelize."""
     if case_count <= 1:
         return None
-    return min(case_count, _XDIST_MAX_WORKERS)
+    return min(case_count, max_workers)
 
 
 def _run_pytest(
@@ -314,6 +327,7 @@ def _run_pytest(
     *,
     verbosity: int = 0,
     case_count: int = 1,
+    max_workers: int | None = None,
 ) -> subprocess.CompletedProcess[str]:
     """Run the Playwright pytest spec, streaming its output live.
 
@@ -321,7 +335,9 @@ def _run_pytest(
     sequentially in one when there is more than one -- embed token
     acquisition already happened once per role before this is called
     (`acquire_embed_configs` in `_run_single_report`), so xdist only ever
-    parallelizes case execution, never token acquisition.
+    parallelizes case execution, never token acquisition. `max_workers`
+    defaults to `_resolve_max_workers(None)` (env var, else the packaged
+    default) when not given explicitly.
     """
     repo_root = _repo_root()
     spec_path = repo_root / _SPEC_PATH
@@ -339,7 +355,8 @@ def _run_pytest(
         "--junitxml=fab-test-results/playwright/report/results.xml",
     ]
 
-    workers = _resolve_xdist_workers(case_count)
+    resolved_max_workers = _resolve_max_workers(max_workers)
+    workers = _resolve_xdist_workers(case_count, resolved_max_workers)
     if workers is not None:
         command += ["-n", str(workers)]
 
@@ -522,6 +539,17 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Path to an impacted-report manifest JSON.",
     )
     parser.add_argument(
+        "--workers",
+        type=int,
+        default=None,
+        metavar="N",
+        help=(
+            "Max pytest-xdist workers for running generated cases concurrently "
+            "[env: PLAYWRIGHT_XDIST_WORKERS, default: 4]. Raise this on a "
+            "machine that can safely run more concurrent browser instances."
+        ),
+    )
+    parser.add_argument(
         "-v",
         "--verbose",
         action="count",
@@ -665,7 +693,9 @@ def _run_single_report(
     )
 
     with Timer() as timer:
-        proc = _run_pytest(env, verbosity=level, case_count=len(cases))
+        proc = _run_pytest(
+            env, verbosity=level, case_count=len(cases), max_workers=getattr(args, "workers", None)
+        )
 
     success = proc.returncode == 0
     message = (
