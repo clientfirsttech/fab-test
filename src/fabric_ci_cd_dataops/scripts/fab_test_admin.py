@@ -245,6 +245,7 @@ _FAB_TEST_YML_TEMPLATE = """\
 # jobs: 1                          # artifacts to run in parallel for the same analyzer
 # format: text                     # text | json
 # timeout: 200                     # per-artifact subprocess timeout in seconds [env: ANALYZER_TIMEOUT]
+#                                   # (playwright scales this up on its own for a large matrix; setting this overrides that)
 # environment: DEV                 # default environment label [env: FABRIC_ENVIRONMENT]
 # workspace: Sales Dev             # default workspace name or GUID [env: FABRIC_WORKSPACE_ID]
 

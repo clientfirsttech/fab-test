@@ -33,19 +33,25 @@ from tests.conftest import _RunAnalyzerArgs, _stub_subprocess_run, _TimeoutArgs
 def test_resolve_timeout_uses_cli_flag_over_env(monkeypatch):
     """--timeout takes precedence over ANALYZER_TIMEOUT."""
     monkeypatch.setenv("ANALYZER_TIMEOUT", "60")
-    assert _resolve_timeout(_TimeoutArgs(timeout=300)) == 300
+    value, is_default = _resolve_timeout(_TimeoutArgs(timeout=300))
+    assert value == 300
+    assert is_default is False
 
 
 @pytest.mark.fab_test
 def test_resolve_timeout_uses_env_when_no_cli_flag(monkeypatch):
     """ANALYZER_TIMEOUT overrides the default when --timeout is not passed."""
     monkeypatch.setenv("ANALYZER_TIMEOUT", "200")
-    assert _resolve_timeout(_TimeoutArgs(timeout=None)) == 200
+    value, is_default = _resolve_timeout(_TimeoutArgs(timeout=None))
+    assert value == 200
+    assert is_default is False
 
 
 @pytest.mark.fab_test
 def test_resolve_timeout_defaults_to_200(monkeypatch):
-    """With neither --timeout nor ANALYZER_TIMEOUT set, the default is 200.
+    """With neither --timeout nor ANALYZER_TIMEOUT set, the default is 200,
+    and `is_default` is True -- the signal that lets playwright's
+    case-count-scaled timeout apply (Playwright Case Scaling epic).
 
     200 must stay above PLAYWRIGHT_TIMEOUT_SECONDS's default (180) plus
     auth/startup overhead -- this is the outer subprocess timeout that
@@ -54,7 +60,9 @@ def test_resolve_timeout_defaults_to_200(monkeypatch):
     render timeout it is meant to catch.
     """
     monkeypatch.delenv("ANALYZER_TIMEOUT", raising=False)
-    assert _resolve_timeout(_TimeoutArgs(timeout=None)) == 200
+    value, is_default = _resolve_timeout(_TimeoutArgs(timeout=None))
+    assert value == 200
+    assert is_default is True
 
 
 @pytest.mark.fab_test

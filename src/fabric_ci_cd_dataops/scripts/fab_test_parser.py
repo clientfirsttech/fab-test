@@ -93,7 +93,10 @@ def _add_common_flags(
         metavar="SECONDS",
         help=(
             "Per-artifact subprocess timeout in seconds "
-            f"[env: ANALYZER_TIMEOUT, default: {_DEFAULT_SUBPROCESS_TIMEOUT}]"
+            f"[env: ANALYZER_TIMEOUT, default: {_DEFAULT_SUBPROCESS_TIMEOUT}]. "
+            "For playwright, setting this explicitly overrides fab-test's own "
+            "case-count-scaled timeout (which otherwise raises the ceiling "
+            "for a report with a large page/bookmark/role matrix)."
         ),
     )
     parser.add_argument(
