@@ -9,7 +9,7 @@ A Power BI report can pass every PBIR structural rule and still be unusable for 
 
 ---
 
-## Node Toolchain Bootstrap
+## Node Toolchain Bootstrap  ✅
 
 Extend the analyzer tool bootstrap with a source-build path: fetch pbir-a11y from GitHub at a pinned ref, `npm install`, `npm run build`, and cache the built CLI the way the zip-extract path caches an unpacked binary.
 
@@ -22,6 +22,79 @@ Extend the analyzer tool bootstrap with a source-build path: fetch pbir-a11y fro
 - Given the existing zip-extract analyzers, should keep resolving exactly as before, since the bootstrap now has two acquisition shapes and one is new
 - Given acquisition method is chosen, should be selected by a declared `analyzers.json` key rather than a branch on the analyzer's name, so a later npm-published pbir-a11y is a new method plus a metadata edit and no change to resolution order, caching, doctor, or the wrapper
 - Given a resolved executable, should reach every downstream caller as a plain path carrying no trace of how it was acquired
+
+Done: `_analyzer_tool_bootstrap.py` gained a second acquisition shape,
+selected by `tool_install.archive_type: "npm_build"` (the existing
+`archive_type` field, previously single-valued at `"zip"`) rather than a
+branch on the analyzer's name — `resolve_executable`'s dispatch is now
+`if archive_type == "zip": ... elif archive_type == "npm_build": ...`,
+sharing every version-keyed-cache/local-candidate/shadow-note mechanism the
+zip path already had. `_download_build_and_cache` mirrors
+`_download_and_cache`'s download/verify/extract steps, then adds
+`_find_build_root` (locates `package.json` inside the archive — GitHub's
+tag-archive zip nests everything under one `<repo>-<ref>/` folder whose name
+isn't knowable in advance, so this is an `rglob`, not a fixed path) and
+`_run_npm_build` (runs `npm install`, then any declared
+`build_extra_dependencies`, then `npm run build`, each step wrapped by
+`_run_build_step` so a failure names *which* step broke — including npm's
+own absence, which surfaces as `FileNotFoundError` the same way a missing
+tool binary does elsewhere in this module). On any failure the partially
+extracted/built cache directory is removed (`shutil.rmtree` in the `except`
+clause) before re-raising, and the marker file — the only thing a later run
+consults — is written only after `_find_executable` locates a real entry
+point, so a broken build never gets mistaken for a working one on the next
+run.
+
+Verified against the **real upstream tool**, not a synthetic fixture, before
+writing a single test: downloaded `Juls-BI/pbir-a11y`'s real tag archives and
+ran `npm install && npm run build` by hand. This surfaced a genuine upstream
+defect: `v0.3.2` (the newest tag)'s `package.json` dropped the `docx`
+dependency that `src/lib/docxReport.ts` still `require()`s unconditionally
+at module load, so a plain build produces a `dist/cli.js` that crashes on
+*any* invocation (`Error: Cannot find module 'docx'`), not just `--docx`
+usage — confirmed by diffing `package.json` at `v0.2.0` (declares `docx`
+correctly) against `v0.3.2` (doesn't) and reproducing the crash directly.
+Asked the user whether to pin the last known-good tag (`v0.2.0`) or keep
+`v0.3.2` with a workaround; chose to keep `v0.3.2` and paper over the gap —
+`tool_install.build_extra_dependencies: ["docx@^9.6.1"]` (the exact version
+`v0.2.0` pinned) becomes a second, distinct `npm install` call after the
+first, confirmed live to fix the build (exit 0) and produce a working
+`check --json` against a real fab-test fixture (`ThinReport.Report`). Then
+ran the *actual* `resolve_executable("pbir_a11y", ...)` end-to-end against
+the real `analyzers.json` entry in a scratch repo root — real network
+download, real `npm install`/`npm install docx@^9.6.1`/`npm run build`,
+real resolved `dist/cli.js` — and ran the resolved CLI against a real
+artifact before writing any test; confirmed a second resolve at the same
+version is instant (0.013s, no rebuild).
+
+`probe_executable`'s wording is now acquisition-method-aware: `archive_type:
+"npm_build"` reports "not yet built" (not "not yet downloaded") and checks
+Node/npm presence before reporting what *would* happen, returning a
+distinctly worded, distinctly remediated result for Node missing vs. npm
+missing vs. toolchain-present-nothing-cached — the split was pulled into a
+new `_probe_pending_install` helper specifically to keep `probe_executable`
+itself under the complexity ratchet's return-statement ceiling (adding the
+two new branches inline pushed it to 7 returns against a ceiling of 6).
+
+`tests/test_pbir_a11y_tool_bootstrap.py` (new, 11 tests) exercises real
+`npm`/`node` subprocesses against synthetic zero-dependency fixtures (a
+`build.js` that just writes a marker file, so no real package is fetched
+and each test runs in ~2-4s) rather than mocking `subprocess.run` for the
+integration-shaped tests: build-from-source end-to-end, cache reuse without
+rebuild (`_download`/`_run_npm_build` patched to raise if called), a version
+bump forcing a fresh build while the old version's cache is left alone
+(mirrors the zip path's equivalent test — both share `_cache_dir`), build
+failure leaving no partial cache, npm absence reported clearly, and each of
+`probe_executable`'s three npm_build branches. `_run_npm_build`'s extra-
+dependency argument order is the one place `subprocess.run` is mocked
+directly, since asserting exact argv shape doesn't need a real process.
+This pushed the original `test_fab_test_tool_bootstrap.py` from 708 to 1020
+lines (over the 900-line hard budget), so the new section was split into
+its own file rather than exempted — matching the Test Module Split epic's
+precedent of splitting by behavior rather than raising the ceiling. Full
+suite: **1491 passed, 0 failed, 3 skipped**, coverage held (floor 80%);
+`test_complexity_budget.py` and `test_module_budget.py` re-confirmed clean
+after the split and the `_probe_pending_install` extraction.
 
 ---
 

@@ -11,6 +11,7 @@ _verify_checksum's install_sha256 verification before extraction.
 import hashlib
 import json
 import unittest.mock
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -704,5 +705,4 @@ def test_probe_executable_cli_argument_never_gets_a_shadow_note(tmp_path, monkey
     assert result["ready"] is True
     assert "shadows" not in result["reason"]
     assert result["remediation"] is None
-
 
