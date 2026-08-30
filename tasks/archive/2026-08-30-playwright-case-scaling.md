@@ -1,6 +1,6 @@
 # Playwright Case Scaling Epic
 
-**Status**: 📋 PLANNED
+**Status**: ✅ COMPLETED — 2 of 2 tasks done
 **Goal**: A `fab-test playwright` run for a report with many pages/bookmarks/roles
 neither gets killed mid-matrix by a timeout sized for one case, nor takes
 proportionally longer wall-clock as the matrix grows.
@@ -150,7 +150,7 @@ just written and assumed correct. `fab_test_registry.py`'s and
 suite: **1561 passed, 0 failed, 3 skipped**, coverage held (floor 80%);
 complexity and module budgets re-confirmed clean.
 
-## Run generated Playwright cases concurrently via pytest-xdist
+## Run generated Playwright cases concurrently via pytest-xdist  ✅
 
 **Requirements**:
 - Given more than one generated case for a report, should invoke pytest with
@@ -171,3 +171,76 @@ complexity and module budgets re-confirmed clean.
 - Given `pytest-xdist` is a new dependency, should be added to the project's
   test/dev dependency group and to `doctor`'s readiness checks if pytest
   itself is checked there
+
+Done: `_run_pytest` (`invoke_playwright.py`) now accepts `case_count` and
+adds `-n {workers}` when there is more than one case; `workers =
+min(case_count, _XDIST_MAX_WORKERS)` with `_XDIST_MAX_WORKERS = 4` — a
+fixed, modest cap rather than pytest-xdist's own `-n auto` (which sizes off
+CPU count and could open far more concurrent Chromium instances than a
+typical CI runner's memory can hold). A single-case run omits `-n`
+entirely, adding no xdist overhead where there is nothing to parallelize.
+
+Embed token acquisition is structurally unaffected without any code
+change: `acquire_embed_configs` (`_run_single_report`, line 612) already
+runs once per distinct role, entirely before `_run_pytest` is called (line
+668) — xdist workers only ever execute already-generated, already-tokened
+test *cases*; there is nothing between discovery and pytest for a worker to
+race against.
+
+Per-case evidence writing needed no change either, once traced rather than
+assumed safe: `_case_result_dir(case, test_cases_dir)` already keys each
+case's `result.json`/screenshots by `sanitize_case_id(case.test_case)` — a
+distinct directory per case — so concurrent xdist workers running
+*different* cases write to *disjoint* paths by construction, not by
+coordination. The shared `--html`/`--junitxml` output is `pytest-html`/
+pytest's own centralized reporting, which aggregates every worker's results
+through the standard hook protocol rather than raced file writes — verified
+live, not assumed: a real `pytest -n 3 --html=... --junitxml=...` run
+against a 6-case dummy spec produced one correct HTML report and one
+`results.xml` reporting `tests="6"`, matching every case, not a subset or a
+corrupted file.
+
+`pytest-xdist` added to `pyproject.toml`'s `dev` extra; `doctor` does not
+check `pytest` itself anywhere in this codebase (confirmed by search), so
+the requirement's conditional clause on that point doesn't apply — nothing
+to wire there. A guard test
+(`test_pytest_xdist_is_a_dev_dependency`, mirroring the existing
+`pytest-html`/`pytest-playwright` one) fails if the dependency entry ever
+goes stale.
+
+`tests/test_invoke_playwright_xdist.py` (new): `_resolve_xdist_workers`'s
+formula (omits `-n` for one case, matches case count under the cap, caps at
+`_XDIST_MAX_WORKERS` for a large matrix) and `_run_pytest`'s actual
+constructed argv (via a stubbed `_stream_subprocess` — every other test of
+`_run_pytest` in `test_invoke_playwright.py` mocks it wholesale and never
+inspects the command line at all, so this is new coverage, not a rewrite of
+existing assertions). Split into its own file from the start, rather than
+appended to `test_invoke_playwright.py`, which would have pushed that file
+(already large) over its 900-line hard budget — confirmed the split was
+necessary, not precautionary, by adding the tests inline first and watching
+`test_no_unexempted_file_exceeds_its_hard_budget` fail at 950 lines before
+moving them.
+
+Verified pytest-xdist itself works in this environment with a real
+subprocess, not just import-checked: `pytest -n 2` against a small
+parametrized dummy spec printed `bringing up nodes...` twice and passed all
+cases — confirming the mechanism functions before trusting it inside
+`invoke_playwright.py`'s own, much harder to exercise, spec (which needs a
+live Fabric tenant/service principal this environment doesn't have — not
+verified live end-to-end for that reason, the same gap several earlier
+Playwright epics recorded rather than papered over).
+
+Full suite: **1568 passed, 0 failed, 3 skipped**, coverage held (floor
+80%); complexity and module budgets re-confirmed clean.
+
+---
+
+This closes the epic. Both tasks complete: the outer subprocess timeout
+scales with the real generated case count (sharing one discovery pass
+rather than duplicating a live Fabric REST call), and generated cases run
+concurrently across bounded `pytest-xdist` workers instead of stacking
+sequentially inside one process -- together addressing the observed defect
+this epic exists to fix (`Report with Bookmarks - Broken Visuals` killed
+mid-matrix by a 200s ceiling sized for one case) from both directions: a
+larger, case-count-aware ceiling, and a smaller real-world need to reach it
+at all.

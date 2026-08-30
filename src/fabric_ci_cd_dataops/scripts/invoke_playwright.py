@@ -293,12 +293,36 @@ def _stream_subprocess(
     )
 
 
+# Each xdist worker opens its own browser instance -- unconditionally
+# maximal (e.g. pytest-xdist's own "-n auto", which sizes off CPU count)
+# risks exhausting local memory/CPU on a large matrix. A small, fixed cap
+# bounds concurrent browser instances regardless of how large a report's
+# case matrix gets.
+_XDIST_MAX_WORKERS = 4
+
+
+def _resolve_xdist_workers(case_count: int) -> int | None:
+    """Return the `-n` worker count for a run generating `case_count` cases,
+    or None to omit `-n` entirely -- a single case has nothing to parallelize."""
+    if case_count <= 1:
+        return None
+    return min(case_count, _XDIST_MAX_WORKERS)
+
+
 def _run_pytest(
     env: dict[str, str],
     *,
     verbosity: int = 0,
+    case_count: int = 1,
 ) -> subprocess.CompletedProcess[str]:
-    """Run the Playwright pytest spec, streaming its output live."""
+    """Run the Playwright pytest spec, streaming its output live.
+
+    Cases run across `pytest-xdist` worker processes rather than
+    sequentially in one when there is more than one -- embed token
+    acquisition already happened once per role before this is called
+    (`acquire_embed_configs` in `_run_single_report`), so xdist only ever
+    parallelizes case execution, never token acquisition.
+    """
     repo_root = _repo_root()
     spec_path = repo_root / _SPEC_PATH
 
@@ -314,6 +338,10 @@ def _run_pytest(
         "--self-contained-html",
         "--junitxml=fab-test-results/playwright/report/results.xml",
     ]
+
+    workers = _resolve_xdist_workers(case_count)
+    if workers is not None:
+        command += ["-n", str(workers)]
 
     if verbosity >= 2:
         command.append("-vv")
@@ -637,7 +665,7 @@ def _run_single_report(
     )
 
     with Timer() as timer:
-        proc = _run_pytest(env, verbosity=level)
+        proc = _run_pytest(env, verbosity=level, case_count=len(cases))
 
     success = proc.returncode == 0
     message = (
