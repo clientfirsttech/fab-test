@@ -21,6 +21,7 @@ from ._fab_test_context import (
     RESULTS_ROOT,
 )
 from .fab_test_registry import (
+    _DEFAULT_A11Y_PATH,
     _DEFAULT_BPA_RULES,
     _DEFAULT_INSPECTOR_PATH,
     _DEFAULT_PBIR_RULES,
@@ -357,6 +358,31 @@ def _add_pbir_subparser(subs: argparse._SubParsersAction) -> None:
         metavar="PATH",
         help=f"PBIR Inspector rules JSON [default: {_DEFAULT_PBIR_RULES}]",
     )
+
+def _add_a11y_subparser(subs: argparse._SubParsersAction) -> None:
+    a11y_p = subs.add_parser(
+        "a11y",
+        help="pbir-a11y — accessibility checks (Report artifacts)",
+    )
+    _add_common_flags(a11y_p)
+    a11y_p.add_argument(
+        "--a11y-path",
+        default=None,
+        dest="a11y_path",
+        metavar="PATH",
+        help=(
+            "Path to pbir-a11y's built CLI entry point (dist/cli.js) "
+            f"[env: PBIR_A11Y_PATH, default: {_DEFAULT_A11Y_PATH}]"
+        ),
+    )
+    a11y_p.add_argument(
+        "--fail-on",
+        default=None,
+        dest="fail_on",
+        metavar="SEVERITY",
+        help="Forwarded to pbir-a11y's own --fail-on (warn|fail; tool default: fail)",
+    )
+
 
 def _add_pql_test_subparser(subs: argparse._SubParsersAction) -> None:
     pql_test_p = subs.add_parser(
@@ -830,6 +856,7 @@ def _add_help_subparser(subs: argparse._SubParsersAction) -> None:
 _SUBPARSER_BUILDERS = (
     _add_bpa_subparser,
     _add_pbir_subparser,
+    _add_a11y_subparser,
     _add_pql_test_subparser,
     _add_pql_lint_subparser,
     _add_playwright_subparser,

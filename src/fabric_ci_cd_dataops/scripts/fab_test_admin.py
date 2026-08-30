@@ -428,6 +428,7 @@ def _doctor(args: argparse.Namespace) -> int:
 _TOOL_DISPLAY_NAMES = {
     "bpa": "Tabular Editor",
     "pbir": "PBIR Inspector",
+    "a11y": "pbir-a11y",
 }
 
 
