@@ -66,6 +66,7 @@ ANALYZERS_JSON = metadata_path(ANALYZERS, REPO_ROOT)
 ANALYZER_REGISTRY: dict[str, tuple[str, str]] = {
     "bpa": ("*.SemanticModel", "Tabular Editor Best Practice Analyzer"),
     "pbir": ("*.Report", "PBIR Inspector"),
+    "a11y": ("*.Report", "PBIR accessibility checks (pbir-a11y)"),
     "pql_test": ("*.SemanticModel", "pql-test"),
     "pql_lint": ("*.SemanticModel", "pqlint"),
     "playwright": ("*.Report", "Playwright visual/error validation"),
@@ -80,7 +81,12 @@ ANALYZER_REGISTRY: dict[str, tuple[str, str]] = {
 # state and never a removal. `doctor --analyzer <name>` still reports one
 # on request, because hiding a name from a menu should not refuse to
 # answer a direct question about it.
-HIDDEN_ANALYZERS: frozenset[str] = frozenset({"pql_lint"})
+#
+# "a11y" is hidden only until its command builder/subparser land (PBIR
+# Accessibility Integration epic, task 3): registering it early is what lets
+# `doctor --analyzer a11y` report readiness now, without exposing a
+# subcommand that argparse doesn't actually accept yet.
+HIDDEN_ANALYZERS: frozenset[str] = frozenset({"pql_lint", "a11y"})
 
 
 def visible_analyzers() -> tuple[str, ...]:
@@ -102,6 +108,7 @@ def visible_analyzers() -> tuple[str, ...]:
 ANALYZER_SCOPES: dict[str, frozenset[str]] = {
     "bpa": frozenset({"path", "desktop"}),
     "pbir": frozenset({"path", "desktop"}),
+    "a11y": frozenset({"path", "desktop"}),
     "pql_lint": frozenset({"path", "desktop"}),
     "pql_test": frozenset({"path", "desktop", "workspace"}),
     "playwright": frozenset({"path", "workspace"}),
@@ -178,7 +185,7 @@ def unsupported_type_error(name: str, target: ResolvedTarget | None) -> str | No
 
 
 # Analyzers that depend on an external binary/tool.
-_BOOTSTRAPPED_ANALYZERS = {"bpa", "pbir"}
+_BOOTSTRAPPED_ANALYZERS = {"bpa", "pbir", "a11y"}
 
 # Analyzers that resolve no external binary but still cannot run on a bare
 # checkout: they need a Fabric workspace plus credentials, or -- pql_test
@@ -203,6 +210,7 @@ _SERVICE_PRINCIPAL_HINT = (
 _BOOTSTRAP_REGISTRY_NAME = {
     "bpa": "tabular_editor_bpa",
     "pbir": "pbir_inspector",
+    "a11y": "pbir_a11y",
 }
 
 
@@ -632,6 +640,8 @@ def resolve_tool(name: str, args: argparse.Namespace) -> Path | None:
         explicit = getattr(args, "tabular_editor_path", None)
     elif name == "pbir":
         explicit = getattr(args, "inspector_path", None)
+    elif name == "a11y":
+        explicit = getattr(args, "a11y_path", None)
 
     resolved = resolve_executable(
         _BOOTSTRAP_REGISTRY_NAME.get(name, name),
@@ -646,6 +656,7 @@ def resolve_tool(name: str, args: argparse.Namespace) -> Path | None:
 _TOOL_FLAG_HINTS = {
     "bpa": "--tabular-editor-path",
     "pbir": "--inspector-path",
+    "a11y": "--a11y-path",
 }
 
 
@@ -792,6 +803,8 @@ def _readiness_without_version(name: str, args: argparse.Namespace | None) -> di
             explicit = getattr(args, "tabular_editor_path", None)
         elif name == "pbir":
             explicit = getattr(args, "inspector_path", None)
+        elif name == "a11y":
+            explicit = getattr(args, "a11y_path", None)
 
     return probe_executable(
         _BOOTSTRAP_REGISTRY_NAME.get(name, name),

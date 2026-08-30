@@ -98,7 +98,7 @@ after the split and the `_probe_pending_install` extraction.
 
 ---
 
-## Node and pbir-a11y Readiness in Doctor
+## Node and pbir-a11y Readiness in Doctor  ✅
 
 Teach `fab-test doctor` to probe the Node toolchain and the built pbir-a11y CLI, with remediation that names the failing step.
 
@@ -109,6 +109,68 @@ Teach `fab-test doctor` to probe the Node toolchain and the built pbir-a11y CLI,
 - Given everything resolves, should report ready and include the resolved executable path and the pinned ref it was built from
 - Given `--format json`, should emit these checks in the same row shape as every other doctor check so an agent parses one schema
 - Given `fab-test doctor --local`, should include the same readiness rows, since the analyzer reads files on disk and needs no workspace
+
+Done: The Node/npm-aware probing itself (distinct reasons for Node missing,
+npm missing, and "not yet built") landed in Task 1's `probe_executable`
+extension — this task is what wires `a11y` into `fab_test_registry.py`'s
+tables so `doctor` can reach it at all: `ANALYZER_REGISTRY` (`*.Report`),
+`ANALYZER_SCOPES` (`path`, `desktop` — same as `pbir`, no workspace), `
+_BOOTSTRAPPED_ANALYZERS`, `_BOOTSTRAP_REGISTRY_NAME` (`"a11y" ->
+"pbir_a11y"`, since the CLI subcommand and the `analyzers.json` key
+deliberately differ, matching `pbir`/`pbir_inspector`'s existing precedent),
+`_TOOL_FLAG_HINTS`, and a `getattr(args, "a11y_path", None)` branch in both
+`resolve_tool` and `_readiness_without_version` — safe to add before the CLI
+flag itself exists, since `getattr`'s default just returns `None` until
+Task 4's `--a11y-path` argument lands.
+
+Registering it in `ANALYZER_REGISTRY` also made it eligible everywhere else
+that table drives — `fab-test list`, the default `doctor` report, and
+discovery's glob-matching — before its command builder and subparser exist
+(Task 3/4), which would have exposed a subcommand argparse doesn't actually
+accept yet. Added `"a11y"` to the existing `HIDDEN_ANALYZERS` set (previously
+just `{"pql_lint"}`) to hold that surface back: `doctor --analyzer a11y`
+answers a direct question (confirmed live: reports `"not yet built"` with
+the exact remediation text, including the `PBIR_A11Y_PATH` override
+mention added to `_probe_pending_install` for this requirement), while
+`fab-test list` and the default `fab-test doctor` correctly still omit it —
+both confirmed against the real installed CLI, not just a unit test. This
+mirrors `pql_lint`'s exact existing precedent (hidden but fully invocable),
+including one pre-existing wrinkle that precedent already had and this
+change inherits rather than introduces: `applicable_analyzers()` (the
+per-artifact "(analyzers: ...)" annotation another analyzer's `--dry-run`
+prints) does not filter `HIDDEN_ANALYZERS` — `pql_lint` already appeared
+there for `.SemanticModel` artifacts before this epic, and `a11y` now does
+the same for `.Report` artifacts. Fixing that filter gap was judged
+out of scope here: it would change `pql_lint`'s behavior too, is not named
+in any requirement above, and risks the exact kind of undirected cleanup
+this repo's constraints ask reviewers to push back on.
+
+Blast Radius re-verified through the real CLI after the registry edit, not
+just the one path that prompted it: `fab-test doctor` (a11y absent from the
+default view), `fab-test doctor --analyzer a11y --format json` (reports
+correctly), `fab-test list` (a11y absent), `fab-test bpa --dry-run` and
+`fab-test pbir --dry-run` (both still run correctly; the latter's per-
+artifact annotation now includes `a11y`, the expected discovery-glob
+consequence of registration, not a regression). `_LOCAL_ANALYZERS`
+(`fab-test local`'s run set and `doctor --local`'s row set) deliberately
+was **not** touched yet — adding `a11y` there would make `fab-test local`
+try to actually run it, which fails today with no command builder (Task 3);
+picking that up once the wrapper exists is more honest than reporting a
+readiness row for a bundle member that cannot yet run.
+
+`tests/test_readiness.py` gained two tests: `check_readiness("a11y", args)`
+delegating via its own `--a11y-path`-shaped attribute (mirrors the existing
+`bpa` delegation test), and a dedicated hidden-but-answerable contract test.
+The pre-existing `test_check_readiness_returns_same_shape_for_every_analyzer`
+(iterates `ANALYZER_REGISTRY` directly, not filtered by `HIDDEN_ANALYZERS`)
+already covered `a11y`'s five-key shape for free once registered.
+`tests/test_fab_test_discovery.py`'s `test_applicable_analyzers_for_report`
+needed its exact expected tuple updated from `("pbir", "playwright")` to
+`("pbir", "a11y", "playwright")` — a genuine, expected consequence of
+registration, not a defect. `tests/test_module_budget.py`:
+`fab_test_registry.py`'s exemption ceiling raised from 829 to 842 lines (13
+lines for the registration surface above). Full suite: **1493 passed, 0
+failed, 3 skipped**, coverage held (floor 80%).
 
 ---
 

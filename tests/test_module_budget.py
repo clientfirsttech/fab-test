@@ -56,7 +56,7 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
         ),
     ),
     "src/fabric_ci_cd_dataops/scripts/fab_test_registry.py": (
-        829,
+        842,
         (
             "2026-08-23: 11 lines over hard, same story as fab_test_summary.py -- "
             "small drift from other epics, not yet worth a forced split. "
@@ -65,7 +65,13 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
             "2026-08-29: +12 lines splitting check_readiness's dict-merge into "
             "_readiness_without_version so every readiness branch (including "
             "_cloud_readiness's five returns) gets a uniform `version` key from "
-            "one place, not five (Tool Version Currency epic)."
+            "one place, not five (Tool Version Currency epic). "
+            "2026-08-29: +13 lines registering the `a11y` analyzer (hidden until "
+            "its command builder lands) into ANALYZER_REGISTRY/ANALYZER_SCOPES/"
+            "_BOOTSTRAPPED_ANALYZERS/_BOOTSTRAP_REGISTRY_NAME plus its explicit-path "
+            "branch in resolve_tool and _readiness_without_version (PBIR "
+            "Accessibility Integration epic, Node and pbir-a11y Readiness in "
+            "Doctor task)."
         ),
     ),
 }

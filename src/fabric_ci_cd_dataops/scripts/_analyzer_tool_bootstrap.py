@@ -306,11 +306,15 @@ def _probe_pending_install(
         action = f"build version {pinned_version} from source at" if pinned_version else "build from source at"
     else:
         action = f"download version {pinned_version} from" if pinned_version else "download from"
+    remediation = f"Would {action} {install_url} on first run."
+    env_var = tool_install.get("env_var")
+    if archive_type == "npm_build" and env_var:
+        remediation += f" Or set {env_var}=<path> to a manually built executable to skip this."
     return {
         "ready": False,
         "resolved_path": None,
         "reason": "not yet built" if archive_type == "npm_build" else "not yet downloaded",
-        "remediation": f"Would {action} {install_url} on first run.",
+        "remediation": remediation,
         "version": None,
     }
 
