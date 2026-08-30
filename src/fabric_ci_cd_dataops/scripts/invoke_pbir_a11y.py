@@ -36,6 +36,7 @@ from ._analyzer_envelope import (
     native_output_path,
     write_envelope,
 )
+from ._report_html import attach_report
 
 _VERBOSITY_LEVELS = {"summary": 0, "default": 1, "verbose": 2, "debug": 3}
 
@@ -90,7 +91,12 @@ def build_a11y_command(node_path: str, a11y_path: Path, artifact_path: Path, fai
 
 
 def write_results(result: WrapperResult) -> None:
-    """Write the standardized pbir-a11y envelope JSON."""
+    """Write the standardized pbir-a11y envelope JSON.
+
+    ``attach_report`` renders `report.html` beside the envelope when
+    `--report` is enabled (a no-op otherwise) -- pbir-a11y has no native
+    HTML output of its own to defer to, unlike PBIR Inspector.
+    """
     env = build_envelope(
         EnvelopeIdentity("pbir_a11y", str(result.artifact_path)),
         status=result.status,
@@ -99,6 +105,7 @@ def write_results(result: WrapperResult) -> None:
         native_output_path_str=str(result.native_out) if result.native_out else "",
         duration_ms=result.duration_ms,
     )
+    attach_report(env, result.output_path)
     write_envelope(result.output_path, env)
 
 

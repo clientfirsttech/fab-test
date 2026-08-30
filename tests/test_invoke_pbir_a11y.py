@@ -317,6 +317,30 @@ class TestRunA11y:
         assert mock_run.call_args.kwargs["encoding"] == "utf-8"
 
     @mock.patch("fabric_ci_cd_dataops.scripts.invoke_pbir_a11y.shutil.which", return_value="node")
+    @mock.patch("fabric_ci_cd_dataops.scripts.invoke_pbir_a11y.subprocess.run")
+    def test_run_writes_a_report_when_enabled_even_with_zero_findings(
+        self, mock_run, _mock_which, tmp_path: Path, monkeypatch
+    ):
+        """`--report` (ANALYZER_REPORT) writes report.html beside the envelope,
+        including a clean run -- an analyzer that passed must still appear in
+        the report/index, not be silently omitted."""
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setenv("ANALYZER_REPORT", "1")
+        artifact = tmp_path / "R.Report"
+        artifact.mkdir()
+        a11y_path = tmp_path / "cli.js"
+        a11y_path.write_text("//", encoding="utf-8")
+        output = tmp_path / "out.json"
+
+        mock_run.return_value = mock.Mock(returncode=0, stdout=json.dumps({"pages": []}), stderr="")
+
+        run_a11y(self._args(artifact, a11y_path, output))
+
+        report = output.parent / "report.html"
+        assert report.exists()
+        assert "R.Report" in report.read_text(encoding="utf-8")
+
+    @mock.patch("fabric_ci_cd_dataops.scripts.invoke_pbir_a11y.shutil.which", return_value="node")
     @mock.patch(
         "fabric_ci_cd_dataops.scripts.invoke_pbir_a11y.subprocess.run",
         side_effect=FileNotFoundError,
