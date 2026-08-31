@@ -16,7 +16,12 @@ from pathlib import Path
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts._scan import EXCLUDED_DIR_NAMES, find_artifact_dirs, scan
+from fabric_ci_cd_dataops.scripts._scan import (
+    EXCLUDED_DIR_NAMES,
+    find_artifact_dirs,
+    find_rdl_files,
+    scan,
+)
 from fabric_ci_cd_dataops.scripts.fab_test import RESULTS_ROOT
 
 SUFFIXES = (".SemanticModel", ".Report")
@@ -220,3 +225,73 @@ def test_find_artifact_dirs_still_returns_a_plain_list(tmp_path):
     folder = _artifact(tmp_path, "Sales.SemanticModel")
 
     assert find_artifact_dirs(tmp_path, SUFFIXES) == [folder]
+
+
+# --------------------------------------------------------------------------- #
+# .rdl files (Paginated Report RDL Data Source Resolution epic)
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.fab_test
+def test_find_rdl_files_finds_a_flat_rdl_file(tmp_path):
+    """A paginated report is a flat NAME.rdl file, not a folder with a
+    Fabric type suffix -- scan()'s directory-only walk cannot find it."""
+    rdl = tmp_path / "Invoice RDL.rdl"
+    rdl.write_text("<Report />", encoding="utf-8")
+
+    assert find_rdl_files(tmp_path) == [rdl]
+
+
+@pytest.mark.fab_test
+def test_find_rdl_files_ignores_non_rdl_files(tmp_path):
+    """Only .rdl files count -- a sibling .pbip or README is not an artifact."""
+    (tmp_path / "Invoice RDL.rdl").write_text("<Report />", encoding="utf-8")
+    (tmp_path / "README.md").write_text("notes", encoding="utf-8")
+
+    assert [p.name for p in find_rdl_files(tmp_path)] == ["Invoice RDL.rdl"]
+
+
+@pytest.mark.fab_test
+def test_find_rdl_files_finds_one_at_any_depth(tmp_path):
+    """Matches scan()'s own "at any depth" behavior for directory artifacts."""
+    nested = tmp_path / "deployed" / "reports"
+    nested.mkdir(parents=True)
+    rdl = nested / "Invoice RDL.rdl"
+    rdl.write_text("<Report />", encoding="utf-8")
+
+    assert find_rdl_files(tmp_path) == [rdl]
+
+
+@pytest.mark.fab_test
+def test_find_rdl_files_prunes_excluded_directories(tmp_path):
+    """The same exclusion list scan() uses -- a .venv cannot hold a real artifact."""
+    excluded = tmp_path / ".venv"
+    excluded.mkdir()
+    (excluded / "Vendored.rdl").write_text("<Report />", encoding="utf-8")
+
+    assert find_rdl_files(tmp_path) == []
+
+
+@pytest.mark.fab_test
+def test_find_rdl_files_prunes_a_nested_git_checkout(tmp_path):
+    """A worktree's own copy of an .rdl file is not rediscovered."""
+    checkout = tmp_path / "nested-repo"
+    (checkout / ".git").mkdir(parents=True)
+    (checkout / "Invoice RDL.rdl").write_text("<Report />", encoding="utf-8")
+
+    assert find_rdl_files(tmp_path) == []
+
+
+@pytest.mark.fab_test
+def test_find_rdl_files_honors_excluded_paths(tmp_path):
+    """The run's own output directory is pruned, matching scan()'s contract."""
+    output_dir = tmp_path / "fab-test-results"
+    output_dir.mkdir()
+    (output_dir / "leftover.rdl").write_text("<Report />", encoding="utf-8")
+
+    assert find_rdl_files(tmp_path, excluded_paths=[output_dir]) == []
+
+
+@pytest.mark.fab_test
+def test_find_rdl_files_missing_root_yields_nothing(tmp_path):
+    assert find_rdl_files(tmp_path / "does-not-exist") == []

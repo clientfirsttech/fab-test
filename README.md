@@ -278,16 +278,23 @@ fab-test playwright --artifact "Not Working Visuals" --env dev --pages none --ro
 ### Validating a paginated (RDL) report
 
 A Power BI paginated report has no page/bookmark dimension and doesn't fire the
-interactive embed SDK's render events, so it's tested differently: set
-`PLAYWRIGHT_REPORT_TYPE=paginated` to resolve against Fabric's `PaginatedReport`
-item type (no dataset ID needed), skip page/bookmark/role discovery, and check
-for Power BI's error modal after a fixed wait instead of racing render events.
+interactive embed SDK's render events, so it's tested differently -- but you
+don't need to declare any of that up front. `fab-test playwright` figures out
+which kind of report a target is itself: a local `NAME.rdl` file (a paginated
+report's real local artifact shape -- a flat file, not a folder) is discovered
+alongside `NAME.Report` folders, and `--artifact NAME --env ENV` with no local
+match tries Fabric's `Report` item type first, then `PaginatedReport`, using
+whichever actually matches the name. If the report is bound to a Power BI
+dataset, its dataset ID and workspace are read straight out of the `.rdl`
+file's own `<DataSources>` block, too -- no GUID to look up and supply by hand.
 
 ```bash
-PLAYWRIGHT_REPORT_TYPE=paginated fab-test playwright --artifact "Invoice RDL" --env dev --env-file .env
+fab-test playwright --artifact "Invoice RDL" --env dev --env-file .env
 ```
 
-See [the fab-test skill's playwright flags reference](https://github.com/kerski/fab-test/blob/main/.github/skills/fab-test/references/flags.md) for the full behavior.
+`--report-type {report,paginated}` (or `PLAYWRIGHT_REPORT_TYPE`) forces it
+explicitly, for the rare case you need to -- never required for `--artifact`
+or local discovery. See [the fab-test skill's playwright flags reference](https://github.com/kerski/fab-test/blob/main/.github/skills/fab-test/references/flags.md) for the full behavior.
 
 ### Naming what to test
 

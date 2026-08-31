@@ -36,8 +36,11 @@ TEST_HARD = 900
 # test_complexity_budget.py.
 EXEMPTIONS: dict[str, tuple[int, str]] = {
     "src/fabric_ci_cd_dataops/scripts/fab_test_parser.py": (
-        1004,
+        1016,
         (
+            "2026-08-31: +12 lines adding --report-type to the playwright "
+            "subparser, an explicit override for report-type auto-detection "
+            "(Playwright Report Type Auto-Detection epic). "
             "2026-08-31: +10 lines adding --dataset-workspace-id to the "
             "playwright subparser, for a dataset that lives in a different "
             "workspace than its report -- common practice for a dataset "
@@ -76,8 +79,20 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
         ),
     ),
     "src/fabric_ci_cd_dataops/scripts/fab_test_registry.py": (
-        894,
+        949,
         (
+            "2026-08-31: +28 lines adding _dataset_override_for_command, "
+            "which derives --dataset-id/--dataset-workspace-id from a "
+            "discovered .rdl file's own PBIDATASET data source when neither "
+            "was given explicitly -- the caller should never have to already "
+            "know and supply a GUID fab-test can read out of a file already "
+            "checked into the repository (Paginated Report RDL Data Source "
+            "Resolution epic). "
+            "2026-08-31: +27 lines adding _report_type_for_command, which "
+            "derives --report-type for the subprocess from a discovered "
+            "local folder's own suffix (or an explicit override), so the "
+            "subprocess never has to ask Fabric something the outer CLI "
+            "already knows (Playwright Report Type Auto-Detection epic). "
             "2026-08-31: +3 lines forwarding --dataset-workspace-id to "
             "invoke_playwright.py's subprocess command (Paginated Report "
             "Testing epic, live-verification fix). "
@@ -109,8 +124,18 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
         ),
     ),
     "src/fabric_ci_cd_dataops/scripts/invoke_playwright.py": (
-        882,
+        909,
         (
+            "2026-08-31: +8 lines resolving --dataset-workspace-id through "
+            "resolve_workspace_id, since a value here may be a display name "
+            "-- e.g. a .rdl file's own rd:PowerBIWorkspaceName -- rather "
+            "than a GUID (Paginated Report RDL Data Source Resolution "
+            "epic). "
+            "2026-08-31: +19 lines adding --report-type as an explicit "
+            "auto-detection override and using the resolved report's own "
+            "report_type (never the pre-resolution \"auto\") for the final "
+            "PlaywrightValidationConfig (Playwright Report Type "
+            "Auto-Detection epic). "
             "2026-08-31: +11 lines adding --dataset-workspace-id and "
             "threading it into the service-resolved PlaywrightValidationConfig "
             "(Paginated Report Testing epic, live-verification fix). "

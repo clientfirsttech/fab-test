@@ -133,6 +133,44 @@ def find_artifact_dirs(
     return scan(root, suffixes, excluded_paths=excluded_paths).artifacts
 
 
+def find_rdl_files(
+    root: Path,
+    *,
+    excluded_paths: Iterable[Path] = (),
+) -> list[Path]:
+    """Walk ``root`` once for ``.rdl`` files, pruned the same way `scan` prunes directories.
+
+    A paginated (RDL) report is a flat ``NAME.rdl`` file, not a folder with a
+    Fabric type suffix -- `scan` cannot find it, since it only ever looks at
+    directory names in `os.walk`'s ``dirnames``, never ``filenames``. This
+    mirrors `scan`'s own pruning (nested checkouts, `EXCLUDED_DIR_NAMES`,
+    caller-supplied ``excluded_paths``) rather than walking unfiltered, at
+    the cost of a second small walk alongside a suffix-based one -- files
+    and directories are different enough shapes of "artifact" that forcing
+    them through one walk would obscure both.
+    """
+    root = root.resolve()
+    if not root.is_dir():
+        return []
+    pruned = {path.resolve() for path in excluded_paths}
+    files: list[Path] = []
+
+    for dirpath, dirnames, filenames in os.walk(root):
+        current = Path(dirpath)
+        keep: list[str] = []
+        for name in sorted(dirnames):
+            child = current / name
+            if name in EXCLUDED_DIR_NAMES or child in pruned:
+                continue
+            if _is_nested_checkout(child, root):
+                continue
+            keep.append(name)
+        dirnames[:] = keep
+        files.extend(current / name for name in filenames if name.endswith(".rdl"))
+
+    return sorted(set(files))
+
+
 def find_skipped_checkouts(root: Path) -> list[Path]:
     """The nested git checkouts a scan of ``root`` refuses to walk into.
 

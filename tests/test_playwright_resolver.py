@@ -8,6 +8,7 @@ from typing import Any
 import pytest
 
 from fabric_ci_cd_dataops.scripts.playwright_validation.resolver import (
+    ItemNotFoundError,
     ResolvedItem,
     ResolvedReport,
     ServiceResolutionError,
@@ -320,6 +321,7 @@ def test_resolve_report_paginated_resolves_against_paginated_report_type(
         report_name="Invoice RDL",
         semantic_model_id="",
         environment="dev",
+        report_type="paginated",
     )
 
 
@@ -363,6 +365,90 @@ def test_resolve_report_paginated_leaves_dataset_empty_when_none_bound(
     )
 
     assert report.semantic_model_id == ""
+
+
+def test_resolve_report_auto_finds_an_interactive_report_with_no_type_declared(
+    env_file: Path,
+) -> None:
+    """The default -- no report_type passed at all -- resolves an interactive
+    report without the caller ever declaring its type."""
+    client = FakeClient()
+    client.add_item("ws-dev", "Report", "rpt-1", "Sales Report")
+    client.add_report_dataset("ws-dev", "rpt-1", "sm-1")
+    resolved_env = resolve_environment("dev", env_path=env_file)
+
+    report = resolve_report("Sales Report", resolved_env, client)
+
+    assert report.report_type == "report"
+    assert report.semantic_model_id == "sm-1"
+
+
+def test_resolve_report_auto_falls_back_to_paginated_when_no_report_matches(
+    env_file: Path,
+) -> None:
+    """A name that exists only as a PaginatedReport resolves under auto
+    without the caller declaring report_type="paginated" -- the fix for a
+    caller having to already know something fab-test can ask Fabric itself."""
+    client = FakeClient()
+    client.add_item("ws-dev", "PaginatedReport", "rdl-1", "Invoice RDL")
+    resolved_env = resolve_environment("dev", env_path=env_file)
+
+    report = resolve_report("Invoice RDL", resolved_env, client, report_type="auto")
+
+    assert report.report_type == "paginated"
+    assert report.report_id == "rdl-1"
+
+
+def test_resolve_report_auto_is_the_default_when_report_type_is_omitted(
+    env_file: Path,
+) -> None:
+    """Calling resolve_report with no report_type kwarg at all behaves the
+    same as report_type="auto" -- the caller-facing default."""
+    client = FakeClient()
+    client.add_item("ws-dev", "PaginatedReport", "rdl-1", "Invoice RDL")
+    resolved_env = resolve_environment("dev", env_path=env_file)
+
+    report = resolve_report("Invoice RDL", resolved_env, client)
+
+    assert report.report_type == "paginated"
+
+
+def test_resolve_report_auto_does_not_retry_a_real_ambiguity_under_the_other_type(
+    env_file: Path,
+) -> None:
+    """More than one Report matches is a different, more specific problem
+    than "not found" -- auto must surface it rather than silently trying
+    PaginatedReport next, which would only hide the ambiguity."""
+    client = FakeClient()
+    client.add_item("ws-dev", "Report", "rpt-1", "Sales")
+    client.add_item("ws-dev", "Report", "rpt-2", "Sales")
+    resolved_env = resolve_environment("dev", env_path=env_file)
+
+    with pytest.raises(ServiceResolutionError) as exc_info:
+        resolve_report("Sales", resolved_env, client, report_type="auto")
+    assert "Multiple Report items match" in str(exc_info.value)
+
+
+def test_resolve_report_explicit_type_skips_auto_detection(env_file: Path) -> None:
+    """An explicit report_type is used directly -- no fallback attempted,
+    even if the other type would also have matched."""
+    client = FakeClient()
+    client.add_item("ws-dev", "PaginatedReport", "rdl-1", "Ambiguous Name")
+    resolved_env = resolve_environment("dev", env_path=env_file)
+
+    with pytest.raises(ItemNotFoundError):
+        resolve_report("Ambiguous Name", resolved_env, client, report_type="report")
+
+
+def test_resolve_report_auto_raises_when_neither_type_matches(env_file: Path) -> None:
+    """Neither Report nor PaginatedReport matches: fails with the existing
+    "no match" message, not a confusing type-specific one."""
+    client = FakeClient()
+    resolved_env = resolve_environment("dev", env_path=env_file)
+
+    with pytest.raises(ItemNotFoundError) as exc_info:
+        resolve_report("Nonexistent", resolved_env, client, report_type="auto")
+    assert "No PaginatedReport matching" in str(exc_info.value)
 
 
 def test_resolve_semantic_model_dependents(env_file: Path) -> None:

@@ -34,6 +34,7 @@ from ._playwright_timeout_scaling import (
 from ._playwright_timeout_scaling import run_playwright_with_scaled_timeout
 from ._report_html import resolve_report
 from ._run_manifest import RunManifest
+from ._scan import find_rdl_files as _find_rdl_files
 from ._scan import find_skipped_checkouts as _find_skipped_checkouts
 from ._target import target_from_args
 from .fab_test_registry import (
@@ -494,6 +495,26 @@ def _playwright_remote_target(args: argparse.Namespace) -> Path | None:
     return Path(target.name)
 
 
+def _discover_rdl_files(args: argparse.Namespace, output_dir: Path) -> list[Path]:
+    """Return local ``.rdl`` files matching the current target, if any.
+
+    A paginated report is a flat ``NAME.rdl`` file, not a folder with a
+    Fabric type suffix -- ``discover_artifacts``/`scan` cannot find it, since
+    they only ever match directory names. Narrowed the same way
+    `discover_artifacts` narrows a directory match: a target naming a
+    different type finds nothing, and a target naming a name filters to it.
+    """
+    target = _target_of(args)
+    if target is not None and target.type is not None and target.type != "PaginatedReport":
+        return []
+    files = _find_rdl_files(
+        Path(args.artifact_dir), excluded_paths=[output_dir]
+    )
+    if target is None or target.name is None:
+        return files
+    return [f for f in files if f.stem == target.name]
+
+
 def _discover_for(name: str, args: argparse.Namespace, glob: str) -> list[Path]:
     """Return the artifacts ``name`` will run against.
 
@@ -505,16 +526,20 @@ def _discover_for(name: str, args: argparse.Namespace, glob: str) -> list[Path]:
         return [Path(".")]
     if name == "playwright" and getattr(args, "impact_manifest", None):
         return [Path(".")]
+    output_dir = Path(getattr(args, "output_dir", RESULTS_ROOT))
     discovered = _discover(
-        Path(args.artifact_dir),
-        glob,
-        _target_of(args),
-        output_dir=Path(getattr(args, "output_dir", RESULTS_ROOT)),
+        Path(args.artifact_dir), glob, _target_of(args), output_dir=output_dir
     )
-    if not discovered and name == "playwright":
-        remote = _playwright_remote_target(args)
-        if remote is not None:
-            return [remote]
+    if name == "playwright":
+        # playwright's own registered glob only ever covers *.Report, so a
+        # paginated report -- a flat .rdl file, never discovered by the
+        # directory-suffix scan above -- needs its own lookup or a batch run
+        # (no --artifact) would never find one at all.
+        discovered = discovered + _discover_rdl_files(args, output_dir)
+        if not discovered:
+            remote = _playwright_remote_target(args)
+            if remote is not None:
+                return [remote]
     return discovered
 
 

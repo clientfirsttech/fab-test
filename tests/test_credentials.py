@@ -246,6 +246,7 @@ def test_playwright_config_loader_shares_the_same_default_discovery(
         "PLAYWRIGHT_WORKSPACE_ID=ws-1\n"
         "PLAYWRIGHT_REPORT_ID=rpt-1\n"
         "PLAYWRIGHT_DATASET_ID=ds-1\n"
+        "PLAYWRIGHT_REPORT_TYPE=report\n"
         f"FABRIC_TENANT_ID={_TENANT}\n"
         f"FABRIC_CLIENT_ID={_CLIENT}\n"
         f"FABRIC_CLIENT_SECRET={_SECRET}\n",

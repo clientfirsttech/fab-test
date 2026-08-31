@@ -130,6 +130,7 @@ Playwright validation can run in three modes: static `.env` mode, service-resolv
 | `--workspace-id ID` | Explicit workspace ID override [env: `FABRIC_WORKSPACE_ID`] |
 | `--dataset-id ID` | Explicit dataset / semantic-model ID override |
 | `--dataset-workspace-id ID` | Workspace ID the dataset lives in, when different from the report's own workspace [env: `PLAYWRIGHT_DATASET_WORKSPACE_ID`] |
+| `--report-type {report,paginated}` | Force the report type instead of auto-detecting it [env: `PLAYWRIGHT_REPORT_TYPE`] |
 | `--impact-manifest PATH` | Validate every report listed in the impacted-report manifest once, regardless of local `.Report` artifacts |
 | `--pages {auto,none}` | Discover every report page and its own bookmarks (default: `auto`); `none` tests only the default page |
 | `--roles {auto,none}` | Discover RLS/OLS roles from the semantic model and test the page matrix under each one when RLS is enabled (default: `auto`); `none` tests only `PLAYWRIGHT_ROLE` |
@@ -217,69 +218,108 @@ field), and `--output-path`'s `envelope.json` -- what `output_path` in
 link, so nothing beyond reading that one file is needed to reach either.
 
 **Paginated (RDL) reports are validated with a different check than interactive
-reports.** Set `PLAYWRIGHT_REPORT_TYPE=paginated` (default `report`) to switch
-targets. A paginated report is resolved against Fabric item type
-`PaginatedReport` instead of `Report`. Page/bookmark/role discovery is skipped
-entirely (RDL reports have neither dimension), and exactly one test case is
-generated, with no `page_name`/`bookmark_name` and a `report_link` that stays
-`{}` (RDL reports use a different URL shape in the Fabric portal, not yet
-linked). The embed configuration itself carries no `pageName`/`bookmark` key
-at all, rather than empty values that would mimic a real page or bookmark.
-Because a paginated report never fires the interactive embed SDK's
-`rendered`/`error` events, the pytest spec does not race them for this case:
-it embeds, waits `PLAYWRIGHT_RENDER_WAIT_SECONDS` (default `20`; also settable
-per case via `render_wait_seconds` if you generate test cases yourself), lets
-in-flight network activity settle (`networkidle`, bounded to 5s, best-effort),
-and then scans the page and every iframe for Power BI's own `ms-Dialog-content`
+reports, and fab-test determines which kind a target is itself.** You never
+need to declare `--report-type`/`PLAYWRIGHT_REPORT_TYPE` up front:
+
+- A local `NAME.Report`/`NAME.PaginatedReport` folder's own suffix tells the
+  per-artifact subprocess its type directly -- a batch run with no `--artifact`
+  discovers and correctly validates both kinds in the same repository, and a
+  local `.PaginatedReport` folder (which previously wasn't discoverable at
+  all) is found alongside `.Report` folders.
+- `--artifact NAME --env ENV` with no matching local folder resolves the type
+  live: `resolve_report` tries Fabric item type `Report` first, then
+  `PaginatedReport`, and uses whichever actually matches the name.
+- `--report-type {report,paginated}` (or `PLAYWRIGHT_REPORT_TYPE`) is an
+  explicit override for the rare case you want to force it, mirroring
+  `--dataset-id`'s override pattern -- never required for either path above.
+  A single global value could never correctly describe a workspace with both
+  report types in it, which is exactly why detection, not declaration, is the
+  default. Static `.env`-only mode (workspace/report/dataset IDs supplied
+  directly, no artifact name at all) is the one exception that still requires
+  it -- there's no name to detect a type from there.
+
+A paginated report is resolved against Fabric item type `PaginatedReport`
+instead of `Report`. Page/bookmark/role discovery is skipped entirely (RDL
+reports have neither dimension), and exactly one test case is generated, with
+no `page_name`/`bookmark_name` and a `report_link` that stays `{}` (RDL
+reports use a different URL shape in the Fabric portal, not yet linked). The
+embed configuration itself carries no `pageName`/`bookmark` key at all, rather
+than empty values that would mimic a real page or bookmark. Because a
+paginated report never fires the interactive embed SDK's `rendered`/`error`
+events, the pytest spec does not race them for this case: it embeds, waits
+`PLAYWRIGHT_RENDER_WAIT_SECONDS` (default `20`; also settable per case via
+`render_wait_seconds` if you generate test cases yourself), lets in-flight
+network activity settle (`networkidle`, bounded to 5s, best-effort), and then
+scans the page and every iframe for Power BI's own `ms-Dialog-content`
 error-modal marker -- found means the case fails, absent means it passes.
 Evidence (screenshot, console, network) is captured the same way as an
 interactive-report failure either way.
 
 ```bash
-PLAYWRIGHT_REPORT_TYPE=paginated fab-test playwright --artifact "Invoice RDL" --env dev --env-file .env
+# Auto-detected -- no PLAYWRIGHT_REPORT_TYPE needed
+fab-test playwright --artifact "Invoice RDL" --env dev --env-file .env
+
+# Forced explicitly, if you ever need to
+fab-test playwright --artifact "Invoice RDL" --env dev --report-type paginated
 ```
 
-**A paginated report's embed token payload is deliberately different from an
-interactive report's, and needs a dataset ID more often than not.** `resolve_report`
-looks up a bound dataset the same way for either report type (Power BI's
-`GET /reports/{id}` metadata endpoint), but that lookup commonly comes back
-empty for an RDL report even when it queries one or more Power BI datasets as
-data sources -- confirmed live against real RDL reports. When that happens,
-`GenerateToken` itself rejects the request with `"At least one dataset is
-required"`, so pass the dataset explicitly with `--dataset-id`/`PLAYWRIGHT_DATASET_ID`.
-When that dataset lives in a *different* workspace than the report -- common
-practice for a dataset shared across several reports -- also pass
-`--dataset-workspace-id`/`PLAYWRIGHT_DATASET_WORKSPACE_ID`; naming only the
-report's workspace produces a misleading `"Cannot connect to dataset ... because
-XMLA permissions are off"` 400 that has nothing to do with any XMLA setting
-(confirmed live: the identical error persisted across several payload shapes
-until the dataset's actual workspace was named). Once named, a paginated
-report's `GenerateToken` payload is otherwise minimal -- `reports`/`datasets`
-only, no `targetWorkspaces`/`accessLevel` -- matching a validated reference
-implementation exactly; an interactive report's payload is unchanged (it keeps
-`targetWorkspaces`/`accessLevel`, and gains the same cross-workspace
-`--dataset-workspace-id` support).
+**A paginated report bound to a Power BI dataset resolves that binding
+automatically -- from the report's own local `.rdl` file, when one exists.**
+Power BI's `GET /reports/{id}` metadata lookup that resolves an interactive
+report's dataset commonly comes back empty for an RDL report even when it
+queries one or more Power BI datasets as data sources (confirmed live), so
+`fab-test` reads a local `NAME.rdl` file's own `<DataSources>` block instead:
+a `PBIDATASET` data source's `ConnectString` embeds the dataset's own GUID
+(`Initial Catalog=sobe_wowvirtualserver-<GUID>`) and `rd:PowerBIWorkspaceName`
+names the workspace it lives in, which commonly differs from the report's own
+workspace -- a shared dataset commonly does. Nothing needs supplying by hand
+for a report checked in this way; `--dataset-id`/`PLAYWRIGHT_DATASET_ID` and
+`--dataset-workspace-id`/`PLAYWRIGHT_DATASET_WORKSPACE_ID` remain available as
+explicit overrides (a display name there resolves the same way
+`WORKSPACE.Workspace/NAME.Type` targets resolve a workspace name), for a
+purely-remote report with nothing checked in locally.
+
+A paginated report's `GenerateToken` payload is otherwise minimal --
+`reports`/`datasets` only, no `targetWorkspaces`/`accessLevel` -- matching a
+validated reference implementation, but its dataset entry carries one field
+an interactive report's never does: `xmlaPermissions: "ReadOnly"`. Without it,
+`GenerateToken` itself succeeds but the resulting token cannot connect to the
+dataset, and embedding fails with `"Cannot connect to dataset ... because XMLA
+permissions are off"` -- a genuinely misleading message: it has nothing to do
+with any workspace, tenant, or capacity-tier XMLA setting (all changed and
+tested live, no effect); only this one field, confirmed live and matching
+[Microsoft's own paginated-report embedding
+documentation](https://learn.microsoft.com/en-us/power-bi/developer/embedded/embed-paginated-reports),
+clears it. An interactive report's dataset entry is unaffected.
 
 ```bash
-PLAYWRIGHT_REPORT_TYPE=paginated fab-test playwright --artifact "Invoice RDL" --env dev \
+# A checked-in .rdl file resolves both the dataset and its workspace on its own
+fab-test playwright --artifact "Invoice RDL" --env dev
+
+# Forced explicitly, for a report with nothing checked in locally
+fab-test playwright --artifact "Invoice RDL" --env dev \
   --dataset-id 4c353b5c-d311-4e90-b9d1-5766b87f59dc \
-  --dataset-workspace-id c4698d28-b05c-40bc-926c-707563ac85e7
+  --dataset-workspace-id visual-error-testing
 ```
 
-**`--artifact NAME --env ENV` now resolves live even with no matching local
-folder.** Previously `fab-test playwright --artifact NAME --env ENV` silently
-required a local folder named `NAME.Report` under `--artifact-dir` to exist --
-the folder was never read for playwright (it validates the *deployed* report,
-never local file content), but discovery still needed one to find before
-dispatching. That made a purely-remote report -- any paginated (RDL) report,
-since this project's `.fabric/artifacts/` tree only ever holds PBIR-format
-interactive reports checked in from Desktop -- undiscoverable through the real
-CLI, previously working only by coincidence when a same-named local folder
-happened to exist. `fab-test playwright` now falls back to resolving the named
-target live whenever local discovery finds nothing and an environment was
-given; a real filesystem path (`./src/Sales.Report`) is unaffected -- naming a
-specific location and finding nothing there is still a real miss, not a
-service-resolution signal.
+**A paginated report is a flat `NAME.rdl` file, discovered the same way
+`NAME.Report` folders are.** `fab-test playwright` with no `--artifact` scans
+for both, so a repository with a mix of interactive and paginated reports
+validates all of them in one batch run, and each subprocess is told its type
+directly from the file/folder actually found -- never a global setting, which
+could never correctly describe a repository containing both.
+
+**`--artifact NAME --env ENV` also resolves live even with no matching local
+file at all.** The local file/folder is never read for playwright's own
+validation (it validates the *deployed* report, never local content) --
+discovery only used it to find something to dispatch against, so a purely
+remote report with nothing checked in locally used to be silently
+undiscoverable through the real CLI (previously working only by coincidence
+when a same-named local folder happened to exist). `fab-test playwright` now
+falls back to resolving the named target live whenever local discovery finds
+nothing and an environment was given; a real filesystem path
+(`./src/Sales.Report`) is unaffected -- naming a specific location and finding
+nothing there is still a real miss, not a service-resolution signal.
 
 **A render timeout or a broken visual names the real cause, not just a bare
 timeout.** The spec races `rendered` against `error` by listening on

@@ -105,3 +105,30 @@ def test_discover_for_stays_empty_with_no_environment(tmp_path, environment) -> 
     args = _args(artifact="Invoice RDL", environment=environment, artifact_dir=str(tmp_path))
     artifacts = _discover_for("playwright", args, "*.Report")
     assert artifacts == []
+
+
+def test_discover_for_finds_a_local_rdl_file(tmp_path) -> None:
+    """A flat NAME.rdl file -- a paginated report's real local artifact
+    shape -- is discoverable by a batch run (no --artifact): playwright's
+    own registered glob only covers *.Report folders, so this needs its
+    own lookup rather than depending on it."""
+    rdl = tmp_path / "Invoice RDL.rdl"
+    rdl.write_text("<Report />", encoding="utf-8")
+    args = _args(environment="dev", artifact_dir=str(tmp_path))
+    artifacts = _discover_for("playwright", args, "*.Report")
+    assert artifacts == [rdl]
+
+
+def test_discover_for_finds_both_report_types_in_one_batch_run(tmp_path) -> None:
+    """A repository with both an interactive and a paginated report
+    discovers both -- the actual scenario a single global
+    PLAYWRIGHT_REPORT_TYPE could never describe correctly."""
+    (tmp_path / "SalesReport.Report").mkdir()
+    rdl = tmp_path / "Invoice RDL.rdl"
+    rdl.write_text("<Report />", encoding="utf-8")
+    args = _args(environment="dev", artifact_dir=str(tmp_path))
+    artifacts = _discover_for("playwright", args, "*.Report")
+    assert set(artifacts) == {
+        tmp_path / "SalesReport.Report",
+        rdl,
+    }

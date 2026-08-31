@@ -33,6 +33,7 @@ from ._report_html import resolve_report
 from ._rule_overlay import apply_overlay, apply_pbir_overlay
 from ._scan import find_artifact_dirs
 from ._target import ResolvedTarget
+from .playwright_validation.rdl_datasource import parse_rdl_power_bi_datasource
 
 # Shares _metadata.default_repo_root with fab_test.py, so the two cannot
 # disagree about what the repository is. This comment used to claim the reuse
@@ -539,6 +540,58 @@ def playwright_test_cases_dir(output_dir: Path, artifact: Path) -> Path:
     return output_dir / "playwright" / artifact.stem / "test-cases"
 
 
+_LOCAL_SUFFIX_TO_REPORT_TYPE = {
+    ".Report": "report",
+    # A paginated report is a flat NAME.rdl file, not a folder with a
+    # PaginatedReport suffix -- that convention doesn't exist in practice
+    # (Paginated Report RDL Data Source Resolution epic).
+    ".rdl": "paginated",
+}
+
+
+def _report_type_for_command(artifact: Path, args: argparse.Namespace) -> str:
+    """Return the report type to force on the subprocess, or "" to let it
+    auto-detect.
+
+    An explicit ``--report-type`` always wins. Otherwise, a real local
+    folder's own suffix names its type definitively -- no need to make the
+    subprocess ask Fabric something the outer CLI already knows just by
+    having found the folder. A synthetic remote target (no local folder
+    matched; see ``_playwright_remote_target``) has no such suffix, so it
+    is left for the subprocess to auto-detect, exactly like a bare
+    ``--artifact NAME`` always has.
+    """
+    explicit = getattr(args, "report_type", "") or ""
+    if explicit:
+        return explicit
+    return _LOCAL_SUFFIX_TO_REPORT_TYPE.get(artifact.suffix, "")
+
+
+def _dataset_override_for_command(
+    artifact: Path, args: argparse.Namespace
+) -> tuple[str, str]:
+    """Return ``(dataset_id, dataset_workspace_id)`` to force on the
+    subprocess, or ``("", "")`` for either half to let it resolve normally.
+
+    Explicit ``--dataset-id``/``--dataset-workspace-id`` always win. Otherwise,
+    a discovered ``.rdl`` file's own ``PBIDATASET`` data source already names
+    the dataset it queries and the workspace that dataset lives in -- the
+    caller should never have to already know and supply a GUID fab-test can
+    read directly out of a file already checked into the repository. The
+    workspace half is passed through as whatever the ``.rdl`` file recorded
+    (a display name, not necessarily a GUID); ``--dataset-workspace-id``
+    already resolves either transparently on the subprocess side.
+    """
+    dataset_id = getattr(args, "dataset_id", "") or ""
+    dataset_workspace_id = getattr(args, "dataset_workspace_id", "") or ""
+    if dataset_id or dataset_workspace_id or artifact.suffix != ".rdl":
+        return dataset_id, dataset_workspace_id
+    parsed = parse_rdl_power_bi_datasource(artifact)
+    if parsed is None:
+        return "", ""
+    return parsed.dataset_id, parsed.workspace_name
+
+
 def build_playwright_command(
     artifact: Path,
     args: argparse.Namespace,
@@ -573,12 +626,14 @@ def build_playwright_command(
     impact_manifest = getattr(args, "impact_manifest", None)
     if impact_manifest:
         cmd += ["--impact-manifest", str(impact_manifest)]
-    dataset_id = getattr(args, "dataset_id", "")
+    dataset_id, dataset_workspace_id = _dataset_override_for_command(artifact, args)
     if dataset_id:
         cmd += ["--dataset-id", dataset_id]
-    dataset_workspace_id = getattr(args, "dataset_workspace_id", "")
     if dataset_workspace_id:
         cmd += ["--dataset-workspace-id", dataset_workspace_id]
+    report_type = _report_type_for_command(artifact, args)
+    if report_type:
+        cmd += ["--report-type", report_type]
     pages = getattr(args, "pages", "auto")
     if pages != "auto":
         cmd += ["--pages", pages]
