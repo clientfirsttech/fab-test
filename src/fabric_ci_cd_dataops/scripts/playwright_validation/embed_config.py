@@ -19,10 +19,24 @@ class EmbedConfig:
     viewMode: int
     pageName: str
     bookmark: dict[str, str] | None
+    report_type: str = "report"
 
     def to_dict(self) -> dict[str, Any]:
-        """Return the embed configuration as a dictionary."""
-        return asdict(self)
+        """Return the embed configuration as a dictionary.
+
+        ``report_type`` is bookkeeping for this builder, not something the
+        JavaScript embed client understands, so it never reaches the
+        returned dict. A paginated report also drops ``pageName``/
+        ``bookmark`` entirely -- RDL reports have neither dimension, and
+        passing empty-string/None values would mimic a real page or
+        bookmark rather than the absence of one.
+        """
+        data = asdict(self)
+        data.pop("report_type", None)
+        if self.report_type == "paginated":
+            data.pop("pageName", None)
+            data.pop("bookmark", None)
+        return data
 
 
 # Numeric values align with the powerbi-client enum constants used by the CDN build
@@ -43,6 +57,7 @@ def build_embed_config(
     embed_token: str,
     page_id: str = "",
     bookmark_id: str = "",
+    report_type: str = "report",
 ) -> EmbedConfig:
     """Create an embed configuration for a report/page/bookmark combination."""
     bookmark = {"name": bookmark_id} if bookmark_id else None
@@ -56,4 +71,5 @@ def build_embed_config(
         viewMode=_VIEW_MODE_VIEW,
         pageName=page_id,
         bookmark=bookmark,
+        report_type=report_type,
     )

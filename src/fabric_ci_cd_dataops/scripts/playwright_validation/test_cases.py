@@ -45,6 +45,7 @@ class TestCase:
     user_name: str
     role: str
     report_type: str = "report"
+    render_wait_seconds: int = 20
 
 
 def _default_page() -> tuple[str, str]:
@@ -116,6 +117,35 @@ def _build_case(
         user_name=config.user_name,
         role=role,
         report_type=getattr(config, "report_type", "report"),
+        render_wait_seconds=getattr(config, "render_wait_seconds", 20),
+    )
+
+
+def _build_paginated_case(config: PlaywrightValidationConfig) -> TestCase:
+    """Build the single case a paginated report generates.
+
+    A paginated (RDL) report has no page/bookmark dimension, so unlike
+    ``_build_case`` this never encodes ``"default-page"``/``"no-bookmark"``
+    placeholders that only make sense for that matrix.
+    """
+    role = config.role
+    test_case = "_".join(
+        part for part in [config.report_name, f"role-{role}" if role else ""] if part
+    )
+    return TestCase(
+        test_case=test_case,
+        report_name=config.report_name,
+        report_id=config.report_id,
+        workspace_id=config.workspace_id,
+        page_id="",
+        page_name="",
+        bookmark_id="",
+        bookmark_name="",
+        dataset_id=config.dataset_id,
+        user_name=config.user_name,
+        role=role,
+        report_type="paginated",
+        render_wait_seconds=getattr(config, "render_wait_seconds", 20),
     )
 
 
@@ -199,8 +229,12 @@ def generate_test_cases(
     configured role -- the legacy shape, still used for an explicit
     ``--page-ids``/``--bookmark-ids`` override. With ``pages`` (a discovered
     matrix), each page's own bookmarks are used instead of every bookmark in
-    the report, and the whole matrix repeats once per entry in ``roles``.
+    the report, and the whole matrix repeats once per entry in ``roles``. A
+    paginated report always emits exactly one case regardless of
+    ``pages``/``roles`` -- RDL reports have no page/bookmark matrix to expand.
     """
+    if getattr(config, "report_type", "report") == "paginated":
+        return [_build_paginated_case(config)]
     if pages is not None:
         return _generate_discovered_cases(config, pages, roles or [config.role])
     return _generate_cartesian_cases(config)
@@ -238,6 +272,7 @@ def write_test_cases(
         "user_name",
         "role",
         "report_type",
+        "render_wait_seconds",
     ]
 
     with open(csv_path, "w", newline="", encoding="utf-8") as fh:

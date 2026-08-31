@@ -290,6 +290,20 @@ PLAYWRIGHT_WORKSPACE_ID=
 PLAYWRIGHT_REPORT_ID=
 PLAYWRIGHT_REPORT_NAME=
 PLAYWRIGHT_DATASET_ID=
+
+# Set to "paginated" to validate a Power BI paginated (RDL) report instead of
+# an interactive one -- skips page/bookmark/role discovery and checks for an
+# error modal after a fixed wait rather than racing render events. A
+# paginated report's dataset is often not auto-discoverable; set
+# PLAYWRIGHT_DATASET_ID above if resolution reports "At least one dataset is
+# required". Leave unset for interactive reports (default: report).
+# PLAYWRIGHT_REPORT_TYPE=paginated
+# PLAYWRIGHT_RENDER_WAIT_SECONDS=20
+
+# Only needed when a report's dataset lives in a different workspace than the
+# report itself -- common practice for a dataset shared across several
+# reports. Leave unset when the dataset is in the report's own workspace.
+# PLAYWRIGHT_DATASET_WORKSPACE_ID=
 """
 
 _FAB_TEST_GITIGNORE_TEMPLATE = """\

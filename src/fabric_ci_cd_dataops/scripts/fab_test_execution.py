@@ -467,6 +467,33 @@ def _resolve_workspace_target(args: argparse.Namespace) -> int | None:
 _target_of = target_from_args
 
 
+def _playwright_remote_target(args: argparse.Namespace) -> Path | None:
+    """A playwright target named explicitly, with an environment to resolve it
+    against, but no matching local folder.
+
+    Playwright never reads report content from disk for either report type --
+    the local folder under ``--artifact-dir`` is purely a naming anchor for
+    the "discover everything" batch case. A caller who named a specific
+    report (``--artifact NAME`` or ``WORKSPACE.Workspace/NAME.Type``) and an
+    environment has stated an intent to resolve it live via ``resolve_report``,
+    which a paginated (RDL) report especially needs: this repo's
+    ``.fabric/artifacts/`` tree only ever holds PBIR-format interactive
+    reports, so an RDL report can never have a local folder to be found by at
+    all. A real filesystem path (``./src/Sales.Report``) is left alone --
+    naming a specific location and finding nothing there is a real miss, not
+    a signal to resolve remotely.
+    """
+    target = _target_of(args)
+    if target is None or target.scope not in ("path", "workspace"):
+        return None
+    if target.scope == "path" and target.path is not None:
+        return None
+    environment = getattr(args, "environment", "") or os.getenv("FABRIC_ENVIRONMENT", "")
+    if not environment:
+        return None
+    return Path(target.name)
+
+
 def _discover_for(name: str, args: argparse.Namespace, glob: str) -> list[Path]:
     """Return the artifacts ``name`` will run against.
 
@@ -478,12 +505,17 @@ def _discover_for(name: str, args: argparse.Namespace, glob: str) -> list[Path]:
         return [Path(".")]
     if name == "playwright" and getattr(args, "impact_manifest", None):
         return [Path(".")]
-    return _discover(
+    discovered = _discover(
         Path(args.artifact_dir),
         glob,
         _target_of(args),
         output_dir=Path(getattr(args, "output_dir", RESULTS_ROOT)),
     )
+    if not discovered and name == "playwright":
+        remote = _playwright_remote_target(args)
+        if remote is not None:
+            return [remote]
+    return discovered
 
 
 def _report_no_artifacts(

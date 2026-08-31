@@ -576,6 +576,9 @@ def build_playwright_command(
     dataset_id = getattr(args, "dataset_id", "")
     if dataset_id:
         cmd += ["--dataset-id", dataset_id]
+    dataset_workspace_id = getattr(args, "dataset_workspace_id", "")
+    if dataset_workspace_id:
+        cmd += ["--dataset-workspace-id", dataset_workspace_id]
     pages = getattr(args, "pages", "auto")
     if pages != "auto":
         cmd += ["--pages", pages]

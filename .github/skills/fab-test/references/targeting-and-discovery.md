@@ -57,7 +57,9 @@ exists.
 
 **Where the suffixes come from.** `artifact-map.json`, resolved via the metadata
 layers (`.fab-test/metadata/` > `.github/metadata/` > packaged with the
-distribution), maps nine suffixes to Fabric types. The packaged copy is the
+distribution), maps ten suffixes to Fabric types (`PaginatedReport` added
+alongside `Report` for the Paginated Report Testing epic, so
+`WORKSPACE.Workspace/NAME.PaginatedReport` parses). The packaged copy is the
 fallback so an install from PyPI or a run outside a checkout behaves
 identically; a malformed map takes the same path as a missing one and warns.
 Adding a type means editing the map, not the code.
@@ -95,7 +97,7 @@ nothing was pruned, so `skipped_checkouts: []` with an empty `artifacts`
 means the root genuinely holds no artifacts — that is the distinction the
 key exists to make.
 
-**Unhandled types.** All nine types parse, so a target can name one no
+**Unhandled types.** All ten types parse, so a target can name one no
 analyzer reads. `fab-test bpa Sales.Notebook` exits `2` with
 `bpa reads SemanticModel artifacts; 'Sales.Notebook' is a Notebook, which no
 fab-test analyzer reads`; where another analyzer does read that type it is

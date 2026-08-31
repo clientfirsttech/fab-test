@@ -110,7 +110,14 @@ def resolve_discovery(
     it is a statement about what to test, not a filter over what was found.
     Role discovery only runs when RLS is in play (``config.use_rls``); with
     no roles requested there is nothing a role matrix would add.
+
+    A paginated report has neither dimension -- RDL reports have no
+    page/bookmark matrix -- so both are skipped outright rather than
+    discovering an empty result the hard way.
     """
+    if config.report_type == "paginated":
+        return None, None
+
     discover_pages = not (config.page_ids or config.bookmark_ids) and getattr(
         args, "pages", "auto"
     ) != "none"
@@ -176,5 +183,6 @@ def acquire_embed_configs(
             report_id=embed_context.report_id,
             embed_url=embed_context.embed_url,
             embed_token=embed_context.embed_token,
+            report_type=config.report_type,
         ).to_dict()
     return embed_configs

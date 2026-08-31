@@ -152,6 +152,92 @@ def test_load_config_not_required_allows_missing() -> None:
     assert config.client_secret == ""
 
 
+def test_load_config_defaults_report_type_and_render_wait(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """PLAYWRIGHT_REPORT_TYPE unset keeps resolving as an interactive report."""
+    env_path = tmp_path / ".env"
+    env_path.write_text(
+        "\n".join(
+            [
+                "PLAYWRIGHT_WORKSPACE_ID=ws-1",
+                "PLAYWRIGHT_REPORT_ID=rpt-1",
+                "PLAYWRIGHT_DATASET_ID=ds-1",
+                "FABRIC_CLIENT_ID=client-1",
+                "FABRIC_CLIENT_SECRET=secret-1",
+                "FABRIC_TENANT_ID=tenant-1",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.delenv("PLAYWRIGHT_REPORT_TYPE", raising=False)
+    monkeypatch.delenv("PLAYWRIGHT_RENDER_WAIT_SECONDS", raising=False)
+
+    config = load_config(env_path)
+
+    assert config.report_type == "report"
+    assert config.render_wait_seconds == 20
+
+
+def test_load_config_reads_report_type_and_render_wait_seconds(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """PLAYWRIGHT_REPORT_TYPE=paginated and PLAYWRIGHT_RENDER_WAIT_SECONDS load."""
+    env_path = tmp_path / ".env"
+    env_path.write_text(
+        "\n".join(
+            [
+                "PLAYWRIGHT_WORKSPACE_ID=ws-1",
+                "PLAYWRIGHT_REPORT_ID=rpt-1",
+                "FABRIC_CLIENT_ID=client-1",
+                "FABRIC_CLIENT_SECRET=secret-1",
+                "FABRIC_TENANT_ID=tenant-1",
+                "PLAYWRIGHT_REPORT_TYPE=paginated",
+                "PLAYWRIGHT_RENDER_WAIT_SECONDS=15",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    config = load_config(env_path)
+
+    assert config.report_type == "paginated"
+    assert config.render_wait_seconds == 15
+
+
+def test_load_config_paginated_does_not_require_dataset_id(
+    tmp_path: Path,
+) -> None:
+    """A paginated report has no bound semantic model, so no dataset_id is required."""
+    env_path = tmp_path / ".env"
+    env_path.write_text(
+        "\n".join(
+            [
+                "PLAYWRIGHT_WORKSPACE_ID=ws-1",
+                "PLAYWRIGHT_REPORT_ID=rpt-1",
+                "FABRIC_CLIENT_ID=client-1",
+                "FABRIC_CLIENT_SECRET=secret-1",
+                "FABRIC_TENANT_ID=tenant-1",
+                "PLAYWRIGHT_REPORT_TYPE=paginated",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    config = load_config(env_path)  # required=True by default; must not raise
+
+    assert config.dataset_id == ""
+
+
+def test_load_config_missing_dataset_id_still_required_for_interactive_report() -> None:
+    """An interactive report (the default) still requires a dataset_id."""
+    with pytest.raises(ValueError) as exc_info:
+        load_config(Path("/nonexistent/.env"))
+    assert "PLAYWRIGHT_DATASET_ID" in str(exc_info.value)
+
+
 # --------------------------------------------------------------------------- #
 # Auto-discovering .env at the repository root (Config Consolidation §8)
 # --------------------------------------------------------------------------- #
