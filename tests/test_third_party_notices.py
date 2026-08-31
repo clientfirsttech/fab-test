@@ -6,6 +6,7 @@ tests/test_pql_test_pin_consistency.py for the pql-test pin.
 """
 
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -13,6 +14,7 @@ import pytest
 _ROOT = Path(__file__).resolve().parent.parent
 _THIRD_PARTY = _ROOT / "THIRD-PARTY.md"
 _ANALYZERS_JSON = _ROOT / "src" / "fabric_ci_cd_dataops" / "metadata" / "analyzers.json"
+_PYPROJECT = _ROOT / "pyproject.toml"
 
 # (registry key, expected substring naming the tool in THIRD-PARTY.md)
 _WRAPPED_TOOLS = (
@@ -20,6 +22,11 @@ _WRAPPED_TOOLS = (
     ("pbir_inspector", "fab-inspector"),
     ("pbir_a11y", "pbir-a11y"),
 )
+
+# Pinned pip dependencies whose license is not a short permissive one --
+# each needs a row and a dedicated section here, the same as a tool_install
+# analyzer, even though pip installs it rather than the tool bootstrap.
+_NON_PERMISSIVE_PIP_DEPENDENCIES = ("pql-test",)
 
 
 @pytest.mark.fab_test
@@ -44,12 +51,40 @@ def test_every_tool_install_analyzer_is_named_in_third_party_md():
 
 
 @pytest.mark.fab_test
+def test_every_non_permissive_pip_dependency_is_named_in_third_party_md():
+    """pql-test isn't a `tool_install`-bootstrapped analyzer -- it's a
+    regular pinned pip dependency in pyproject.toml -- so the tool_install
+    scan above can't see it. It still needs a row here since it ships to
+    every installer, unlike the on-demand-downloaded tools."""
+    text = _THIRD_PARTY.read_text(encoding="utf-8")
+    pyproject = _PYPROJECT.read_text(encoding="utf-8")
+
+    missing = [
+        name
+        for name in _NON_PERMISSIVE_PIP_DEPENDENCIES
+        if re.search(rf'"{re.escape(name)}==', pyproject) and name not in text
+    ]
+    assert missing == [], f"THIRD-PARTY.md does not name pinned dependency: {missing}"
+
+
+@pytest.mark.fab_test
+def test_pql_test_license_states_its_key_terms_as_written():
+    """Business Source License 1.1 terms must be stated as written (name,
+    Additional Use Grant, Change Date/License) -- no interpretation of what
+    they permit, which is a legal question for the license text itself."""
+    text = _THIRD_PARTY.read_text(encoding="utf-8")
+    assert "Business Source License" in text or "BUSL" in text
+    assert "Additional Use Grant" in text
+    assert "Change Date" in text
+
+
+@pytest.mark.fab_test
 def test_pbir_a11y_license_is_named_as_source_available_not_permissive():
     """PolyForm Shield is the one non-permissive license here; it must read
     as such, not blend in with the two MIT entries next to it."""
     text = _THIRD_PARTY.read_text(encoding="utf-8")
     assert "PolyForm Shield" in text
-    assert "non-compete" in text or "source-available" in text.lower()
+    assert "source-available" in text.lower()
 
 
 @pytest.mark.fab_test
