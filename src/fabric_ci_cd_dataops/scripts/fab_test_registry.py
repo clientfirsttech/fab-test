@@ -33,7 +33,10 @@ from ._report_html import resolve_report
 from ._rule_overlay import apply_overlay, apply_pbir_overlay
 from ._scan import find_artifact_dirs
 from ._target import ResolvedTarget
-from .playwright_validation.rdl_datasource import parse_rdl_power_bi_datasource
+from .playwright_validation.rdl_datasource import (
+    parse_rdl_power_bi_datasource,
+    parse_rdl_report_parameters,
+)
 
 # Shares _metadata.default_repo_root with fab_test.py, so the two cannot
 # disagree about what the repository is. This comment used to claim the reuse
@@ -592,6 +595,28 @@ def _dataset_override_for_command(
     return parsed.dataset_id, parsed.workspace_name
 
 
+def _report_parameters_for_command(artifact: Path, args: argparse.Namespace) -> str:
+    """Return the JSON-encoded report parameters to force on the subprocess,
+    or "" when there is nothing to derive.
+
+    Only a local ``.rdl`` file has a ``<ReportParameters>`` block to read --
+    a report resolved remotely by name has no local file, and its parameters
+    (if any) are left for the subprocess to discover on its own some other
+    way, exactly like dataset/workspace overrides above.
+    """
+    if getattr(args, "report_parameters", "") or artifact.suffix != ".rdl":
+        return getattr(args, "report_parameters", "") or ""
+    parameters = parse_rdl_report_parameters(artifact)
+    if not parameters:
+        return ""
+    return json.dumps(
+        [
+            {"name": parameter.name, "multi_value": parameter.multi_value}
+            for parameter in parameters
+        ]
+    )
+
+
 def build_playwright_command(
     artifact: Path,
     args: argparse.Namespace,
@@ -634,6 +659,9 @@ def build_playwright_command(
     report_type = _report_type_for_command(artifact, args)
     if report_type:
         cmd += ["--report-type", report_type]
+    report_parameters = _report_parameters_for_command(artifact, args)
+    if report_parameters:
+        cmd += ["--report-parameters", report_parameters]
     pages = getattr(args, "pages", "auto")
     if pages != "auto":
         cmd += ["--pages", pages]

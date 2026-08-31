@@ -36,8 +36,13 @@ TEST_HARD = 900
 # test_complexity_budget.py.
 EXEMPTIONS: dict[str, tuple[int, str]] = {
     "src/fabric_ci_cd_dataops/scripts/fab_test_parser.py": (
-        1016,
+        1039,
         (
+            "2026-08-31: +12 lines adding --report-parameters to the "
+            "playwright subparser, an internal override for the JSON list "
+            "of report parameters otherwise derived from a local .rdl "
+            "file's own <ReportParameters> block (Paginated Report "
+            "Parameter Testing epic). "
             "2026-08-31: +12 lines adding --report-type to the playwright "
             "subparser, an explicit override for report-type auto-detection "
             "(Playwright Report Type Auto-Detection epic). "
@@ -67,7 +72,10 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
             "2026-08-30: +40 lines adding _add_skill_subparser (`fab-test "
             "skill --install/--show/--uninstall/--dry-run/--force`, fab-test "
             "Skill Distribution epic) -- one more subcommand builder, same "
-            "shape as every other one already here."
+            "shape as every other one already here. "
+            "2026-08-31: +11 lines adding --open-report to the shared "
+            "common-flags block, alongside --report/--no-report (Open "
+            "Report Flag epic, Task 1)."
         ),
     ),
     "src/fabric_ci_cd_dataops/scripts/fab_test_summary.py": (
@@ -79,8 +87,13 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
         ),
     ),
     "src/fabric_ci_cd_dataops/scripts/fab_test_registry.py": (
-        949,
+        977,
         (
+            "2026-08-31: +28 lines adding _report_parameters_for_command, "
+            "which derives --report-parameters from a discovered .rdl "
+            "file's own <ReportParameters> block when not given explicitly "
+            "-- mirrors _dataset_override_for_command's shape (Paginated "
+            "Report Parameter Testing epic). "
             "2026-08-31: +28 lines adding _dataset_override_for_command, "
             "which derives --dataset-id/--dataset-workspace-id from a "
             "discovered .rdl file's own PBIDATASET data source when neither "
@@ -124,8 +137,13 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
         ),
     ),
     "src/fabric_ci_cd_dataops/scripts/invoke_playwright.py": (
-        909,
+        920,
         (
+            "2026-08-31: +11 lines adding --report-parameters and threading "
+            "it into the resolved PlaywrightValidationConfig, so a "
+            "paginated report's declared parameters reach the pytest spec "
+            "even for a service-resolved (non-static-.env) run (Paginated "
+            "Report Parameter Testing epic). "
             "2026-08-31: +8 lines resolving --dataset-workspace-id through "
             "resolve_workspace_id, since a value here may be a display name "
             "-- e.g. a .rdl file's own rd:PowerBIWorkspaceName -- rather "

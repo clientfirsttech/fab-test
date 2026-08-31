@@ -41,6 +41,7 @@ from ._fab_test_context import (
     REPO_ROOT,
     RESULTS_ROOT,  # noqa: F401 -- re-exported: tests import this directly from `fab_test`
 )
+from ._report_html import open_report_conflict
 from ._run_manifest import RunManifest
 from ._target import TargetError, select_target, workspace_conflict
 
@@ -174,6 +175,15 @@ def _prepare_config(args: argparse.Namespace) -> int | None:
     return None
 
 
+def _prepare_report_flags(args: argparse.Namespace) -> int | None:
+    """Refuse an explicit `--no-report --open-report` before anything runs."""
+    conflict = open_report_conflict(args)
+    if conflict:
+        print(f"  ✗ fab-test: {conflict}", file=sys.stderr)
+        return 2
+    return None
+
+
 def _prepare_target(args: argparse.Namespace) -> int | None:
     """Resolve and validate the target onto ``args``, or return an exit code.
 
@@ -227,6 +237,7 @@ def _prepare_paths(args: argparse.Namespace) -> int | None:
 # because the environment default feeds them.
 _PREPARE_STEPS: tuple[Callable[[argparse.Namespace], int | None], ...] = (
     _prepare_config,
+    _prepare_report_flags,
     _dispatch_admin_command,
     _prepare_target,
     _prepare_paths,

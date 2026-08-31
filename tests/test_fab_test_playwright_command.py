@@ -8,6 +8,7 @@ none` overrides must reach the `invoke_playwright` subprocess command line.
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path
 
 from fabric_ci_cd_dataops.scripts.fab_test_registry import build_playwright_command
@@ -23,6 +24,7 @@ def _args(**overrides) -> argparse.Namespace:
         "pages": "auto",
         "roles": "auto",
         "report_type": "",
+        "report_parameters": "",
     }
     defaults.update(overrides)
     return argparse.Namespace(**defaults)
@@ -164,3 +166,50 @@ def test_explicit_report_type_flag_overrides_the_folder_suffix(tmp_path: Path) -
     )
 
     assert cmd[cmd.index("--report-type") + 1] == "paginated"
+
+
+_PARAMETERIZED_RDL = """<?xml version="1.0" encoding="utf-8"?>
+<Report xmlns="http://schemas.microsoft.com/sqlserver/reporting/2016/01/reportdefinition" xmlns:rd="http://schemas.microsoft.com/SQLServer/reporting/reportdesigner">
+  <ReportParameters>
+    <ReportParameter Name="ReportParameter1">
+      <DataType>Integer</DataType>
+      <MultiValue>true</MultiValue>
+    </ReportParameter>
+  </ReportParameters>
+</Report>
+"""
+
+
+def test_report_parameters_are_derived_from_a_local_rdl_files_own_declarations(
+    tmp_path: Path,
+) -> None:
+    """A discovered .rdl file's own <ReportParameters> block is passed
+    through as JSON -- the caller never has to already know what a report
+    prompts for."""
+    rdl = tmp_path / "Invoice RDL.rdl"
+    rdl.write_text(_PARAMETERIZED_RDL, encoding="utf-8")
+
+    cmd = build_playwright_command(rdl, _args(), tmp_path)
+
+    assert "--report-parameters" in cmd
+    payload = json.loads(cmd[cmd.index("--report-parameters") + 1])
+    assert payload == [{"name": "ReportParameter1", "multi_value": True}]
+
+
+def test_report_parameters_are_absent_for_a_non_rdl_artifact(tmp_path: Path) -> None:
+    """A .Report folder is never parsed for RDL report parameters."""
+    cmd = build_playwright_command(Path("ThinReport.Report"), _args(), tmp_path)
+
+    assert "--report-parameters" not in cmd
+
+
+def test_report_parameters_are_absent_when_the_rdl_declares_none(
+    tmp_path: Path,
+) -> None:
+    """An .rdl file with no <ReportParameters> block has nothing to pass."""
+    rdl = tmp_path / "Invoice RDL.rdl"
+    rdl.write_text("<Report><DataSources /></Report>", encoding="utf-8")
+
+    cmd = build_playwright_command(rdl, _args(), tmp_path)
+
+    assert "--report-parameters" not in cmd

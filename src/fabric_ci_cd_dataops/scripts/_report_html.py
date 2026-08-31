@@ -465,6 +465,11 @@ def resolve_report(args: Any, file_config: dict[str, Any] | None = None) -> bool
     default. Lives here rather than in `fab_test.py` so the summary module
     can ask the same question without importing the CLI, which would be a
     cycle. Default False: generation is opt-in.
+
+    ``--open-report`` auto-enables this (Open Report Flag epic) so passing
+    it alone is never a silent no-op; the explicit ``--no-report
+    --open-report`` conflict is refused earlier, by `open_report_conflict`,
+    so this never has to choose between them.
     """
     from ._config import resolve_setting
 
@@ -476,9 +481,45 @@ def resolve_report(args: Any, file_config: dict[str, Any] | None = None) -> bool
         file_config=config or {},
         packaged_default=False,
     )
+    resolved = value.strip().lower() in _TRUTHY if isinstance(value, str) else bool(value)
+    return resolved or resolve_open_report(args, config)
+
+
+def resolve_open_report(args: Any, file_config: dict[str, Any] | None = None) -> bool:
+    """Resolve whether to open the produced report in the browser.
+
+    ``--open-report`` > ``ANALYZER_OPEN_REPORT`` > config file > default,
+    mirroring `resolve_report`'s own precedence chain. Default False:
+    opening is opt-in, same as report generation itself.
+    """
+    from ._config import resolve_setting
+
+    config = file_config if file_config is not None else getattr(args, "file_config", None)
+    value, _origin = resolve_setting(
+        "open_report",
+        cli_value=getattr(args, "open_report", None),
+        env_var="ANALYZER_OPEN_REPORT",
+        file_config=config or {},
+        packaged_default=False,
+    )
     if isinstance(value, str):
         return value.strip().lower() in _TRUTHY
     return bool(value)
+
+
+def open_report_conflict(args: Any) -> str | None:
+    """Return a refusal message when `--no-report` and `--open-report` both apply.
+
+    `--open-report` implies `--report` (see `resolve_report`), so an
+    explicit `--no-report` alongside it is a real contradiction rather than
+    something to silently resolve one way or the other.
+    """
+    if getattr(args, "open_report", None) and getattr(args, "report", None) is False:
+        return (
+            "--no-report and --open-report conflict: --open-report requires "
+            "a report to open. Drop --no-report or --open-report."
+        )
+    return None
 
 
 def _format_run_metadata(metadata: dict[str, str]) -> str:

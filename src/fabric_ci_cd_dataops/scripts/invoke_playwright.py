@@ -502,6 +502,7 @@ def _build_config_from_args(
         )
         if (args.dataset_workspace_id or config.dataset_workspace_id)
         else "",
+        report_parameters=getattr(args, "report_parameters", "") or config.report_parameters,
     )
 
 
@@ -572,6 +573,16 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
             "Force the report type instead of auto-detecting it from the "
             "artifact name (tries Report, then PaginatedReport) "
             "[env: PLAYWRIGHT_REPORT_TYPE]."
+        ),
+    )
+    parser.add_argument(
+        "--report-parameters",
+        default="",
+        help=(
+            "JSON list of a paginated report's declared parameters "
+            '({"name": ..., "multi_value": ...}), derived from a local '
+            ".rdl file's own <ReportParameters> block by fab-test's own "
+            "discovery."
         ),
     )
     parser.add_argument(

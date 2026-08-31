@@ -229,6 +229,128 @@ def test_paginated_report_records_pass_when_no_error_modal_found(
     assert result["status"] == "pass"
 
 
+def _stub_powerbi_embed_with_parameter_panel(
+    page: Any, *, param_name: str = "ReportParameter1", multi_value: bool = False
+) -> None:
+    """Replace the real Power BI JS client and, on embed, render a fake
+    parameter panel that mimics the real Fluent UI structure found via live
+    DOM recon against PaginatedExample-WithFilter/-WithMultiFilter: a
+    combobox input (``#{name}-input``), its options
+    (``[id^="{name}-list"]``, a multi-value combobox's first option titled
+    "Select All"), and a submit button
+    (``[data-testid="parameter-pane-submit-action"]``). Selecting the
+    fake "2" option injects the error modal, simulating a filter value that
+    only fails once actually applied -- the initial no-filter render stays
+    clean.
+    """
+    options_html = (
+        f"<div id='{param_name}-list0'>Select All</div>"
+        f"<div id='{param_name}-list1'>2</div>"
+        f"<div id='{param_name}-list2'>4</div>"
+        if multi_value
+        else f"<div id='{param_name}-list0'>2</div>"
+        f"<div id='{param_name}-list1'>4</div>"
+    )
+    panel_html = (
+        f"<input id='{param_name}-input' />"
+        f"<div id='{param_name}-options' style='display:none'>{options_html}</div>"
+        "<button data-testid='parameter-pane-submit-action'>View report</button>"
+    )
+    page.add_init_script(
+        "window.powerbi = { embed: () => {"
+        f"document.body.insertAdjacentHTML('beforeend', {json.dumps(panel_html)});"
+        f"const opts = document.getElementById('{param_name}-options');"
+        "document.getElementById("
+        f"'{param_name}-input').addEventListener('click', () => {{"
+        "opts.style.display = 'block';"
+        "});"
+        "opts.querySelectorAll('div').forEach((opt) => {"
+        "opt.addEventListener('click', () => {"
+        "if (opt.textContent === '2') {"
+        "document.body.insertAdjacentHTML('beforeend', "
+        "\"<div class='ms-Dialog-content'>Something went wrong</div>\");"
+        "}"
+        "});"
+        "});"
+        "} };"
+    )
+    page.route(
+        "https://cdn.jsdelivr.net/npm/powerbi-client@2.23.1/dist/powerbi.min.js",
+        lambda route: route.fulfill(status=200, content_type="application/javascript", body=""),
+    )
+
+
+def test_paginated_report_applies_a_single_value_parameter_and_catches_a_filter_error(
+    page, tmp_path: Path, monkeypatch
+) -> None:
+    """A report that renders clean with no filter, but declares a
+    single-value parameter, gets that parameter applied and re-checked --
+    catching an error that only the filtered render exposes."""
+    monkeypatch.setenv("PLAYWRIGHT_RESULTS_ROOT", str(tmp_path))
+    monkeypatch.setenv("PLAYWRIGHT_EMBED_CONFIG", json.dumps({"accessToken": "t"}))
+    _stub_powerbi_embed_with_parameter_panel(page, multi_value=False)
+
+    case = {
+        "test_case": "WithFilter",
+        "report_type": "paginated",
+        "render_wait_seconds": "1",
+        "report_parameters": json.dumps(
+            [{"name": "ReportParameter1", "multi_value": False}]
+        ),
+    }
+
+    with pytest.raises(pytest.fail.Exception, match="RDL error modal detected"):
+        _test_paginated_report(page, case)
+
+    result = json.loads((_case_result_dir(case) / "result.json").read_text(encoding="utf-8"))
+    assert result["status"] == "error"
+
+
+def test_paginated_report_applies_a_multi_value_parameter_skipping_select_all(
+    page, tmp_path: Path, monkeypatch
+) -> None:
+    """A multi-value parameter's "Select All" option is skipped -- the first
+    two real values are picked instead."""
+    monkeypatch.setenv("PLAYWRIGHT_RESULTS_ROOT", str(tmp_path))
+    monkeypatch.setenv("PLAYWRIGHT_EMBED_CONFIG", json.dumps({"accessToken": "t"}))
+    _stub_powerbi_embed_with_parameter_panel(page, multi_value=True)
+
+    case = {
+        "test_case": "WithMultiFilter",
+        "report_type": "paginated",
+        "render_wait_seconds": "1",
+        "report_parameters": json.dumps(
+            [{"name": "ReportParameter1", "multi_value": True}]
+        ),
+    }
+
+    with pytest.raises(pytest.fail.Exception, match="RDL error modal detected"):
+        _test_paginated_report(page, case)
+
+
+def test_paginated_report_with_no_declared_parameters_only_scans_once(
+    page, tmp_path: Path, monkeypatch
+) -> None:
+    """No declared parameters -- behavior is unchanged: embed, wait, scan
+    once. A clean render passes even though the stub's parameter panel
+    (never opened) would have injected an error if clicked."""
+    monkeypatch.setenv("PLAYWRIGHT_RESULTS_ROOT", str(tmp_path))
+    monkeypatch.setenv("PLAYWRIGHT_EMBED_CONFIG", json.dumps({"accessToken": "t"}))
+    _stub_powerbi_embed_with_parameter_panel(page, multi_value=False)
+
+    case = {
+        "test_case": "NoParameters",
+        "report_type": "paginated",
+        "render_wait_seconds": "1",
+        "report_parameters": "",
+    }
+
+    _test_paginated_report(page, case)
+
+    result = json.loads((_case_result_dir(case) / "result.json").read_text(encoding="utf-8"))
+    assert result["status"] == "pass"
+
+
 def test_paginated_report_records_error_when_modal_detected(
     page, tmp_path: Path, monkeypatch
 ) -> None:
@@ -561,6 +683,71 @@ def test_report_visual_renders(page, case: dict[str, str]) -> None:
     _write_result(result_dir, "pass")
 
 
+_ERROR_MODAL_SELECTORS = [
+    ".ms-Dialog-content",
+    ".errorDialog",
+    "[data-testid='error-message']",
+]
+
+
+def _scan_for_error_modal(page: Any) -> bool:
+    """Return True if Power BI's error modal is present anywhere on the
+    page or inside any of its iframes."""
+    for selector in _ERROR_MODAL_SELECTORS:
+        if page.locator(selector).count() > 0:
+            return True
+    for frame in page.frames:
+        with contextlib.suppress(Exception):
+            if "ms-Dialog-content" in frame.content():
+                return True
+    return False
+
+
+def _apply_report_parameters(page: Any, parameters: list[dict[str, Any]]) -> bool:
+    """Select real values for each declared report parameter and submit the
+    panel, driving the report's own rendered parameter combobox the way a
+    person would -- selectors confirmed via live DOM recon against
+    PaginatedExample-WithFilter/-WithMultiFilter: a combobox input
+    (``#{name}-input``), its options (``[id^="{name}-list"]``, with a
+    multi-value combobox's first option titled "Select All"), and a submit
+    button (``[data-testid="parameter-pane-submit-action"]``).
+
+    A report renders clean with no parameter applied -- the error this
+    exists to catch (e.g. a FilterExpression type mismatch) only appears
+    once a real value is actually selected, which nothing before this
+    function ever did. Returns True if any parameter's control was found
+    and interacted with, so the caller knows whether a second render check
+    is warranted at all.
+    """
+    applied = False
+    for parameter in parameters:
+        name = parameter.get("name", "")
+        if not name:
+            continue
+        take = 2 if parameter.get("multi_value") else 1
+        for frame in page.frames:
+            combo_input = frame.locator(f"#{name}-input")
+            if combo_input.count() == 0:
+                continue
+            with contextlib.suppress(Exception):
+                combo_input.first.click(timeout=3000)
+                frame.wait_for_timeout(500)
+                options = frame.locator(f"[id^='{name}-list']").filter(
+                    has_not_text="Select All"
+                )
+                for i in range(min(options.count(), take)):
+                    options.nth(i).click(timeout=3000)
+                page.keyboard.press("Escape")
+                submit = frame.locator(
+                    "[data-testid='parameter-pane-submit-action']"
+                )
+                if submit.count() > 0:
+                    submit.first.click(timeout=3000)
+                applied = True
+            break
+    return applied
+
+
 def _test_paginated_report(page: Any, case: dict[str, str]) -> None:
     """Embed a paginated (RDL) report and fail if an error modal is detected."""
     try:
@@ -635,25 +822,23 @@ def _test_paginated_report(page: Any, case: dict[str, str]) -> None:
     with contextlib.suppress(Exception):
         page.wait_for_load_state("networkidle", timeout=5000)
 
-    error_selectors = [
-        ".ms-Dialog-content",
-        ".errorDialog",
-        "[data-testid='error-message']",
-    ]
-    error_found = False
-    for selector in error_selectors:
-        if page.locator(selector).count() > 0:
-            error_found = True
-            break
+    error_found = _scan_for_error_modal(page)
 
-    # Check inside iframes as well.
+    # A clean no-filter render says nothing about a parameter's own
+    # FilterExpression -- that only breaks once a real value is selected,
+    # which the embed above never did. Applying the report's own declared
+    # parameters and re-checking is what catches it (Paginated Report
+    # Parameter Testing epic).
     if not error_found:
-        for frame in page.frames:
+        try:
+            parameters = json.loads(case.get("report_parameters") or "[]")
+        except json.JSONDecodeError:
+            parameters = []
+        if parameters and _apply_report_parameters(page, parameters):
+            page.wait_for_timeout(rdl_wait_seconds * 1000)
             with contextlib.suppress(Exception):
-                content = frame.content()
-                if "ms-Dialog-content" in content:
-                    error_found = True
-                    break
+                page.wait_for_load_state("networkidle", timeout=5000)
+            error_found = _scan_for_error_modal(page)
 
     _write_evidence(page, result_dir, console_logs, failed_requests)
 
