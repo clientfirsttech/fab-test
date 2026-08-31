@@ -1,6 +1,7 @@
 {
   ".SemanticModel": "SemanticModel",
   ".Report": "Report",
+  ".PaginatedReport": "PaginatedReport",
   ".Agent": "Agent",
   ".Notebook": "Notebook",
   ".Dataflow": "Dataflow",

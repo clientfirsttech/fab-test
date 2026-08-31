@@ -345,8 +345,37 @@ def resolve_report(
     name: str,
     resolved_env: ResolvedEnvironment,
     client: ServiceClient,
+    *,
+    report_type: str = "report",
 ) -> ResolvedReport:
-    """Resolve a report and its bound semantic model (dataset)."""
+    """Resolve a report and its bound semantic model (dataset).
+
+    A paginated report is a distinct Fabric item type (``PaginatedReport``),
+    resolved separately from an interactive ``Report``. It does not have a
+    single bound semantic model the way an interactive report's primary
+    dataset works, but ``GenerateToken`` still rejects a paginated report's
+    embed-token request with "At least one dataset is required" when no
+    dataset is named at all (confirmed live against a real RDL report) --
+    RDL reports can bind one or more shared datasets as data sources, and
+    the Power BI REST API's report-metadata lookup surfaces that same way
+    for either report type. So the lookup runs for both; only the "fall
+    back to the report's own ID when nothing is bound" behavior is
+    interactive-only, since a paginated report's own ID is never a valid
+    dataset ID to fall back to.
+    """
+    if report_type == "paginated":
+        resolved = resolve_item(name, "PaginatedReport", resolved_env, client)
+        dataset_id = client.get_report_dataset_id(
+            resolved.workspace_id, resolved.item_id
+        )
+        return ResolvedReport(
+            workspace_id=resolved.workspace_id,
+            report_id=resolved.item_id,
+            report_name=resolved.display_name,
+            semantic_model_id=dataset_id,
+            environment=resolved.environment,
+        )
+
     resolved = resolve_item(name, "Report", resolved_env, client)
     dataset_id = client.get_report_dataset_id(
         resolved.workspace_id, resolved.item_id

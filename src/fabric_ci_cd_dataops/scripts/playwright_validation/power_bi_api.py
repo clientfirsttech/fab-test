@@ -46,14 +46,21 @@ class EmbedContext:
 class ReportIdentity:
     """Which workspace, report, and dataset an embed token is scoped to.
 
-    Grouped because every caller of ``generate_embed_token`` passes all
-    three together -- there is no call that supplies one without the
-    other two.
+    Grouped because every caller of ``generate_embed_token`` passes most of
+    these together. ``dataset_workspace_id`` is optional and defaults to
+    empty, meaning "same workspace as the report" -- the common case, and
+    the only shape this ever supported until a report and its dataset
+    living in different workspaces (a common practice for a dataset shared
+    across several reports) surfaced the gap: ``GenerateToken`` needs every
+    workspace involved named in ``targetWorkspaces``, or it cannot resolve
+    the dataset and reports a misleading "XMLA permissions are off" instead
+    of a workspace-resolution failure (confirmed live).
     """
 
     workspace_id: str
     report_id: str
     dataset_id: str
+    dataset_workspace_id: str = ""
 
 
 class PowerBiApiError(Exception):
@@ -151,17 +158,41 @@ def generate_embed_token(
     role: str = "",
     cloud: str = "public",
     timeout_seconds: int = 30,
+    report_type: str = "report",
 ) -> str:
-    """Generate an embed token for a report via the Power BI REST API."""
+    """Generate an embed token for a report via the Power BI REST API.
+
+    The two report types send different payload shapes to ``GenerateToken``.
+    An interactive report's has always included ``targetWorkspaces`` and
+    ``accessLevel`` (verified live in the Playwright Embed Token Type epic),
+    extended here to name the dataset's own workspace too when it differs
+    from the report's -- a dataset shared across reports commonly lives
+    elsewhere. A paginated report's payload is deliberately minimal --
+    ``reports``/``datasets`` only, matching a validated reference
+    implementation exactly. Including ``targetWorkspaces``/``accessLevel``
+    for a paginated report reproduced a live "XMLA permissions are off" 400
+    that had nothing to do with any XMLA setting -- removing them is what
+    actually cleared it, not any workspace/tenant configuration change.
+    """
     api_root = _api_root_for(cloud)
     url = f"{api_root}/v1.0/myorg/GenerateToken"
 
-    payload: dict[str, Any] = {
-        "reports": [{"id": identity.report_id}],
-        "datasets": [{"id": identity.dataset_id}],
-        "targetWorkspaces": [{"id": identity.workspace_id}],
-        "accessLevel": "View",
-    }
+    payload: dict[str, Any] = {"reports": [{"id": identity.report_id}]}
+    # A paginated report may have no bound semantic model the report-metadata
+    # lookup can find -- omit the key rather than sending a dataset entry
+    # with no id, which the GenerateToken API rejects.
+    if identity.dataset_id:
+        payload["datasets"] = [{"id": identity.dataset_id}]
+
+    if report_type != "paginated":
+        target_workspace_ids = [identity.workspace_id]
+        if (
+            identity.dataset_workspace_id
+            and identity.dataset_workspace_id != identity.workspace_id
+        ):
+            target_workspace_ids.append(identity.dataset_workspace_id)
+        payload["targetWorkspaces"] = [{"id": wid} for wid in target_workspace_ids]
+        payload["accessLevel"] = "View"
 
     if use_rls and user_name and role:
         payload["identities"] = [
@@ -209,12 +240,18 @@ def get_embed_context(config: PlaywrightValidationConfig) -> EmbedContext:
     )
     embed_token = generate_embed_token(
         access_token,
-        ReportIdentity(config.workspace_id, config.report_id, config.dataset_id),
+        ReportIdentity(
+            config.workspace_id,
+            config.report_id,
+            config.dataset_id,
+            dataset_workspace_id=config.dataset_workspace_id,
+        ),
         use_rls=config.use_rls,
         user_name=config.user_name,
         role=config.role,
         cloud=config.cloud,
         timeout_seconds=config.timeout_seconds,
+        report_type=config.report_type,
     )
     return EmbedContext(
         embed_url=embed_url,

@@ -119,6 +119,114 @@ def test_generate_embed_token_success() -> None:
     assert token == "embed-token-1"
 
 
+def test_generate_embed_token_target_workspaces_defaults_to_the_report_workspace() -> None:
+    """With no dataset_workspace_id, targetWorkspaces names only the report's
+    own workspace -- the shape verified live in the Playwright Embed Token
+    Type epic, unchanged here."""
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {"token": "embed-token-1"}
+
+    with patch(
+        "fabric_ci_cd_dataops.scripts.playwright_validation.power_bi_api.requests.post",
+        return_value=mock_response,
+    ) as mock_post:
+        generate_embed_token("token", ReportIdentity("ws-1", "rpt-1", "ds-1"))
+
+    payload = mock_post.call_args.kwargs["json"]
+    assert payload["targetWorkspaces"] == [{"id": "ws-1"}]
+
+
+def test_generate_embed_token_names_both_workspaces_for_a_cross_workspace_dataset() -> None:
+    """A dataset in a different workspace than its report -- common practice
+    for a dataset shared across several reports -- must be named in
+    targetWorkspaces too. Naming only the report's workspace produced a
+    misleading "XMLA permissions are off" 400 for a cross-workspace RDL
+    report's dataset (confirmed live) rather than the real problem, which
+    GenerateToken never had enough information to name."""
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {"token": "embed-token-1"}
+
+    with patch(
+        "fabric_ci_cd_dataops.scripts.playwright_validation.power_bi_api.requests.post",
+        return_value=mock_response,
+    ) as mock_post:
+        generate_embed_token(
+            "token",
+            ReportIdentity(
+                "ws-report", "rdl-1", "ds-1", dataset_workspace_id="ws-dataset"
+            ),
+        )
+
+    payload = mock_post.call_args.kwargs["json"]
+    assert payload["targetWorkspaces"] == [{"id": "ws-report"}, {"id": "ws-dataset"}]
+
+
+def test_generate_embed_token_does_not_duplicate_a_matching_dataset_workspace() -> None:
+    """dataset_workspace_id equal to the report's own workspace names it once."""
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {"token": "embed-token-1"}
+
+    with patch(
+        "fabric_ci_cd_dataops.scripts.playwright_validation.power_bi_api.requests.post",
+        return_value=mock_response,
+    ) as mock_post:
+        generate_embed_token(
+            "token",
+            ReportIdentity("ws-1", "rdl-1", "ds-1", dataset_workspace_id="ws-1"),
+        )
+
+    payload = mock_post.call_args.kwargs["json"]
+    assert payload["targetWorkspaces"] == [{"id": "ws-1"}]
+
+
+def test_generate_embed_token_payload_is_minimal_for_a_paginated_report() -> None:
+    """A paginated report's GenerateToken payload is deliberately minimal --
+    reports/datasets only, matching a validated reference implementation
+    exactly. targetWorkspaces/accessLevel are neither present nor needed;
+    including them reproduced a live "XMLA permissions are off" 400 that
+    had nothing to do with any XMLA setting -- removing them, not any
+    workspace/tenant configuration change, is what cleared it."""
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {"token": "embed-token-1"}
+
+    with patch(
+        "fabric_ci_cd_dataops.scripts.playwright_validation.power_bi_api.requests.post",
+        return_value=mock_response,
+    ) as mock_post:
+        generate_embed_token(
+            "token",
+            ReportIdentity("ws-1", "rdl-1", "ds-1"),
+            report_type="paginated",
+        )
+
+    payload = mock_post.call_args.kwargs["json"]
+    assert payload == {
+        "reports": [{"id": "rdl-1"}],
+        "datasets": [{"id": "ds-1"}],
+    }
+
+
+def test_generate_embed_token_omits_datasets_when_none_bound() -> None:
+    """No dataset_id at all (nothing bound, of either report type) omits
+    the "datasets" key entirely rather than sending an entry with no id."""
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {"token": "embed-token-1"}
+
+    with patch(
+        "fabric_ci_cd_dataops.scripts.playwright_validation.power_bi_api.requests.post",
+        return_value=mock_response,
+    ) as mock_post:
+        generate_embed_token("token", ReportIdentity("ws-1", "rdl-1", ""))
+
+    payload = mock_post.call_args.kwargs["json"]
+    assert "datasets" not in payload
+
+
 def test_generate_embed_token_includes_rls_identity() -> None:
     """When RLS is enabled and user_name/role are provided, identities are included."""
     mock_response = MagicMock()

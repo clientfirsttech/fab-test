@@ -36,8 +36,13 @@ TEST_HARD = 900
 # test_complexity_budget.py.
 EXEMPTIONS: dict[str, tuple[int, str]] = {
     "src/fabric_ci_cd_dataops/scripts/fab_test_parser.py": (
-        994,
+        1004,
         (
+            "2026-08-31: +10 lines adding --dataset-workspace-id to the "
+            "playwright subparser, for a dataset that lives in a different "
+            "workspace than its report -- common practice for a dataset "
+            "shared across several reports (Paginated Report Testing epic, "
+            "live-verification fix). "
             "2026-08-28: born over the hard budget by the move itself -- "
             "build_parser's 17 subparser builders were, together, larger than "
             "most modules this split produces even before the move (see "
@@ -71,8 +76,11 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
         ),
     ),
     "src/fabric_ci_cd_dataops/scripts/fab_test_registry.py": (
-        891,
+        894,
         (
+            "2026-08-31: +3 lines forwarding --dataset-workspace-id to "
+            "invoke_playwright.py's subprocess command (Paginated Report "
+            "Testing epic, live-verification fix). "
             "2026-08-23: 11 lines over hard, same story as fab_test_summary.py -- "
             "small drift from other epics, not yet worth a forced split. "
             "2026-08-24: +6 lines forwarding --pages/--roles to "
@@ -101,8 +109,11 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
         ),
     ),
     "src/fabric_ci_cd_dataops/scripts/invoke_playwright.py": (
-        867,
+        882,
         (
+            "2026-08-31: +11 lines adding --dataset-workspace-id and "
+            "threading it into the service-resolved PlaywrightValidationConfig "
+            "(Paginated Report Testing epic, live-verification fix). "
             "2026-08-30: born over the hard budget adding configurable "
             "pytest-xdist worker resolution (--workers/PLAYWRIGHT_XDIST_WORKERS "
             "> packaged default) -- a small, cohesive addition to an already "
@@ -111,7 +122,11 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
             "2026-08-30: +47 lines adding _report_deep_link and threading "
             "cloud through _test_results_rows/_write_embed_error_envelope, so "
             "the HTML report can link back to the report page/bookmark a "
-            "Playwright case validated (Report Page Deep Link work)."
+            "Playwright case validated (Report Page Deep Link work). "
+            "2026-08-30: +4 lines threading report_type through the "
+            "resolve_report call and the resulting PlaywrightValidationConfig "
+            "so a paginated target resolves against PaginatedReport instead of "
+            "Report (Paginated Report Testing epic)."
         ),
     ),
 }

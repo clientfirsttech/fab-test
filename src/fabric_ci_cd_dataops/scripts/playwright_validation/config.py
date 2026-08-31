@@ -132,6 +132,9 @@ class PlaywrightValidationConfig:
     tenant_id: str
     timeout_seconds: int
     headless: bool
+    report_type: str = "report"
+    render_wait_seconds: int = 20
+    dataset_workspace_id: str = ""
 
     def to_test_case_dict(self) -> dict[str, Any]:
         """Return non-secret fields as a dictionary for test-case generation."""
@@ -147,6 +150,8 @@ class PlaywrightValidationConfig:
             "use_rls": self.use_rls,
             "cloud": self.cloud,
             "timeout_seconds": self.timeout_seconds,
+            "report_type": self.report_type,
+            "render_wait_seconds": self.render_wait_seconds,
         }
 
 
@@ -224,6 +229,7 @@ def load_config(
 
     headless = _bool("PLAYWRIGHT_HEADLESS", True)
     use_rls = _bool("PLAYWRIGHT_USE_RLS", False)
+    report_type = get("PLAYWRIGHT_REPORT_TYPE") or "report"
 
     # Prefer the explicit Playwright credential names, but fall back to the
     # workflow-wide service principal secrets that artifact-runner.yml sets.
@@ -250,25 +256,26 @@ def load_config(
         tenant_id=get("FABRIC_TENANT_ID"),
         timeout_seconds=int(get("PLAYWRIGHT_TIMEOUT_SECONDS") or "180"),
         headless=headless,
+        report_type=report_type,
+        render_wait_seconds=int(get("PLAYWRIGHT_RENDER_WAIT_SECONDS") or "20"),
+        dataset_workspace_id=get("PLAYWRIGHT_DATASET_WORKSPACE_ID"),
     )
 
     if required:
-        missing = [
-            name
-            for name, value in {
-                "PLAYWRIGHT_WORKSPACE_ID": config.workspace_id,
-                "PLAYWRIGHT_REPORT_ID": config.report_id,
-                "PLAYWRIGHT_DATASET_ID": config.dataset_id,
-                "FABRIC_CLIENT_ID / FABRIC_SERVICE_PRINCIPAL_ID": (
-                    config.client_id
-                ),
-                "FABRIC_CLIENT_SECRET / FABRIC_SERVICE_PRINCIPAL_SECRET": (
-                    config.client_secret
-                ),
-                "FABRIC_TENANT_ID": config.tenant_id,
-            }.items()
-            if not value
-        ]
+        # A paginated report has no bound semantic model the way an
+        # interactive report does, so it does not need PLAYWRIGHT_DATASET_ID.
+        required_fields = {
+            "PLAYWRIGHT_WORKSPACE_ID": config.workspace_id,
+            "PLAYWRIGHT_REPORT_ID": config.report_id,
+            "FABRIC_CLIENT_ID / FABRIC_SERVICE_PRINCIPAL_ID": config.client_id,
+            "FABRIC_CLIENT_SECRET / FABRIC_SERVICE_PRINCIPAL_SECRET": (
+                config.client_secret
+            ),
+            "FABRIC_TENANT_ID": config.tenant_id,
+        }
+        if config.report_type != "paginated":
+            required_fields["PLAYWRIGHT_DATASET_ID"] = config.dataset_id
+        missing = [name for name, value in required_fields.items() if not value]
         if missing:
             raise ValueError(
                 f"Missing required Playwright validation config: {', '.join(missing)}"

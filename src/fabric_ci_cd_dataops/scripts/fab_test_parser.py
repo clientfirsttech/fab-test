@@ -466,6 +466,16 @@ def _add_playwright_subparser(subs: argparse._SubParsersAction) -> None:
         help="Semantic model / dataset ID override",
     )
     playwright_p.add_argument(
+        "--dataset-workspace-id",
+        default="",
+        dest="dataset_workspace_id",
+        metavar="ID",
+        help=(
+            "Workspace ID the dataset lives in, when different from the "
+            "report's own workspace [env: PLAYWRIGHT_DATASET_WORKSPACE_ID]"
+        ),
+    )
+    playwright_p.add_argument(
         "--pages",
         choices=["auto", "none"],
         default="auto",

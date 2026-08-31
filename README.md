@@ -275,6 +275,20 @@ fab-test playwright --artifact "Not Working Visuals" --env dev
 fab-test playwright --artifact "Not Working Visuals" --env dev --pages none --roles none
 ```
 
+### Validating a paginated (RDL) report
+
+A Power BI paginated report has no page/bookmark dimension and doesn't fire the
+interactive embed SDK's render events, so it's tested differently: set
+`PLAYWRIGHT_REPORT_TYPE=paginated` to resolve against Fabric's `PaginatedReport`
+item type (no dataset ID needed), skip page/bookmark/role discovery, and check
+for Power BI's error modal after a fixed wait instead of racing render events.
+
+```bash
+PLAYWRIGHT_REPORT_TYPE=paginated fab-test playwright --artifact "Invoice RDL" --env dev --env-file .env
+```
+
+See [the fab-test skill's playwright flags reference](https://github.com/kerski/fab-test/blob/main/.github/skills/fab-test/references/flags.md) for the full behavior.
+
 ### Naming what to test
 
 Every analyzer subcommand takes an optional target. Omit it and `fab-test` discovers everything matching, as before. The grammar is the one `pql-test` and the Fabric CLI already use, so a target pasted from either works here unchanged.

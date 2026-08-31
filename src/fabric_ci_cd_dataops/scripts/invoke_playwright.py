@@ -463,7 +463,9 @@ def _build_config_from_args(
         args.environment,
         workspace_id_override=args.workspace_id or config.workspace_id,
     )
-    report = resolve_report(args.artifact, resolved_env, client)
+    report = resolve_report(
+        args.artifact, resolved_env, client, report_type=config.report_type
+    )
 
     return PlaywrightValidationConfig(
         workspace_id=report.workspace_id,
@@ -481,6 +483,11 @@ def _build_config_from_args(
         tenant_id=config.tenant_id,
         timeout_seconds=config.timeout_seconds,
         headless=config.headless,
+        report_type=config.report_type,
+        render_wait_seconds=config.render_wait_seconds,
+        dataset_workspace_id=(
+            args.dataset_workspace_id or config.dataset_workspace_id
+        ),
     )
 
 
@@ -535,6 +542,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--dataset-id",
         help="Explicit dataset/semantic-model ID (advanced override).",
+    )
+    parser.add_argument(
+        "--dataset-workspace-id",
+        help=(
+            "Workspace ID the dataset lives in, when different from the "
+            "report's own workspace (a dataset shared across reports "
+            "commonly lives elsewhere) [env: PLAYWRIGHT_DATASET_WORKSPACE_ID]."
+        ),
     )
     parser.add_argument(
         "--page-ids",

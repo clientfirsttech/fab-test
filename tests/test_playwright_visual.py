@@ -182,6 +182,74 @@ def test_embed_config_for_role_falls_back_to_single_role_env(monkeypatch) -> Non
     assert _embed_config_for_role("") == {"accessToken": "t"}
 
 
+def _stub_powerbi_embed(page: Any, *, inject_error_modal: bool) -> None:
+    """Replace the real Power BI JS client with a test double.
+
+    Registered as an init script (before ``about:blank`` loads) so it wins
+    over the real CDN library ``_test_paginated_report`` loads next --
+    ``add_script_tag`` overwrites ``window.powerbi`` with the real bundle
+    each time, so it must be neutered too. Avoids any real embed call: this
+    is about proving the paginated code path waits the configured duration
+    and then scans for the error-modal marker, not about a real Fabric
+    backend.
+    """
+    modal_html = (
+        "<div class='ms-Dialog-content'>Something went wrong</div>"
+        if inject_error_modal
+        else ""
+    )
+    page.add_init_script(
+        "window.powerbi = { embed: () => {"
+        f"document.body.insertAdjacentHTML('beforeend', {json.dumps(modal_html)});"
+        "} };"
+    )
+    page.route(
+        "https://cdn.jsdelivr.net/npm/powerbi-client@2.23.1/dist/powerbi.min.js",
+        lambda route: route.fulfill(status=200, content_type="application/javascript", body=""),
+    )
+
+
+def test_paginated_report_records_pass_when_no_error_modal_found(
+    page, tmp_path: Path, monkeypatch
+) -> None:
+    """No error modal after the configured wait records a pass."""
+    monkeypatch.setenv("PLAYWRIGHT_RESULTS_ROOT", str(tmp_path))
+    monkeypatch.setenv("PLAYWRIGHT_EMBED_CONFIG", json.dumps({"accessToken": "t"}))
+    _stub_powerbi_embed(page, inject_error_modal=False)
+
+    case = {
+        "test_case": "InvoiceRDL",
+        "report_type": "paginated",
+        "render_wait_seconds": "1",
+    }
+
+    _test_paginated_report(page, case)
+
+    result = json.loads((_case_result_dir(case) / "result.json").read_text(encoding="utf-8"))
+    assert result["status"] == "pass"
+
+
+def test_paginated_report_records_error_when_modal_detected(
+    page, tmp_path: Path, monkeypatch
+) -> None:
+    """An error modal found after the configured wait records an error."""
+    monkeypatch.setenv("PLAYWRIGHT_RESULTS_ROOT", str(tmp_path))
+    monkeypatch.setenv("PLAYWRIGHT_EMBED_CONFIG", json.dumps({"accessToken": "t"}))
+    _stub_powerbi_embed(page, inject_error_modal=True)
+
+    case = {
+        "test_case": "InvoiceRDLBroken",
+        "report_type": "paginated",
+        "render_wait_seconds": "1",
+    }
+
+    with pytest.raises(pytest.fail.Exception, match="RDL error modal detected"):
+        _test_paginated_report(page, case)
+
+    result = json.loads((_case_result_dir(case) / "result.json").read_text(encoding="utf-8"))
+    assert result["status"] == "error"
+
+
 class _FakeClock:
     """Deterministic stand-in for time.monotonic()/time.sleep() in tests."""
 
@@ -310,7 +378,7 @@ def test_report_visual_renders(page, case: dict[str, str]) -> None:
         pytest.skip("Empty test case")
 
     report_type = case.get("report_type", "report")
-    if report_type == "rdl":
+    if report_type == "paginated":
         _test_paginated_report(page, case)
         return
 
@@ -510,7 +578,10 @@ def _test_paginated_report(page: Any, case: dict[str, str]) -> None:
     result_dir = _case_result_dir(case)
     result_dir.mkdir(parents=True, exist_ok=True)
 
-    rdl_wait_seconds = int(os.getenv("PLAYWRIGHT_RDL_WAIT_SECONDS", "10"))
+    rdl_wait_seconds = int(
+        case.get("render_wait_seconds")
+        or os.getenv("PLAYWRIGHT_RENDER_WAIT_SECONDS", "20")
+    )
 
     console_logs: list[dict[str, Any]] = []
     failed_requests: list[dict[str, Any]] = []
@@ -554,6 +625,15 @@ def _test_paginated_report(page: Any, case: dict[str, str]) -> None:
         pytest.fail(error)
 
     page.wait_for_timeout(rdl_wait_seconds * 1000)
+
+    # Give any in-flight network activity (the RDL data/parameter calls the
+    # fixed wait above may have just missed) a bounded chance to settle
+    # before scanning -- matches the validated reference implementation's
+    # waitForLoadState('networkidle') between its own wait and its DOM scan.
+    # Best-effort: background telemetry connections can keep the page from
+    # ever going fully idle, so this must never turn into a hard failure.
+    with contextlib.suppress(Exception):
+        page.wait_for_load_state("networkidle", timeout=5000)
 
     error_selectors = [
         ".ms-Dialog-content",
