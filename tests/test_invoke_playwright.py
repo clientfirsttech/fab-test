@@ -605,7 +605,7 @@ def test_build_config_from_args_uses_service_client_for_artifact() -> None:
         workspace_id_override="",
     )
     mock_report.assert_called_once_with(
-        "Resolved Report", mock_env.return_value, client, report_type="report"
+        "Resolved Report", mock_env.return_value, client, report_type="auto"
     )
 
 

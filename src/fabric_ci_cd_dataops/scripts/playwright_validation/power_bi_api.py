@@ -169,10 +169,14 @@ def generate_embed_token(
     from the report's -- a dataset shared across reports commonly lives
     elsewhere. A paginated report's payload is deliberately minimal --
     ``reports``/``datasets`` only, matching a validated reference
-    implementation exactly. Including ``targetWorkspaces``/``accessLevel``
-    for a paginated report reproduced a live "XMLA permissions are off" 400
-    that had nothing to do with any XMLA setting -- removing them is what
-    actually cleared it, not any workspace/tenant configuration change.
+    implementation -- but its dataset entry needs one field an interactive
+    report's never does: ``xmlaPermissions: "ReadOnly"``. Without it,
+    ``GenerateToken`` succeeds but the token itself cannot connect to the
+    dataset, and embedding fails with "XMLA permissions are off" regardless
+    of ``targetWorkspaces``, ``accessLevel``, capacity tier, or which
+    workspace anything lives in -- all tried and all irrelevant; only this
+    field, confirmed live and matching Microsoft's own "Embed paginated
+    reports" documentation, cleared it.
     """
     api_root = _api_root_for(cloud)
     url = f"{api_root}/v1.0/myorg/GenerateToken"
@@ -182,7 +186,10 @@ def generate_embed_token(
     # lookup can find -- omit the key rather than sending a dataset entry
     # with no id, which the GenerateToken API rejects.
     if identity.dataset_id:
-        payload["datasets"] = [{"id": identity.dataset_id}]
+        dataset_entry: dict[str, str] = {"id": identity.dataset_id}
+        if report_type == "paginated":
+            dataset_entry["xmlaPermissions"] = "ReadOnly"
+        payload["datasets"] = [dataset_entry]
 
     if report_type != "paginated":
         target_workspace_ids = [identity.workspace_id]

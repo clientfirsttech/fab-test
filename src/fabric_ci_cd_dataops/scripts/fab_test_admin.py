@@ -291,12 +291,16 @@ PLAYWRIGHT_REPORT_ID=
 PLAYWRIGHT_REPORT_NAME=
 PLAYWRIGHT_DATASET_ID=
 
-# Set to "paginated" to validate a Power BI paginated (RDL) report instead of
-# an interactive one -- skips page/bookmark/role discovery and checks for an
-# error modal after a fixed wait rather than racing render events. A
-# paginated report's dataset is often not auto-discoverable; set
-# PLAYWRIGHT_DATASET_ID above if resolution reports "At least one dataset is
-# required". Leave unset for interactive reports (default: report).
+# A paginated (RDL) report is validated with a different check than an
+# interactive one -- skips page/bookmark/role discovery and checks for an
+# error modal after a fixed wait rather than racing render events. With
+# --artifact, fab-test detects which kind a target is itself (tries Report,
+# then PaginatedReport) -- you should not normally need to set this. Set it
+# to "report"/"paginated" only to force the type, or if using the static IDs
+# above with no --artifact at all, where there is no name to detect from and
+# this becomes required. A paginated report's dataset is often not
+# auto-discoverable; set PLAYWRIGHT_DATASET_ID above if resolution reports
+# "At least one dataset is required".
 # PLAYWRIGHT_REPORT_TYPE=paginated
 # PLAYWRIGHT_RENDER_WAIT_SECONDS=20
 

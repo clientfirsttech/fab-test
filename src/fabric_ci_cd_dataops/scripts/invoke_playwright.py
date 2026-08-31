@@ -42,6 +42,7 @@ from .playwright_validation.resolver import (
     ServiceResolutionError,
     resolve_environment,
     resolve_report,
+    resolve_workspace_id,
 )
 from .playwright_validation.test_cases import (
     TestCase,
@@ -464,7 +465,10 @@ def _build_config_from_args(
         workspace_id_override=args.workspace_id or config.workspace_id,
     )
     report = resolve_report(
-        args.artifact, resolved_env, client, report_type=config.report_type
+        args.artifact,
+        resolved_env,
+        client,
+        report_type=getattr(args, "report_type", None) or config.report_type,
     )
 
     return PlaywrightValidationConfig(
@@ -483,11 +487,21 @@ def _build_config_from_args(
         tenant_id=config.tenant_id,
         timeout_seconds=config.timeout_seconds,
         headless=config.headless,
-        report_type=config.report_type,
+        # The type resolution actually settled on -- never the pre-resolution
+        # "auto" config.report_type, which nothing downstream (test-case
+        # generation, embed config, the pytest spec) understands.
+        report_type=report.report_type,
         render_wait_seconds=config.render_wait_seconds,
-        dataset_workspace_id=(
-            args.dataset_workspace_id or config.dataset_workspace_id
-        ),
+        # A value here may be a display name, not a GUID -- e.g. parsed
+        # straight out of a paginated report's own .rdl file, which records
+        # rd:PowerBIWorkspaceName rather than an ID. resolve_workspace_id
+        # resolves a name and passes a GUID through unchanged, using the
+        # client already built above rather than a second one.
+        dataset_workspace_id=resolve_workspace_id(
+            client, args.dataset_workspace_id or config.dataset_workspace_id
+        )
+        if (args.dataset_workspace_id or config.dataset_workspace_id)
+        else "",
     )
 
 
@@ -549,6 +563,15 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
             "Workspace ID the dataset lives in, when different from the "
             "report's own workspace (a dataset shared across reports "
             "commonly lives elsewhere) [env: PLAYWRIGHT_DATASET_WORKSPACE_ID]."
+        ),
+    )
+    parser.add_argument(
+        "--report-type",
+        choices=["report", "paginated"],
+        help=(
+            "Force the report type instead of auto-detecting it from the "
+            "artifact name (tries Report, then PaginatedReport) "
+            "[env: PLAYWRIGHT_REPORT_TYPE]."
         ),
     )
     parser.add_argument(
@@ -810,6 +833,10 @@ def _config_from_impact_report(
         tenant_id=base_config.tenant_id,
         timeout_seconds=base_config.timeout_seconds,
         headless=base_config.headless,
+        # Impact-manifest reports are resolved via semantic-model dependents
+        # (impact.py), which only ever surfaces interactive Report items --
+        # never "auto", which has no report name here to detect against.
+        report_type="report",
     )
 
 

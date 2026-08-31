@@ -184,11 +184,14 @@ def test_generate_embed_token_does_not_duplicate_a_matching_dataset_workspace() 
 
 def test_generate_embed_token_payload_is_minimal_for_a_paginated_report() -> None:
     """A paginated report's GenerateToken payload is deliberately minimal --
-    reports/datasets only, matching a validated reference implementation
-    exactly. targetWorkspaces/accessLevel are neither present nor needed;
-    including them reproduced a live "XMLA permissions are off" 400 that
-    had nothing to do with any XMLA setting -- removing them, not any
-    workspace/tenant configuration change, is what cleared it."""
+    reports/datasets only, no targetWorkspaces/accessLevel, matching a
+    validated reference implementation. Its dataset entry does need one
+    field an interactive report's never does: xmlaPermissions: "ReadOnly" --
+    without it, GenerateToken succeeds but the token itself cannot connect
+    to the dataset ("XMLA permissions are off"), regardless of
+    targetWorkspaces, capacity tier, or which workspace anything lives in --
+    all tried and all irrelevant; only this field cleared it (confirmed live
+    and matching Microsoft's own "Embed paginated reports" documentation)."""
     mock_response = MagicMock()
     mock_response.status_code = 200
     mock_response.json.return_value = {"token": "embed-token-1"}
@@ -206,8 +209,25 @@ def test_generate_embed_token_payload_is_minimal_for_a_paginated_report() -> Non
     payload = mock_post.call_args.kwargs["json"]
     assert payload == {
         "reports": [{"id": "rdl-1"}],
-        "datasets": [{"id": "ds-1"}],
+        "datasets": [{"id": "ds-1", "xmlaPermissions": "ReadOnly"}],
     }
+
+
+def test_generate_embed_token_interactive_dataset_has_no_xmla_permissions_field() -> None:
+    """xmlaPermissions is paginated-specific -- an interactive report's
+    dataset entry is unchanged."""
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {"token": "embed-token-1"}
+
+    with patch(
+        "fabric_ci_cd_dataops.scripts.playwright_validation.power_bi_api.requests.post",
+        return_value=mock_response,
+    ) as mock_post:
+        generate_embed_token("token", ReportIdentity("ws-1", "rpt-1", "ds-1"))
+
+    payload = mock_post.call_args.kwargs["json"]
+    assert payload["datasets"] == [{"id": "ds-1"}]
 
 
 def test_generate_embed_token_omits_datasets_when_none_bound() -> None:

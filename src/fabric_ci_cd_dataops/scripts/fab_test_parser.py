@@ -476,6 +476,18 @@ def _add_playwright_subparser(subs: argparse._SubParsersAction) -> None:
         ),
     )
     playwright_p.add_argument(
+        "--report-type",
+        choices=["report", "paginated"],
+        default="",
+        dest="report_type",
+        help=(
+            "Force the report type instead of auto-detecting it (a local "
+            "*.Report/*.PaginatedReport folder's own suffix decides it "
+            "automatically; --artifact with no local match tries Report "
+            "then PaginatedReport) [env: PLAYWRIGHT_REPORT_TYPE]"
+        ),
+    )
+    playwright_p.add_argument(
         "--pages",
         choices=["auto", "none"],
         default="auto",

@@ -132,7 +132,7 @@ class PlaywrightValidationConfig:
     tenant_id: str
     timeout_seconds: int
     headless: bool
-    report_type: str = "report"
+    report_type: str = "auto"
     render_wait_seconds: int = 20
     dataset_workspace_id: str = ""
 
@@ -229,7 +229,11 @@ def load_config(
 
     headless = _bool("PLAYWRIGHT_HEADLESS", True)
     use_rls = _bool("PLAYWRIGHT_USE_RLS", False)
-    report_type = get("PLAYWRIGHT_REPORT_TYPE") or "report"
+    # "auto" (not a literal report type) means: detect it from the artifact
+    # name at resolution time rather than require the caller to already know
+    # it. Static .env-only mode has no name to detect from, so it still
+    # requires an explicit value -- enforced below, in the `required` block.
+    report_type = get("PLAYWRIGHT_REPORT_TYPE") or "auto"
 
     # Prefer the explicit Playwright credential names, but fall back to the
     # workflow-wide service principal secrets that artifact-runner.yml sets.
@@ -273,7 +277,14 @@ def load_config(
             ),
             "FABRIC_TENANT_ID": config.tenant_id,
         }
-        if config.report_type != "paginated":
+        if config.report_type == "auto":
+            # Static .env-only mode supplies workspace/report/dataset IDs
+            # directly rather than resolving a name against Fabric, so there
+            # is nothing for auto-detection to detect from -- unlike
+            # --artifact mode, this one path still requires the caller to
+            # state the type.
+            required_fields["PLAYWRIGHT_REPORT_TYPE"] = ""
+        elif config.report_type != "paginated":
             required_fields["PLAYWRIGHT_DATASET_ID"] = config.dataset_id
         missing = [name for name, value in required_fields.items() if not value]
         if missing:

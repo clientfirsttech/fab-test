@@ -39,6 +39,7 @@ def base_config() -> PlaywrightValidationConfig:
         tenant_id="tenant-1",
         timeout_seconds=60,
         headless=True,
+        report_type="report",
     )
 
 

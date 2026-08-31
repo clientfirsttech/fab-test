@@ -24,6 +24,7 @@ def temp_env_file(tmp_path: Path) -> Path:
                 "PLAYWRIGHT_REPORT_ID=rpt-1",
                 "PLAYWRIGHT_REPORT_NAME=SalesReport",
                 "PLAYWRIGHT_DATASET_ID=ds-1",
+                "PLAYWRIGHT_REPORT_TYPE=report",
                 "PLAYWRIGHT_PAGE_IDS=page1, page2",
                 "PLAYWRIGHT_BOOKMARK_IDS=bmk1",
                 "PLAYWRIGHT_USER_NAME=user@example.com",
@@ -59,6 +60,7 @@ def test_load_config_from_env_file(temp_env_file: Path) -> None:
         tenant_id="tenant-1",
         timeout_seconds=120,
         headless=False,
+        report_type="report",
     )
 
 
@@ -90,6 +92,7 @@ def test_load_config_defaults_when_optional_omitted(
                 "PLAYWRIGHT_REPORT_ID=rpt-1",
                 "PLAYWRIGHT_REPORT_NAME=Report",
                 "PLAYWRIGHT_DATASET_ID=ds-1",
+                "PLAYWRIGHT_REPORT_TYPE=report",
                 "FABRIC_CLIENT_ID=client-1",
                 "FABRIC_CLIENT_SECRET=secret-1",
                 "FABRIC_TENANT_ID=tenant-1",
@@ -122,6 +125,7 @@ def test_load_config_falls_back_to_fabric_service_principal(
                 "PLAYWRIGHT_REPORT_ID=rpt-1",
                 "PLAYWRIGHT_REPORT_NAME=Report",
                 "PLAYWRIGHT_DATASET_ID=ds-1",
+                "PLAYWRIGHT_REPORT_TYPE=report",
                 "FABRIC_SERVICE_PRINCIPAL_ID=sp-id",
                 "FABRIC_SERVICE_PRINCIPAL_SECRET=sp-secret",
                 "FABRIC_TENANT_ID=tenant-1",
@@ -152,11 +156,14 @@ def test_load_config_not_required_allows_missing() -> None:
     assert config.client_secret == ""
 
 
-def test_load_config_defaults_report_type_and_render_wait(
+def test_load_config_defaults_report_type_to_auto_when_not_required(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """PLAYWRIGHT_REPORT_TYPE unset keeps resolving as an interactive report."""
+    """PLAYWRIGHT_REPORT_TYPE unset defaults to "auto" -- detected later from
+    the artifact name at resolution time, not required upfront -- whenever
+    the caller isn't in static .env-only mode (required=False, e.g. the
+    --artifact/--env service-resolved path)."""
     env_path = tmp_path / ".env"
     env_path.write_text(
         "\n".join(
@@ -174,10 +181,38 @@ def test_load_config_defaults_report_type_and_render_wait(
     monkeypatch.delenv("PLAYWRIGHT_REPORT_TYPE", raising=False)
     monkeypatch.delenv("PLAYWRIGHT_RENDER_WAIT_SECONDS", raising=False)
 
-    config = load_config(env_path)
+    config = load_config(env_path, required=False)
 
-    assert config.report_type == "report"
+    assert config.report_type == "auto"
     assert config.render_wait_seconds == 20
+
+
+def test_load_config_required_mode_still_needs_an_explicit_report_type(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Static .env-only mode (required=True: workspace/report/dataset IDs
+    supplied directly, no artifact name) has nothing to auto-detect the
+    report type from, so it stays required there even though --artifact
+    mode no longer needs it."""
+    env_path = tmp_path / ".env"
+    env_path.write_text(
+        "\n".join(
+            [
+                "PLAYWRIGHT_WORKSPACE_ID=ws-1",
+                "PLAYWRIGHT_REPORT_ID=rpt-1",
+                "PLAYWRIGHT_DATASET_ID=ds-1",
+                "FABRIC_CLIENT_ID=client-1",
+                "FABRIC_CLIENT_SECRET=secret-1",
+                "FABRIC_TENANT_ID=tenant-1",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.delenv("PLAYWRIGHT_REPORT_TYPE", raising=False)
+
+    with pytest.raises(ValueError, match="PLAYWRIGHT_REPORT_TYPE"):
+        load_config(env_path)
 
 
 def test_load_config_reads_report_type_and_render_wait_seconds(
@@ -231,8 +266,11 @@ def test_load_config_paginated_does_not_require_dataset_id(
     assert config.dataset_id == ""
 
 
-def test_load_config_missing_dataset_id_still_required_for_interactive_report() -> None:
-    """An interactive report (the default) still requires a dataset_id."""
+def test_load_config_missing_dataset_id_still_required_for_interactive_report(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An explicitly-declared interactive report still requires a dataset_id."""
+    monkeypatch.setenv("PLAYWRIGHT_REPORT_TYPE", "report")
     with pytest.raises(ValueError) as exc_info:
         load_config(Path("/nonexistent/.env"))
     assert "PLAYWRIGHT_DATASET_ID" in str(exc_info.value)

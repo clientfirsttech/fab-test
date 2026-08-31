@@ -62,6 +62,9 @@ alongside `Report` for the Paginated Report Testing epic, so
 `WORKSPACE.Workspace/NAME.PaginatedReport` parses). The packaged copy is the
 fallback so an install from PyPI or a run outside a checkout behaves
 identically; a malformed map takes the same path as a missing one and warns.
+A local paginated report is the one type here with no corresponding folder
+convention: it is a flat `NAME.rdl` file, discovered by `playwright`
+specifically (see [Flags](flags.md)) rather than through this suffix map.
 Adding a type means editing the map, not the code.
 
 **What is pruned, and why it is load-bearing.** Nested git checkouts
