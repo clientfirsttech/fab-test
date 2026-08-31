@@ -33,6 +33,14 @@ class RdlPowerBiDataSource:
     dataset_id: str
 
 
+@dataclass(frozen=True)
+class RdlReportParameter:
+    """One report parameter declared in an ``.rdl`` file's ``ReportParameters``."""
+
+    name: str
+    multi_value: bool
+
+
 def _local_name(tag: str) -> str:
     """Strip an XML namespace from a tag: ``{ns}DataSource`` -> ``DataSource``."""
     return tag.rsplit("}", 1)[-1]
@@ -70,3 +78,40 @@ def parse_rdl_power_bi_datasource(rdl_path: Path) -> RdlPowerBiDataSource | None
             workspace_name=workspace_name, dataset_id=match.group(1)
         )
     return None
+
+
+def parse_rdl_report_parameters(rdl_path: Path) -> list[RdlReportParameter]:
+    """Return the report parameters declared in an ``.rdl`` file's own
+    ``<ReportParameters>`` block.
+
+    A paginated report's dropdown-driven filter errors (Paginated Report
+    Parameter Testing epic) only surface once a real value is selected --
+    something ``fab-test`` cannot do without first knowing which parameters
+    the report declares and whether each accepts one value or several.
+    Returns an empty list for a file with no parameters, or one that cannot
+    be read or parsed.
+    """
+    try:
+        # A repo-local .rdl file the caller already has checked out, not
+        # attacker-controlled input fetched from the network.
+        root = ET.parse(rdl_path).getroot()  # noqa: S314
+    except (OSError, ET.ParseError):
+        return []
+
+    parameters: list[RdlReportParameter] = []
+    for report_parameters in root.iter():
+        if _local_name(report_parameters.tag) != "ReportParameters":
+            continue
+        for parameter in report_parameters:
+            if _local_name(parameter.tag) != "ReportParameter":
+                continue
+            name = parameter.get("Name", "")
+            if not name:
+                continue
+            multi_value = any(
+                _local_name(child.tag) == "MultiValue"
+                and (child.text or "").strip().lower() == "true"
+                for child in parameter
+            )
+            parameters.append(RdlReportParameter(name=name, multi_value=multi_value))
+    return parameters

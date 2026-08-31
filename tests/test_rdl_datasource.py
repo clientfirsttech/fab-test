@@ -8,7 +8,9 @@ from pathlib import Path
 
 from fabric_ci_cd_dataops.scripts.playwright_validation.rdl_datasource import (
     RdlPowerBiDataSource,
+    RdlReportParameter,
     parse_rdl_power_bi_datasource,
+    parse_rdl_report_parameters,
 )
 
 _PBI_DATASOURCE_RDL = """<?xml version="1.0" encoding="utf-8"?>
@@ -102,3 +104,76 @@ def test_returns_none_when_connect_string_has_no_recognizable_catalog(
     )
 
     assert parse_rdl_power_bi_datasource(rdl_path) is None
+
+
+_MULTI_VALUE_PARAMETER_RDL = """<?xml version="1.0" encoding="utf-8"?>
+<Report xmlns="http://schemas.microsoft.com/sqlserver/reporting/2016/01/reportdefinition" xmlns:rd="http://schemas.microsoft.com/SQLServer/reporting/reportdesigner">
+  <ReportParameters>
+    <ReportParameter Name="ReportParameter1">
+      <DataType>Integer</DataType>
+      <MultiValue>true</MultiValue>
+    </ReportParameter>
+  </ReportParameters>
+</Report>
+"""
+
+_SINGLE_VALUE_PARAMETER_RDL = """<?xml version="1.0" encoding="utf-8"?>
+<Report xmlns="http://schemas.microsoft.com/sqlserver/reporting/2016/01/reportdefinition" xmlns:rd="http://schemas.microsoft.com/SQLServer/reporting/reportdesigner">
+  <ReportParameters>
+    <ReportParameter Name="ReportParameter1">
+      <DataType>Integer</DataType>
+    </ReportParameter>
+  </ReportParameters>
+</Report>
+"""
+
+_NO_PARAMETERS_RDL = """<?xml version="1.0" encoding="utf-8"?>
+<Report xmlns="http://schemas.microsoft.com/sqlserver/reporting/2016/01/reportdefinition" xmlns:rd="http://schemas.microsoft.com/SQLServer/reporting/reportdesigner">
+  <DataSources />
+</Report>
+"""
+
+
+def test_parses_a_multi_value_report_parameter(tmp_path: Path) -> None:
+    """<MultiValue>true</MultiValue> marks a parameter as multi-select."""
+    rdl_path = tmp_path / "WithMultiFilter.rdl"
+    rdl_path.write_text(_MULTI_VALUE_PARAMETER_RDL, encoding="utf-8")
+
+    assert parse_rdl_report_parameters(rdl_path) == [
+        RdlReportParameter(name="ReportParameter1", multi_value=True)
+    ]
+
+
+def test_parses_a_single_value_report_parameter(tmp_path: Path) -> None:
+    """No <MultiValue> element means single-select."""
+    rdl_path = tmp_path / "WithFilter.rdl"
+    rdl_path.write_text(_SINGLE_VALUE_PARAMETER_RDL, encoding="utf-8")
+
+    assert parse_rdl_report_parameters(rdl_path) == [
+        RdlReportParameter(name="ReportParameter1", multi_value=False)
+    ]
+
+
+def test_returns_empty_list_when_no_parameters_declared(tmp_path: Path) -> None:
+    """A report with no <ReportParameters> block has nothing to apply."""
+    rdl_path = tmp_path / "LocalSemanticModel.rdl"
+    rdl_path.write_text(_NO_PARAMETERS_RDL, encoding="utf-8")
+
+    assert parse_rdl_report_parameters(rdl_path) == []
+
+
+def test_report_parameters_returns_empty_list_for_a_missing_file(
+    tmp_path: Path,
+) -> None:
+    """No .rdl file at all -- nothing to parse, no exception."""
+    assert parse_rdl_report_parameters(tmp_path / "does-not-exist.rdl") == []
+
+
+def test_report_parameters_returns_empty_list_for_a_malformed_file(
+    tmp_path: Path,
+) -> None:
+    """Invalid XML fails closed rather than raising into the caller."""
+    rdl_path = tmp_path / "broken.rdl"
+    rdl_path.write_text("<Report><Unclosed>", encoding="utf-8")
+
+    assert parse_rdl_report_parameters(rdl_path) == []

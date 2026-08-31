@@ -135,6 +135,7 @@ class PlaywrightValidationConfig:
     report_type: str = "auto"
     render_wait_seconds: int = 20
     dataset_workspace_id: str = ""
+    report_parameters: str = "[]"
 
     def to_test_case_dict(self) -> dict[str, Any]:
         """Return non-secret fields as a dictionary for test-case generation."""
@@ -263,6 +264,7 @@ def load_config(
         report_type=report_type,
         render_wait_seconds=int(get("PLAYWRIGHT_RENDER_WAIT_SECONDS") or "20"),
         dataset_workspace_id=get("PLAYWRIGHT_DATASET_WORKSPACE_ID"),
+        report_parameters=get("PLAYWRIGHT_REPORT_PARAMETERS") or "[]",
     )
 
     if required:

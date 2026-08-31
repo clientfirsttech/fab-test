@@ -46,6 +46,7 @@ class TestCase:
     role: str
     report_type: str = "report"
     render_wait_seconds: int = 20
+    report_parameters: str = "[]"
 
 
 def _default_page() -> tuple[str, str]:
@@ -146,6 +147,7 @@ def _build_paginated_case(config: PlaywrightValidationConfig) -> TestCase:
         role=role,
         report_type="paginated",
         render_wait_seconds=getattr(config, "render_wait_seconds", 20),
+        report_parameters=getattr(config, "report_parameters", "[]"),
     )
 
 
@@ -273,6 +275,7 @@ def write_test_cases(
         "role",
         "report_type",
         "render_wait_seconds",
+        "report_parameters",
     ]
 
     with open(csv_path, "w", newline="", encoding="utf-8") as fh:

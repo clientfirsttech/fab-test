@@ -130,6 +130,17 @@ def _add_common_flags(
         dest="report",
         help="Suppress HTML report generation (the default)",
     )
+    parser.add_argument(
+        "--open-report",
+        action="store_true",
+        dest="open_report",
+        default=None,
+        help=(
+            "Open the produced HTML report/index in the default browser "
+            "after the run; implies --report and is suppressed under CI "
+            "[env: ANALYZER_OPEN_REPORT]"
+        ),
+    )
     telemetry_group = parser.add_mutually_exclusive_group()
     telemetry_group.add_argument(
         "--telemetry",
@@ -485,6 +496,18 @@ def _add_playwright_subparser(subs: argparse._SubParsersAction) -> None:
             "*.Report/*.PaginatedReport folder's own suffix decides it "
             "automatically; --artifact with no local match tries Report "
             "then PaginatedReport) [env: PLAYWRIGHT_REPORT_TYPE]"
+        ),
+    )
+    playwright_p.add_argument(
+        "--report-parameters",
+        default="",
+        dest="report_parameters",
+        metavar="JSON",
+        help=(
+            "Force the paginated report's declared parameters instead of "
+            "deriving them from a local .rdl file's own <ReportParameters> "
+            "block, as a JSON list of {\"name\": ..., \"multi_value\": ...} "
+            "[internal: set by fab-test's own discovery]"
         ),
     )
     playwright_p.add_argument(
