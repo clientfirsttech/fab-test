@@ -581,6 +581,13 @@ def _run_npm_build(analyzer_name: str, build_root: Path, tool_install: dict[str,
     )
 
 
+def _raise_entrypoint_not_found(analyzer_name: str, extract_dir: Path, build_entrypoint: str) -> None:
+    raise RuntimeError(
+        f"Could not locate built entry point for {analyzer_name} inside "
+        f"{extract_dir} (expected: {build_entrypoint!r})."
+    )
+
+
 def _download_build_and_cache(
     analyzer_name: str,
     tool_install: dict[str, Any],
@@ -612,10 +619,7 @@ def _download_build_and_cache(
             _run_npm_build(analyzer_name, build_root, tool_install)
             entrypoint = _find_executable(extract_dir, build_entrypoint)
             if entrypoint is None:
-                raise RuntimeError(
-                    f"Could not locate built entry point for {analyzer_name} inside "
-                    f"{extract_dir} (expected: {build_entrypoint!r})."
-                )
+                _raise_entrypoint_not_found(analyzer_name, extract_dir, build_entrypoint)
     except Exception:
         shutil.rmtree(extract_dir, ignore_errors=True)
         raise

@@ -30,7 +30,6 @@ from fabric_ci_cd_dataops.scripts._analyzer_tool_bootstrap import (
 @pytest.mark.fab_test
 def test_resolve_executable_downloads_and_extracts_zip(tmp_path, monkeypatch):
     """Missing tool is downloaded from install URL and extracted from zip."""
-    import zipfile
 
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
@@ -109,7 +108,6 @@ def test_resolve_executable_prefers_existing_path(tmp_path, monkeypatch):
 @pytest.mark.fab_test
 def test_resolve_executable_uses_committed_install_url(tmp_path, monkeypatch):
     """If no env var is set, a committed install_url in analyzers.json is used."""
-    import zipfile
 
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
@@ -158,7 +156,6 @@ def test_resolve_executable_uses_committed_install_url(tmp_path, monkeypatch):
 @pytest.mark.fab_test
 def test_resolve_executable_env_install_url_wins_over_committed(tmp_path, monkeypatch):
     """The env-var install URL takes precedence over the committed install_url."""
-    import zipfile
 
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
@@ -215,7 +212,6 @@ def test_resolve_executable_env_install_url_wins_over_committed(tmp_path, monkey
 @pytest.mark.fab_test
 def test_resolve_executable_selects_platform_specific_url_and_subpath(tmp_path, monkeypatch):
     """Platform-specific install_urls and executable_subpaths are honored."""
-    import zipfile
 
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
@@ -343,7 +339,6 @@ def test_verify_checksum_match_leaves_file_in_place(tmp_path):
 
 
 def _write_zip_with_executable(zip_path: Path, exe_path: Path, arcname: str) -> None:
-    import zipfile
 
     exe_path.parent.mkdir(parents=True, exist_ok=True)
     exe_path.write_text("#!/bin/sh\necho hi", encoding="utf-8")

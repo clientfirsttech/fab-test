@@ -67,7 +67,14 @@ class TestBuildA11yCommand:
 class TestMapA11ySeverity:
     @pytest.mark.parametrize(
         "raw,expected",
-        [("fail", "error"), ("warn", "warning"), ("info", "info"), ("pass", "info"), (None, "warning"), ("", "warning")],
+        [
+            ("fail", "error"),
+            ("warn", "warning"),
+            ("info", "info"),
+            ("pass", "info"),
+            (None, "warning"),
+            ("", "warning"),
+        ],
     )
     def test_mapping(self, raw, expected):
         assert _map_a11y_severity(raw) == expected

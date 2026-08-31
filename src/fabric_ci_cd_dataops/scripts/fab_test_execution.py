@@ -28,6 +28,10 @@ from ._fab_test_context import (
     _PYPROJECT_CONFIG,
     RESULTS_ROOT,
 )
+from ._playwright_timeout_scaling import (
+    Narration as PlaywrightNarration,
+)
+from ._playwright_timeout_scaling import run_playwright_with_scaled_timeout
 from ._report_html import resolve_report
 from ._run_manifest import RunManifest
 from ._scan import find_skipped_checkouts as _find_skipped_checkouts
@@ -53,10 +57,6 @@ from .fab_test_registry import (
 from .fab_test_registry import (
     is_repository_scoped as _is_repository_scoped,
 )
-from ._playwright_timeout_scaling import (
-    Narration as PlaywrightNarration,
-)
-from ._playwright_timeout_scaling import run_playwright_with_scaled_timeout
 from .fab_test_registry import (
     playwright_test_cases_dir as _playwright_test_cases_dir,
 )

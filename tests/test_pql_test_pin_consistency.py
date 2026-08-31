@@ -49,8 +49,7 @@ def _claimed_versions(relative_path: Path) -> list[tuple[Path, int, str]]:
     found = []
     for line_no, line in enumerate(text.splitlines(), start=1):
         for pattern in _PIN_CLAIM_PATTERNS:
-            for match in pattern.finditer(line):
-                found.append((relative_path, line_no, match.group(1)))
+            found.extend((relative_path, line_no, match.group(1)) for match in pattern.finditer(line))
     return found
 
 

@@ -169,12 +169,15 @@ def extract_findings(result: dict[str, Any]) -> list[dict[str, Any]]:
     for page_report in result.get("pages", []) or []:
         page = page_report.get("page", {}) or {}
         page_name = page.get("displayName") or page.get("id") or "?"
-        for issue in page_report.get("issues", []) or []:
-            findings.append(_normalize_a11y_issue(page_name, None, issue))
+        findings.extend(
+            _normalize_a11y_issue(page_name, None, issue) for issue in page_report.get("issues", []) or []
+        )
         for visual_report in page_report.get("visuals", []) or []:
             visual_name = _visual_label(visual_report.get("visual", {}) or {})
-            for issue in visual_report.get("issues", []) or []:
-                findings.append(_normalize_a11y_issue(page_name, visual_name, issue))
+            findings.extend(
+                _normalize_a11y_issue(page_name, visual_name, issue)
+                for issue in visual_report.get("issues", []) or []
+            )
     return findings
 
 
