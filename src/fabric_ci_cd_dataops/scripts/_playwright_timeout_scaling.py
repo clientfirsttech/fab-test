@@ -24,9 +24,10 @@ import os
 import subprocess
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from ._fab_test_context import _DEFAULT_SUBPROCESS_TIMEOUT
 
@@ -76,8 +77,7 @@ def _drain_pipe(pipe: Any, chunks: list[str]) -> None:
     if pipe is None:
         return
     try:
-        for line in iter(pipe.readline, ""):
-            chunks.append(line)
+        chunks.extend(iter(pipe.readline, ""))
     finally:
         pipe.close()
 
@@ -101,7 +101,7 @@ def run_playwright_with_scaled_timeout(
     display_name: str,
     test_cases_path: Path,
     narration: Narration,
-) -> "subprocess.CompletedProcess | tuple[str, int]":
+) -> subprocess.CompletedProcess | tuple[str, int]:
     """Run the playwright subprocess with a timeout that extends once the
     real generated case count is known, instead of one flat number sized
     for a single case.
@@ -159,7 +159,7 @@ def run_playwright_with_scaled_timeout(
     stderr_text = "".join(stderr_chunks)
 
     if timed_out:
-        effective_timeout = int(round(deadline - start))
+        effective_timeout = round(deadline - start)
         narration.narrate(
             f"  ⏰ fab-test {name}: timed out after {effective_timeout}s for {display_name}",
             output_format=output_format,

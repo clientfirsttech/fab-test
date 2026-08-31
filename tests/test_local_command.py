@@ -251,8 +251,7 @@ def test_local_dry_run_emits_single_json_plan(tmp_path, monkeypatch, capsys):
 @pytest.mark.fab_test
 def test_local_dry_run_never_spawns_a_subprocess(tmp_path, monkeypatch):
     """--dry-run never spawns a subprocess for any analyzer."""
-    from fabric_ci_cd_dataops.scripts import fab_test_execution
-    from fabric_ci_cd_dataops.scripts import fab_test_local
+    from fabric_ci_cd_dataops.scripts import fab_test_execution, fab_test_local
 
     _write_pbip_project(tmp_path, "SampleModel")
     monkeypatch.setattr(

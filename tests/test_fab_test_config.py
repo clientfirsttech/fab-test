@@ -239,10 +239,9 @@ def test_clean_tools_dry_run_lists_without_deleting(tmp_path, capsys):
 
 
 @pytest.mark.fab_test
-def test_clean_tools_nothing_to_clean_when_missing(tmp_path, capsys):
+def test_clean_tools_nothing_to_clean_when_missing(tmp_path):
     """A missing .fab-test-tools cache exits cleanly with a clear message."""
     code = _clean_tools(tmp_path, dry_run=False)
-    captured = capsys.readouterr()
 
     assert code == 0
 

@@ -2,6 +2,7 @@
 
 import sys
 from pathlib import Path
+from typing import ClassVar
 from unittest import mock
 
 import pytest
@@ -120,7 +121,7 @@ class TestValidateEnvironmentsSchema:
 class TestValidateEnvBlock:
     """Tests for _validate_env_block's structural branches."""
 
-    BASE_BLOCK = {
+    BASE_BLOCK: ClassVar = {
         "description": "Development",
         "workspace_id": "ws-dev",
         "allowed_branches": ["develop"],
