@@ -126,7 +126,10 @@ def _print_json(payload: dict) -> None:
     print(json.dumps(payload, indent=2))
 
 
-_KNOWN_SKILL_NAMES = ("fab-test",)
+_REFERENCE_TABLE_ROW = re.compile(
+    r"^\|\s*\[references/([\w-]+)\.md\]\(references/[\w-]+\.md\)\s*\|\s*(.+?)\s*\|\s*$",
+    re.MULTILINE,
+)
 
 
 def _skill_frontmatter_description(main_content: str) -> str:
@@ -136,16 +139,28 @@ def _skill_frontmatter_description(main_content: str) -> str:
     return ""
 
 
+def _reference_topics(main_content: str) -> list[tuple[str, str]]:
+    """Parse SKILL.md's own "## Reference files" table (name, description)
+    per row -- the sub-topics a person means by "list the skill files" --
+    rather than hardcoding a second list that would drift from it."""
+    return _REFERENCE_TABLE_ROW.findall(main_content)
+
+
 def _skill_list(output_format: str, resolved) -> int:
     main_content = (resolved.path / "SKILL.md").read_text(encoding="utf-8")
     rows = [
         {
-            "name": name,
+            "name": "fab-test",
             "description": _skill_frontmatter_description(main_content),
             "source_path": str(resolved.path / "SKILL.md"),
         }
-        for name in _KNOWN_SKILL_NAMES
     ]
+    for name, description in _reference_topics(main_content):
+        rows.append({
+            "name": name,
+            "description": description,
+            "source_path": str(resolved.path / "references" / f"{name}.md"),
+        })
     if output_format == "json":
         print(json.dumps(rows, indent=2))
     else:
@@ -154,16 +169,38 @@ def _skill_list(output_format: str, resolved) -> int:
     return 0
 
 
-def _skill_print_named(name: str | None, output_format: str, resolved) -> int:
-    """Validate an explicit `name` positional, then print -- split out of
-    `_skill` to keep its own branch count under the complexity ratchet."""
-    if name is not None and name not in _KNOWN_SKILL_NAMES:
-        narrate(
-            f"fab-test skill: unknown skill '{name}' -- available: {', '.join(_KNOWN_SKILL_NAMES)}",
-            output_format=output_format,
-        )
-        return 2
-    return _skill_print(output_format, resolved)
+def _skill_print_reference(name: str, output_format: str, resolved) -> int:
+    target = resolved.path / "references" / f"{name}.md"
+    content = target.read_text(encoding="utf-8")
+    if output_format == "json":
+        _print_json({
+            "version": _FAB_TEST_VERSION,
+            "source_path": str(target),
+            "content": content,
+        })
+    else:
+        print(content)
+    return 0
+
+
+def _skill_print_named(name: str, output_format: str, resolved) -> int:
+    """Resolve an explicit `name` positional to the main skill, a reference
+    topic, or an error -- split out of `_skill` to keep its own branch
+    count under the complexity ratchet."""
+    if name == "fab-test":
+        return _skill_print(output_format, resolved)
+
+    main_content = (resolved.path / "SKILL.md").read_text(encoding="utf-8")
+    topics = dict(_reference_topics(main_content))
+    if name in topics:
+        return _skill_print_reference(name, output_format, resolved)
+
+    available = ", ".join(["fab-test", *topics])
+    narrate(
+        f"fab-test skill: unknown skill '{name}' -- available: {available}",
+        output_format=output_format,
+    )
+    return 2
 
 
 def _skill_print(output_format: str, resolved) -> int:
@@ -286,21 +323,21 @@ def _skill_uninstall(harness: str | None, output_format: str) -> int:
 
 
 def _skill(args: argparse.Namespace) -> int:
-    """`fab-test skill`: print the resolved skill content, list, or install it.
+    """`fab-test skill`: list skills and topics, print one by name, or install it.
 
-    Bare, prints the repo-override-first resolved main SKILL.md (`--format
-    json` wraps it with version/source metadata and the reference file
-    paths) -- unchanged from before `--list`/`name` existed, so existing
-    callers (docs, the `document` skill) keep working. `--list` prints the
-    known skill names with their descriptions instead (today a one-row
-    list; fab-test packages only its own skill). An explicit `name`
-    positional prints that skill's content -- currently only "fab-test" is
-    valid, so this is symmetry for a future second skill rather than new
-    behavior today. `--install <harness>` writes or updates every
-    component (SKILL.md/instructions file plus references/*.md) for that
-    harness; `--show` reports install state per harness; `--uninstall`
-    (paired with `--install <harness>`) removes only a directory this
-    command's own marker text identifies as its.
+    Bare, lists the main "fab-test" skill plus one row per reference
+    topic (parsed from SKILL.md's own "## Reference files" table, so the
+    two can't drift apart) -- each with its description and the file
+    it'll print. `fab-test skill fab-test` prints the repo-override-first
+    resolved main SKILL.md (`--format json` wraps it with version/source
+    metadata and the reference file paths); `fab-test skill <topic>`
+    (e.g. `flags`, `credentials`) prints that references/*.md file the
+    same way, without the reference-paths list since it has none of its
+    own. `--install <harness>` writes or updates every component
+    (SKILL.md/instructions file plus references/*.md) for that harness;
+    `--show` reports install state per harness; `--uninstall` (paired
+    with `--install <harness>`) removes only a directory this command's
+    own marker text identifies as its.
     """
     output_format = getattr(args, "output_format", "text")
 
@@ -327,7 +364,8 @@ def _skill(args: argparse.Namespace) -> int:
             force=getattr(args, "force", False),
         )
 
-    if getattr(args, "list", False):
+    name = getattr(args, "name", None)
+    if name is None:
         return _skill_list(output_format, resolved)
 
-    return _skill_print_named(getattr(args, "name", None), output_format, resolved)
+    return _skill_print_named(name, output_format, resolved)

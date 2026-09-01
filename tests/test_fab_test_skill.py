@@ -1,7 +1,9 @@
-"""Tests for `fab-test skill` (fab-test Skill Distribution/Componentization epics).
+"""Tests for `fab-test skill` (fab-test Skill Distribution/Componentization/
+Listing epics).
 
-`fab-test skill` prints the resolved skill content and, with `--install`,
-writes a harness-specific copy of the whole component set (main
+Bare `fab-test skill` lists known skill names with their descriptions;
+`fab-test skill <name>` prints that skill's resolved content. With
+`--install`, writes a harness-specific copy of the whole component set (main
 SKILL.md/instructions file plus references/*.md) into a consumer
 repository -- the anti-drift install path this epic exists to add,
 following `fab-test init`'s idempotent/never-clobber/`--dry-run`
@@ -27,7 +29,6 @@ def _args(**overrides) -> argparse.Namespace:
         "uninstall": False,
         "dry_run": False,
         "force": False,
-        "list": False,
         "name": None,
     }
     defaults.update(overrides)
@@ -42,7 +43,11 @@ def _write_skill_dir(root, *, description=None):
     skill_dir = root / ".fab-test" / "skill"
     (skill_dir / "references").mkdir(parents=True)
     (skill_dir / "SKILL.md").write_text(
-        f"---\nname: fab-test\ndescription: {description}\n---\nbody\n",
+        f"---\nname: fab-test\ndescription: {description}\n---\nbody\n\n"
+        "## Reference files\n\n"
+        "| File | Read it when... |\n"
+        "|------|------------------|\n"
+        "| [references/flags.md](references/flags.md) | You need the full flag table |\n",
         encoding="utf-8",
     )
     (skill_dir / "references" / "flags.md").write_text("# Flags\ncontent\n", encoding="utf-8")
@@ -59,18 +64,51 @@ def _repo_root(tmp_path, monkeypatch):
     return tmp_path
 
 
-def test_bare_skill_prints_the_main_files_content(capsys):
+def test_bare_skill_lists_the_main_skill_and_its_reference_topics(capsys):
     exit_code = skill_module._skill(_args())
 
     assert exit_code == 0
-    assert "name: fab-test" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "fab-test" in out
+    assert "flags" in out
 
 
-def test_named_skill_prints_the_same_content_as_bare(capsys):
+def test_bare_skill_format_json_reports_name_and_description_per_row(capsys):
+    exit_code = skill_module._skill(_args(output_format="json"))
+
+    assert exit_code == 0
+    payload = json.loads(capsys.readouterr().out)
+    names = {row["name"] for row in payload}
+    assert names == {"fab-test", "flags"}
+    for row in payload:
+        assert row["description"]
+        assert row["source_path"]
+
+
+def test_named_skill_prints_its_content(capsys):
     exit_code = skill_module._skill(_args(name="fab-test"))
 
     assert exit_code == 0
     assert "name: fab-test" in capsys.readouterr().out
+
+
+def test_named_reference_topic_prints_that_reference_files_content(capsys):
+    exit_code = skill_module._skill(_args(name="flags"))
+
+    assert exit_code == 0
+    out = capsys.readouterr().out
+    assert "# Flags" in out
+    assert "content" in out
+
+
+def test_named_reference_topic_format_json_wraps_version_source_and_content(capsys):
+    exit_code = skill_module._skill(_args(name="flags", output_format="json"))
+
+    assert exit_code == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["version"]
+    assert payload["source_path"].endswith("flags.md")
+    assert "# Flags" in payload["content"]
 
 
 def test_unknown_name_errors_with_available_skills_listed(capsys):
@@ -80,29 +118,11 @@ def test_unknown_name_errors_with_available_skills_listed(capsys):
     err = capsys.readouterr().out
     assert "does-not-exist" in err
     assert "fab-test" in err
+    assert "flags" in err
 
 
-def test_list_flag_reports_the_known_skill_text(capsys):
-    exit_code = skill_module._skill(_args(list=True))
-
-    assert exit_code == 0
-    out = capsys.readouterr().out
-    assert "fab-test" in out
-
-
-def test_list_flag_format_json_reports_name_and_description(capsys):
-    exit_code = skill_module._skill(_args(list=True, output_format="json"))
-
-    assert exit_code == 0
-    payload = json.loads(capsys.readouterr().out)
-    assert len(payload) == 1
-    assert payload[0]["name"] == "fab-test"
-    assert payload[0]["source_path"].endswith("SKILL.md")
-    assert payload[0]["description"]
-
-
-def test_skill_format_json_wraps_version_source_and_reference_paths(capsys):
-    exit_code = skill_module._skill(_args(output_format="json"))
+def test_named_skill_format_json_wraps_version_source_and_reference_paths(capsys):
+    exit_code = skill_module._skill(_args(name="fab-test", output_format="json"))
 
     assert exit_code == 0
     payload = json.loads(capsys.readouterr().out)

@@ -840,18 +840,13 @@ def _add_init_subparser(subs: argparse._SubParsersAction) -> None:
 def _add_skill_subparser(subs: argparse._SubParsersAction) -> None:
     skill_p = subs.add_parser(
         "skill",
-        help="Print fab-test's own skill resource, or install it into an agent harness",
+        help="List fab-test's own skill resource, print one by name, or install it into an agent harness",
     )
     skill_p.add_argument(
         "name",
         nargs="?",
         default=None,
-        help="Skill name to print (default: fab-test, the only one currently packaged)",
-    )
-    skill_p.add_argument(
-        "--list",
-        action="store_true",
-        help="List available skill names with their descriptions instead of printing content",
+        help="'fab-test' or a reference topic (e.g. 'flags') to print; omit to list them",
     )
     skill_p.add_argument(
         "--install",
