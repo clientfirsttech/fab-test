@@ -1,6 +1,6 @@
 # Open Report Flag Epic
 
-**Status**: 📋 PLANNED
+**Status**: ✅ COMPLETED
 **Goal**: Let a human skip the three-click "find it in Explorer, double-click" dance after a run by adding `--open-report`, which launches the produced HTML report in the default browser.
 
 ## Overview
