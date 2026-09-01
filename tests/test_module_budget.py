@@ -82,7 +82,7 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
         ),
     ),
     "src/fab_test/scripts/fab_test_summary.py": (
-        883,
+        919,
         (
             "2026-08-23: 12 lines over hard, from unrelated feature work landing "
             "since this file was last at 793; not yet worth a forced split for "
@@ -93,7 +93,15 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
             "nothing single to open) -- Open Report Flag epic, Task 3. Split "
             "into _write_and_open_index/_open_single_analyzer_report to keep "
             "both callers under the branch budget (net new lines, not "
-            "shrinkage, since the decision logic itself is unchanged)."
+            "shrinkage, since the decision logic itself is unchanged). "
+            "2026-08-31: +36 lines making _open_single_analyzer_report build and "
+            "open a per-run index for a single analyzer's several artifacts, "
+            "the same way _write_and_open_index does for `fab-test all` -- was "
+            "printing a warning and opening nothing, which was the inconsistency "
+            "reported for `fab-test a11y` with multiple artifacts. New "
+            "_index_row_fields factors out the envelope-reading rules shared "
+            "with build_all_summary_rows so both index shapes classify status "
+            "identically."
         ),
     ),
     "src/fab_test/scripts/fab_test_registry.py": (

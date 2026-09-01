@@ -846,21 +846,26 @@ def _print_summary(
         for report in reports:
             print(f"  Report: {report}")
         if args is not None:
-            _open_single_analyzer_report(args, results, reports)
+            _open_single_analyzer_report(args, name, results, reports, output_dir)
     return 1 if any_failed else 0
 
 
 def _open_single_analyzer_report(
-    args: argparse.Namespace, results: list[tuple[str, int]], reports: list[str]
+    args: argparse.Namespace,
+    name: str,
+    results: list[tuple[str, int]],
+    reports: list[str],
+    output_dir: Path | None,
 ) -> None:
-    """Open a single-analyzer run's sole report under `--open-report`.
+    """Open a single-analyzer run's report(s) under `--open-report`.
 
     Split out of `_print_summary` to keep that function under the branch
-    budget -- this is one self-contained decision (open, note, or warn),
-    not several the caller needs to see. No per-run index exists for one
-    analyzer with several artifacts (see the epic's Overview), so that
-    shape gets a note instead of an open -- already listed just above,
-    one per line.
+    budget -- this is one self-contained decision (open the sole report,
+    or build and open an index), not several the caller needs to see.
+    Mirrors `_write_and_open_index` so `fab-test a11y` (or `bpa`, `pbir`,
+    ...) with several artifacts behaves the same as `fab-test all` with
+    several analyzers: one index, one thing to open, instead of a warning
+    that nothing launches automatically.
     """
     report_on = resolve_report(args)
     open_wanted = resolve_open_report(args)
@@ -872,12 +877,43 @@ def _open_single_analyzer_report(
             "  ⚠ fab-test: --open-report resolved on but report generation "
             "resolved off; skipping"
         )
-    elif open_wanted and report_on:
-        if len(results) == 1:
-            if reports:
-                open_report_in_browser(reports[0])
-        elif len(results) > 1:
-            print(
-                "  ⚠ fab-test: multiple reports were generated; open one "
-                "directly above (nothing to launch automatically)"
-            )
+        return
+    if not open_wanted:
+        return
+    if len(results) == 1:
+        if reports:
+            open_report_in_browser(reports[0])
+        return
+    if len(results) > 1 and output_dir is not None:
+        rows = [
+            {
+                "analyzer": name,
+                "artifact": stem,
+                **_index_row_fields(output_dir, name, stem, code),
+            }
+            for stem, code in results
+        ]
+        index = write_index(rows, output_dir)
+        if index:
+            print(f"  Index:  {_display_path(index)}")
+            open_report_in_browser(index)
+
+
+def _index_row_fields(
+    output_dir: Path, analyzer: str, stem: str, code: int
+) -> dict[str, Any]:
+    """Return the status/count/path fields `write_index` needs for one artifact.
+
+    Same envelope-reading logic `build_all_summary_rows` uses for `fab-test
+    all`, factored out so a single-analyzer index is built from identical
+    rules -- one status classification, not two that could drift apart.
+    """
+    data = _read_artifact_envelope(output_dir, analyzer, stem)
+    errors, warnings = _envelope_error_warning_counts(data)
+    return {
+        "status": _artifact_status(data, code, errors, warnings),
+        "errors": errors,
+        "warnings": warnings,
+        "output_path": str(output_dir / analyzer / stem / "envelope.json"),
+        "report_path": _report_path_for(data),
+    }

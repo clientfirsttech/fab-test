@@ -178,12 +178,13 @@ def test_no_args_means_no_opening_at_all(tmp_path, monkeypatch):
 
 
 # --------------------------------------------------------------------------- #
-# A single-analyzer command with more than one artifact: note, no opening
+# A single-analyzer command with more than one artifact: same as `all` --
+# write a per-run index and open that, instead of opening nothing.
 # --------------------------------------------------------------------------- #
 
 
 @pytest.mark.fab_test
-def test_multiple_artifacts_prints_a_note_and_opens_nothing(tmp_path, monkeypatch, capsys):
+def test_multiple_artifacts_builds_and_opens_an_index(tmp_path, monkeypatch, capsys):
     output_dir = tmp_path / "fab-test-results"
     _write_envelope(output_dir, "bpa", "First", report_path=str(tmp_path / "first.html"))
     _write_envelope(output_dir, "bpa", "Second", report_path=str(tmp_path / "second.html"))
@@ -199,11 +200,11 @@ def test_multiple_artifacts_prints_a_note_and_opens_nothing(tmp_path, monkeypatc
         "bpa", [("First", 0), ("Second", 0)], output_dir=output_dir, args=args
     )
 
-    assert calls == []
+    assert calls == [output_dir / "index.html"]
     out = capsys.readouterr().out
     assert "first.html" in out
     assert "second.html" in out
-    assert "multiple reports" in out.lower()
+    assert "Index:" in out
 
 
 # --------------------------------------------------------------------------- #
