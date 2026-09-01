@@ -412,6 +412,39 @@ class TestRunPqlTest:
         assert data["status"] == "failed"
         assert len(data["findings"]) == 1
 
+    @mock.patch("fab_test.scripts._analyzer_process.subprocess.run")
+    def test_run_reports_skipped_when_no_results_and_nonzero_exit(
+        self, mock_run, tmp_path: Path
+    ):
+        """A connection failure (no test results at all) is skipped, not failed.
+
+        pql-test exits non-zero with no parsed test results when it never
+        connected to a model -- most commonly a local Desktop session that
+        closed or was never open. There is nothing to report as a finding,
+        so this degrades to skipped like the missing-credentials case does,
+        rather than reporting the misleading "0 tests, 0 passed, 0 failed,
+        0 skipped" failed message.
+        """
+        artifact = tmp_path / "SalesModel.SemanticModel"
+        artifact.mkdir()
+        output = tmp_path / "out.json"
+        mock_run.return_value = mock.Mock(
+            returncode=1, stdout="", stderr="could not connect to model"
+        )
+
+        class Args:
+            artifact_path = str(artifact)
+            artifact_name = "SalesModel"
+            output_path = str(output)
+            workspace_id = ""
+            env = ""
+
+        exit_code = run_pql_test(Args())
+        assert exit_code == 0
+        data = json.loads(output.read_text(encoding="utf-8"))
+        assert data["status"] == "skipped"
+        assert data["findings"] == []
+
     @mock.patch("fab_test.scripts.invoke_pql_test.native_output_path")
     @mock.patch("fab_test.scripts._analyzer_process.subprocess.run")
     def test_run_creates_native_output_parent_dir(

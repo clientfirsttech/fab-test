@@ -108,9 +108,13 @@ what an artifact looks like. A `.fab-test/metadata/artifact-map.json` (or
 the legacy `.github/metadata/artifact-map.json`) overrides it when present.
 
 Skipped while walking: nested git checkouts (worktrees, vendored clones),
-`.venv`, `node_modules`, `__pycache__`, `dist`, `build`, and the run's own
-`--output-dir`. Without those exclusions a scan of this repository returns
-eight artifacts where three are real.
+`.venv`, `node_modules`, `__pycache__`, `dist`, `build`, `.github`, `.claude`,
+and the run's own `--output-dir`. `.github` and `.claude` hold agent
+tooling -- skill instructions, worked examples, worktrees -- not this
+project's own artifacts, so a suffix-matching folder placed there for
+documentation purposes is never mistaken for one to test. Without those
+exclusions a scan of this repository returns eight artifacts where three
+are real.
 
 One consequence is worth knowing: run `fab-test` from a folder that holds
 *repositories* rather than artifacts and it finds nothing, because every
