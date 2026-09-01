@@ -20,7 +20,12 @@ from tabulate import tabulate
 
 from ._analyzer_envelope import normalize_findings, severity_counts
 from ._cli_utils import CHECKOUT_REMEDIATION, skipped_checkout_lines
-from ._report_html import resolve_report, write_index
+from ._report_html import (
+    open_report_in_browser,
+    resolve_open_report,
+    resolve_report,
+    write_index,
+)
 from ._table_style import TABLE_FORMAT, table_padding
 from ._target import target_from_args
 from .fab_test_registry import ANALYZER_REGISTRY, discover_artifacts
@@ -599,6 +604,36 @@ def build_all_summary_rows(
     return rows
 
 
+def _write_and_open_index(
+    rows: list[dict[str, Any]],
+    output_dir: Path,
+    args: argparse.Namespace,
+    analyzers: tuple[str, ...],
+) -> None:
+    """Write the `fab-test all` index and open it under `--open-report`.
+
+    Split out of `_print_all_summary` to keep that function under the
+    branch budget -- this is one self-contained decision (write, name,
+    maybe open), not several the caller needs to see.
+    """
+    report_on = resolve_report(args)
+    open_wanted = resolve_open_report(args)
+    if report_on and len(analyzers) > 1:
+        index = write_index(rows, output_dir)
+        if index:
+            print(f"  Index:  {_display_path(index)}")
+            if open_wanted:
+                open_report_in_browser(index)
+    elif open_wanted and not report_on:
+        # Should not happen -- --open-report auto-enables report generation
+        # (resolve_report) -- but never open a stale or nonexistent report
+        # from a prior run if it somehow does.
+        print(
+            "  ⚠ fab-test: --open-report resolved on but report generation "
+            "resolved off; skipping"
+        )
+
+
 def _print_all_summary(
     output_dir: Path,
     analyzers: tuple[str, ...],
@@ -716,10 +751,7 @@ def _print_all_summary(
         # Built from these same rows, so the index can never report counts
         # that disagree with the table just printed. Only for a multi-analyzer
         # run: indexing one analyzer is a page pointing at a single link.
-        if resolve_report(args) and len(analyzers) > 1:
-            index = write_index(rows, output_dir)
-            if index:
-                print(f"  Index:  {_display_path(index)}")
+        _write_and_open_index(rows, output_dir, args, analyzers)
     print(sep)
     return 1 if any_failed else 0
 
@@ -753,13 +785,17 @@ def _print_summary(
     output_format: str = "text",
     *,
     show_reports: bool = True,
+    args: argparse.Namespace | None = None,
 ) -> int:
     """Print the per-analyzer summary and return 0 or 1.
 
     ``show_reports`` is False under `fab-test all`, which lists every
     report beneath its aggregate table -- printing them here too named
     each one twice. `local` keeps them, because it has no aggregate
-    listing and would otherwise lose the information entirely.
+    listing and would otherwise lose the information entirely. ``args``
+    is optional (existing callers don't pass it) and gates `--open-report`
+    handling the same way -- no `args`, no opening, same as before this
+    parameter existed.
     """
     if output_format == "json":
         rows: list[dict[str, Any]] = []
@@ -809,4 +845,39 @@ def _print_summary(
     if show_reports:
         for report in reports:
             print(f"  Report: {report}")
+        if args is not None:
+            _open_single_analyzer_report(args, results, reports)
     return 1 if any_failed else 0
+
+
+def _open_single_analyzer_report(
+    args: argparse.Namespace, results: list[tuple[str, int]], reports: list[str]
+) -> None:
+    """Open a single-analyzer run's sole report under `--open-report`.
+
+    Split out of `_print_summary` to keep that function under the branch
+    budget -- this is one self-contained decision (open, note, or warn),
+    not several the caller needs to see. No per-run index exists for one
+    analyzer with several artifacts (see the epic's Overview), so that
+    shape gets a note instead of an open -- already listed just above,
+    one per line.
+    """
+    report_on = resolve_report(args)
+    open_wanted = resolve_open_report(args)
+    if open_wanted and not report_on:
+        # Should not happen -- --open-report auto-enables report generation
+        # -- but never open a stale or nonexistent report from a prior run
+        # if it somehow does.
+        print(
+            "  ⚠ fab-test: --open-report resolved on but report generation "
+            "resolved off; skipping"
+        )
+    elif open_wanted and report_on:
+        if len(results) == 1:
+            if reports:
+                open_report_in_browser(reports[0])
+        elif len(results) > 1:
+            print(
+                "  ⚠ fab-test: multiple reports were generated; open one "
+                "directly above (nothing to launch automatically)"
+            )

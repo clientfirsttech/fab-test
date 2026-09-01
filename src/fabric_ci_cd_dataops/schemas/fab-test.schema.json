@@ -39,6 +39,10 @@
       "type": "boolean",
       "description": "Write a readable HTML report beside each result envelope. Opt-in; false unless set. PBIR Inspector's own TestRun.html is unaffected and appears regardless."
     },
+    "open_report": {
+      "type": "boolean",
+      "description": "Open the produced report/index in the default browser after the run. Opt-in; implies report generation; suppressed under CI (GITHUB_ACTIONS or CI set)."
+    },
     "workspace": {
       "type": "string",
       "description": "Default Fabric workspace for targets that name an artifact but not a workspace. A display name or a GUID [env: FABRIC_WORKSPACE_ID]; a positional WORKSPACE.Workspace/NAME.Type target overrides it."

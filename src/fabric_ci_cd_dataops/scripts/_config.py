@@ -36,6 +36,10 @@ _VALID_KEYS: dict[str, type] = {
     # Generate a readable HTML report beside each envelope (Human-Readable
     # Reports §5). Opt-in: false unless asked for.
     "report": bool,
+    # Open the produced report/index in the default browser after the run
+    # (Open Report Flag epic §1). Opt-in, implies `report`, suppressed
+    # under CI.
+    "open_report": bool,
     # Rule overlays (Config Consolidation §6-7): {"bpa": {...}, "pbir": {...}}.
     # Nested disable/severity/extend keys are validated by _rule_overlay.py
     # itself at use time, not here.

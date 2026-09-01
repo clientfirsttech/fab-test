@@ -125,6 +125,14 @@ fab-test pql-test SampleModel-PQLAssert --env DEV
 
 `--artifact SampleModel-PQLAssert` still works as a deprecated alias.
 
+### Open the HTML report automatically
+
+```bash
+fab-test bpa --open-report
+```
+
+`--open-report` implies `--report` and opens the produced report (or, for `fab-test all`, the run's `index.html`) in your default browser once the run finishes — skip the "find it in Explorer, double-click" step. This is a local convenience only: it is automatically suppressed under CI (falls back to printing the path), so there is no reason to add it to a pipeline YAML.
+
 ### Naming what to test
 
 Every analyzer subcommand takes an optional target. Omit it and `fab-test` discovers everything matching. The grammar matches `pql-test` and the Fabric CLI, so a target pasted from either works unchanged.
