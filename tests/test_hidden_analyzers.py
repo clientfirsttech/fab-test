@@ -19,7 +19,7 @@ import sys
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts.fab_test_registry import (
+from fab_test.scripts.fab_test_registry import (
     ANALYZER_REGISTRY,
     HIDDEN_ANALYZERS,
     visible_analyzers,
@@ -34,7 +34,7 @@ def artifact_tree(tmp_path):
 
 def _run_cli(*argv):
     return subprocess.run(
-        [sys.executable, "-m", "fabric_ci_cd_dataops.scripts.fab_test", *argv],
+        [sys.executable, "-m", "fab_test.scripts.fab_test", *argv],
         capture_output=True,
         text=True,
         encoding="utf-8",

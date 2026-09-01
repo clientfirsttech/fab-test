@@ -22,7 +22,7 @@ import re
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts.playwright_validation.embed_config import (
+from fab_test.scripts.playwright_validation.embed_config import (
     _PERMISSIONS_READ,
     _TOKEN_TYPE_EMBED,
     _VIEW_MODE_VIEW,

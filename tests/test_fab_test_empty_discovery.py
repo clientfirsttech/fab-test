@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts.fab_test import _run_analyzer
+from fab_test.scripts.fab_test import _run_analyzer
 from tests.conftest import _RunAnalyzerArgs
 
 # --------------------------------------------------------------------------- #

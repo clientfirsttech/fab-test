@@ -12,7 +12,7 @@ import json
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts._pbip_discovery import discover_pbip_projects
+from fab_test.scripts._pbip_discovery import discover_pbip_projects
 
 
 def _write_pbip(root, name, report_relpath):
@@ -128,6 +128,27 @@ def test_discover_finds_multiple_projects_in_nested_directories(tmp_path):
 
     assert len(projects) == 1
     assert projects[0].name == "Nested"
+
+
+@pytest.mark.fab_test
+def test_discover_skips_pbip_files_inside_excluded_directories(tmp_path):
+    """A `.pbip` inside a directory `_scan.EXCLUDED_DIR_NAMES` prunes (`.venv`,
+    `node_modules`, ...) is not discovered -- a vendored sample or cached
+    wheel should not surface as a project any more than a folder-suffix
+    artifact would (pbip Discovery Shared Pruning epic)."""
+    excluded = tmp_path / ".venv" / "lib"
+    excluded.mkdir(parents=True)
+    _write_pbip(excluded, "Vendored", "Vendored.Report")
+
+    visible = tmp_path / "workspace"
+    visible.mkdir()
+    _write_pbip(visible, "Real", "Real.Report")
+    _write_report(visible, "Real", "../Real.SemanticModel")
+    _write_semantic_model(visible, "Real")
+
+    projects = discover_pbip_projects(tmp_path)
+
+    assert [p.name for p in projects] == ["Real"]
 
 
 @pytest.mark.fab_test

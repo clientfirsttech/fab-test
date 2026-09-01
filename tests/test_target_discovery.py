@@ -21,9 +21,9 @@ from pathlib import Path
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts._target import TargetError, parse_target, select_target
-from fabric_ci_cd_dataops.scripts.fab_test import RESULTS_ROOT
-from fabric_ci_cd_dataops.scripts.fab_test_registry import discover_artifacts
+from fab_test.scripts._target import TargetError, parse_target, select_target
+from fab_test.scripts.fab_test import RESULTS_ROOT
+from fab_test.scripts.fab_test_registry import discover_artifacts
 
 
 @pytest.fixture
@@ -37,7 +37,7 @@ def artifact_tree(tmp_path):
 def _run_cli(*argv, cwd=None, env=None):
     merged = {**os.environ, **(env or {})}
     return subprocess.run(
-        [sys.executable, "-m", "fabric_ci_cd_dataops.scripts.fab_test", *argv],
+        [sys.executable, "-m", "fab_test.scripts.fab_test", *argv],
         capture_output=True,
         text=True,
         encoding="utf-8",
@@ -312,7 +312,7 @@ def test_an_artifact_without_a_pbip_is_discovered(tmp_path):
 def test_pbip_pairing_still_enriches_a_discovered_artifact(tmp_path):
     """Pairing stopped deciding whether an artifact exists. It must not have
     stopped supplying the `[from X.pbip]` note and the Desktop binding."""
-    from fabric_ci_cd_dataops.scripts.fab_test_registry import discover_pbip_sources
+    from fab_test.scripts.fab_test_registry import discover_pbip_sources
 
     model = tmp_path / "Sales.SemanticModel"
     model.mkdir()

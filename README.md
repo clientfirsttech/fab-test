@@ -20,9 +20,9 @@ The current pre-release is `1.0.0.0.dev1`. Two things about the command below ar
 not optional:
 
 - **`--extra-index-url https://pypi.org/simple`.** TestPyPI does not carry
-  `pql-test==0.1.12` or a current `fabric-cicd`; it has 0.1.11 and 0.1.7. Without
-  the production index alongside it, the install fails to resolve dependencies,
-  not because anything is wrong with `fab-test`.
+  `pql-test==0.1.12`; it has 0.1.11. Without the production index alongside
+  it, the install fails to resolve that dependency, not because anything is
+  wrong with `fab-test`.
 - **The exact pin.** `1.0.0.0.dev1` is a PEP 440 dev release, and pip skips
   pre-releases unless you name one or pass `--pre`. A bare `pip install fab-test`
   against TestPyPI finds no acceptable version.
@@ -102,7 +102,7 @@ A folder is an artifact because its name ends in a Fabric type suffix:
 CI rather than opened in Desktop: `deployed/Sales.SemanticModel` on its own
 is found.
 
-The suffixes come from [`artifact-map.json`](https://github.com/kerski/fab-test/blob/main/src/fabric_ci_cd_dataops/metadata/artifact-map.json),
+The suffixes come from [`artifact-map.json`](https://github.com/kerski/fab-test/blob/main/src/fab_test/metadata/artifact-map.json),
 packaged with the distribution so an install outside this repository knows
 what an artifact looks like. A `.fab-test/metadata/artifact-map.json` (or
 the legacy `.github/metadata/artifact-map.json`) overrides it when present.
@@ -196,6 +196,12 @@ fab-test bpa --tabular-editor-path "/path/to/TabularEditor.exe"
 # Run PBIR Inspector against Report artifacts
 fab-test pbir --inspector-path "/path/to/PBIRInspectorCLI"
 
+# Run pbir-a11y accessibility checks against Report artifacts (requires
+# Node.js >= 18 and npm the first time -- it's built from source, then
+# cached; see fab-test doctor --analyzer a11y). Not run by `fab-test all`
+# by default -- add "a11y" to fab_test_all in analyzers.json to opt in.
+fab-test a11y
+
 # Run pql-test DAX tests
 fab-test pql-test --env DEV
 
@@ -238,9 +244,18 @@ A run with 5 report x page x bookmark cases and 1 real failure now says so:
 real outcome, so `findings` names only the case that actually failed instead of
 tagging all 5 identically. Each row also points at that case's own evidence
 (`fab-test-results/playwright/test-cases/<case>/screenshot.png`, plus
-`console.json`/`network.json` when there's something to capture); `--report`
-renders those as links right in the table, and the same paths are in
+`console.json`/`network.json` when there's something to capture) and links
+straight back to the report page/bookmark it validated on `app.powerbi.com`;
+`--report` renders both as links right in the table, and the same paths are in
 `envelope.json` for a script or an agent to open directly.
+
+A render timeout or a broken visual now names the real cause. A failed race
+between Power BI's `rendered` and `error` events writes that case's full SDK
+event history to `event_log.json`, and a timeout with no event at all falls
+back to scanning the embedded frame for Power BI's own error panel, writing
+any text it finds to `embed_error_details.txt` and folding it into the
+failure message -- so `envelope.json` names a permissions/token-scope problem
+instead of restating "did not render within 180000ms".
 
 ### Playwright tests every page, bookmark, and role by default
 
@@ -259,6 +274,27 @@ fab-test playwright --artifact "Not Working Visuals" --env dev
 # Only the default page/role, matching every prior release
 fab-test playwright --artifact "Not Working Visuals" --env dev --pages none --roles none
 ```
+
+### Validating a paginated (RDL) report
+
+A Power BI paginated report has no page/bookmark dimension and doesn't fire the
+interactive embed SDK's render events, so it's tested differently -- but you
+don't need to declare any of that up front. `fab-test playwright` figures out
+which kind of report a target is itself: a local `NAME.rdl` file (a paginated
+report's real local artifact shape -- a flat file, not a folder) is discovered
+alongside `NAME.Report` folders, and `--artifact NAME --env ENV` with no local
+match tries Fabric's `Report` item type first, then `PaginatedReport`, using
+whichever actually matches the name. If the report is bound to a Power BI
+dataset, its dataset ID and workspace are read straight out of the `.rdl`
+file's own `<DataSources>` block, too -- no GUID to look up and supply by hand.
+
+```bash
+fab-test playwright --artifact "Invoice RDL" --env dev --env-file .env
+```
+
+`--report-type {report,paginated}` (or `PLAYWRIGHT_REPORT_TYPE`) forces it
+explicitly, for the rare case you need to -- never required for `--artifact`
+or local discovery. See [the fab-test skill's playwright flags reference](https://github.com/kerski/fab-test/blob/main/.github/skills/fab-test/references/flags.md) for the full behavior.
 
 ### Naming what to test
 
@@ -280,7 +316,7 @@ fab-test pql-test "Sales Dev.Workspace/Sales.SemanticModel"   # a deployed model
 fab-test all local/Sales                                  # everything that can run locally
 ```
 
-Not every analyzer accepts every form: `bpa` reads files on disk and cannot fetch a deployed item. Run `fab-test list` for the Scopes column, and see the [targeting reference](https://github.com/kerski/fab-test/blob/main/.github/skills/fab-test/SKILL.md#targeting) for the rules. `--artifact STEM` still works as a deprecated alias.
+Not every analyzer accepts every form: `bpa` reads files on disk and cannot fetch a deployed item. Run `fab-test list` for the Scopes column, and see the [targeting reference](https://github.com/kerski/fab-test/blob/main/.github/skills/fab-test/references/targeting-and-discovery.md#targeting) for the rules. `--artifact STEM` still works as a deprecated alias.
 
 ### Credentials
 
@@ -333,6 +369,14 @@ That table also has a **search box and sortable column headers**: type to narrow
 
 The index also shows when the run happened and, in CI, who ran it and from which branch/commit (falling back to local `git`, or an em-dash outside a git checkout).
 
+Running locally and don't want to go find the file? Add `--open-report` and it opens in your default browser when the run finishes:
+
+```bash
+fab-test bpa --open-report
+```
+
+`--open-report` implies `--report`, so you never have to pass both. This is a local convenience for a human at a terminal, not something to add to a pipeline YAML: it is automatically suppressed under CI, falling back to just printing the path.
+
 Status and non-zero counts are coloured in a terminal. Colour is off when output is redirected, off whenever `NO_COLOR` is set, and never present under `--format json`.
 
 ### The machine-readable workflow (agents and pipelines)
@@ -371,7 +415,7 @@ Precedence, for every setting:
 | 3 | `fab-test.yml` (or `[tool.fab-test]` in `pyproject.toml`) | `jobs: 4` |
 | 4 (lowest) | Packaged default | `200` seconds |
 
-`fab-test.yml` is meant to be committed; it holds no credentials, only settings and rule overlays (tune one BPA/PBIR Inspector rule without forking the packaged rules file). Credentials belong in a `.env` file (auto-discovered, gitignored) or a pipeline's own secrets store. See the [Configuration section of the fab-test skill](https://github.com/kerski/fab-test/blob/main/.github/skills/fab-test/SKILL.md#configuration) for the full settings list and rule-overlay keys.
+`fab-test.yml` is meant to be committed; it holds no credentials, only settings and rule overlays (tune one BPA/PBIR Inspector rule without forking the packaged rules file). Credentials belong in a `.env` file (auto-discovered, gitignored) or a pipeline's own secrets store. See the [Configuration section of the fab-test skill](https://github.com/kerski/fab-test/blob/main/.github/skills/fab-test/references/configuration.md#configuration) for the full settings list and rule-overlay keys.
 
 ### Telemetry (optional)
 
@@ -477,6 +521,19 @@ metadata of your own at all.
 baked into a release would aim a deployment at somewhere you never chose. If no layer supplies
 it, the command fails and names both places you could put it.
 
+### Tool versions
+
+`analyzers.json`'s `tool_install.version` field pins each wrapped tool (Tabular Editor,
+PBIR Inspector) to a specific release, and the download cache is keyed by that version, so
+a newer pin in a `fab-test` upgrade downloads the new binary rather than silently reusing
+whatever an older checkout had cached. `fab-test doctor` reports the resolved version
+alongside each tool's readiness, and names the environment variable or file path
+shadowing the pin if one is in play. See
+[docs/RELEASE.md](https://github.com/kerski/fab-test/blob/main/docs/RELEASE.md#bumping-a-wrapped-tools-pin)
+for the pin-bump procedure, and
+[.github/workflows/check-tool-updates.yml](https://github.com/kerski/fab-test/blob/main/.github/workflows/check-tool-updates.yml)
+for the weekly job that watches upstream for you.
+
 ## Usage
 
 `fab-test` discovers and analyzes artifacts under your working directory. It is the local equivalent of the CI artifact validation gate. See the [Run manual tests locally](#run-manual-tests-locally) section above for common commands, and [`.github/skills/fab-test/SKILL.md`](https://github.com/kerski/fab-test/blob/main/.github/skills/fab-test/SKILL.md) for the full CLI reference.
@@ -490,7 +547,7 @@ What the distribution *does* carry is the metadata the analyzers need, so `bpa`,
 ```python
 import importlib.resources as resources
 
-metadata = resources.files("fabric_ci_cd_dataops").joinpath("metadata")
+metadata = resources.files("fab_test").joinpath("metadata")
 print(metadata.joinpath("rules/BPARules.json"))  # packaged BPA ruleset
 print(metadata.joinpath("analyzers.json"))       # tool install URLs doctor reads
 ```
@@ -498,3 +555,10 @@ print(metadata.joinpath("analyzers.json"))       # tool install URLs doctor read
 ## License
 
 MIT. See [LICENSE](https://github.com/kerski/fab-test/blob/main/LICENSE).
+
+`fab-test` wraps, but does not redistribute, several external tools it
+downloads or builds at runtime — Tabular Editor 2, fab-inspector, and
+pbir-a11y (the latter under the source-available PolyForm Shield 1.0.0
+license, not MIT). See
+[THIRD-PARTY.md](https://github.com/kerski/fab-test/blob/main/THIRD-PARTY.md)
+for what each permits.

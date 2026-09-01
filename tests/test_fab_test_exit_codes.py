@@ -16,9 +16,9 @@ from pathlib import Path
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts._analyzer_tool_bootstrap import UnsupportedPlatformError
-from fabric_ci_cd_dataops.scripts.fab_test import _artifact_exit_code, _run_analyzer
-from fabric_ci_cd_dataops.scripts.fab_test_registry import preflight_error
+from fab_test.scripts._analyzer_tool_bootstrap import UnsupportedPlatformError
+from fab_test.scripts.fab_test import _artifact_exit_code, _run_analyzer
+from fab_test.scripts.fab_test_registry import preflight_error
 from tests.conftest import _RunAnalyzerArgs
 
 # --------------------------------------------------------------------------- #
@@ -88,7 +88,7 @@ def test_cli_invalid_argument_exits_with_code_2():
 @pytest.mark.fab_test
 def test_preflight_error_platform_mismatch_returns_exit_code_126(monkeypatch):
     """A platform-only analyzer on an unsupported OS reports exit code 126."""
-    from fabric_ci_cd_dataops.scripts import fab_test_registry as registry
+    from fab_test.scripts import fab_test_registry as registry
 
     def _raise_unsupported(*_args, **_kwargs):
         raise UnsupportedPlatformError(
@@ -104,7 +104,7 @@ def test_preflight_error_platform_mismatch_returns_exit_code_126(monkeypatch):
 @pytest.mark.fab_test
 def test_preflight_error_other_runtime_error_returns_exit_code_127(monkeypatch):
     """A non-platform tool-resolution failure exits 127 (tool not found)."""
-    from fabric_ci_cd_dataops.scripts import fab_test_registry as registry
+    from fab_test.scripts import fab_test_registry as registry
 
     def _raise_generic(*_args, **_kwargs):
         raise RuntimeError("could not download TabularEditor.exe")
@@ -118,7 +118,7 @@ def test_preflight_error_other_runtime_error_returns_exit_code_127(monkeypatch):
 @pytest.mark.fab_test
 def test_preflight_error_names_cli_flag_env_var_and_config_key(monkeypatch):
     """The missing-tool message names the CLI flag alongside env var/config key."""
-    from fabric_ci_cd_dataops.scripts import fab_test_registry as registry
+    from fab_test.scripts import fab_test_registry as registry
 
     def _raise_generic(*_args, **_kwargs):
         raise RuntimeError(
@@ -138,7 +138,7 @@ def test_preflight_error_names_cli_flag_env_var_and_config_key(monkeypatch):
 @pytest.mark.fab_test
 def test_preflight_error_pbir_names_inspector_path_flag(monkeypatch):
     """The pbir missing-tool message names --inspector-path."""
-    from fabric_ci_cd_dataops.scripts import fab_test_registry as registry
+    from fab_test.scripts import fab_test_registry as registry
 
     def _raise_generic(*_args, **_kwargs):
         raise RuntimeError("Could not resolve executable for analyzer 'pbir_inspector'.")
@@ -152,7 +152,7 @@ def test_preflight_error_pbir_names_inspector_path_flag(monkeypatch):
 @pytest.mark.fab_test
 def test_preflight_error_none_when_tool_resolves(monkeypatch):
     """No preflight error is returned when the tool resolves successfully."""
-    from fabric_ci_cd_dataops.scripts import fab_test_registry as registry
+    from fab_test.scripts import fab_test_registry as registry
 
     monkeypatch.setattr(registry, "resolve_tool", lambda *a, **k: Path("/tmp/te.exe"))
     assert preflight_error("bpa", argparse.Namespace()) is None
@@ -169,7 +169,7 @@ def test_run_analyzer_bpa_on_unsupported_platform_fails_fast(tmp_path, monkeypat
 
     Tabular Editor is Windows-only (requires_platform: win32 in analyzers.json).
     """
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fab_test.scripts import fab_test_execution
 
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
@@ -177,7 +177,7 @@ def test_run_analyzer_bpa_on_unsupported_platform_fails_fast(tmp_path, monkeypat
 
     calls = []
     monkeypatch.setattr(
-        fab_test_module.subprocess, "run", lambda *a, **k: calls.append(a) or None
+        fab_test_execution.subprocess, "run", lambda *a, **k: calls.append(a) or None
     )
     monkeypatch.setattr(sys, "platform", "linux")
 

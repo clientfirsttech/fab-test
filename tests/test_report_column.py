@@ -20,13 +20,13 @@ import sys
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts._analyzer_envelope import (
+from fab_test.scripts._analyzer_envelope import (
     ENVELOPE_OPTIONAL_KEYS,
     ENVELOPE_REQUIRED_KEYS,
     EnvelopeIdentity,
     build_envelope,
 )
-from fabric_ci_cd_dataops.scripts.fab_test_summary import _report_path_for
+from fab_test.scripts.fab_test_summary import _report_path_for
 
 
 def _envelope(**overrides):
@@ -42,7 +42,7 @@ def _envelope(**overrides):
 
 def _run_cli(*argv):
     return subprocess.run(
-        [sys.executable, "-m", "fabric_ci_cd_dataops.scripts.fab_test", *argv],
+        [sys.executable, "-m", "fab_test.scripts.fab_test", *argv],
         capture_output=True,
         text=True,
         encoding="utf-8",
@@ -186,7 +186,7 @@ def _write_envelope(output_dir, analyzer, stem, **extra):
 @pytest.mark.fab_test
 def test_the_report_path_is_listed_below_the_table(tmp_path, capsys):
     """The point of the feature: a readable artifact stops being invisible."""
-    from fabric_ci_cd_dataops.scripts.fab_test_summary import _print_all_summary
+    from fab_test.scripts.fab_test_summary import _print_all_summary
 
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "Sales.Report").mkdir(parents=True)
@@ -210,7 +210,7 @@ def test_the_report_path_is_listed_below_the_table(tmp_path, capsys):
 @pytest.mark.fab_test
 def test_an_artifact_without_a_report_falls_back_to_its_envelope(tmp_path, capsys):
     """Every artifact gets one clickable line: the report, or the envelope."""
-    from fabric_ci_cd_dataops.scripts.fab_test_summary import _print_all_summary
+    from fab_test.scripts.fab_test_summary import _print_all_summary
 
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "Sales.Report").mkdir(parents=True)
@@ -275,7 +275,7 @@ def _envelope_on_disk(output_dir, analyzer, stem, **extra):
 @pytest.mark.fab_test
 def test_single_analyzer_run_names_its_report(tmp_path, capsys):
     """The flag has to be visibly doing something, or it reads as broken."""
-    from fabric_ci_cd_dataops.scripts.fab_test_summary import _print_summary
+    from fab_test.scripts.fab_test_summary import _print_summary
 
     report = tmp_path / "pql_test" / "Sales" / "report.html"
     _envelope_on_disk(
@@ -290,7 +290,7 @@ def test_single_analyzer_run_names_its_report(tmp_path, capsys):
 @pytest.mark.fab_test
 def test_single_analyzer_run_without_a_report_invents_nothing(tmp_path, capsys):
     """No --report means no report; the summary must not imply one exists."""
-    from fabric_ci_cd_dataops.scripts.fab_test_summary import _print_summary
+    from fab_test.scripts.fab_test_summary import _print_summary
 
     _envelope_on_disk(tmp_path, "bpa", "Sales")
 
@@ -302,7 +302,7 @@ def test_single_analyzer_run_without_a_report_invents_nothing(tmp_path, capsys):
 @pytest.mark.fab_test
 def test_single_analyzer_json_carries_report_path_like_all_does(tmp_path, capsys):
     """One analyzer and `all` must not disagree about the row shape."""
-    from fabric_ci_cd_dataops.scripts.fab_test_summary import _print_summary
+    from fab_test.scripts.fab_test_summary import _print_summary
 
     report = tmp_path / "pql_test" / "Sales" / "report.html"
     _envelope_on_disk(
@@ -325,7 +325,8 @@ def test_all_suppresses_the_per_analyzer_report_line(tmp_path, monkeypatch):
     Asserts the wiring rather than the rendered output, because `all`
     really runs the analyzers and would overwrite any fixture envelope.
     """
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fab_test.scripts import fab_test as fab_test_module
+    from fab_test.scripts import fab_test_execution
 
     seen: dict[str, bool] = {}
 
@@ -333,9 +334,9 @@ def test_all_suppresses_the_per_analyzer_report_line(tmp_path, monkeypatch):
         seen[name] = kwargs.get("show_reports", True)
         return 0
 
-    monkeypatch.setattr(fab_test_module, "_print_summary", _spy)
-    monkeypatch.setattr(fab_test_module, "_preflight", lambda *a, **k: None)
-    monkeypatch.setattr(fab_test_module, "_run_one_artifact", lambda *a, **k: ("Sales", 0))
+    monkeypatch.setattr(fab_test_execution, "_print_summary", _spy)
+    monkeypatch.setattr(fab_test_execution, "_preflight", lambda *a, **k: None)
+    monkeypatch.setattr(fab_test_execution, "_run_one_artifact", lambda *a, **k: ("Sales", 0))
     (tmp_path / "Sales.SemanticModel").mkdir()
 
     import argparse
@@ -353,15 +354,16 @@ def test_all_suppresses_the_per_analyzer_report_line(tmp_path, monkeypatch):
 @pytest.mark.fab_test
 def test_a_standalone_run_keeps_the_per_analyzer_report_line(tmp_path, monkeypatch):
     """One analyzer has no aggregate listing, so the line is the only mention."""
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fab_test.scripts import fab_test as fab_test_module
+    from fab_test.scripts import fab_test_execution
 
     seen: dict[str, bool] = {}
     monkeypatch.setattr(
-        fab_test_module, "_print_summary",
+        fab_test_execution, "_print_summary",
         lambda name, results, **kw: (seen.setdefault(name, kw.get("show_reports", True)) and 0) or 0,
     )
-    monkeypatch.setattr(fab_test_module, "_preflight", lambda *a, **k: None)
-    monkeypatch.setattr(fab_test_module, "_run_one_artifact", lambda *a, **k: ("Sales", 0))
+    monkeypatch.setattr(fab_test_execution, "_preflight", lambda *a, **k: None)
+    monkeypatch.setattr(fab_test_execution, "_run_one_artifact", lambda *a, **k: ("Sales", 0))
     (tmp_path / "Sales.SemanticModel").mkdir()
 
     import argparse
@@ -383,7 +385,7 @@ def test_local_still_names_its_reports(tmp_path):
     Suppressing the Report line for every bundle would have removed the
     information from `local` entirely rather than de-duplicating it.
     """
-    from fabric_ci_cd_dataops.scripts.fab_test_summary import _print_summary
+    from fab_test.scripts.fab_test_summary import _print_summary
 
     path = tmp_path / "pql_lint" / "Sales"
     path.mkdir(parents=True)

@@ -18,8 +18,8 @@ import sys
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts._target import parse_target
-from fabric_ci_cd_dataops.scripts.fab_test_registry import (
+from fab_test.scripts._target import parse_target
+from fab_test.scripts.fab_test_registry import (
     ANALYZER_REGISTRY,
     ANALYZER_SCOPES,
     unsupported_scope_error,
@@ -37,7 +37,7 @@ def artifact_tree(tmp_path):
 
 def _run_cli(*argv, env=None):
     return subprocess.run(
-        [sys.executable, "-m", "fabric_ci_cd_dataops.scripts.fab_test", *argv],
+        [sys.executable, "-m", "fab_test.scripts.fab_test", *argv],
         capture_output=True,
         text=True,
         encoding="utf-8",
@@ -99,6 +99,16 @@ def test_workspace_target_is_refused_for_a_file_reading_analyzer():
     assert "bpa" in message
     assert "local/NAME" in message
     assert "./src/Sales.SemanticModel" in message
+
+
+@pytest.mark.fab_test
+def test_workspace_target_is_refused_for_a11y():
+    """a11y reads Report files on disk; it cannot fetch a deployed item."""
+    message = unsupported_scope_error("a11y", parse_target(_WORKSPACE_TARGET))
+
+    assert message is not None
+    assert "a11y" in message
+    assert "cannot fetch a deployed item" in message
 
 
 @pytest.mark.fab_test
@@ -178,7 +188,7 @@ def test_a_type_the_analyzer_does_not_read_names_both_halves():
     """Was "unknown artifact type 'Notebook'" — a type the repository's own
     map declares. Then, once it parsed, "no *.SemanticModel artifacts found",
     which describes the directory rather than the mistake."""
-    from fabric_ci_cd_dataops.scripts.fab_test_registry import unsupported_type_error
+    from fab_test.scripts.fab_test_registry import unsupported_type_error
 
     message = unsupported_type_error("bpa", parse_target("Sales.Notebook"))
 
@@ -191,7 +201,7 @@ def test_a_type_the_analyzer_does_not_read_names_both_halves():
 @pytest.mark.fab_test
 def test_a_type_another_analyzer_reads_names_that_analyzer():
     """The next question is always "then what do I run?"."""
-    from fabric_ci_cd_dataops.scripts.fab_test_registry import unsupported_type_error
+    from fab_test.scripts.fab_test_registry import unsupported_type_error
 
     message = unsupported_type_error("bpa", parse_target("Sales.Report"))
 
@@ -200,9 +210,21 @@ def test_a_type_another_analyzer_reads_names_that_analyzer():
 
 
 @pytest.mark.fab_test
+def test_a_semantic_model_target_names_a11y_does_not_read_it():
+    """a11y reads Report artifacts only; a SemanticModel target refuses cleanly."""
+    from fab_test.scripts.fab_test_registry import unsupported_type_error
+
+    message = unsupported_type_error("a11y", parse_target("Sales.SemanticModel"))
+
+    assert message is not None
+    assert "Report" in message
+    assert "SemanticModel" in message
+
+
+@pytest.mark.fab_test
 def test_a_type_no_analyzer_reads_says_so_plainly():
     """Rather than naming a flag or an analyzer that would not help."""
-    from fabric_ci_cd_dataops.scripts.fab_test_registry import unsupported_type_error
+    from fab_test.scripts.fab_test_registry import unsupported_type_error
 
     message = unsupported_type_error("bpa", parse_target("Sales.Lakehouse"))
 
@@ -213,7 +235,7 @@ def test_a_type_no_analyzer_reads_says_so_plainly():
 @pytest.mark.fab_test
 def test_a_hidden_analyzer_is_not_suggested():
     """pql_lint is off the advertised surface; a refusal must not readvertise it."""
-    from fabric_ci_cd_dataops.scripts.fab_test_registry import unsupported_type_error
+    from fab_test.scripts.fab_test_registry import unsupported_type_error
 
     message = unsupported_type_error("pbir", parse_target("Sales.SemanticModel"))
 
@@ -223,7 +245,7 @@ def test_a_hidden_analyzer_is_not_suggested():
 
 @pytest.mark.fab_test
 def test_the_matching_type_is_not_refused():
-    from fabric_ci_cd_dataops.scripts.fab_test_registry import unsupported_type_error
+    from fab_test.scripts.fab_test_registry import unsupported_type_error
 
     assert unsupported_type_error("bpa", parse_target("Sales.SemanticModel")) is None
 
@@ -231,7 +253,7 @@ def test_the_matching_type_is_not_refused():
 @pytest.mark.fab_test
 def test_a_target_with_no_type_is_not_refused():
     """`Sales` leaves the type to the analyzer's glob, which is the point."""
-    from fabric_ci_cd_dataops.scripts.fab_test_registry import unsupported_type_error
+    from fab_test.scripts.fab_test_registry import unsupported_type_error
 
     assert unsupported_type_error("bpa", parse_target("Sales")) is None
 
@@ -240,7 +262,7 @@ def test_a_target_with_no_type_is_not_refused():
 def test_a_repository_scoped_analyzer_refuses_no_type():
     """It runs against the repository, so an artifact type is not something
     it could be given the wrong one of."""
-    from fabric_ci_cd_dataops.scripts.fab_test_registry import unsupported_type_error
+    from fab_test.scripts.fab_test_registry import unsupported_type_error
 
     assert unsupported_type_error("dependencies", parse_target("Sales.Notebook")) is None
 
@@ -248,7 +270,7 @@ def test_a_repository_scoped_analyzer_refuses_no_type():
 @pytest.mark.fab_test
 def test_list_shows_which_suffix_each_analyzer_handles():
     """So the answer is discoverable before the error, not only after it."""
-    from fabric_ci_cd_dataops.scripts.fab_test_registry import (
+    from fab_test.scripts.fab_test_registry import (
         ANALYZER_REGISTRY,
         visible_analyzers,
     )

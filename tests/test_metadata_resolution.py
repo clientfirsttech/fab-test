@@ -24,7 +24,7 @@ from pathlib import Path
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts._metadata import (
+from fab_test.scripts._metadata import (
     PACKAGED_METADATA,
     MetadataNotFoundError,
     metadata_path,
@@ -260,7 +260,7 @@ _MAP = Path("artifact-map.json")
 @pytest.mark.fab_test
 def test_the_artifact_map_honours_the_fab_test_layer(tmp_path):
     """`artifact-map.json` predates the layers and only read `.github/`."""
-    from fabric_ci_cd_dataops.scripts._artifact_types import load_artifact_map
+    from fab_test.scripts._artifact_types import load_artifact_map
 
     _write(tmp_path, ".github/metadata", _MAP, text=json.dumps({".Report": "Legacy"}))
     _write(tmp_path, ".fab-test/metadata", _MAP, text=json.dumps({".Report": "Override"}))
@@ -271,7 +271,7 @@ def test_the_artifact_map_honours_the_fab_test_layer(tmp_path):
 @pytest.mark.fab_test
 def test_the_artifact_map_still_falls_back_to_the_packaged_copy(tmp_path):
     """Unlike environments.yml, a shipped default here is correct and safe."""
-    from fabric_ci_cd_dataops.scripts._artifact_types import load_artifact_map
+    from fab_test.scripts._artifact_types import load_artifact_map
 
     assert load_artifact_map(tmp_path)[".SemanticModel"] == "SemanticModel"
 
@@ -279,7 +279,7 @@ def test_the_artifact_map_still_falls_back_to_the_packaged_copy(tmp_path):
 @pytest.mark.fab_test
 def test_a_malformed_override_still_warns_and_falls_back(tmp_path, capsys):
     """The layer search must not swallow the diagnostic it replaced."""
-    from fabric_ci_cd_dataops.scripts._artifact_types import load_artifact_map
+    from fab_test.scripts._artifact_types import load_artifact_map
 
     _write(tmp_path, ".fab-test/metadata", _MAP, text="{ not json")
 
@@ -296,7 +296,7 @@ def test_the_analyzer_runner_resolves_analyzers_json_by_default(tmp_path, monkey
     Outside a checkout that names a file which cannot exist, so a pip
     install had no analyzer definitions at all.
     """
-    from fabric_ci_cd_dataops.scripts.run_analyzer import AnalyzerRunner
+    from fab_test.scripts.run_analyzer import AnalyzerRunner
 
     monkeypatch.delenv("GITHUB_WORKSPACE", raising=False)
     monkeypatch.chdir(tmp_path)
@@ -310,7 +310,7 @@ def test_the_analyzer_runner_resolves_analyzers_json_by_default(tmp_path, monkey
 @pytest.mark.fab_test
 def test_the_analyzer_runner_still_honours_an_explicit_path(tmp_path, monkeypatch):
     """Every existing caller and test passes one."""
-    from fabric_ci_cd_dataops.scripts.run_analyzer import AnalyzerRunner
+    from fab_test.scripts.run_analyzer import AnalyzerRunner
 
     monkeypatch.delenv("GITHUB_WORKSPACE", raising=False)
     override = _write(tmp_path, ".fab-test/metadata", Path("analyzers.json"), text='{"analyzers": {}}')

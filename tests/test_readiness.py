@@ -13,8 +13,8 @@ from pathlib import Path
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts._analyzer_tool_bootstrap import probe_executable
-from fabric_ci_cd_dataops.scripts.fab_test_registry import check_readiness
+from fab_test.scripts._analyzer_tool_bootstrap import probe_executable
+from fab_test.scripts.fab_test_registry import check_readiness
 
 # A path guaranteed not to exist, so credential/env-file resolution in this
 # module never picks up a real `.fab-test/.env` or `.env` a developer keeps
@@ -93,7 +93,7 @@ def test_probe_reports_would_download_without_downloading(tmp_path, monkeypatch)
     monkeypatch.delenv("TABULAR_EDITOR_PATH", raising=False)
     monkeypatch.delenv("TABULAR_EDITOR_INSTALL_URL", raising=False)
 
-    from fabric_ci_cd_dataops.scripts import _analyzer_tool_bootstrap as bootstrap
+    from fab_test.scripts import _analyzer_tool_bootstrap as bootstrap
 
     def _fail_if_called(*_a, **_k):
         raise AssertionError("probe must never download")
@@ -168,7 +168,7 @@ def test_check_readiness_bpa_delegates_to_probe(tmp_path, monkeypatch):
     """check_readiness('bpa', args) resolves via the CLI flag like preflight_error does."""
     import sys
 
-    from fabric_ci_cd_dataops.scripts import fab_test_registry as registry
+    from fab_test.scripts import fab_test_registry as registry
 
     # bpa's tool_install requires_platform is "win32" (Tabular Editor is a
     # Windows executable) -- pin the platform so this delegation test
@@ -189,6 +189,42 @@ def test_check_readiness_bpa_delegates_to_probe(tmp_path, monkeypatch):
 
 
 @pytest.mark.fab_test
+def test_check_readiness_a11y_delegates_to_probe_via_its_own_flag(tmp_path):
+    """check_readiness('a11y', args) resolves via --a11y-path like bpa/pbir do."""
+    from fab_test.scripts import fab_test_registry as registry
+
+    existing = tmp_path / "cli.js"
+    existing.write_text("// built", encoding="utf-8")
+
+    class _Args:
+        a11y_path = str(existing)
+
+    result = registry.check_readiness("a11y", _Args())
+
+    assert result["ready"] is True
+    assert result["resolved_path"] == str(existing.resolve())
+
+
+@pytest.mark.fab_test
+def test_a11y_is_a_fully_advertised_analyzer():
+    """`a11y` is a first-class analyzer: registered, visible, and answerable.
+
+    Hidden only briefly (Task 2, before its command builder/subparser
+    existed) -- Task 4 registered both, so it belongs on the advertised
+    surface the same as bpa/pbir, not tucked away like pql_lint.
+    """
+    from fab_test.scripts.fab_test_registry import (
+        HIDDEN_ANALYZERS,
+        visible_analyzers,
+    )
+
+    assert "a11y" not in HIDDEN_ANALYZERS
+    assert "a11y" in visible_analyzers()
+    result = check_readiness("a11y", None)
+    assert set(result.keys()) == {"ready", "resolved_path", "reason", "remediation", "version"}
+
+
+@pytest.mark.fab_test
 def test_check_readiness_non_bootstrapped_analyzer_is_always_ready():
     """An analyzer with no external tool and no cloud dependency is always ready.
 
@@ -205,10 +241,10 @@ def test_check_readiness_non_bootstrapped_analyzer_is_always_ready():
 
 @pytest.mark.fab_test
 def test_check_readiness_returns_same_shape_for_every_analyzer():
-    """Every analyzer's readiness dict has the same four keys (stable for `doctor`)."""
-    from fabric_ci_cd_dataops.scripts.fab_test_registry import ANALYZER_REGISTRY
+    """Every analyzer's readiness dict has the same five keys (stable for `doctor`)."""
+    from fab_test.scripts.fab_test_registry import ANALYZER_REGISTRY
 
-    expected_keys = {"ready", "resolved_path", "reason", "remediation"}
+    expected_keys = {"ready", "resolved_path", "reason", "remediation", "version"}
     for name in ANALYZER_REGISTRY:
         result = check_readiness(name, None)
         assert set(result.keys()) == expected_keys, f"{name} readiness shape mismatch"
@@ -254,7 +290,7 @@ def _set_service_principal(monkeypatch):
 @pytest.mark.fab_test
 def test_cloud_analyzer_not_ready_without_workspace_credentials_or_desktop(monkeypatch):
     """pql_test with nothing configured is not ready -- the false green this fixes."""
-    from fabric_ci_cd_dataops.scripts import fab_test_registry as registry
+    from fab_test.scripts import fab_test_registry as registry
 
     _clear_cloud_env(monkeypatch)
     monkeypatch.setattr(registry, "desktop_ports", list)  # no instance running
@@ -268,7 +304,7 @@ def test_cloud_analyzer_not_ready_without_workspace_credentials_or_desktop(monke
 @pytest.mark.fab_test
 def test_cloud_analyzer_remediation_names_every_accepted_source(monkeypatch):
     """Not-ready remediation names the workspace variable, the credentials, and Desktop."""
-    from fabric_ci_cd_dataops.scripts import fab_test_registry as registry
+    from fab_test.scripts import fab_test_registry as registry
 
     _clear_cloud_env(monkeypatch)
     monkeypatch.setattr(registry, "desktop_ports", list)  # no instance running
@@ -283,7 +319,7 @@ def test_cloud_analyzer_remediation_names_every_accepted_source(monkeypatch):
 @pytest.mark.fab_test
 def test_cloud_analyzer_ready_with_workspace_and_service_principal(monkeypatch):
     """A workspace plus resolvable credentials reports ready and names the source."""
-    from fabric_ci_cd_dataops.scripts import fab_test_registry as registry
+    from fab_test.scripts import fab_test_registry as registry
 
     _clear_cloud_env(monkeypatch)
     monkeypatch.setenv("FABRIC_WORKSPACE_ID", "33333333-3333-3333-3333-333333333333")
@@ -305,8 +341,8 @@ def test_cloud_analyzer_with_workspace_but_no_credentials_is_not_ready(monkeypat
     this analyzer ready for a different (and correct) reason. See
     tests/test_credentials.py for the ambient path itself.
     """
-    from fabric_ci_cd_dataops.scripts import _credentials
-    from fabric_ci_cd_dataops.scripts import fab_test_registry as registry
+    from fab_test.scripts import _credentials
+    from fab_test.scripts import fab_test_registry as registry
 
     _clear_cloud_env(monkeypatch)
     monkeypatch.setenv("FABRIC_WORKSPACE_ID", "33333333-3333-3333-3333-333333333333")
@@ -323,8 +359,8 @@ def test_cloud_analyzer_with_workspace_but_no_credentials_is_not_ready(monkeypat
 @pytest.mark.fab_test
 def test_workspace_plus_ambient_credential_is_ready_but_flagged_unverified(monkeypatch):
     """An az-logged-in developer is not reported red, but the reason says unproven."""
-    from fabric_ci_cd_dataops.scripts import _credentials
-    from fabric_ci_cd_dataops.scripts import fab_test_registry as registry
+    from fab_test.scripts import _credentials
+    from fab_test.scripts import fab_test_registry as registry
 
     _clear_cloud_env(monkeypatch)
     monkeypatch.setenv("FABRIC_WORKSPACE_ID", "33333333-3333-3333-3333-333333333333")
@@ -340,7 +376,7 @@ def test_workspace_plus_ambient_credential_is_ready_but_flagged_unverified(monke
 @pytest.mark.fab_test
 def test_pql_test_is_ready_via_a_running_desktop_instance(monkeypatch):
     """A running Desktop instance makes pql_test ready with no workspace at all."""
-    from fabric_ci_cd_dataops.scripts import fab_test_registry as registry
+    from fab_test.scripts import fab_test_registry as registry
 
     _clear_cloud_env(monkeypatch)
     monkeypatch.setattr(registry, "desktop_ports", lambda: [51001])
@@ -354,7 +390,7 @@ def test_pql_test_is_ready_via_a_running_desktop_instance(monkeypatch):
 @pytest.mark.fab_test
 def test_playwright_does_not_fall_back_to_desktop(monkeypatch):
     """Only pql_test binds to Desktop; playwright needs a real workspace."""
-    from fabric_ci_cd_dataops.scripts import fab_test_registry as registry
+    from fab_test.scripts import fab_test_registry as registry
 
     _clear_cloud_env(monkeypatch)
     monkeypatch.setattr(registry, "desktop_ports", lambda: [51001])
@@ -374,8 +410,8 @@ def test_playwright_ambient_credential_is_not_ready(monkeypatch):
     an az-logged-in developer would see green and then hit an MSAL
     traceback on the one command that cannot use their sign-in.
     """
-    from fabric_ci_cd_dataops.scripts import _credentials
-    from fabric_ci_cd_dataops.scripts import fab_test_registry as registry
+    from fab_test.scripts import _credentials
+    from fab_test.scripts import fab_test_registry as registry
 
     _clear_cloud_env(monkeypatch)
     monkeypatch.setenv("FABRIC_WORKSPACE_ID", "33333333-3333-3333-3333-333333333333")
@@ -390,7 +426,7 @@ def test_playwright_ambient_credential_is_not_ready(monkeypatch):
 @pytest.mark.fab_test
 def test_explicit_workspace_id_argument_is_honored(monkeypatch):
     """--workspace-id counts as a resolved workspace even with no env var set."""
-    from fabric_ci_cd_dataops.scripts import fab_test_registry as registry
+    from fab_test.scripts import fab_test_registry as registry
 
     class _CloudArgs:
         workspace_id = "44444444-4444-4444-4444-444444444444"
@@ -417,7 +453,7 @@ def test_file_only_analyzer_stays_ready_without_any_credentials(monkeypatch):
 @pytest.mark.fab_test
 def test_readiness_never_echoes_a_credential_value(monkeypatch):
     """The secrets constraint: no probe output ever contains the secret itself."""
-    from fabric_ci_cd_dataops.scripts import fab_test_registry as registry
+    from fab_test.scripts import fab_test_registry as registry
 
     _clear_cloud_env(monkeypatch)
     monkeypatch.setenv("FABRIC_WORKSPACE_ID", "33333333-3333-3333-3333-333333333333")
@@ -429,16 +465,16 @@ def test_readiness_never_echoes_a_credential_value(monkeypatch):
 
 
 @pytest.mark.fab_test
-def test_cloud_analyzer_readiness_keeps_the_stable_four_keys(monkeypatch):
+def test_cloud_analyzer_readiness_keeps_the_stable_five_keys(monkeypatch):
     """A not-ready cloud row has the same shape as every other row (JSON consumers)."""
-    from fabric_ci_cd_dataops.scripts import fab_test_registry as registry
+    from fab_test.scripts import fab_test_registry as registry
 
     _clear_cloud_env(monkeypatch)
     monkeypatch.setattr(registry, "desktop_ports", list)  # no instance running
 
     result = registry.check_readiness("pql_test", None)
 
-    assert set(result.keys()) == {"ready", "resolved_path", "reason", "remediation"}
+    assert set(result.keys()) == {"ready", "resolved_path", "reason", "remediation", "version"}
 
 
 @pytest.mark.fab_test
@@ -446,7 +482,7 @@ def test_readiness_probe_spawns_no_subprocess_for_a_cloud_analyzer(monkeypatch):
     """The probe stays cheap: no subprocess, per check_readiness's contract."""
     import subprocess
 
-    from fabric_ci_cd_dataops.scripts import fab_test_registry as registry
+    from fab_test.scripts import fab_test_registry as registry
 
     _clear_cloud_env(monkeypatch)
 

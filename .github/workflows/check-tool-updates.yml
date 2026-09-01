@@ -1,0 +1,97 @@
+name: Check tool updates
+
+# Watches the four tools fab-test wraps for a newer upstream release (see
+# tools/check_tool_updates.py). This workflow is that script's only caller
+# -- if this file is ever deleted, delete tools/check_tool_updates.py with
+# it, per the comment at the top of that script.
+
+on:
+  schedule:
+    # Monday 06:00 UTC. A flaky upstream never fails this job (the script
+    # itself degrades a tool it can't reach to "unknown" and still exits
+    # 0), so a red run here always means the workflow broke, not upstream.
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # No --fail-on-update: this job's own exit code should reflect
+      # whether the *workflow* ran correctly, not whether a tool has
+      # drifted -- drift is reported by opening an issue below, not by a
+      # red check mark on a schedule nobody is watching.
+      - name: Check for tool updates
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python tools/check_tool_updates.py --format json > tool-updates.json
+
+      - name: Open an issue naming each drifted tool
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require("fs");
+
+            let results;
+            try {
+              results = JSON.parse(fs.readFileSync("tool-updates.json", "utf8"));
+            } catch (err) {
+              // The check step failed to even produce a report (a bug in
+              // the script, not an upstream outage -- that case already
+              // reports "unknown" and a valid JSON array). Say so once,
+              // in the run log, and never fail this scheduled job over it.
+              console.log(`Could not read tool-updates.json: ${err.message}`);
+              return;
+            }
+
+            const drifted = results.filter((r) => r.status === "update-available");
+            if (drifted.length === 0) {
+              console.log("No drift reported; nothing to do.");
+              return;
+            }
+
+            const title = `Tool update available: ${drifted.map((r) => r.tool).join(", ")}`;
+            const body = [
+              "The following tools fab-test wraps have a newer release available:",
+              "",
+              ...drifted.map(
+                (r) =>
+                  `- **${r.tool}**: \`${r.current}\` → \`${r.available}\`` +
+                  (r.url ? ` ([release](${r.url}))` : "")
+              ),
+              "",
+              "Edit `src/fab_test/metadata/analyzers.json` to bump the pin(s) above,",
+              "then follow the release procedure in `docs/RELEASE.md` -- including recording a",
+              "fresh `install_sha256` per platform for the new download.",
+            ].join("\n");
+
+            const open = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: "open",
+              labels: "tool-update",
+            });
+            if (open.data.some((issue) => issue.title === title)) {
+              console.log(`An open issue already reports this exact drift: "${title}"`);
+              return;
+            }
+
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title,
+              body,
+              labels: ["tool-update"],
+            });

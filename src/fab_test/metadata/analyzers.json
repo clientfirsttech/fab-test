@@ -1,0 +1,209 @@
+{
+  "fab_test_all": [
+    "bpa",
+    "pbir",
+    "pql_test"
+  ],
+  "analyzer_registry": {
+    "pqlint": {
+      "type": "static",
+      "implementation": "python",
+      "command": "python",
+      "args": ["scripts/invoke_pqlint.py", "--artifact-path", "{artifact_path}", "--output-path", "{output_path}"],
+      "description": "Power Query linting via a local Python wrapper",
+      "exit_code_success": 0,
+      "native_output": {"extension": "json", "format": "JSON"},
+      "reference": "https://www.kerski.tech/making-your-power-bi-teams-more-analytic-with-fabric-5-semantic-model-analysis/"
+    },
+    "pbir_inspector": {
+      "type": "both",
+      "implementation": "python",
+      "command": "python",
+      "args": ["scripts/invoke_pbir_inspector.py", "--artifact-path", "{artifact_path}", "--rules-path", "{rules_path}", "--inspector-path", "./PBIR-Inspector/PBIRInspectorCLI", "--output-path", "{output_path}"],
+      "description": "PBIR schema and structure validation using native executable invoked from Python",
+      "exit_code_success": 0,
+      "native_output": {"extension": "json", "format": "JSON"},
+      "reference": "https://www.kerski.tech/making-your-power-bi-teams-more-analytic-with-fabric-4-static-report-analysis/",
+      "tool_install": {
+        "env_var": "PBIR_INSPECTOR_PATH",
+        "default_path": "./PBIR-Inspector/PBIRInspectorCLI",
+        "install_url_env_var": "PBIR_INSPECTOR_INSTALL_URL",
+        "install_urls": {
+          "linux": "https://github.com/NatVanG/fab-inspector/releases/download/v3.4.0/linux-x64-FabInspCLI.zip",
+          "win32": "https://github.com/NatVanG/fab-inspector/releases/download/v3.4.0/win-x64-FabInspCLI.zip",
+          "darwin": "https://github.com/NatVanG/fab-inspector/releases/download/v3.4.0/osx-x64-FabInspCLI.zip"
+        },
+        "archive_type": "zip",
+        "executable_subpaths": {
+          "linux": "linux-x64/FabInspCLI/fab-inspector",
+          "win32": "win-x64/FabInspCLI/fab-inspector.exe",
+          "darwin": "osx-x64/FabInspCLI/fab-inspector"
+        },
+        "version": "3.4.0",
+        "install_sha256s": {
+          "linux": "f4f6ed53cf092e235084c8049f394720c8fe52c63479638646079644b191f25e",
+          "win32": "c6f468b1ab1cab5643e490fad0793a8c075e8c94a44388d50b12f7c366fd90bc",
+          "darwin": "d3001d41a4c6c9d085c6aff53c9b8e56bce078f7a5c24cffcdf2b5dba2755ceb"
+        },
+        "release_source": {
+          "type": "github_release",
+          "repo": "NatVanG/fab-inspector",
+          "asset_prefixes": {
+            "linux": "linux-x64",
+            "win32": "win-x64",
+            "darwin": "osx-x64"
+          },
+          "asset_suffix": "-FabInspCLI.zip",
+          "allow_prerelease": false
+        }
+      }
+    },
+    "pbir_a11y": {
+      "type": "static",
+      "implementation": "python",
+      "command": "python",
+      "args": ["scripts/invoke_pbir_a11y.py", "--artifact-path", "{artifact_path}", "--a11y-path", "./pbir-a11y/dist/cli.js", "--output-path", "{output_path}"],
+      "description": "Accessibility checks (contrast, alt text, tab order, target size, and more) for PBIR reports, via the pbir-a11y Node CLI",
+      "exit_code_success": 0,
+      "native_output": {"extension": "json", "format": "JSON"},
+      "reference": "https://github.com/Juls-BI/pbir-a11y",
+      "tool_install": {
+        "env_var": "PBIR_A11Y_PATH",
+        "default_path": "./pbir-a11y/dist/cli.js",
+        "install_url_env_var": "PBIR_A11Y_INSTALL_URL",
+        "install_url": "https://github.com/Juls-BI/pbir-a11y/archive/refs/tags/v0.3.2.zip",
+        "archive_type": "npm_build",
+        "build_entrypoint": "dist/cli.js",
+        "build_extra_dependencies": ["docx@^9.6.1"],
+        "version": "0.3.2",
+        "install_sha256": "403a2ab0ae1648d0b385201a3b5b57ae10a16d71eda7584cafd8391fe81d5e77"
+      }
+    },
+    "prompt_lint": {
+      "type": "static",
+      "implementation": "python",
+      "command": "python",
+      "args": ["scripts/invoke_prompt_lint.py", "--artifact-path", "{artifact_path}", "--output-path", "{output_path}"],
+      "description": "Prompt linting, tool contract validation, restricted content validation",
+      "exit_code_success": 0,
+      "native_output": {"extension": "json", "format": "JSON"}
+    },
+    "pql_test": {
+      "type": "dynamic",
+      "implementation": "python",
+      "command": "python",
+      "args": ["scripts/invoke_pql_test.py", "--artifact-path", "{artifact_path}", "--artifact-name", "{artifact_name}", "--output-path", "{output_path}"],
+      "description": "Runs DAX/PQL tests from the pql-test PyPI package through a Python wrapper.",
+      "exit_code_success": 0,
+      "native_output": {"extension": "json", "format": "JSON"},
+      "reference": "https://pypi.org/project/pql-test/",
+      "tool_install": {
+        "env_var": "PQL_TEST_PATH",
+        "default_path": "",
+        "install_url_env_var": "PQL_TEST_INSTALL_URL",
+        "archive_type": "zip",
+        "requires_platform": null,
+        "executable_subpath": "",
+        "release_source": {
+          "type": "pypi",
+          "package": "pql-test",
+          "version_source": "pyproject.toml"
+        }
+      }
+    },
+    "playwright": {
+      "type": "dynamic",
+      "implementation": "python",
+      "command": "python",
+      "args": ["scripts/invoke_playwright.py", "--artifact-path", "{artifact_path}", "--workspace-id", "{workspace_id}", "--output-path", "{output_path}"],
+      "description": "Runtime browser validation for Reports (Python playwright + pytest-playwright)",
+      "exit_code_success": 0,
+      "native_output": {"extension": "json", "format": "JSON"}
+    },
+    "prompt_eval": {
+      "type": "dynamic",
+      "command": "prompt-eval",
+      "args": ["--artifact", "{artifact_name}", "--workspace", "{workspace_id}"],
+      "description": "Prompt evals, expected response matching, grounding validation, hallucination checks",
+      "exit_code_success": 0
+    },
+    "tabular_editor_bpa": {
+      "type": "static",
+      "implementation": "python",
+      "command": "python",
+      "args": ["scripts/invoke_tabular_editor_bpa.py", "--tmdl-path", "{artifact_path}", "--bpa-rules-path", "{rules_path}", "--tabular-editor-path", "./TabularEditor/TabularEditor.exe", "--output-path", "{output_path}"],
+      "description": "Tabular Editor Best Practice Analyzer for semantic models (Windows executable invoked from Python)",
+      "exit_code_success": 0,
+      "requires_platform": "win32",
+      "native_output": {"extension": "xml", "format": "TRX"},
+      "reference": "https://www.kerski.tech/making-your-power-bi-teams-more-analytic-with-fabric-5-semantic-model-analysis/",
+      "tool_install": {
+        "env_var": "TABULAR_EDITOR_PATH",
+        "default_path": "./TabularEditor/TabularEditor.exe",
+        "install_url_env_var": "TABULAR_EDITOR_INSTALL_URL",
+        "install_url": "https://cdn.tabulareditor.com/files/TabularEditor.2.28.0.zip",
+        "archive_type": "zip",
+        "requires_platform": "win32",
+        "executable_subpath": "TabularEditor.exe",
+        "version": "2.28.0",
+        "install_sha256": "ba85f4653c850b06687e6e0b3c8af3d7c951921ec281deb5df615b2ce43d4ef2",
+        "install_url_template": "https://cdn.tabulareditor.com/files/TabularEditor.{version}.zip",
+        "release_source": {
+          "type": "url_template",
+          "repo": "TabularEditor/TabularEditor",
+          "version_line": "2"
+        }
+      }
+    }
+  },
+  "artifact_analyzers": {
+    "SemanticModel": {
+      "static": [
+        "tabular_editor_bpa"
+      ],
+      "dynamic": [
+        "pql_test"
+      ]
+    },
+    "Report": {
+      "static": [
+        "pbir_inspector"
+      ],
+      "dynamic": [
+        "playwright"
+      ]
+    },
+    "Agent": {
+      "static": [
+        "prompt_lint"
+      ],
+      "dynamic": [
+        "prompt_eval"
+      ]
+    },
+    "Notebook": {
+      "static": [],
+      "dynamic": []
+    },
+    "Dataflow": {
+      "static": [],
+      "dynamic": []
+    },
+    "Eventhouse": {
+      "static": [],
+      "dynamic": []
+    },
+    "Warehouse": {
+      "static": [],
+      "dynamic": []
+    },
+    "Lakehouse": {
+      "static": [],
+      "dynamic": []
+    },
+    "Environment": {
+      "static": [],
+      "dynamic": []
+    }
+  }
+}

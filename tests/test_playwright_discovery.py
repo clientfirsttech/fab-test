@@ -12,20 +12,20 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts.playwright_validation.config import PlaywrightValidationConfig
-from fabric_ci_cd_dataops.scripts.playwright_validation.discovery import (
+from fab_test.scripts.playwright_validation.config import PlaywrightValidationConfig
+from fab_test.scripts.playwright_validation.discovery import (
     _discover_pages,
     _discover_roles,
     acquire_embed_configs,
     resolve_discovery,
 )
-from fabric_ci_cd_dataops.scripts.playwright_validation.power_bi_api import (
+from fab_test.scripts.playwright_validation.power_bi_api import (
     EmbedContext,
     PowerBiApiError,
 )
-from fabric_ci_cd_dataops.scripts.playwright_validation.service_client import ServiceClientError
+from fab_test.scripts.playwright_validation.service_client import ServiceClientError
 
-_DISCOVERY = "fabric_ci_cd_dataops.scripts.playwright_validation.discovery"
+_DISCOVERY = "fab_test.scripts.playwright_validation.discovery"
 
 
 def _config(**overrides) -> PlaywrightValidationConfig:
@@ -132,6 +132,20 @@ def test_resolve_discovery_skips_pages_when_page_ids_are_explicit() -> None:
     assert roles is None
 
 
+def test_resolve_discovery_skips_entirely_for_paginated_reports() -> None:
+    """A paginated report has neither a page nor a bookmark dimension, so
+    discovery is skipped outright -- even with RLS on, which would
+    otherwise trigger role discovery."""
+    config = _config(report_type="paginated", use_rls=True)
+
+    with patch(f"{_DISCOVERY}.build_fabric_service_client") as mock_build:
+        pages, roles = resolve_discovery(config, _args())
+
+    mock_build.assert_not_called()
+    assert pages is None
+    assert roles is None
+
+
 def test_resolve_discovery_skips_roles_without_rls() -> None:
     """Role discovery only runs when RLS is in play."""
     config = _config(use_rls=False)
@@ -199,6 +213,26 @@ def test_acquire_embed_configs_mints_one_token_per_role() -> None:
 
     assert configs["Manager"]["accessToken"] == "token-Manager"
     assert configs["Analyst"]["accessToken"] == "token-Analyst"
+
+
+def test_acquire_embed_configs_omits_page_and_bookmark_for_paginated_reports() -> None:
+    """A paginated report's minted embed config carries no pageName/bookmark
+    key at all -- RDL reports have neither dimension."""
+    config = _config(report_type="paginated")
+
+    def fake_get_embed_context(cfg: PlaywrightValidationConfig) -> EmbedContext:
+        return EmbedContext(
+            embed_url="https://app.powerbi.com/embed",
+            embed_token="token",
+            report_id=cfg.report_id,
+            dataset_id=cfg.dataset_id,
+        )
+
+    with patch(f"{_DISCOVERY}.get_embed_context", side_effect=fake_get_embed_context):
+        configs = acquire_embed_configs(config, [""])
+
+    assert "pageName" not in configs[""]
+    assert "bookmark" not in configs[""]
 
 
 def test_acquire_embed_configs_names_the_failing_role() -> None:

@@ -2,19 +2,20 @@
 
 from __future__ import annotations
 
+import dataclasses
 import json
 from pathlib import Path
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts.playwright_validation.config import PlaywrightValidationConfig
-from fabric_ci_cd_dataops.scripts.playwright_validation.test_cases import (
+from fab_test.scripts.playwright_validation.config import PlaywrightValidationConfig
+from fab_test.scripts.playwright_validation.test_cases import (
     DiscoveredBookmark,
     DiscoveredPage,
     generate_test_cases,
     write_test_cases,
 )
-from fabric_ci_cd_dataops.scripts.playwright_validation.test_cases import (
+from fab_test.scripts.playwright_validation.test_cases import (
     TestCase as PlaywrightTestCase,
 )
 
@@ -38,6 +39,7 @@ def base_config() -> PlaywrightValidationConfig:
         tenant_id="tenant-1",
         timeout_seconds=60,
         headless=True,
+        report_type="report",
     )
 
 
@@ -144,6 +146,55 @@ def test_discovered_matrix_with_no_roles_uses_configured_role(
     assert len(cases) == 1
     assert cases[0].role == ""
     assert cases[0].test_case == "SalesReport_page1_no-bookmark"
+
+
+def test_paginated_report_emits_exactly_one_case(
+    base_config: PlaywrightValidationConfig,
+) -> None:
+    """A paginated report target emits exactly one case with empty
+    page/bookmark dimensions and report_type="paginated", even when a
+    discovered matrix is passed in -- RDL reports have no such matrix."""
+    config = dataclasses.replace(base_config, report_type="paginated")
+    pages = [DiscoveredPage(page_id="page1", page_name="Page One", bookmarks=[])]
+
+    cases = generate_test_cases(config, pages=pages, roles=["Manager"])
+
+    assert len(cases) == 1
+    case = cases[0]
+    assert case.report_type == "paginated"
+    assert case.page_id == ""
+    assert case.page_name == ""
+    assert case.bookmark_id == ""
+    assert case.bookmark_name == ""
+
+
+def test_paginated_case_id_has_no_page_or_bookmark_placeholder(
+    base_config: PlaywrightValidationConfig,
+) -> None:
+    """A paginated case id never encodes "default-page"/"no-bookmark" --
+    those placeholders only make sense for the page/bookmark matrix."""
+    config = dataclasses.replace(base_config, report_type="paginated")
+
+    cases = generate_test_cases(config)
+
+    assert cases[0].test_case == "SalesReport"
+    assert "default-page" not in cases[0].test_case
+    assert "no-bookmark" not in cases[0].test_case
+
+
+def test_paginated_case_carries_render_wait_seconds(
+    base_config: PlaywrightValidationConfig,
+) -> None:
+    """The configured render-wait duration is carried onto the generated
+    case, giving the pytest spec's embed-then-wait check a configurable
+    budget instead of a hardcoded number."""
+    config = dataclasses.replace(
+        base_config, report_type="paginated", render_wait_seconds=25
+    )
+
+    cases = generate_test_cases(config)
+
+    assert cases[0].render_wait_seconds == 25
 
 
 def test_write_test_cases_creates_csv_and_json(

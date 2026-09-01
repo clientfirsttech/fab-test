@@ -17,12 +17,12 @@ import sys
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts._telemetry import (
+from fab_test.scripts._telemetry import (
     ENABLE_VAR,
     EVENTHOUSE_DATABASE_VAR,
     EVENTHOUSE_URI_VAR,
 )
-from fabric_ci_cd_dataops.scripts.eventhouse_logger import describe_ingest_failure
+from fab_test.scripts.eventhouse_logger import describe_ingest_failure
 
 _SECRET = "s3cret-client-secret-value"
 _URI = "https://trd-abc123.z9.kusto.fabric.microsoft.com"
@@ -51,8 +51,8 @@ def test_no_credential_value_reaches_the_payload(tmp_path, monkeypatch):
     Inspected at the sink rather than after a send, because a leak that only
     a real cluster would witness is the one nobody catches.
     """
-    from fabric_ci_cd_dataops.scripts import eventhouse_logger
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fab_test.scripts import eventhouse_logger
+    from fab_test.scripts import fab_test as fab_test_module
 
     queued: list[dict] = []
     monkeypatch.setattr(
@@ -113,8 +113,8 @@ def test_the_redacted_failure_reaches_the_manifest_and_the_log_already_redacted(
     Both destinations in one test on purpose: redacting for the console and
     forgetting the manifest is exactly the shape of leak this guards.
     """
-    from fabric_ci_cd_dataops.scripts import eventhouse_logger
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fab_test.scripts import eventhouse_logger
+    from fab_test.scripts import fab_test as fab_test_module
 
     def _boom(self, table, rows):
         raise RuntimeError(f"connection refused for AppKey={_SECRET}")
@@ -156,7 +156,7 @@ def test_the_redacted_failure_reaches_the_manifest_and_the_log_already_redacted(
 @pytest.mark.telemetry
 def test_the_dry_run_names_the_destination_but_never_the_secret(tmp_path, monkeypatch, capsys):
     """Given --dry-run, should print where it would go without printing how it gets in."""
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fab_test.scripts import fab_test as fab_test_module
 
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "Sales.SemanticModel").mkdir(parents=True)
@@ -188,7 +188,7 @@ def test_the_dry_run_names_the_destination_but_never_the_secret(tmp_path, monkey
 @pytest.mark.telemetry
 def test_config_show_never_prints_a_credential(tmp_path, monkeypatch, capsys):
     """Given credentials in the environment, should report the address and not the secret."""
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fab_test.scripts import fab_test as fab_test_module
 
     config = tmp_path / "fab-test.yml"
     config.write_text(_CONFIG_YAML, encoding="utf-8")

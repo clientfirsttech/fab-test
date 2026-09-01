@@ -36,6 +36,7 @@ _EXPECTED_WORKFLOWS = {
     "publish.yml",
     "publish-testpypi.yml",
     "copilot-setup-steps.yml",
+    "check-tool-updates.yml",
 }
 
 _SELF_STARTING_TRIGGERS = ("push", "pull_request", "pull_request_target", "schedule")
@@ -96,6 +97,75 @@ def test_the_scripts_the_workflows_call_exist():
             for token in str(step.get("run", "")).split():
                 if token.startswith(".github/scripts/"):
                     assert (_ROOT / token).exists(), f"{name} calls missing {token}"
+
+
+@pytest.mark.fab_test
+def test_the_tools_the_workflows_call_exist():
+    """tools/ is maintainer scripting, invoked by path the same way .github/scripts is."""
+    for name in sorted(_EXPECTED_WORKFLOWS):
+        for step in _steps(name):
+            for token in str(step.get("run", "")).split():
+                if token.startswith("tools/"):
+                    assert (_ROOT / token).exists(), f"{name} calls missing {token}"
+
+
+# --------------------------------------------------------------------------
+# check-tool-updates.yml (Tool Version Currency epic)
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.fab_test
+def test_check_tool_updates_runs_weekly_and_can_be_run_by_hand():
+    """A cadence nobody has to remember, plus a manual escape hatch to test it."""
+    triggers = _triggers("check-tool-updates.yml")
+
+    assert "schedule" in triggers, triggers
+    assert triggers["schedule"], "no cron entries"
+    assert "workflow_dispatch" in triggers, triggers
+
+
+@pytest.mark.fab_test
+def test_check_tool_updates_can_open_an_issue():
+    """Reporting drift as an issue needs `issues: write`; the default token can't."""
+    data = yaml.safe_load(
+        (_WORKFLOWS / "check-tool-updates.yml").read_text(encoding="utf-8")
+    )
+
+    assert data.get("permissions", {}).get("issues") == "write", data.get("permissions")
+
+
+@pytest.mark.fab_test
+def test_check_tool_updates_never_fails_the_workflow_on_a_flaky_upstream():
+    """The check step tolerates its own failure; drift is reported by the issue step, not a red run."""
+    steps = _steps("check-tool-updates.yml")
+    check_steps = [s for s in steps if "check_tool_updates.py" in str(s.get("run", ""))]
+
+    assert check_steps, "no step invokes tools/check_tool_updates.py"
+    for step in check_steps:
+        assert step.get("continue-on-error") is True, step
+
+
+@pytest.mark.fab_test
+def test_check_tool_updates_passes_format_json_to_the_script():
+    """The issue-opening step needs machine-readable output to parse."""
+    steps = _steps("check-tool-updates.yml")
+    check_steps = [s for s in steps if "check_tool_updates.py" in str(s.get("run", ""))]
+
+    assert any("--format json" in str(s.get("run", "")) for s in check_steps)
+
+
+# --------------------------------------------------------------------------
+# dependabot.yml
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.fab_test
+def test_dependabot_watches_pip_and_github_actions():
+    """Both ecosystems that can actually drift here: the pyproject pins and the workflow actions."""
+    data = yaml.safe_load((_ROOT / ".github" / "dependabot.yml").read_text(encoding="utf-8"))
+    ecosystems = {update["package-ecosystem"] for update in data["updates"]}
+
+    assert ecosystems == {"pip", "github-actions"}, ecosystems
 
 
 # --------------------------------------------------------------------------

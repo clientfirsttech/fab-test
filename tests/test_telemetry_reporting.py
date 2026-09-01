@@ -17,7 +17,7 @@ import sys
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts._telemetry import (
+from fab_test.scripts._telemetry import (
     ENABLE_VAR,
     EVENTHOUSE_DATABASE_VAR,
     EVENTHOUSE_URI_VAR,
@@ -43,7 +43,7 @@ def _artifacts(tmp_path):
 
 def _run(tmp_path, monkeypatch, *, config: str | None = _CONFIG_YAML, argv_extra=()):
     """Run `fab-test pql_lint` over three artifacts, returning the output dir."""
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fab_test.scripts import fab_test as fab_test_module
 
     artifact_dir = _artifacts(tmp_path)
     output_dir = tmp_path / "fab-test-results"
@@ -64,7 +64,7 @@ def _run(tmp_path, monkeypatch, *, config: str | None = _CONFIG_YAML, argv_extra
 
 def _fail_ingest(monkeypatch, message="cluster unreachable"):
     """Make every ingest attempt fail, without a network call."""
-    from fabric_ci_cd_dataops.scripts import eventhouse_logger
+    from fab_test.scripts import eventhouse_logger
 
     def _boom(self, table, rows):
         raise RuntimeError(message)

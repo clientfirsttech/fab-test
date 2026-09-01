@@ -72,7 +72,7 @@ before it reaches the upload step.
 
 ### 1. Bump the version — one file
 
-`src/fabric_ci_cd_dataops/__init__.py` is the only place the version is written.
+`src/fab_test/__init__.py` is the only place the version is written.
 `pyproject.toml` reads it through `[tool.setuptools.dynamic]`, so there is no
 second place to keep in step.
 
@@ -125,10 +125,9 @@ retries for that reason, and a manual install may need the same patience.
 ### Why the install command looks like that
 
 - **`--extra-index-url https://pypi.org/simple`** — TestPyPI carries
-  `pql-test` 0.1.11 and `fabric-cicd` 0.1.7; this project requires
-  `pql-test==0.1.12` and a current `fabric-cicd`. Without the production index
-  alongside it the install fails to resolve, which reads as a broken package and
-  is not one.
+  `pql-test` 0.1.11; this project requires `pql-test==0.1.12`. Without the
+  production index alongside it the install fails to resolve, which reads
+  as a broken package and is not one.
 - **The exact pin** — `1.0.0.0.dev1` is a PEP 440 dev release. pip skips
   pre-releases unless you name a version exactly or pass `--pre`, so a bare
   `pip install fab-test` finds no acceptable version even once the project
@@ -208,6 +207,59 @@ Keep `--artifact-dir` explicit in CI, and see
 [QUICK-VALIDATION.md](QUICK-VALIDATION.md#pipeline-snippet-doctor-as-a-gate-runjson-as-the-artifact)
 for why, plus what `run.json` carries when a build goes red.
 
+### Stay current on tool pins (`tool-currency.yml`)
+
+A wrapped tool's pin (Tabular Editor, PBIR Inspector) travels inside
+`analyzers.json`, so the only way a consuming pipeline receives a bump is by
+installing a newer `fab-test`. This job checks weekly and opens an issue when
+one is available, mirroring
+[`.github/workflows/check-tool-updates.yml`](../.github/workflows/check-tool-updates.yml)
+in this repository but scoped to the package itself rather than its
+dependencies:
+
+```yaml
+name: fab-test tool currency
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Compare the installed pin against the index
+        id: check
+        run: |
+          current=$(pip show fab-test | grep '^Version:' | cut -d' ' -f2)
+          latest=$(pip index versions fab-test 2>/dev/null | head -1 | grep -oE '[0-9][0-9a-zA-Z.]*' | head -1)
+          echo "current=$current" >> "$GITHUB_OUTPUT"
+          echo "latest=$latest" >> "$GITHUB_OUTPUT"
+
+      - name: Open an issue if a newer fab-test is available
+        if: steps.check.outputs.current != steps.check.outputs.latest
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = `fab-test update available: ${{ steps.check.outputs.current }} -> ${{ steps.check.outputs.latest }}`;
+            const open = await github.rest.issues.listForRepo({
+              owner: context.repo.owner, repo: context.repo.repo,
+              state: "open", labels: "tool-update",
+            });
+            if (open.data.some((issue) => issue.title === title)) return;
+            await github.rest.issues.create({
+              owner: context.repo.owner, repo: context.repo.repo,
+              title,
+              body: "A newer fab-test release may carry an updated tool pin. See https://github.com/kerski/fab-test/blob/main/docs/RELEASE.md",
+              labels: ["tool-update"],
+            });
+```
+
 ---
 
 ## For the agent
@@ -215,6 +267,52 @@ for why, plus what `run.json` carries when a build goes red.
 The same install commands and the metadata resolution order live in
 [`.github/skills/fab-test/SKILL.md`](../.github/skills/fab-test/SKILL.md), so an
 agent reads them from its skill rather than from this file.
+
+---
+
+## Bumping a wrapped tool's pin
+
+`fab-test` wraps four external tools (`pbir_inspector`, `tabular_editor_bpa`,
+`pql_test`, and whichever others `analyzers.json` lists), each pinned by a
+`tool_install.version` field so `doctor` and the cache can tell a stale binary
+from a current one. [`.github/workflows/check-tool-updates.yml`](../.github/workflows/check-tool-updates.yml)
+runs weekly, and opens an issue labeled `tool-update` naming any tool whose
+upstream has moved past the pin — that issue is normally what starts this
+procedure, though `python tools/check_tool_updates.py` can be run by hand too.
+
+1. **Edit the pin** in
+   [`src/fab_test/metadata/analyzers.json`](../src/fab_test/metadata/analyzers.json):
+   bump `tool_install.version` to the new release.
+2. **Record a fresh checksum per platform.** Download each platform's asset for
+   the new version and hash it:
+
+   ```bash
+   sha256sum <downloaded-asset>
+   ```
+
+   Write the result into `tool_install.install_sha256` (one hash) or
+   `install_sha256s` (`{"linux": ..., "win32": ..., "darwin": ...}`), matching
+   whichever key the tool's existing entry already uses. A pin without a
+   matching hash is worse than no pin — it lets a corrupted or substituted
+   download through silently.
+3. **Verify locally**, from a checkout with the analyzer's old cache still on
+   disk, that `fab-test doctor` reports the tool as not-yet-downloaded (the
+   version-keyed cache directory means the new pin cannot resolve the old
+   binary), then let it download and confirm the new version resolves cleanly:
+
+   ```bash
+   fab-test doctor --local
+   ```
+4. **Run the full test suite** — `analyzers.json` changes are covered by
+   `tests/test_fab_test_tool_bootstrap.py` and `tests/test_readiness.py`, among
+   others.
+5. **Commit** the `analyzers.json` change with a message naming the tool and
+   the version, e.g. `chore(tools): bump tabular_editor_bpa to 2.29.0`.
+
+`pql_test`'s entry deliberately carries no `version` field — it tracks the
+`pql-test==` pin in `pyproject.toml` instead, via `release_source.version_source
+== "pyproject.toml"`, so that version has exactly one place to change (see
+"Bump the version" above; the same file, different reason).
 
 ---
 

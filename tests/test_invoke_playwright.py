@@ -13,7 +13,7 @@ _ROOT = Path(__file__).resolve().parent.parent
 
 # Match the import path used by invoke_playwright.py so exception classes compare
 # equal when patched.
-from fabric_ci_cd_dataops.scripts.invoke_playwright import (
+from fab_test.scripts.invoke_playwright import (
     _build_config_from_args,
     _build_env_for_pytest,
     _parse_pytest_summary,
@@ -23,9 +23,9 @@ from fabric_ci_cd_dataops.scripts.invoke_playwright import (
     parse_args,
     run_playwright_validation,
 )
-from fabric_ci_cd_dataops.scripts.playwright_validation.config import PlaywrightValidationConfig
-from fabric_ci_cd_dataops.scripts.playwright_validation.power_bi_api import EmbedContext, PowerBiApiError
-from fabric_ci_cd_dataops.scripts.playwright_validation.resolver import (
+from fab_test.scripts.playwright_validation.config import PlaywrightValidationConfig
+from fab_test.scripts.playwright_validation.power_bi_api import EmbedContext, PowerBiApiError
+from fab_test.scripts.playwright_validation.resolver import (
     ResolvedEnvironment,
     ResolvedReport,
     ServiceResolutionError,
@@ -72,7 +72,7 @@ def test_parse_args_picks_up_env_file_and_output_path() -> None:
 
 def test_write_findings_empty_on_success() -> None:
     """No findings are emitted when the run succeeds."""
-    from fabric_ci_cd_dataops.scripts.playwright_validation.test_cases import TestCase
+    from fab_test.scripts.playwright_validation.test_cases import TestCase
 
     case = TestCase(
         test_case="Report_default-page_no-bookmark",
@@ -92,7 +92,7 @@ def test_write_findings_empty_on_success() -> None:
 
 def test_write_findings_on_failure() -> None:
     """Each case becomes an error finding when the run fails."""
-    from fabric_ci_cd_dataops.scripts.playwright_validation.test_cases import TestCase
+    from fab_test.scripts.playwright_validation.test_cases import TestCase
 
     case = TestCase(
         test_case="Report_default-page_no-bookmark",
@@ -135,7 +135,7 @@ def test_build_env_for_pytest_sets_expected_vars(
     """The pytest environment includes CSV path, embed config, timeout,
     and results root."""
 
-    from fabric_ci_cd_dataops.scripts.playwright_validation.test_cases import generate_test_cases
+    from fab_test.scripts.playwright_validation.test_cases import generate_test_cases
 
     cases = generate_test_cases(config)
     embed_config = {"type": "report", "id": "rpt-1"}
@@ -167,7 +167,7 @@ def test_stream_subprocess_verbose_echoes_every_line_as_it_arrives(tmp_path: Pat
     ]
 
     with patch(
-        "fabric_ci_cd_dataops.scripts.invoke_playwright.log",
+        "fab_test.scripts.invoke_playwright.log",
         side_effect=seen.append,
     ):
         result = _stream_subprocess(command, cwd=tmp_path, env={}, verbose=True)
@@ -196,7 +196,7 @@ def test_stream_subprocess_terse_by_default_only_logs_pytest_outcome_lines(
     command = [sys.executable, "-c", script]
 
     with patch(
-        "fabric_ci_cd_dataops.scripts.invoke_playwright.log",
+        "fab_test.scripts.invoke_playwright.log",
         side_effect=seen.append,
     ):
         result = _stream_subprocess(command, cwd=tmp_path, env={})
@@ -220,7 +220,7 @@ def test_stream_subprocess_reports_a_nonzero_exit_code(tmp_path: Path) -> None:
 
     command = [sys.executable, "-c", "import sys; sys.exit(3)"]
 
-    with patch("fabric_ci_cd_dataops.scripts.invoke_playwright.log"):
+    with patch("fab_test.scripts.invoke_playwright.log"):
         result = _stream_subprocess(command, cwd=tmp_path, env={})
 
     assert result.returncode == 3
@@ -236,7 +236,7 @@ def test_stream_subprocess_raises_if_child_has_no_stdout_pipe(tmp_path: Path) ->
 
     with (
         patch(
-            "fabric_ci_cd_dataops.scripts.invoke_playwright.subprocess.Popen",
+            "fab_test.scripts.invoke_playwright.subprocess.Popen",
             return_value=fake_proc,
         ),
         pytest.raises(RuntimeError, match="stdout"),
@@ -270,14 +270,14 @@ def test_main_writes_envelope_and_returns_zero_on_success(
     )
 
     with (
-        patch("fabric_ci_cd_dataops.scripts.invoke_playwright.load_config", return_value=config),
-        patch("fabric_ci_cd_dataops.scripts.invoke_playwright.resolve_discovery", return_value=(None, None)),
+        patch("fab_test.scripts.invoke_playwright.load_config", return_value=config),
+        patch("fab_test.scripts.invoke_playwright.resolve_discovery", return_value=(None, None)),
         patch(
-            "fabric_ci_cd_dataops.scripts.playwright_validation.discovery.get_embed_context",
+            "fab_test.scripts.playwright_validation.discovery.get_embed_context",
             return_value=embed_context,
         ),
-        patch("fabric_ci_cd_dataops.scripts.invoke_playwright._run_pytest", return_value=completed),
-        patch("fabric_ci_cd_dataops.scripts.invoke_playwright._repo_root", return_value=tmp_path),
+        patch("fab_test.scripts.invoke_playwright._run_pytest", return_value=completed),
+        patch("fab_test.scripts.invoke_playwright._repo_root", return_value=tmp_path),
     ):
         code = main(["--env-file", ".env", "--output-path", str(output_path)])
 
@@ -307,14 +307,14 @@ def test_main_writes_envelope_and_returns_one_on_failure(
     )
 
     with (
-        patch("fabric_ci_cd_dataops.scripts.invoke_playwright.load_config", return_value=config),
-        patch("fabric_ci_cd_dataops.scripts.invoke_playwright.resolve_discovery", return_value=(None, None)),
+        patch("fab_test.scripts.invoke_playwright.load_config", return_value=config),
+        patch("fab_test.scripts.invoke_playwright.resolve_discovery", return_value=(None, None)),
         patch(
-            "fabric_ci_cd_dataops.scripts.playwright_validation.discovery.get_embed_context",
+            "fab_test.scripts.playwright_validation.discovery.get_embed_context",
             return_value=embed_context,
         ),
-        patch("fabric_ci_cd_dataops.scripts.invoke_playwright._run_pytest", return_value=completed),
-        patch("fabric_ci_cd_dataops.scripts.invoke_playwright._repo_root", return_value=tmp_path),
+        patch("fab_test.scripts.invoke_playwright._run_pytest", return_value=completed),
+        patch("fab_test.scripts.invoke_playwright._repo_root", return_value=tmp_path),
     ):
         code = main(["--env-file", ".env", "--output-path", str(output_path)])
 
@@ -331,13 +331,13 @@ def test_main_returns_one_on_api_error(
     output_path = tmp_path / "envelope.json"
 
     with (
-        patch("fabric_ci_cd_dataops.scripts.invoke_playwright.load_config", return_value=config),
-        patch("fabric_ci_cd_dataops.scripts.invoke_playwright.resolve_discovery", return_value=(None, None)),
+        patch("fab_test.scripts.invoke_playwright.load_config", return_value=config),
+        patch("fab_test.scripts.invoke_playwright.resolve_discovery", return_value=(None, None)),
         patch(
-            "fabric_ci_cd_dataops.scripts.playwright_validation.discovery.get_embed_context",
+            "fab_test.scripts.playwright_validation.discovery.get_embed_context",
             side_effect=PowerBiApiError("boom", 400),
         ),
-        patch("fabric_ci_cd_dataops.scripts.invoke_playwright._repo_root", return_value=tmp_path),
+        patch("fab_test.scripts.invoke_playwright._repo_root", return_value=tmp_path),
     ):
         code = main(["--env-file", ".env", "--output-path", str(output_path)])
 
@@ -358,13 +358,13 @@ def test_discovered_roles_without_user_name_fail_before_minting_a_token(
     output_path = tmp_path / "envelope.json"
 
     with (
-        patch("fabric_ci_cd_dataops.scripts.invoke_playwright.load_config", return_value=config),
+        patch("fab_test.scripts.invoke_playwright.load_config", return_value=config),
         patch(
-            "fabric_ci_cd_dataops.scripts.invoke_playwright.resolve_discovery",
+            "fab_test.scripts.invoke_playwright.resolve_discovery",
             return_value=(None, ["Manager"]),
         ),
         patch(
-            "fabric_ci_cd_dataops.scripts.invoke_playwright.acquire_embed_configs"
+            "fab_test.scripts.invoke_playwright.acquire_embed_configs"
         ) as mock_acquire,
     ):
         code = main(["--env-file", ".env", "--output-path", str(output_path)])
@@ -393,7 +393,7 @@ def test_resolution_exception_writes_envelope_instead_of_a_traceback(
     metadata scavenger hunt") does not stop at the embed-token step.
     """
     with patch(
-        "fabric_ci_cd_dataops.scripts.invoke_playwright._build_config_from_args",
+        "fab_test.scripts.invoke_playwright._build_config_from_args",
         side_effect=RuntimeError("token service unreachable"),
     ):
         args = parse_args(
@@ -422,13 +422,13 @@ def test_main_returns_one_on_unexpected_exception(
     output_path = tmp_path / "envelope.json"
 
     with (
-        patch("fabric_ci_cd_dataops.scripts.invoke_playwright.load_config", return_value=config),
-        patch("fabric_ci_cd_dataops.scripts.invoke_playwright.resolve_discovery", return_value=(None, None)),
+        patch("fab_test.scripts.invoke_playwright.load_config", return_value=config),
+        patch("fab_test.scripts.invoke_playwright.resolve_discovery", return_value=(None, None)),
         patch(
-            "fabric_ci_cd_dataops.scripts.playwright_validation.discovery.get_embed_context",
+            "fab_test.scripts.playwright_validation.discovery.get_embed_context",
             side_effect=ValueError("Unable to parse QueryString"),
         ),
-        patch("fabric_ci_cd_dataops.scripts.invoke_playwright._repo_root", return_value=tmp_path),
+        patch("fab_test.scripts.invoke_playwright._repo_root", return_value=tmp_path),
     ):
         code = main(["--env-file", ".env", "--output-path", str(output_path)])
 
@@ -447,13 +447,13 @@ def test_unexpected_exception_writes_error_annotation_to_stderr(
     output_path = tmp_path / "envelope.json"
 
     with (
-        patch("fabric_ci_cd_dataops.scripts.invoke_playwright.load_config", return_value=config),
-        patch("fabric_ci_cd_dataops.scripts.invoke_playwright.resolve_discovery", return_value=(None, None)),
+        patch("fab_test.scripts.invoke_playwright.load_config", return_value=config),
+        patch("fab_test.scripts.invoke_playwright.resolve_discovery", return_value=(None, None)),
         patch(
-            "fabric_ci_cd_dataops.scripts.playwright_validation.discovery.get_embed_context",
+            "fab_test.scripts.playwright_validation.discovery.get_embed_context",
             side_effect=RuntimeError("boom"),
         ),
-        patch("fabric_ci_cd_dataops.scripts.invoke_playwright._repo_root", return_value=tmp_path),
+        patch("fab_test.scripts.invoke_playwright._repo_root", return_value=tmp_path),
     ):
         code = main(["--env-file", ".env", "--output-path", str(output_path)])
 
@@ -516,23 +516,23 @@ def test_resolution_failure_in_impact_run_leaves_other_artifacts_intact(
 
     with (
         patch(
-            "fabric_ci_cd_dataops.scripts.invoke_playwright.load_config",
+            "fab_test.scripts.invoke_playwright.load_config",
             return_value=config,
         ),
         patch(
-            "fabric_ci_cd_dataops.scripts.invoke_playwright.resolve_discovery",
+            "fab_test.scripts.invoke_playwright.resolve_discovery",
             return_value=(None, None),
         ),
         patch(
-            "fabric_ci_cd_dataops.scripts.playwright_validation.discovery.get_embed_context",
+            "fab_test.scripts.playwright_validation.discovery.get_embed_context",
             side_effect=fake_get_embed_context,
         ),
         patch(
-            "fabric_ci_cd_dataops.scripts.invoke_playwright._run_pytest",
+            "fab_test.scripts.invoke_playwright._run_pytest",
             return_value=completed,
         ),
         patch(
-            "fabric_ci_cd_dataops.scripts.invoke_playwright._repo_root",
+            "fab_test.scripts.invoke_playwright._repo_root",
             return_value=tmp_path,
         ),
     ):
@@ -541,7 +541,7 @@ def test_resolution_failure_in_impact_run_leaves_other_artifacts_intact(
 
     assert code == 1  # overall failed because one report errored
 
-    from fabric_ci_cd_dataops.scripts._analyzer_envelope import envelope_path
+    from fab_test.scripts._analyzer_envelope import envelope_path
 
     bad_envelope = envelope_path("playwright", "Bad Report")
     good_envelope = envelope_path("playwright", "Good Report")
@@ -578,11 +578,11 @@ def test_build_config_from_args_uses_service_client_for_artifact() -> None:
     client = object()
 
     with (
-        patch("fabric_ci_cd_dataops.scripts.invoke_playwright.load_config", return_value=config),
-        patch("fabric_ci_cd_dataops.scripts.invoke_playwright.resolve_environment") as mock_env,
-        patch("fabric_ci_cd_dataops.scripts.invoke_playwright.resolve_report", return_value=resolved) as mock_report,
+        patch("fab_test.scripts.invoke_playwright.load_config", return_value=config),
+        patch("fab_test.scripts.invoke_playwright.resolve_environment") as mock_env,
+        patch("fab_test.scripts.invoke_playwright.resolve_report", return_value=resolved) as mock_report,
         patch(
-            "fabric_ci_cd_dataops.scripts.invoke_playwright.build_fabric_service_client",
+            "fab_test.scripts.invoke_playwright.build_fabric_service_client",
             return_value=client,
         ) as mock_client,
     ):
@@ -605,7 +605,7 @@ def test_build_config_from_args_uses_service_client_for_artifact() -> None:
         workspace_id_override="",
     )
     mock_report.assert_called_once_with(
-        "Resolved Report", mock_env.return_value, client
+        "Resolved Report", mock_env.return_value, client, report_type="auto"
     )
 
 
@@ -638,12 +638,12 @@ def test_build_config_loads_config_without_required_ids_for_artifact() -> None:
 
     with (
         patch(
-            "fabric_ci_cd_dataops.scripts.invoke_playwright.load_config",
+            "fab_test.scripts.invoke_playwright.load_config",
             return_value=config,
         ) as mock_load,
-        patch("fabric_ci_cd_dataops.scripts.invoke_playwright.resolve_environment") as mock_env,
-        patch("fabric_ci_cd_dataops.scripts.invoke_playwright.resolve_report", return_value=resolved),
-        patch("fabric_ci_cd_dataops.scripts.invoke_playwright.build_fabric_service_client"),
+        patch("fab_test.scripts.invoke_playwright.resolve_environment") as mock_env,
+        patch("fab_test.scripts.invoke_playwright.resolve_report", return_value=resolved),
+        patch("fab_test.scripts.invoke_playwright.build_fabric_service_client"),
     ):
         mock_env.return_value = ResolvedEnvironment(
             environment="DEV",
@@ -688,11 +688,11 @@ def test_build_config_refuses_incomplete_service_principal_before_any_client(
 
     with (
         patch(
-            "fabric_ci_cd_dataops.scripts.invoke_playwright.load_config",
+            "fab_test.scripts.invoke_playwright.load_config",
             return_value=incomplete,
         ),
         patch(
-            "fabric_ci_cd_dataops.scripts.invoke_playwright.build_fabric_service_client"
+            "fab_test.scripts.invoke_playwright.build_fabric_service_client"
         ) as mock_client,
     ):
         args = parse_args(["--artifact", "ThinReport", "--env", "dev"])
@@ -735,7 +735,7 @@ def test_incomplete_service_principal_refusal_exits_127() -> None:
     )
 
     with patch(
-        "fabric_ci_cd_dataops.scripts.invoke_playwright.load_config",
+        "fab_test.scripts.invoke_playwright.load_config",
         return_value=incomplete,
     ):
         args = parse_args(["--artifact", "ThinReport", "--env", "dev"])
@@ -758,16 +758,16 @@ def test_complete_service_principal_behaves_as_before(config) -> None:
 
     with (
         patch(
-            "fabric_ci_cd_dataops.scripts.invoke_playwright.load_config",
+            "fab_test.scripts.invoke_playwright.load_config",
             return_value=config,
         ),
-        patch("fabric_ci_cd_dataops.scripts.invoke_playwright.resolve_environment") as mock_env,
+        patch("fab_test.scripts.invoke_playwright.resolve_environment") as mock_env,
         patch(
-            "fabric_ci_cd_dataops.scripts.invoke_playwright.resolve_report",
+            "fab_test.scripts.invoke_playwright.resolve_report",
             return_value=resolved,
         ),
         patch(
-            "fabric_ci_cd_dataops.scripts.invoke_playwright.build_fabric_service_client"
+            "fab_test.scripts.invoke_playwright.build_fabric_service_client"
         ) as mock_client,
     ):
         mock_env.return_value = ResolvedEnvironment(
@@ -793,7 +793,7 @@ def test_build_config_refuses_an_artifact_with_no_environment(config) -> None:
     short-circuited past it, which is why passing --env hid this.
     """
     with patch(
-        "fabric_ci_cd_dataops.scripts.invoke_playwright.load_config", return_value=config
+        "fab_test.scripts.invoke_playwright.load_config", return_value=config
     ):
         args = parse_args(["--artifact", "ThinReport"])
 
@@ -815,10 +815,10 @@ def test_no_environment_is_reported_before_a_credential_is_built(config) -> None
     """
     with (
         patch(
-            "fabric_ci_cd_dataops.scripts.invoke_playwright.load_config", return_value=config
+            "fab_test.scripts.invoke_playwright.load_config", return_value=config
         ),
         patch(
-            "fabric_ci_cd_dataops.scripts.invoke_playwright.build_fabric_service_client"
+            "fab_test.scripts.invoke_playwright.build_fabric_service_client"
         ) as mock_client,
     ):
         args = parse_args(["--artifact", "ThinReport"])
@@ -837,7 +837,7 @@ def test_a_missing_environment_exits_one_without_a_traceback(config, capsys) -> 
     ``::error::`` line and exit 1 is what a CI log and an agent can read.
     """
     with patch(
-        "fabric_ci_cd_dataops.scripts.invoke_playwright.load_config", return_value=config
+        "fab_test.scripts.invoke_playwright.load_config", return_value=config
     ):
         args = parse_args(["--artifact", "ThinReport"])
 
@@ -864,7 +864,7 @@ def test_missing_environment_abort_writes_its_message_to_stderr(config, capsys):
     args = parse_args(["--artifact", "ThinReport", "--output-path", "unused.json"])
 
     with patch(
-        "fabric_ci_cd_dataops.scripts.invoke_playwright.load_config", return_value=config
+        "fab_test.scripts.invoke_playwright.load_config", return_value=config
     ):
         exit_code = run_playwright_validation(args)
 

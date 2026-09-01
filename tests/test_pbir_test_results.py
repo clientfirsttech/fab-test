@@ -19,7 +19,7 @@ from unittest import mock
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts.invoke_pbir_inspector import run_inspector
+from fab_test.scripts.invoke_pbir_inspector import run_inspector
 
 pytestmark = pytest.mark.pbir
 
@@ -74,7 +74,7 @@ def _run(tmp_path: Path, results: list[dict], monkeypatch):
         emit_html = False
 
     with mock.patch(
-        "fabric_ci_cd_dataops.scripts.invoke_pbir_inspector.subprocess.run"
+        "fab_test.scripts.invoke_pbir_inspector.subprocess.run"
     ) as mock_run:
         mock_run.return_value = mock.Mock(returncode=0, stdout="", stderr="")
         exit_code = run_inspector(Args())

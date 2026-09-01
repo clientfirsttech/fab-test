@@ -16,7 +16,7 @@ import subprocess
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts.fab_test_registry import visible_analyzers
+from fab_test.scripts.fab_test_registry import visible_analyzers
 
 
 @pytest.mark.fab_test
@@ -125,7 +125,7 @@ class _ExplainArgs:
 @pytest.mark.fab_test
 def test_explain_bpa_never_spawns_a_subprocess(tmp_path, monkeypatch):
     """explain builds the resolved command but never executes it."""
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fab_test.scripts import fab_test_admin
 
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
@@ -133,10 +133,10 @@ def test_explain_bpa_never_spawns_a_subprocess(tmp_path, monkeypatch):
     def _fail_if_called(*_a, **_k):
         raise AssertionError("explain must never spawn a subprocess")
 
-    monkeypatch.setattr(fab_test_module.subprocess, "run", _fail_if_called)
+    monkeypatch.setattr(fab_test_admin.subprocess, "run", _fail_if_called)
 
     args = _ExplainArgs("bpa", artifact_dir, tmp_path / "results")
-    code = fab_test_module._explain_analyzer(args)
+    code = fab_test_admin._explain_analyzer(args)
 
     assert code == 0
 
@@ -144,7 +144,7 @@ def test_explain_bpa_never_spawns_a_subprocess(tmp_path, monkeypatch):
 @pytest.mark.fab_test
 def test_explain_json_payload_shape(tmp_path, capsys):
     """The JSON payload has the documented keys and a real command list."""
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fab_test.scripts import fab_test as fab_test_module
 
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
@@ -165,7 +165,7 @@ def test_explain_json_payload_shape(tmp_path, capsys):
 @pytest.mark.fab_test
 def test_explain_text_format_shows_command(tmp_path, capsys):
     """--format text (default) prints a human-readable command breakdown."""
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fab_test.scripts import fab_test as fab_test_module
 
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
@@ -196,24 +196,24 @@ def test_explain_unknown_analyzer_exits_2_and_lists_valid_names():
 @pytest.mark.fab_test
 def test_explain_rules_path_falls_back_to_default_when_not_overridden(tmp_path, capsys):
     """rules_path reports the real default the command uses, not null."""
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fab_test.scripts import fab_test_admin
 
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
 
     args = _ExplainArgs("bpa", artifact_dir, tmp_path / "results")
-    fab_test_module._explain_analyzer(args)
+    fab_test_admin._explain_analyzer(args)
     captured = capsys.readouterr()
 
     payload = json.loads(captured.out)
-    assert payload["rules_path"] == fab_test_module._DEFAULT_BPA_RULES
+    assert payload["rules_path"] == fab_test_admin._DEFAULT_BPA_RULES
     assert payload["rules_path"] in payload["command"]
 
 
 @pytest.mark.fab_test
 def test_explain_falls_back_to_placeholder_when_no_artifact_matches(tmp_path):
     """With no matching artifact, explain still shows an illustrative command."""
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fab_test.scripts import fab_test as fab_test_module
 
     artifact_dir = tmp_path / "empty"
     artifact_dir.mkdir()
@@ -304,7 +304,7 @@ def test_print_list_json_payload_shape(tmp_path, capsys):
     Exercised in-process because every other `list` test shells out, which
     leaves this branch uncovered however green the suite looks.
     """
-    from fabric_ci_cd_dataops.scripts.fab_test_summary import _print_list
+    from fab_test.scripts.fab_test_summary import _print_list
 
     row = {
         "analyzer": "bpa",
@@ -326,7 +326,7 @@ def test_print_list_json_payload_shape(tmp_path, capsys):
 @pytest.mark.fab_test
 def test_print_list_json_payload_omits_remediation_when_nothing_was_pruned(capsys):
     """Given nothing was pruned, there is nothing to remediate."""
-    from fabric_ci_cd_dataops.scripts.fab_test_summary import _print_list
+    from fab_test.scripts.fab_test_summary import _print_list
 
     assert _print_list([], "json") == 0
     payload = json.loads(capsys.readouterr().out)

@@ -19,7 +19,7 @@ from pathlib import Path
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts.eventhouse_logger import (
+from fab_test.scripts.eventhouse_logger import (
     TELEMETRY_EXTRA_HINT,
     TelemetryDependencyError,
     load_ingest_dependencies,
@@ -95,7 +95,7 @@ def test_importing_the_logger_does_not_import_the_kusto_sdk():
     """
     source = (
         Path(__file__).resolve().parents[1]
-        / "src/fabric_ci_cd_dataops/scripts/eventhouse_logger.py"
+        / "src/fab_test/scripts/eventhouse_logger.py"
     ).read_text(encoding="utf-8")
 
     for line in source.splitlines():

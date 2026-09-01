@@ -18,7 +18,7 @@ from pathlib import Path
 import pytest
 
 _ROOT = Path(__file__).resolve().parent.parent
-_SRC = _ROOT / "src" / "fabric_ci_cd_dataops"
+_SRC = _ROOT / "src" / "fab_test"
 
 
 @pytest.fixture(scope="module")
@@ -42,7 +42,7 @@ def test_pytest_cov_is_a_dev_dependency(pyproject):
 @pytest.mark.fab_test
 def test_coverage_is_scoped_to_the_package(coverage_run):
     """Tests are excluded from the denominator, per vision.md."""
-    assert coverage_run["source"] == ["src/fabric_ci_cd_dataops"]
+    assert coverage_run["source"] == ["src/fab_test"]
 
 
 @pytest.mark.fab_test

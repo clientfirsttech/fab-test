@@ -21,7 +21,7 @@ from pathlib import Path
 
 import pytest
 
-_SCRIPTS = Path(__file__).resolve().parent.parent / "src" / "fabric_ci_cd_dataops" / "scripts"
+_SCRIPTS = Path(__file__).resolve().parent.parent / "src" / "fab_test" / "scripts"
 
 # Modules that orchestrate the CLI. A wrapper importing one of these drags
 # the whole graph into a per-artifact subprocess.

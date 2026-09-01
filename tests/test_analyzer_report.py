@@ -4,7 +4,7 @@ import io
 from pathlib import Path
 from typing import Any
 
-from fabric_ci_cd_dataops.scripts._analyzer_report import (
+from fab_test.scripts._analyzer_report import (
     AnalyzerReporter,
     AnalyzerResult,
     _resolve_verbosity,

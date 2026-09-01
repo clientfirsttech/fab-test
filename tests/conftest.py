@@ -8,8 +8,8 @@ from pathlib import Path
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts._analyzer_envelope import EnvelopeIdentity, build_envelope
-from fabric_ci_cd_dataops.scripts._analyzer_report import AnalyzerReporter, _resolve_verbosity
+from fab_test.scripts._analyzer_envelope import EnvelopeIdentity, build_envelope
+from fab_test.scripts._analyzer_report import AnalyzerReporter, _resolve_verbosity
 
 # pytest markers that belong to the analyzer contract tier.
 _ANALYZER_MARKERS = {"bpa", "pbir", "pql_test", "pql_lint"}
