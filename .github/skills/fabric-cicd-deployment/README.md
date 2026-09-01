@@ -1,4 +1,11 @@
-# fabric-cicd-deployment
+# fabric-cicd-deployment — RETIRED
+
+**Retired.** `deploy.py`, `check_promotion_safety.py`, and
+`generate_fabric_cicd_config.py` no longer exist in this repository (Pipeline
+Deletion Dead-Code Audit epic, 2026-08-31) — deployment automation for this
+project does not currently exist, matching vision.md's own Non-Goals. See
+[SKILL.md](SKILL.md)'s retirement note for the full explanation. Kept only as
+historical reference; no command routes here any more.
 
 Documents the metadata-driven Fabric artifact deployment pattern for this project.
 
