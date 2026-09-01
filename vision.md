@@ -117,6 +117,16 @@ Documentation follows the same three callers as the CLI itself. Shipping for one
 3. **Update the skill file** — for fab-test's own skill specifically, write the behavioral/contract content in [SudoLang](.github/skills/aidd-sudolang-syntax/SKILL.md) (`Interfaces`/`Constraints`/`fn` blocks), not prose-and-tables — plain markdown remains fine for flag tables and worked examples, which SudoLang doesn't compress usefully. This is checked by `tests/test_skill_resource.py`'s SudoLang-construct guard, not by review discipline alone, so a rewrite back into plain prose fails CI rather than drifting back silently.
 4. **Confirm it is part of the packaged fab-test skill** — the packaged copy (`src/fab_test/skill/`) must carry every file identical to the authored source (`.github/skills/fab-test/`), guarded by the same test. Run `fab-test skill --show` to confirm an already-installed harness copy elsewhere picks up the change, rather than diffing files by hand.
 
+## Versioning
+
+`src/fab_test/__init__.py`'s `__version__` is the single source of truth (`pyproject.toml` reads it dynamically — see [docs/RELEASE.md](docs/RELEASE.md)). It moves every time `src/` changes, not only when a release is cut:
+
+- **Task-sized change** (a standalone fix, a small correction) → bump PATCH.
+- **Epic-sized change** (anything tracked as an epic in `tasks/`, however many tasks it contains) → bump MINOR, reset PATCH to `0`.
+- **MAJOR** is bumped only at the user's explicit direction — a breaking-change call, not a size threshold, so never bump it without asking.
+
+Three-part semver (`MAJOR.MINOR.PATCH`) — no fourth segment. Until the first final release ships (see "Cutting a final release" in [docs/RELEASE.md](docs/RELEASE.md)), every version stays a pre-release: append `.devN`, restarting at `.dev1` whenever the base `MAJOR.MINOR.PATCH` itself changes to a value that has never been published. A doc-only change with no `src/` edit does not need a bump on its own.
+
 ## Non-Goals
 
 - Replacing the analyzers it wraps, or reimplementing their rules.
