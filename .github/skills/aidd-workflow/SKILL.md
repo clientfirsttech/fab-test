@@ -15,7 +15,6 @@ Constraints {
   (project language is Python) => skip JS/TS skills: aidd-javascript, aidd-lit, aidd-react, aidd-autodux, aidd-ecs
   (task writes or reviews Python) => load aidd-python — it is the language skill the JS/TS skills would otherwise have supplied
   (task adds to, or reviews a diff touching, a file over 400 lines) => load aidd-module-budgets
-  (task involves Fabric deployment) => load fabric-cicd-deployment first
   (task involves code changes) => use aidd-tdd — write tests before implementation
   All skills resolve to: .github/skills/<skill-name>/SKILL.md
   Epic files: tasks/<epic-name>-epic.md
@@ -37,7 +36,6 @@ Constraints {
 | run test, execute test | `aidd-user-testing`, `aidd-please` | Execute AI agent test |
 | log, log changes, changelog | `aidd-log`, `aidd-please` | Document completed work |
 | commit, create commit | `aidd-please` | Conventional commit |
-| deploy, deployment, fabric deploy | `fabric-cicd-deployment` | Fabric artifact deployment pattern |
 | requirements, functional spec, given/should | `aidd-requirements` | Write functional requirements |
 | pr, pull request, review comments | `aidd-pr`, `aidd-please` | Triage + address PR review comments |
 | parallel, fan out, sub-agents | `aidd-parallel`, `aidd-please` | Delegate to parallel sub-agents |
@@ -53,7 +51,6 @@ Constraints {
 | `aidd-workflow` | This file — project command resolver |
 | `aidd-python` | Python best practices, simplicity budgets, over-engineering review lens |
 | `aidd-module-budgets` | File-level size budgets, split seams for oversized modules |
-| `fabric-cicd-deployment` | Metadata-driven Fabric deployment via environments.yml |
 | `document` | Sync docs: README, QUICK-VALIDATION, fab-test skill |
 | `fab-test` | fab-test CLI reference — subcommands, flags, result locations |
 

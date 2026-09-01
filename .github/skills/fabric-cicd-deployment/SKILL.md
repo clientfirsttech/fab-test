@@ -1,9 +1,31 @@
 ---
 name: fabric-cicd-deployment
-description: Metadata-driven Fabric artifact deployment for this project. Covers environments.yml schema, deploy.py usage, promotion chain, validation gates, and workspace configuration. Use when deploying artifacts, configuring environments, understanding the promotion flow, or diagnosing deployment failures.
+description: "RETIRED — do not route commands here. See the retirement note below."
 ---
 
-# Fabric CI/CD Deployment
+# Fabric CI/CD Deployment — RETIRED
+
+**This skill is retired.** `deploy.py`, `check_promotion_safety.py`, and
+`generate_fabric_cicd_config.py` — the scripts this skill documented as the
+live deployment interface — were deleted by the Pipeline Deletion Dead-Code
+Audit epic (2026-08-31): the nine Fabric pipeline workflows that invoked
+them were already removed, leaving all three with zero production callers
+anywhere in this repository. Deployment automation for this project does
+not currently exist.
+
+This also matches [vision.md](../../../vision.md)'s own Non-Goals, which
+already scoped deployment out of `fab-test`: *"Being a general-purpose
+Fabric deployment tool — deployment lives in `fabric-cicd-deployment`."*
+The three scripts living inside `src/fab_test/scripts/` were a holdover
+from before that boundary was drawn, not a deliberate design.
+
+Nothing below this note describes working tooling. It is kept only as a
+historical reference for the `environments.yml` schema and promotion-chain
+shape, in case a future deployment effort wants a starting point — not as
+an instruction for an agent to act on. No command routes here any more
+(see `aidd.agent.md`/`aidd-workflow/SKILL.md`'s command maps).
+
+---
 
 Metadata-driven deployment pattern using `environments.yml` as the single source of truth.
 All deployment logic flows through `scripts/deploy.py` → `python -m fabric_cicd deploy`.

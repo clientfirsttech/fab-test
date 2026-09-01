@@ -15,7 +15,7 @@ VS Code Copilot automatically.
 
 1. Enforces pre-flight constraints (read `vision.md` first, skip JS skills, use TDD)
 2. Maps every user trigger phrase to the exact AIDD skills to load
-3. Surfaces project-specific skills (`fabric-cicd-deployment`)
+3. Surfaces project-specific skills (`fab-test`, `document`, `aidd-module-budgets`)
 
 ## When to use
 
