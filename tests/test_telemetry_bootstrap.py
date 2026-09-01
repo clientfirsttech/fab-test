@@ -18,8 +18,8 @@ from __future__ import annotations
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts._telemetry import EventhouseConfig
-from fabric_ci_cd_dataops.scripts.eventhouse_logger import PAYLOAD_MAPPING, EventhouseSink
+from fab_test.scripts._telemetry import EventhouseConfig
+from fab_test.scripts.eventhouse_logger import PAYLOAD_MAPPING, EventhouseSink
 
 _URI = "https://trd-abc123.z2.kusto.fabric.microsoft.com"
 

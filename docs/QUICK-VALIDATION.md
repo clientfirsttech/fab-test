@@ -75,6 +75,7 @@ pytest -m fab_test      # fab-test CLI surface
 pytest -m analyzers     # all contract-tier analyzer tests
 pytest -m bpa           # BPA wrapper only
 pytest -m pbir          # PBIR Inspector wrapper only
+pytest -m a11y          # pbir-a11y wrapper only
 pytest -m pql_test      # pql-test wrapper only
 ```
 
@@ -102,6 +103,7 @@ The warning says how many checkouts it skipped and gives you the
 ```bash
 fab-test bpa --dry-run
 fab-test pbir --dry-run
+fab-test a11y --dry-run
 fab-test pql-test --dry-run
 ```
 
@@ -110,6 +112,7 @@ fab-test pql-test --dry-run
 ```bash
 fab-test bpa --tabular-editor-path "/path/to/TabularEditor.exe"
 fab-test pbir --inspector-path "/path/to/PBIRInspectorCLI"
+fab-test a11y                            # requires Node.js >= 18 + npm the first time (built from source, then cached)
 fab-test pql-test --env DEV
 ```
 
@@ -121,6 +124,14 @@ fab-test pql-test SampleModel-PQLAssert --env DEV
 ```
 
 `--artifact SampleModel-PQLAssert` still works as a deprecated alias.
+
+### Open the HTML report automatically
+
+```bash
+fab-test bpa --open-report
+```
+
+`--open-report` implies `--report` and opens the produced report (or, whenever more than one artifact ran — `fab-test all`, or one analyzer against several artifacts — the run's `index.html`) in your default browser once the run finishes — skip the "find it in Explorer, double-click" step. This is a local convenience only: it is automatically suppressed under CI (falls back to printing the path), so there is no reason to add it to a pipeline YAML.
 
 ### Naming what to test
 
@@ -173,7 +184,7 @@ pytest -q --cov                      # measure locally, no gate
 pytest -q --cov --cov-fail-under=80  # exactly what CI runs
 ```
 
-The 80% floor is scoped to `src/fabric_ci_cd_dataops` with tests excluded. One module is omitted by explicit path — `validate_fabric_service_client.py` — because it needs a live service to execute, so a unit test could only assert that its argument parser accepts flags. `eventhouse_logger.py` came off that list once its ingest was separable from the validators in front of it. `tests/test_coverage_config.py` fails if one of those entries goes stale or if a core CLI module is ever added to the list.
+The 80% floor is scoped to `src/fab_test` with tests excluded. One module is omitted by explicit path — `validate_fabric_service_client.py` — because it needs a live service to execute, so a unit test could only assert that its argument parser accepts flags. `eventhouse_logger.py` came off that list once its ingest was separable from the validators in front of it. `tests/test_coverage_config.py` fails if one of those entries goes stale or if a core CLI module is ever added to the list.
 
 **Never put a coverage flag in `pytest.ini`.** A granular `pytest -m bpa` run covers a fraction of `src/` by design; gating it would fail every marker run and defeat the point of having them.
 
@@ -255,7 +266,7 @@ missing grant logs a warning and falls back to testing the single default
 page/role rather than failing the run. Add `--pages none --roles none` to the
 command above to keep the one-case-per-report shape every prior release had.
 
-See the [Configuration section of the fab-test skill](../.github/skills/fab-test/SKILL.md#configuration) for the full settings list and rule-overlay keys.
+See the [Configuration section of the fab-test skill](../.github/skills/fab-test/references/configuration.md#configuration) for the full settings list and rule-overlay keys.
 
 ### Pipeline snippet: a reviewable report as the build artifact
 
@@ -281,7 +292,7 @@ See the [Configuration section of the fab-test skill](../.github/skills/fab-test
 
 `if: always()` matters: the run you most want to read is the one that failed. Colour is automatically off because stdout is not a terminal — set `FORCE_COLOR: "1"` if your CI log viewer renders ANSI and you want it back.
 
-The `test-cases/**` line matters specifically for `playwright`: its `report.html` links to each case's own `screenshot.png`/`console.json`/`network.json` under that directory, and a link to a file the upload never included opens to nothing once downloaded.
+The `test-cases/**` line matters specifically for `playwright`: its `report.html` links to each case's own `screenshot.png`/`console.json`/`network.json` under that directory (plus `event_log.json` and, on a render timeout with a visible error panel, `embed_error_details.txt`), and a link to a file the upload never included opens to nothing once downloaded.
 
 ### Pipeline snippet: targeting a deployed item by name
 
@@ -349,6 +360,42 @@ fails loudly instead of quietly analyzing nothing.
 ```
 
 This is the case where uploading `run.json` alone still tells you what to fix. It stays `null` when the analyzer *did* write an envelope — then `envelope_path` points at the findings, and those are the reason. Credential values are redacted out of `detail` on the way in, as they are from `command`.
+
+### Pipeline snippet: pbir-a11y accessibility checks (needs Node)
+
+Every other analyzer's CI job is just `fab-test <name>`; `a11y` is the one
+that needs a runtime installed first, since `fab-test` builds pbir-a11y
+from source on first use rather than downloading a pre-built binary:
+
+```yaml
+- name: Set up Node.js
+  uses: actions/setup-node@v4
+  with:
+    node-version: ">=18"
+
+- name: Check readiness (confirms Node/npm before building anything)
+  run: fab-test doctor --analyzer a11y --format json
+
+- name: Run pbir-a11y accessibility checks
+  run: fab-test a11y --format json --artifact-dir .fabric/artifacts
+
+- name: Upload run manifest
+  uses: actions/upload-artifact@v4
+  if: always()
+  with:
+    name: fab-test-a11y-manifest
+    path: fab-test-results/run.json
+```
+
+The first run builds and caches pbir-a11y under `.fab-test-tools/`; cache
+that directory (`actions/cache@v4`, keyed on the analyzers.json checksum)
+if the job runs often enough for the ~10s build to matter. `a11y` is not in
+`fab_test_all`, so this step is additive to an existing pipeline — nothing
+already green starts failing because this snippet was added elsewhere in
+the same workflow. See [THIRD-PARTY.md](../THIRD-PARTY.md) before using
+this in a commercial pipeline: pbir-a11y is PolyForm Shield-licensed
+(source-available, non-compete), not MIT like the other wrapped tools —
+running it via `fab-test` to check your own reports is a permitted use.
 
 ### Pipeline snippet: shipping telemetry to an Eventhouse
 

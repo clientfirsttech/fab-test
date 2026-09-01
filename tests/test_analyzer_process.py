@@ -18,7 +18,7 @@ import sys
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts._analyzer_process import ProcessOutcome, run_tool
+from fab_test.scripts._analyzer_process import ProcessOutcome, run_tool
 
 _OK = [sys.executable, "-c", "print('hello')"]
 

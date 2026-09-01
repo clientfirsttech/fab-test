@@ -96,8 +96,8 @@ def test_cli_requires_mandatory_arguments():
 def test_envelope_names_artifact(tmp_path: Path):
     """Envelope JSON must capture the artifact path so the reporter can name the model."""
     sys.path.insert(0, str(REPO_ROOT / "scripts"))
-    from fabric_ci_cd_dataops.scripts._analyzer_envelope import WrapperResult
-    from fabric_ci_cd_dataops.scripts.invoke_tabular_editor_bpa import write_results
+    from fab_test.scripts._analyzer_envelope import WrapperResult
+    from fab_test.scripts.invoke_tabular_editor_bpa import write_results
 
     output = tmp_path / "envelope.json"
     model = tmp_path / "SalesModel.SemanticModel"

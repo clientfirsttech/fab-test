@@ -27,7 +27,7 @@ from pathlib import Path
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts._metadata import default_repo_root
+from fab_test.scripts._metadata import default_repo_root
 
 _ROOT = Path(__file__).resolve().parent.parent
 
@@ -109,7 +109,7 @@ def test_only_one_module_decides_what_the_repository_root_is():
     The duplication is why this bug had to be fixed once per module before
     it was consolidated, and why the fix is asserted structurally here.
     """
-    scripts = _ROOT / "src" / "fabric_ci_cd_dataops" / "scripts"
+    scripts = _ROOT / "src" / "fab_test" / "scripts"
     deciding = [
         name
         for name in _CLI_ROOT_MODULES

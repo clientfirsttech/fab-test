@@ -12,9 +12,9 @@ import pytest
 pytestmark = [pytest.mark.pbir, pytest.mark.analyzers]
 
 
-import fabric_ci_cd_dataops.scripts.invoke_pbir_inspector as invoke_pbir_inspector
-from fabric_ci_cd_dataops.scripts._analyzer_envelope import ENVELOPE_REQUIRED_KEYS, WrapperResult
-from fabric_ci_cd_dataops.scripts.invoke_pbir_inspector import (
+import fab_test.scripts.invoke_pbir_inspector as invoke_pbir_inspector
+from fab_test.scripts._analyzer_envelope import ENVELOPE_REQUIRED_KEYS, WrapperResult
+from fab_test.scripts.invoke_pbir_inspector import (
     build_inspector_command,
     ensure_executable,
     log,
@@ -246,7 +246,7 @@ class TestWriteResults:
 class TestVerbosity:
     """Tests for ANALYZER_VERBOSITY handling in run_inspector."""
 
-    @mock.patch("fabric_ci_cd_dataops.scripts.invoke_pbir_inspector.subprocess.run")
+    @mock.patch("fab_test.scripts.invoke_pbir_inspector.subprocess.run")
     def test_summary_suppresses_header(
         self, mock_run, tmp_path: Path, monkeypatch, capsys
     ):
@@ -278,7 +278,7 @@ class TestVerbosity:
         assert exit_code == 0
         assert "PBIR Inspector" not in captured.out
 
-    @mock.patch("fabric_ci_cd_dataops.scripts.invoke_pbir_inspector.subprocess.run")
+    @mock.patch("fab_test.scripts.invoke_pbir_inspector.subprocess.run")
     def test_debug_includes_command(
         self, mock_run, tmp_path: Path, monkeypatch, capsys
     ):
@@ -314,7 +314,7 @@ class TestVerbosity:
         assert "PBIRInspectorCLI" in captured.out
         assert "debug stdout" in captured.out
 
-    @mock.patch("fabric_ci_cd_dataops.scripts.invoke_pbir_inspector.subprocess.run")
+    @mock.patch("fab_test.scripts.invoke_pbir_inspector.subprocess.run")
     def test_verbosity_does_not_change_envelope(
         self, mock_run, tmp_path: Path, monkeypatch
     ):
@@ -372,7 +372,7 @@ class TestRunInspector:
             run_inspector(Args())
         assert exc_info.value.code == 1
 
-    @mock.patch("fabric_ci_cd_dataops.scripts.invoke_pbir_inspector.subprocess.run")
+    @mock.patch("fab_test.scripts.invoke_pbir_inspector.subprocess.run")
     def test_run_passes_no_findings(
         self, mock_run, tmp_path: Path, monkeypatch
     ):
@@ -403,7 +403,7 @@ class TestRunInspector:
         assert data["status"] == "passed"
         assert data["findings"] == []
 
-    @mock.patch("fabric_ci_cd_dataops.scripts.invoke_pbir_inspector.subprocess.run")
+    @mock.patch("fab_test.scripts.invoke_pbir_inspector.subprocess.run")
     def test_run_fails_with_findings(
         self, mock_run, tmp_path: Path, monkeypatch
     ):
@@ -441,7 +441,7 @@ class TestRunInspector:
         assert data["status"] == "failed"
         assert len(data["findings"]) == 1
 
-    @mock.patch("fabric_ci_cd_dataops.scripts.invoke_pbir_inspector.subprocess.run")
+    @mock.patch("fab_test.scripts.invoke_pbir_inspector.subprocess.run")
     def test_run_warns_with_warning_findings(
         self, mock_run, tmp_path: Path, monkeypatch
     ):
@@ -487,7 +487,7 @@ class TestRunInspector:
         assert data["status"] == "warning"
         assert len(data["findings"]) == 1
 
-    @mock.patch("fabric_ci_cd_dataops.scripts.invoke_pbir_inspector.subprocess.run")
+    @mock.patch("fab_test.scripts.invoke_pbir_inspector.subprocess.run")
     def test_run_fails_with_error_findings(
         self, mock_run, tmp_path: Path, monkeypatch
     ):
@@ -533,7 +533,7 @@ class TestRunInspector:
         assert data["status"] == "failed"
         assert len(data["findings"]) == 1
 
-    @mock.patch("fabric_ci_cd_dataops.scripts.invoke_pbir_inspector.subprocess.run")
+    @mock.patch("fab_test.scripts.invoke_pbir_inspector.subprocess.run")
     def test_run_fails_with_mixed_severities(
         self, mock_run, tmp_path: Path, monkeypatch
     ):
@@ -589,7 +589,7 @@ class TestRunInspector:
         severities = {f["severity"] for f in data["findings"]}
         assert severities == {"error", "warning"}
 
-    @mock.patch("fabric_ci_cd_dataops.scripts.invoke_pbir_inspector.subprocess.run")
+    @mock.patch("fab_test.scripts.invoke_pbir_inspector.subprocess.run")
     def test_run_reads_newest_native_json_file(
         self, mock_run, tmp_path: Path, monkeypatch
     ):
@@ -670,7 +670,7 @@ class TestRunInspector:
         assert data["findings"][0]["rule"] == "NEW_ERR"
         assert data["findings"][0]["severity"] == "error"
 
-    @mock.patch("fabric_ci_cd_dataops.scripts.invoke_pbir_inspector.subprocess.run")
+    @mock.patch("fab_test.scripts.invoke_pbir_inspector.subprocess.run")
     def test_run_warns_severity_normalized(
         self, mock_run, tmp_path: Path, monkeypatch
     ):
@@ -745,7 +745,7 @@ class TestRunInspector:
         assert "Invalid binding" in captured.out
         assert "Missing alt text" in captured.out
 
-    @mock.patch("fabric_ci_cd_dataops.scripts.invoke_pbir_inspector.subprocess.run")
+    @mock.patch("fab_test.scripts.invoke_pbir_inspector.subprocess.run")
     def test_run_timeout(self, mock_run, tmp_path: Path):
         """Timeout is handled gracefully."""
         artifact = tmp_path / "SalesReport.Report"
@@ -772,7 +772,7 @@ class TestRunInspector:
         data = json.loads(output.read_text(encoding="utf-8"))
         assert data["status"] == "timeout"
 
-    @mock.patch("fabric_ci_cd_dataops.scripts.invoke_pbir_inspector.subprocess.run")
+    @mock.patch("fab_test.scripts.invoke_pbir_inspector.subprocess.run")
     def test_run_missing_binary(self, mock_run, tmp_path: Path):
         """Missing executable is handled gracefully."""
         artifact = tmp_path / "SalesReport.Report"
@@ -801,7 +801,7 @@ class TestRunInspector:
 class TestMain:
     """Tests for invoke_pbir_inspector.py main entry point."""
 
-    @mock.patch("fabric_ci_cd_dataops.scripts.invoke_pbir_inspector.run_inspector")
+    @mock.patch("fab_test.scripts.invoke_pbir_inspector.run_inspector")
     def test_main_accepts_verbose_flag(
         self, mock_run_inspector, tmp_path: Path, monkeypatch
     ):
@@ -837,7 +837,7 @@ class TestMain:
         assert passed_args.verbose is True
         assert os.environ.get("ANALYZER_VERBOSITY") == "verbose"
 
-    @mock.patch("fabric_ci_cd_dataops.scripts.invoke_pbir_inspector.run_inspector")
+    @mock.patch("fab_test.scripts.invoke_pbir_inspector.run_inspector")
     def test_main_returns_run_inspector_code(
         self, mock_run_inspector, tmp_path: Path, monkeypatch
     ):

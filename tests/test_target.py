@@ -13,8 +13,8 @@ from pathlib import Path
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts._artifact_types import artifact_types
-from fabric_ci_cd_dataops.scripts._target import (
+from fab_test.scripts._artifact_types import artifact_types
+from fab_test.scripts._target import (
     TargetError,
     parse_target,
 )
@@ -224,7 +224,7 @@ def test_every_analyzer_glob_names_a_declared_type():
     that does matter is this direction: an analyzer cannot claim a glob
     for a type the map has never heard of.
     """
-    from fabric_ci_cd_dataops.scripts.fab_test_registry import ANALYZER_REGISTRY
+    from fab_test.scripts.fab_test_registry import ANALYZER_REGISTRY
 
     from_globs = {
         glob.lstrip("*.") for glob, _description in ANALYZER_REGISTRY.values() if glob

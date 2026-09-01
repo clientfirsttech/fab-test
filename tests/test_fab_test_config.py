@@ -14,7 +14,7 @@ import sys
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts.fab_test import (
+from fab_test.scripts.fab_test import (
     _apply_environment_default,
     _clean_tools,
     _resolve_timeout,
@@ -34,9 +34,10 @@ def test_output_dir_packaged_default_is_fab_test_results(monkeypatch):
     base depended on the old name); nothing previously pinned this value,
     which is how the rename went unverified by the suite.
     """
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fab_test.scripts import fab_test as fab_test_module
+    from fab_test.scripts import fab_test_parser
 
-    monkeypatch.setattr(fab_test_module, "_PYPROJECT_CONFIG", {})
+    monkeypatch.setattr(fab_test_parser, "_PYPROJECT_CONFIG", {})
     parser = fab_test_module.build_parser()
     ns = parser.parse_args(["bpa", "--dry-run"])
     assert ns.output_dir == str(fab_test_module.RESULTS_ROOT)
@@ -46,10 +47,14 @@ def test_output_dir_packaged_default_is_fab_test_results(monkeypatch):
 @pytest.mark.fab_test
 def test_common_flags_use_pyproject_config_as_default(monkeypatch):
     """--jobs/--format/--artifact-dir/--output-dir default from [tool.fab-test]."""
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fab_test.scripts import fab_test as fab_test_module
+    from fab_test.scripts import fab_test_parser
 
+    # build_parser (and _add_common_flags) live in fab_test_parser since the
+    # Fab-Test Module Split epic; that module's own binding of
+    # _PYPROJECT_CONFIG is what the parser defaults actually close over.
     monkeypatch.setattr(
-        fab_test_module,
+        fab_test_parser,
         "_PYPROJECT_CONFIG",
         {
             "jobs": 4,
@@ -69,9 +74,10 @@ def test_common_flags_use_pyproject_config_as_default(monkeypatch):
 @pytest.mark.fab_test
 def test_common_flags_cli_overrides_pyproject_config(monkeypatch):
     """An explicit CLI flag still wins over the config file default."""
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fab_test.scripts import fab_test as fab_test_module
+    from fab_test.scripts import fab_test_parser
 
-    monkeypatch.setattr(fab_test_module, "_PYPROJECT_CONFIG", {"jobs": 4})
+    monkeypatch.setattr(fab_test_parser, "_PYPROJECT_CONFIG", {"jobs": 4})
     parser = fab_test_module.build_parser()
     ns = parser.parse_args(["bpa", "--dry-run", "--jobs", "8"])
     assert ns.jobs == 8
@@ -109,21 +115,27 @@ def test_backward_compat_real_command_with_only_pyproject_config(tmp_path):
 def test_resolve_timeout_uses_config_when_no_cli_or_env(monkeypatch):
     """A config-file timeout is used when neither --timeout nor the env is set."""
     monkeypatch.delenv("ANALYZER_TIMEOUT", raising=False)
-    assert _resolve_timeout(_TimeoutArgs(timeout=None), config={"timeout": 300}) == 300
+    value, is_default = _resolve_timeout(_TimeoutArgs(timeout=None), config={"timeout": 300})
+    assert value == 300
+    assert is_default is False
 
 
 @pytest.mark.fab_test
 def test_resolve_timeout_env_overrides_config(monkeypatch):
     """ANALYZER_TIMEOUT still overrides a config-file timeout."""
     monkeypatch.setenv("ANALYZER_TIMEOUT", "60")
-    assert _resolve_timeout(_TimeoutArgs(timeout=None), config={"timeout": 300}) == 60
+    value, is_default = _resolve_timeout(_TimeoutArgs(timeout=None), config={"timeout": 300})
+    assert value == 60
+    assert is_default is False
 
 
 @pytest.mark.fab_test
 def test_resolve_timeout_cli_overrides_config_and_env(monkeypatch):
     """An explicit --timeout wins over both env var and config file."""
     monkeypatch.setenv("ANALYZER_TIMEOUT", "60")
-    assert _resolve_timeout(_TimeoutArgs(timeout=999), config={"timeout": 300}) == 999
+    value, is_default = _resolve_timeout(_TimeoutArgs(timeout=999), config={"timeout": 300})
+    assert value == 999
+    assert is_default is False
 
 
 @pytest.mark.fab_test
@@ -164,7 +176,7 @@ def test_apply_environment_default_noop_when_no_environment_attr():
 @pytest.mark.fab_test
 def test_main_applies_environment_default_before_dispatch(monkeypatch):
     """main() merges the config/env default for --env before running analyzers."""
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fab_test.scripts import fab_test as fab_test_module
 
     calls = []
     monkeypatch.setattr(
@@ -227,19 +239,51 @@ def test_clean_tools_dry_run_lists_without_deleting(tmp_path, capsys):
 
 
 @pytest.mark.fab_test
-def test_clean_tools_nothing_to_clean_when_missing(tmp_path, capsys):
+def test_clean_tools_nothing_to_clean_when_missing(tmp_path):
     """A missing .fab-test-tools cache exits cleanly with a clear message."""
+    code = _clean_tools(tmp_path, dry_run=False)
+
+    assert code == 0
+
+
+@pytest.mark.fab_test
+def test_clean_tools_names_each_cached_analyzer_platform_version(tmp_path, capsys):
+    """A real (version-keyed) cache layout is reported by analyzer/platform/version,
+    not just as one generic ".fab-test-tools removed" line.
+    """
+    cache_dir = tmp_path / ".fab-test-tools"
+    extracted = cache_dir / "pbir_inspector" / "win32" / "3.4.0" / "extracted"
+    extracted.mkdir(parents=True)
+    (extracted / "fab-inspector.exe").write_text("x", encoding="utf-8")
+
     code = _clean_tools(tmp_path, dry_run=False)
     captured = capsys.readouterr()
 
     assert code == 0
-    assert "nothing to clean" in captured.out
+    assert not cache_dir.exists()
+    assert "pbir_inspector/win32/3.4.0" in captured.out
+
+
+@pytest.mark.fab_test
+def test_clean_tools_dry_run_names_each_cached_version_without_deleting(tmp_path, capsys):
+    """--dry-run against a real cache layout lists each version, deletes nothing."""
+    cache_dir = tmp_path / ".fab-test-tools"
+    extracted = cache_dir / "tabular_editor_bpa" / "win32" / "2.28.0" / "extracted"
+    extracted.mkdir(parents=True)
+    (extracted / "TabularEditor.exe").write_text("x", encoding="utf-8")
+
+    code = _clean_tools(tmp_path, dry_run=True)
+    captured = capsys.readouterr()
+
+    assert code == 0
+    assert cache_dir.exists()
+    assert "tabular_editor_bpa/win32/2.28.0" in captured.out
 
 
 @pytest.mark.fab_test
 def test_main_clean_tools_dispatches_correctly(tmp_path, monkeypatch, capsys):
     """main() routes the clean-tools subcommand to _clean_tools."""
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fab_test.scripts import fab_test as fab_test_module
 
     monkeypatch.setattr(fab_test_module, "REPO_ROOT", tmp_path)
     monkeypatch.setattr(sys, "argv", ["fab-test", "clean-tools"])

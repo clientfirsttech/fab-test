@@ -6,15 +6,15 @@ model Model
 		legacyRedirects
 		returnErrorValuesAsNull
 
-annotation PBI_QueryOrder = ["Table","Table (2)"]
+annotation PBI_QueryOrder = ["Table","Table (2)","Table (3)"]
 
 annotation __PBI_TimeIntelligenceEnabled = 1
 
 annotation PBI_ProTooling = ["DevMode"]
 
 ref table Table
-ref table DateTableTemplate_2bf93cec-6e84-4b5f-937b-59ef844ec9e8
 ref table 'Table (2)'
+ref table 'Table (3)'
 
 ref cultureInfo en-US
 

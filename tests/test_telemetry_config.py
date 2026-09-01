@@ -17,8 +17,8 @@ from pathlib import Path
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts._config import ConfigError, validate_config
-from fabric_ci_cd_dataops.scripts._telemetry import (
+from fab_test.scripts._config import ConfigError, validate_config
+from fab_test.scripts._telemetry import (
     EVENTHOUSE_DATABASE_VAR,
     EVENTHOUSE_URI_VAR,
     resolve_eventhouse_config,
@@ -159,7 +159,7 @@ def test_config_show_reports_the_eventhouse_address_and_its_layer(tmp_path, monk
     """Given a configured Eventhouse, should appear in `config --show` with its origin."""
     import sys
 
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fab_test.scripts import fab_test as fab_test_module
 
     monkeypatch.delenv(EVENTHOUSE_URI_VAR, raising=False)
     monkeypatch.delenv(EVENTHOUSE_DATABASE_VAR, raising=False)
@@ -191,7 +191,7 @@ def test_config_show_says_nothing_about_telemetry_when_it_is_not_configured(
     """Given no telemetry config, should add no rows — an absent optional section is a default."""
     import sys
 
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fab_test.scripts import fab_test as fab_test_module
 
     monkeypatch.delenv(EVENTHOUSE_URI_VAR, raising=False)
     monkeypatch.delenv(EVENTHOUSE_DATABASE_VAR, raising=False)
@@ -225,7 +225,7 @@ def test_published_schema_describes_the_telemetry_block():
     schema = json.loads(
         (
             Path(__file__).resolve().parents[1]
-            / "src/fabric_ci_cd_dataops/schemas/fab-test.schema.json"
+            / "src/fab_test/schemas/fab-test.schema.json"
         ).read_text(encoding="utf-8")
     )
 

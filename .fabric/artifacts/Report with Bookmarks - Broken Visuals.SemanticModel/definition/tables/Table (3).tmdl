@@ -1,0 +1,35 @@
+table 'Table (3)'
+	lineageTag: 13aa9c60-c7a0-49a6-bc0e-9577a96a8589
+
+	column 'Column X'
+		dataType: string
+		lineageTag: 7c72cdb3-d6dd-427e-9d6e-f74e36bab38d
+		summarizeBy: none
+		sourceColumn: Column X
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Column Z'
+		dataType: int64
+		formatString: 0
+		lineageTag: 71f6f51f-1b97-4c1f-8ff5-b9b0a051b904
+		summarizeBy: sum
+		sourceColumn: Column Z
+
+		annotation SummarizationSetBy = Automatic
+
+	partition 'Table (3)' = m
+		mode: import
+		source =
+				let
+				    Source = Table.FromRows(Json.Document(Binary.Decompress(Binary.FromText("i45WclTSUTJUitWJVnICsoyVYmMB", BinaryEncoding.Base64), Compression.Deflate)), let _t = ((type nullable text) meta [Serialized.Text = true]) in type table [#"Column X" = _t, #"Column Z" = _t]),
+				    #"Changed Type" = Table.TransformColumnTypes(Source,{{"Column X", type text}, {"Column Z", Int64.Type}}),
+				    #"Duplicated Column" = Table.DuplicateColumn(#"Changed Type", "Column Z", "Column Z - Copy"),
+				    #"Removed Columns" = Table.RemoveColumns(#"Duplicated Column",{"Column Z - Copy"})
+				in
+				    #"Removed Columns"
+
+	annotation PBI_NavigationStepName = Navigation
+
+	annotation PBI_ResultType = Table
+

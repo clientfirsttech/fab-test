@@ -1,14 +1,13 @@
-"""Unit tests for environment configuration validators and generators."""
+"""Unit tests for environment configuration validators."""
 
 import sys
 from pathlib import Path
+from typing import ClassVar
 from unittest import mock
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts.generate_fabric_cicd_config import build_environment_config, load_config
-from fabric_ci_cd_dataops.scripts.generate_fabric_cicd_config import main as generate_main
-from fabric_ci_cd_dataops.scripts.validate_environments_yaml import validate_environments_yaml
+from fab_test.scripts.validate_environments_yaml import validate_environments_yaml
 
 
 @pytest.fixture
@@ -109,7 +108,7 @@ class TestValidateEnvironmentsSchema:
 
     def test_valid_config(self, valid_environments: Path):
         """The schema validator accepts the same valid file."""
-        from fabric_ci_cd_dataops.scripts.validate_environments_schema import main as schema_main
+        from fab_test.scripts.validate_environments_schema import main as schema_main
 
         with mock.patch.object(sys, "argv", ["validate_environments_schema.py", "--file", str(valid_environments)]):
             with pytest.raises(SystemExit) as exc_info:
@@ -117,65 +116,65 @@ class TestValidateEnvironmentsSchema:
             assert exc_info.value.code == 0
 
 
-class TestGenerateFabricCicdConfig:
-    """Tests for generate_fabric_cicd_config."""
+class TestValidateEnvBlock:
+    """Tests for _validate_env_block's structural branches."""
 
-    def test_load_config(self, valid_environments: Path, tmp_path: Path):
-        """load_config reads environments.yml from repo root."""
-        repo = tmp_path
-        metadata = repo / ".github" / "metadata"
-        metadata.mkdir(parents=True)
-        (metadata / "environments.yml").write_text(valid_environments.read_text())
-        config = load_config(repo)
-        assert "environments" in config
-        assert config["environments"]["dev"]["workspace_id"] == "ws-dev"
+    BASE_BLOCK: ClassVar = {
+        "description": "Development",
+        "workspace_id": "ws-dev",
+        "allowed_branches": ["develop"],
+        "promotion_target": "test",
+        "requires_validation": True,
+        "requires_security_scan": True,
+        "requires_ai_validation": False,
+    }
 
-    def test_build_environment_config(self, valid_environments: Path):
-        """build_environment_config merges defaults and strips metadata keys."""
-        import yaml
+    def test_allowed_branches_not_a_list(self):
+        """A string allowed_branches is reported as needing a list."""
+        from fab_test.scripts.validate_environments_schema import _validate_env_block
 
-        config = yaml.safe_load(valid_environments.read_text())
-        env_config = build_environment_config(config, "dev", "")
-        assert env_config["workspace_id"] == "ws-dev"
-        assert "allowed_branches" not in env_config
-        assert "requires_validation" not in env_config
+        block = {**self.BASE_BLOCK, "allowed_branches": "develop"}
+        errors = _validate_env_block("environments.dev", block)
+        assert any(e.path == "environments.dev.allowed_branches" and "Must be a list" in e.message for e in errors)
 
-    def test_build_with_override_workspace(self, valid_environments: Path):
-        """CLI workspace ID overrides the configured value."""
-        import yaml
+    def test_allowed_branches_empty(self):
+        """An empty allowed_branches list is reported as must-not-be-empty."""
+        from fab_test.scripts.validate_environments_schema import _validate_env_block
 
-        config = yaml.safe_load(valid_environments.read_text())
-        env_config = build_environment_config(config, "dev", "override-ws")
-        assert env_config["workspace_id"] == "override-ws"
+        block = {**self.BASE_BLOCK, "allowed_branches": []}
+        errors = _validate_env_block("environments.dev", block)
+        assert any(
+            e.path == "environments.dev.allowed_branches" and "Must not be empty" in e.message for e in errors
+        )
 
-    def test_missing_environment_exits(self, valid_environments: Path):
-        """Unknown environment causes sys.exit(1)."""
-        import yaml
+    def test_boolean_field_not_a_bool(self):
+        """A non-boolean requires_validation is reported as needing a boolean."""
+        from fab_test.scripts.validate_environments_schema import _validate_env_block
 
-        config = yaml.safe_load(valid_environments.read_text())
-        with pytest.raises(SystemExit) as exc_info:
-            build_environment_config(config, "prod", "")
-        assert exc_info.value.code == 1
+        block = {**self.BASE_BLOCK, "requires_validation": "true"}
+        errors = _validate_env_block("environments.dev", block)
+        assert any(
+            e.path == "environments.dev.requires_validation" and "Must be a boolean" in e.message for e in errors
+        )
 
-    def test_main_generates_output(self, valid_environments: Path, tmp_path: Path, monkeypatch):
-        """Main writes a YAML config file for the requested environment."""
-        repo = tmp_path
-        metadata = repo / ".github" / "metadata"
-        metadata.mkdir(parents=True)
-        (metadata / "environments.yml").write_text(valid_environments.read_text())
+    def test_deployment_window_not_a_mapping(self):
+        """A non-mapping deployment_window is reported as needing a mapping."""
+        from fab_test.scripts.validate_environments_schema import _validate_env_block
 
-        output = tmp_path / "fabric-cicd-env-config.yml"
-        argv = [
-            "generate_fabric_cicd_config.py",
-            "--environment",
-            "dev",
-            "--output",
-            str(output),
-        ]
-        monkeypatch.setattr(sys, "argv", argv)
-        monkeypatch.setenv("GITHUB_WORKSPACE", str(repo))
-        generate_main()
+        block = {**self.BASE_BLOCK, "deployment_window": "always"}
+        errors = _validate_env_block("environments.prod", block)
+        assert any(
+            e.path == "environments.prod.deployment_window" and "Must be a mapping" in e.message for e in errors
+        )
 
-        assert output.exists()
-        generated = output.read_text()
-        assert "workspace_id: ws-dev" in generated
+    def test_deployment_window_missing_enabled(self):
+        """A deployment_window mapping missing 'enabled' names the missing key."""
+        from fab_test.scripts.validate_environments_schema import _validate_env_block
+
+        block = {**self.BASE_BLOCK, "deployment_window": {"allowed_days": ["Mon"], "allowed_hours_utc": "9-17"}}
+        errors = _validate_env_block("environments.prod", block)
+        assert any(
+            e.path == "environments.prod.deployment_window.enabled"
+            and "Missing required deployment_window key" in e.message
+            for e in errors
+        )

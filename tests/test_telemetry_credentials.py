@@ -17,11 +17,11 @@ from pathlib import Path
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts._credentials import (
+from fab_test.scripts._credentials import (
     IncompleteServicePrincipalError,
     resolve_service_principal,
 )
-from fabric_ci_cd_dataops.scripts.eventhouse_logger import describe_ingest_failure
+from fab_test.scripts.eventhouse_logger import describe_ingest_failure
 
 _ALL_VARS = (
     "FABRIC_TENANT_ID",

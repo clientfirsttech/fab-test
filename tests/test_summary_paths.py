@@ -21,7 +21,7 @@ from pathlib import Path
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts.fab_test_summary import _display_path
+from fab_test.scripts.fab_test_summary import _display_path
 
 
 @pytest.fixture
@@ -32,7 +32,7 @@ def artifact_tree(tmp_path):
 
 def _run_cli(*argv, cwd=None):
     return subprocess.run(
-        [sys.executable, "-m", "fabric_ci_cd_dataops.scripts.fab_test", *argv],
+        [sys.executable, "-m", "fab_test.scripts.fab_test", *argv],
         capture_output=True,
         text=True,
         encoding="utf-8",

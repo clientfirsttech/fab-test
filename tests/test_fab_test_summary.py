@@ -14,8 +14,8 @@ from pathlib import Path
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts.fab_test import _print_all_summary, _print_summary
-from fabric_ci_cd_dataops.scripts.fab_test_summary import (
+from fab_test.scripts.fab_test import _print_all_summary, _print_summary
+from fab_test.scripts.fab_test_summary import (
     _format_findings,
     _is_pql_test_finding,
     _pql_test_status,

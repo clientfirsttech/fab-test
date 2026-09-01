@@ -23,7 +23,7 @@ from pathlib import Path
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts.fab_test import _build_telemetry_payload, _relativize_paths
+from fab_test.scripts.fab_test import _build_telemetry_payload, _relativize_paths
 
 # --------------------------------------------------------------------------
 # Paths carry no username
@@ -100,9 +100,9 @@ def test_the_built_payload_carries_no_absolute_path(tmp_path, monkeypatch):
     The end-to-end guard: the individual rewrites above are only useful if
     the payload builder actually applies them.
     """
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fab_test.scripts import fab_test_telemetry
 
-    monkeypatch.setattr(fab_test_module, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(fab_test_telemetry, "REPO_ROOT", tmp_path)
     artifact = tmp_path / "artifacts" / "Sales.SemanticModel"
     artifact.mkdir(parents=True)
     envelope = {
@@ -131,11 +131,11 @@ def test_the_actor_is_recorded_as_given_not_hashed(tmp_path, monkeypatch):
     commit, and the Eventhouse belongs to the same organisation, so hashing
     it bought no privacy and cost the attribution the field exists for.
     """
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fab_test.scripts import fab_test_telemetry
 
-    monkeypatch.setattr(fab_test_module, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(fab_test_telemetry, "REPO_ROOT", tmp_path)
     monkeypatch.setattr(
-        fab_test_module,
+        fab_test_telemetry,
         "_git_context",
         lambda: {"actor": "john@kerski.net", "branch": "dev", "commit": "abc123"},
     )
@@ -151,10 +151,10 @@ def test_the_actor_is_recorded_as_given_not_hashed(tmp_path, monkeypatch):
 @pytest.mark.telemetry
 def test_a_non_email_actor_still_passes_through(tmp_path, monkeypatch):
     """Given a CI actor name rather than an email, should record it unchanged."""
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fab_test.scripts import fab_test_telemetry
 
-    monkeypatch.setattr(fab_test_module, "REPO_ROOT", tmp_path)
-    monkeypatch.setattr(fab_test_module, "_git_context", lambda: {"actor": "github-actions[bot]"})
+    monkeypatch.setattr(fab_test_telemetry, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(fab_test_telemetry, "_git_context", lambda: {"actor": "github-actions[bot]"})
     artifact = tmp_path / "Sales.SemanticModel"
     artifact.mkdir(parents=True)
 
@@ -170,10 +170,10 @@ def test_an_absent_actor_is_empty_rather_than_a_hash_of_nothing(tmp_path, monkey
     Hashing "" produced a stable token that looked like a real person and
     was the same for everyone who had no git config.
     """
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fab_test.scripts import fab_test_telemetry
 
-    monkeypatch.setattr(fab_test_module, "REPO_ROOT", tmp_path)
-    monkeypatch.setattr(fab_test_module, "_git_context", dict)
+    monkeypatch.setattr(fab_test_telemetry, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(fab_test_telemetry, "_git_context", dict)
     artifact = tmp_path / "Sales.SemanticModel"
     artifact.mkdir(parents=True)
 

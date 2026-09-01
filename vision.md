@@ -66,7 +66,7 @@ The coverage floor and the granular-test constraint pull in opposite directions 
 | Review / commit checkpoint | Full suite with coverage | Reported; below 80% blocks the commit |
 | CI | Full suite with `--cov-fail-under=80` | Enforced; build fails below the floor |
 
-Rules: coverage is scoped to `src/fabric_ci_cd_dataops` (tests are excluded from the denominator), the 80% floor is a ratchet that does not go down, and the threshold lives in the CI invocation — **not** in `pytest.ini`, where it would fail every granular run and defeat the token-saving constraint.
+Rules: coverage is scoped to `src/fab_test` (tests are excluded from the denominator), the 80% floor is a ratchet that does not go down, and the threshold lives in the CI invocation — **not** in `pytest.ini`, where it would fail every granular run and defeat the token-saving constraint.
 
 One module is omitted from the denominator, by explicit path in `[tool.coverage.run]`: `validate_fabric_service_client.py`. It needs a live service to execute at all, so a unit test could only assert that its argument parser accepts flags — which would inflate the figure rather than improve it. `eventhouse_logger.py` was listed too until it earned a seam (Eventhouse Shipping §5): the ingest needs a cluster, but the validators deciding what reaches the wire never did, and being omitted is how they went untested entirely. Exclusions are single files, never patterns, so library code added later cannot fall into the gap; `tests/test_coverage_config.py` fails if an entry goes stale or if a core CLI module is ever listed.
 
@@ -104,15 +104,18 @@ the command I was asked about" is the failure mode, not the verification.
 
 ## Definition of Done — Documentation
 
-Documentation follows the same three callers as the CLI itself. Shipping for one and not the others leaves the epic incomplete.
+Documentation follows the same three callers as the CLI itself. Shipping for one and not the others leaves the epic incomplete. Close an epic in this order — each step depends on the one before it, so doing them out of order means redoing one:
 
-| Caller | Deliverable | Where |
-|--------|-------------|-------|
-| **AI agent** | Skill created or updated with the new commands, flags, exit codes, and output shapes | `.github/skills/<name>/SKILL.md` |
-| **Human** | README and walkthrough updated so a reader can run the new capability without reading source | [README.md](README.md), [docs/](docs/) |
-| **Pipeline** | A copy-pasteable workflow snippet, or generation/scaffolding, so the YAML is not hand-derived | [docs/](docs/), workflow examples |
+1. **Ruff** — run `ruff check` over `src/` and fix anything it flags. A build that fails lint after the code is "done" is not done — catching it here is cheaper than catching it in CI.
+2. **Documentation** — update all three callers together with the `document` skill, so they never drift apart:
 
-Use the `document` skill to make these changes together, so the three never drift apart.
+   | Caller | Deliverable | Where |
+   |--------|-------------|-------|
+   | **Human** | README and walkthrough updated so a reader can run the new capability without reading source | [README.md](README.md), [docs/](docs/) |
+   | **Pipeline** | A copy-pasteable workflow snippet, or generation/scaffolding, so the YAML is not hand-derived | [docs/](docs/), workflow examples |
+   | **AI agent** | Skill created or updated with the new commands, flags, exit codes, and output shapes | `.github/skills/<name>/SKILL.md` |
+3. **Update the skill file** — for fab-test's own skill specifically, write the behavioral/contract content in [SudoLang](.github/skills/aidd-sudolang-syntax/SKILL.md) (`Interfaces`/`Constraints`/`fn` blocks), not prose-and-tables — plain markdown remains fine for flag tables and worked examples, which SudoLang doesn't compress usefully. This is checked by `tests/test_skill_resource.py`'s SudoLang-construct guard, not by review discipline alone, so a rewrite back into plain prose fails CI rather than drifting back silently.
+4. **Confirm it is part of the packaged fab-test skill** — the packaged copy (`src/fab_test/skill/`) must carry every file identical to the authored source (`.github/skills/fab-test/`), guarded by the same test. Run `fab-test skill --show` to confirm an already-installed harness copy elsewhere picks up the change, rather than diffing files by hand.
 
 ## Non-Goals
 

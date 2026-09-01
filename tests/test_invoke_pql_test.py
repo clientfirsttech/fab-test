@@ -10,8 +10,8 @@ import pytest
 pytestmark = [pytest.mark.pql_test, pytest.mark.analyzers]
 
 
-from fabric_ci_cd_dataops.scripts._analyzer_envelope import ENVELOPE_REQUIRED_KEYS, WrapperResult
-from fabric_ci_cd_dataops.scripts.invoke_pql_test import (
+from fab_test.scripts._analyzer_envelope import ENVELOPE_REQUIRED_KEYS, WrapperResult
+from fab_test.scripts.invoke_pql_test import (
     _parse_native_output,
     build_command,
     log,
@@ -95,7 +95,7 @@ class TestPqlEnv:
 
     def test_pql_env_maps_fabric_credentials(self, monkeypatch):
         """FABRIC_* env vars are mapped to PQL_* env vars."""
-        from fabric_ci_cd_dataops.scripts.invoke_pql_test import _pql_env
+        from fab_test.scripts.invoke_pql_test import _pql_env
 
         monkeypatch.setenv("FABRIC_TENANT_ID", "tenant-1")
         monkeypatch.setenv("FABRIC_SERVICE_PRINCIPAL_ID", "client-1")
@@ -107,7 +107,7 @@ class TestPqlEnv:
 
     def test_pql_env_skips_missing_credentials(self, monkeypatch):
         """Missing Fabric credential env vars are not mapped."""
-        from fabric_ci_cd_dataops.scripts.invoke_pql_test import _pql_env
+        from fab_test.scripts.invoke_pql_test import _pql_env
 
         monkeypatch.delenv("FABRIC_TENANT_ID", raising=False)
         monkeypatch.delenv("FABRIC_SERVICE_PRINCIPAL_ID", raising=False)
@@ -283,7 +283,7 @@ class TestWriteResults:
 class TestVerbosity:
     """Tests for ANALYZER_VERBOSITY handling in run_pql_test."""
 
-    @mock.patch("fabric_ci_cd_dataops.scripts._analyzer_process.subprocess.run")
+    @mock.patch("fab_test.scripts._analyzer_process.subprocess.run")
     def test_summary_suppresses_header(
         self, mock_run, tmp_path: Path, monkeypatch, capsys
     ):
@@ -308,7 +308,7 @@ class TestVerbosity:
         assert exit_code == 0
         assert "pql-test" not in captured.out.lower()
 
-    @mock.patch("fabric_ci_cd_dataops.scripts._analyzer_process.subprocess.run")
+    @mock.patch("fab_test.scripts._analyzer_process.subprocess.run")
     def test_debug_includes_command(
         self, mock_run, tmp_path: Path, monkeypatch, capsys
     ):
@@ -340,7 +340,7 @@ class TestVerbosity:
 class TestRunPqlTest:
     """Tests for run_pql_test entry function."""
 
-    @mock.patch("fabric_ci_cd_dataops.scripts._analyzer_process.subprocess.run")
+    @mock.patch("fab_test.scripts._analyzer_process.subprocess.run")
     def test_run_passes_no_findings(self, mock_run, tmp_path: Path):
         """Successful execution creates a passed result."""
         artifact = tmp_path / "SalesModel.SemanticModel"
@@ -363,7 +363,7 @@ class TestRunPqlTest:
         assert data["status"] == "passed"
         assert data["test_results"] == []
 
-    @mock.patch("fabric_ci_cd_dataops.scripts._analyzer_process.subprocess.run")
+    @mock.patch("fab_test.scripts._analyzer_process.subprocess.run")
     def test_run_writes_desktop_binding_to_envelope(self, mock_run, tmp_path: Path):
         """desktop_port/desktop_model_name args land in the written envelope."""
         artifact = tmp_path / "SalesModel.SemanticModel"
@@ -387,7 +387,7 @@ class TestRunPqlTest:
         data = json.loads(output.read_text(encoding="utf-8"))
         assert data["desktop"] == {"port": 51234, "model_name": "SalesModel"}
 
-    @mock.patch("fabric_ci_cd_dataops.scripts._analyzer_process.subprocess.run")
+    @mock.patch("fab_test.scripts._analyzer_process.subprocess.run")
     def test_run_fails_with_findings(self, mock_run, tmp_path: Path):
         """Failed execution writes a failed result with findings."""
         artifact = tmp_path / "SalesModel.SemanticModel"
@@ -412,8 +412,8 @@ class TestRunPqlTest:
         assert data["status"] == "failed"
         assert len(data["findings"]) == 1
 
-    @mock.patch("fabric_ci_cd_dataops.scripts.invoke_pql_test.native_output_path")
-    @mock.patch("fabric_ci_cd_dataops.scripts._analyzer_process.subprocess.run")
+    @mock.patch("fab_test.scripts.invoke_pql_test.native_output_path")
+    @mock.patch("fab_test.scripts._analyzer_process.subprocess.run")
     def test_run_creates_native_output_parent_dir(
         self, mock_run, mock_native_path, tmp_path: Path
     ):
@@ -439,7 +439,7 @@ class TestRunPqlTest:
         assert nat_out.parent.exists()
 
 
-    @mock.patch("fabric_ci_cd_dataops.scripts._analyzer_process.subprocess.run")
+    @mock.patch("fab_test.scripts._analyzer_process.subprocess.run")
     def test_run_all_skipped_is_success(self, mock_run, tmp_path: Path):
         """An all-skipped test run exits 0 and writes status 'skipped'."""
         artifact = tmp_path / "SalesModel.SemanticModel"
@@ -500,7 +500,7 @@ class TestMain:
                 "DEV",
             ],
         )
-        with mock.patch("fabric_ci_cd_dataops.scripts._analyzer_process.subprocess.run") as mock_run:
+        with mock.patch("fab_test.scripts._analyzer_process.subprocess.run") as mock_run:
             mock_run.return_value = mock.Mock(
                 returncode=0, stdout='{"test_results": []}', stderr=""
             )

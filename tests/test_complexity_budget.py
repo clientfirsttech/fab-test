@@ -33,8 +33,10 @@ _RULES = "C901,PLR0911,PLR0912,PLR0913,PLR0915"
 # it to 6 -- every addressable finding except deploy.py and
 # check_promotion_safety.py, deliberately left out of scope pending the
 # dead-code audit in plan.md's "Audit what the pipeline deletion stranded"
-# task. A ratchet: down, never up.
-COMPLEXITY_CEILING = 6
+# task. That audit (Pipeline Deletion Dead-Code Audit epic, 2026-08-31)
+# deleted both files rather than fixing their findings -- they had no
+# production caller left -- taking the report to 0. A ratchet: down, never up.
+COMPLEXITY_CEILING = 0
 
 
 @pytest.fixture(scope="module")
@@ -86,8 +88,8 @@ def test_the_ceiling_is_not_left_slack_after_a_cleanup(_report):
 @pytest.mark.parametrize(
     ("module", "function"),
     [
-        # Matched on file *and* name: `main` alone also matches deploy.py's,
-        # which is a different function and still over the threshold.
+        # Matched on file *and* name: `main` alone also matched other
+        # modules' own `main` (deploy.py's, before it was deleted).
         ("fab_test.py", "`main`"),
         ("fab_test.py", "`_run_analyzer`"),
         ("fab_test_summary.py", "`_print_all_summary`"),

@@ -16,10 +16,10 @@ import subprocess
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts.fab_test_registry import visible_analyzers
-from fabric_ci_cd_dataops.scripts.fab_test_summary import _print_doctor
+from fab_test.scripts.fab_test_registry import visible_analyzers
+from fab_test.scripts.fab_test_summary import _print_doctor
 
-_DOCTOR_KEYS = {"analyzer", "ready", "reason", "resolved_path", "remediation"}
+_DOCTOR_KEYS = {"analyzer", "ready", "reason", "resolved_path", "remediation", "version"}
 
 
 @pytest.mark.fab_test
@@ -219,14 +219,14 @@ def test_doctor_local_json_is_single_document_with_would_run():
 @pytest.mark.fab_test
 def test_doctor_local_remediation_present_for_missing_prerequisite(monkeypatch):
     """A not-ready check includes a remediation hint the caller can act on."""
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fab_test.scripts import fab_test_admin
 
     monkeypatch.setattr(
-        fab_test_module,
+        fab_test_admin,
         "_local_readiness",
         lambda name, args: {"ready": False, "reason": "not installed", "remediation": "pip install it"},
     )
     args = argparse.Namespace(output_format="json", local=True)
 
-    exit_code = fab_test_module._doctor(args)
+    exit_code = fab_test_admin._doctor(args)
     assert exit_code in (0, 1)

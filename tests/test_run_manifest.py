@@ -16,7 +16,7 @@ import sys
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts._run_manifest import RunManifest, _sanitize_command
+from fab_test.scripts._run_manifest import RunManifest, _sanitize_command
 
 _REQUIRED_KEYS = {
     "schema_version",
@@ -206,7 +206,8 @@ def test_manifest_covers_every_analyzer_in_all_run(tmp_path, monkeypatch):
     """`fab-test all` accumulates manifest entries from every analyzer run,
     not just the last one in the loop.
     """
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fab_test.scripts import fab_test as fab_test_module
+    from fab_test.scripts import fab_test_execution
 
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
@@ -214,10 +215,10 @@ def test_manifest_covers_every_analyzer_in_all_run(tmp_path, monkeypatch):
     output_dir = tmp_path / "fab-test-results"
 
     monkeypatch.setattr(fab_test_module, "_all_analyzers", lambda: ("bpa", "pbir"))
-    monkeypatch.setattr(fab_test_module, "_send_telemetry", lambda *a, **k: None)
-    monkeypatch.setattr(fab_test_module, "_preflight_error", lambda *a, **k: None)
+    monkeypatch.setattr(fab_test_execution, "_send_telemetry", lambda *a, **k: None)
+    monkeypatch.setattr(fab_test_execution, "_preflight_error", lambda *a, **k: None)
     monkeypatch.setattr(
-        fab_test_module.subprocess,
+        fab_test_execution.subprocess,
         "run",
         lambda *a, **k: subprocess.CompletedProcess(
             args=[], returncode=0, stdout="", stderr=""
@@ -245,14 +246,15 @@ def test_manifest_records_preflight_failure_with_exit_code(tmp_path, monkeypatch
     """A preflight tool-resolution abort still writes a manifest with the
     failure reason and the exit code preflight_error returned.
     """
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fab_test.scripts import fab_test as fab_test_module
+    from fab_test.scripts import fab_test_execution
 
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
     output_dir = tmp_path / "fab-test-results"
 
     monkeypatch.setattr(
-        fab_test_module, "_preflight_error", lambda name, args: ("tool not found", 127)
+        fab_test_execution, "_preflight_error", lambda name, args: ("tool not found", 127)
     )
     monkeypatch.setattr(
         sys,
@@ -276,7 +278,8 @@ def test_manifest_records_preflight_failure_with_exit_code(tmp_path, monkeypatch
 @pytest.mark.fab_test
 def test_manifest_records_timeout_status_for_artifact(tmp_path, monkeypatch):
     """A subprocess timeout is recorded with status 'timeout' for that artifact."""
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fab_test.scripts import fab_test as fab_test_module
+    from fab_test.scripts import fab_test_execution
 
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
@@ -285,7 +288,7 @@ def test_manifest_records_timeout_status_for_artifact(tmp_path, monkeypatch):
     def _raise_timeout(cmd, **_kwargs):
         raise subprocess.TimeoutExpired(cmd=cmd, timeout=1)
 
-    monkeypatch.setattr(fab_test_module.subprocess, "run", _raise_timeout)
+    monkeypatch.setattr(fab_test_execution.subprocess, "run", _raise_timeout)
     monkeypatch.setattr(
         sys,
         "argv",
@@ -308,7 +311,7 @@ def test_manifest_records_timeout_status_for_artifact(tmp_path, monkeypatch):
 @pytest.mark.parametrize("argv_tail", [["doctor"], ["list"], ["explain", "bpa"]])
 def test_main_does_not_construct_manifest_for_admin_subcommands(monkeypatch, argv_tail):
     """Admin/reporting subcommands (doctor, list, explain) never build a RunManifest."""
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fab_test.scripts import fab_test as fab_test_module
 
     def _fail_if_constructed(*_a, **_k):
         raise AssertionError(f"RunManifest must not be built for {argv_tail}")
@@ -343,7 +346,7 @@ def test_manifest_records_specified_origin():
 @pytest.mark.fab_test
 def test_main_writes_local_origin_outside_ci(tmp_path, monkeypatch):
     """A run with no CI env vars set records origin: local."""
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fab_test.scripts import fab_test as fab_test_module
 
     for var in ("GITHUB_ACTIONS", "GITLAB_CI", "CIRCLECI", "AZURE_DEVOPS", "CI"):
         monkeypatch.delenv(var, raising=False)
@@ -371,7 +374,7 @@ def test_main_writes_local_origin_outside_ci(tmp_path, monkeypatch):
 @pytest.mark.fab_test
 def test_main_writes_ci_origin_under_github_actions(tmp_path, monkeypatch):
     """A run with GITHUB_ACTIONS set records origin: github-actions."""
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fab_test.scripts import fab_test as fab_test_module
 
     monkeypatch.setenv("GITHUB_ACTIONS", "true")
 
@@ -400,11 +403,11 @@ def test_local_missing_prerequisite_skips_without_failing_under_ci(tmp_path, mon
     """A missing local prerequisite still degrades to a skip -- not a pipeline
     failure -- even when CI env vars are set.
     """
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fab_test.scripts import fab_test_local
 
     monkeypatch.setenv("GITHUB_ACTIONS", "true")
     monkeypatch.setattr(
-        fab_test_module,
+        fab_test_local,
         "_local_readiness",
         lambda name, args: {"ready": False, "reason": "not installed", "remediation": None},
     )
@@ -425,7 +428,7 @@ def test_local_missing_prerequisite_skips_without_failing_under_ci(tmp_path, mon
         verbose=0,
     )
 
-    exit_code = fab_test_module._run_local(args)
+    exit_code = fab_test_local._run_local(args)
 
     assert exit_code == 0
 
@@ -441,7 +444,7 @@ def test_local_missing_prerequisite_skips_without_failing_under_ci(tmp_path, mon
 # --------------------------------------------------------------------------
 
 
-def _stub_analyzer_run(monkeypatch, fab_test_module, *, stderr: str, returncode: int = 1):
+def _stub_analyzer_run(monkeypatch, subprocess_module, *, stderr: str, returncode: int = 1):
     """Replace subprocess.run so the analyzer aborts without writing an envelope."""
     seen: dict[str, object] = {}
 
@@ -449,7 +452,7 @@ def _stub_analyzer_run(monkeypatch, fab_test_module, *, stderr: str, returncode:
         seen["kwargs"] = kwargs
         return subprocess.CompletedProcess(cmd, returncode, stdout="", stderr=stderr)
 
-    monkeypatch.setattr(fab_test_module.subprocess, "run", _fake_run)
+    monkeypatch.setattr(subprocess_module.subprocess, "run", _fake_run)
     return seen
 
 
@@ -458,7 +461,8 @@ def test_manifest_records_stderr_detail_when_analyzer_writes_no_envelope(
     tmp_path, monkeypatch
 ):
     """Given an analyzer that aborts with no envelope, detail carries its message."""
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fab_test.scripts import fab_test as fab_test_module
+    from fab_test.scripts import fab_test_execution
 
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "ThinReport.Report").mkdir(parents=True)
@@ -466,7 +470,7 @@ def test_manifest_records_stderr_detail_when_analyzer_writes_no_envelope(
 
     _stub_analyzer_run(
         monkeypatch,
-        fab_test_module,
+        fab_test_execution,
         stderr=(
             "::error::No environment given, so there is nothing to resolve "
             "'ThinReport' against. Pass --env, set FABRIC_ENVIRONMENT, or set "
@@ -505,7 +509,8 @@ def test_manifest_records_detail_in_ci_where_run_json_is_the_only_artifact(
     CI sends the message to the log and nowhere else, which leaves the one
     file a pipeline uploads with `"detail": null`.
     """
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fab_test.scripts import fab_test as fab_test_module
+    from fab_test.scripts import fab_test_execution
 
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "ThinReport.Report").mkdir(parents=True)
@@ -513,7 +518,7 @@ def test_manifest_records_detail_in_ci_where_run_json_is_the_only_artifact(
 
     monkeypatch.setenv("GITHUB_ACTIONS", "true")
     seen = _stub_analyzer_run(
-        monkeypatch, fab_test_module, stderr="::error::Pass --env to resolve it.\n"
+        monkeypatch, fab_test_execution, stderr="::error::Pass --env to resolve it.\n"
     )
     monkeypatch.setattr(
         sys,
@@ -539,7 +544,8 @@ def test_ci_annotations_survive_stderr_capture(tmp_path, monkeypatch, capsys):
     Capturing stderr to fill `detail` must not cost the human the annotation
     GitHub renders against the file. Both callers, one message.
     """
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fab_test.scripts import fab_test as fab_test_module
+    from fab_test.scripts import fab_test_execution
 
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "ThinReport.Report").mkdir(parents=True)
@@ -547,7 +553,7 @@ def test_ci_annotations_survive_stderr_capture(tmp_path, monkeypatch, capsys):
 
     monkeypatch.setenv("GITHUB_ACTIONS", "true")
     _stub_analyzer_run(
-        monkeypatch, fab_test_module, stderr="::error::Pass --env to resolve it.\n"
+        monkeypatch, fab_test_execution, stderr="::error::Pass --env to resolve it.\n"
     )
     monkeypatch.setattr(
         sys,
@@ -570,7 +576,8 @@ def test_manifest_detail_stays_null_when_the_analyzer_wrote_an_envelope(
     tmp_path, monkeypatch
 ):
     """Given a normal failing run, detail stays null -- the envelope holds the findings."""
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fab_test.scripts import fab_test as fab_test_module
+    from fab_test.scripts import fab_test_execution
 
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "ThinReport.Report").mkdir(parents=True)
@@ -589,7 +596,7 @@ def test_manifest_detail_stays_null_when_the_analyzer_wrote_an_envelope(
         encoding="utf-8",
     )
 
-    _stub_analyzer_run(monkeypatch, fab_test_module, stderr="noise on stderr\n")
+    _stub_analyzer_run(monkeypatch, fab_test_execution, stderr="noise on stderr\n")
     monkeypatch.setattr(
         sys,
         "argv",

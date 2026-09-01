@@ -1,7 +1,7 @@
 # aidd-workflow
 
 Project-specific command resolver for the `fab-test` package in the
-`fabric-ci-cd-dataops` repository. Maps natural-language user commands to the
+`fab-test` repository. Maps natural-language user commands to the
 correct AIDD skill chain for a Python + Microsoft Fabric + GitHub Actions project.
 
 ## Why

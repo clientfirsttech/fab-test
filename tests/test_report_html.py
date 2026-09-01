@@ -18,11 +18,11 @@ import pathlib
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts._analyzer_envelope import (
+from fab_test.scripts._analyzer_envelope import (
     normalize_findings,
     normalize_test_results,
 )
-from fabric_ci_cd_dataops.scripts._report_html import render_report, write_report
+from fab_test.scripts._report_html import render_report, write_report
 from tests.conftest import (
     _BPA_FAILED_RULE,
     _BPA_PASSED_RULE,
@@ -354,7 +354,7 @@ def _index_rows(tmp_path):
 @pytest.mark.fab_test
 def test_index_totals_match_the_rows_it_was_given(tmp_path):
     """Built from the summary's own rows, so the two cannot disagree."""
-    from fabric_ci_cd_dataops.scripts._report_html import render_index
+    from fab_test.scripts._report_html import render_index
 
     html = render_index(_index_rows(tmp_path), tmp_path)
 
@@ -365,7 +365,7 @@ def test_index_totals_match_the_rows_it_was_given(tmp_path):
 @pytest.mark.fab_test
 def test_index_links_are_relative_to_the_index_location(tmp_path):
     """The page must survive being moved or downloaded as a CI artifact."""
-    from fabric_ci_cd_dataops.scripts._report_html import render_index
+    from fab_test.scripts._report_html import render_index
 
     html = render_index(_index_rows(tmp_path), tmp_path)
 
@@ -375,7 +375,7 @@ def test_index_links_are_relative_to_the_index_location(tmp_path):
 
 @pytest.mark.fab_test
 def test_index_marks_a_missing_report_rather_than_linking_nothing(tmp_path):
-    from fabric_ci_cd_dataops.scripts._report_html import render_index
+    from fab_test.scripts._report_html import render_index
 
     html = render_index(_index_rows(tmp_path), tmp_path)
 
@@ -384,7 +384,7 @@ def test_index_marks_a_missing_report_rather_than_linking_nothing(tmp_path):
 
 @pytest.mark.fab_test
 def test_write_index_returns_the_written_path(tmp_path):
-    from fabric_ci_cd_dataops.scripts._report_html import write_index
+    from fab_test.scripts._report_html import write_index
 
     written = write_index(_index_rows(tmp_path), tmp_path)
 
@@ -400,7 +400,7 @@ def test_write_index_returns_the_written_path(tmp_path):
 @pytest.mark.fab_test
 def test_index_without_metadata_renders_exactly_as_before(tmp_path):
     """Existing callers that pass no metadata must see no behavior change."""
-    from fabric_ci_cd_dataops.scripts._report_html import render_index
+    from fab_test.scripts._report_html import render_index
 
     html = render_index(_index_rows(tmp_path), tmp_path)
 
@@ -409,7 +409,7 @@ def test_index_without_metadata_renders_exactly_as_before(tmp_path):
 
 @pytest.mark.fab_test
 def test_index_metadata_shows_timestamp_actor_branch_and_commit(tmp_path):
-    from fabric_ci_cd_dataops.scripts._report_html import render_index
+    from fab_test.scripts._report_html import render_index
 
     metadata = {
         "generated_at": "2026-08-23T10:00:00+00:00",
@@ -429,7 +429,7 @@ def test_index_metadata_shows_timestamp_actor_branch_and_commit(tmp_path):
 @pytest.mark.fab_test
 def test_index_metadata_falls_back_to_a_placeholder_outside_a_git_checkout(tmp_path):
     """Given no CI env vars and no .git directory, should not crash or leave blanks."""
-    from fabric_ci_cd_dataops.scripts._report_html import render_index
+    from fab_test.scripts._report_html import render_index
 
     metadata = {"generated_at": "2026-08-23T10:00:00+00:00", "actor": "", "branch": "", "commit": ""}
     html = render_index(_index_rows(tmp_path), tmp_path, metadata=metadata)
@@ -440,7 +440,7 @@ def test_index_metadata_falls_back_to_a_placeholder_outside_a_git_checkout(tmp_p
 
 @pytest.mark.fab_test
 def test_index_metadata_is_escaped(tmp_path):
-    from fabric_ci_cd_dataops.scripts._report_html import render_index
+    from fab_test.scripts._report_html import render_index
 
     metadata = {
         "generated_at": "2026-08-23T10:00:00+00:00",
@@ -457,7 +457,7 @@ def test_index_metadata_is_escaped(tmp_path):
 @pytest.mark.fab_test
 def test_write_index_stamps_generated_at_and_git_identity(tmp_path, monkeypatch):
     """The real IO entry point gathers metadata itself; render_index stays pure."""
-    from fabric_ci_cd_dataops.scripts import _report_html
+    from fab_test.scripts import _report_html
 
     monkeypatch.setattr(
         _report_html,
@@ -507,7 +507,7 @@ def test_the_finding_shape_helpers_have_exactly_one_definition():
 @pytest.mark.fab_test
 def test_no_helper_is_named_so_pytest_would_collect_it():
     """A src function called test_* becomes a phantom test when imported."""
-    from fabric_ci_cd_dataops.scripts import _analyzer_envelope
+    from fab_test.scripts import _analyzer_envelope
 
     collected = [n for n in dir(_analyzer_envelope) if n.startswith("test_")]
 

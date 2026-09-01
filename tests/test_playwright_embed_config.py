@@ -20,7 +20,7 @@ the real library.
 
 from __future__ import annotations
 
-from fabric_ci_cd_dataops.scripts.playwright_validation.embed_config import EmbedConfig, build_embed_config
+from fab_test.scripts.playwright_validation.embed_config import EmbedConfig, build_embed_config
 
 
 def test_build_embed_config_defaults() -> None:
@@ -75,6 +75,40 @@ def test_build_embed_config_with_page_and_bookmark() -> None:
 
     assert config.pageName == "ReportSection1"
     assert config.bookmark == {"name": "Bookmark1"}
+
+
+def test_build_embed_config_paginated_omits_page_and_bookmark() -> None:
+    """A paginated report's embed config has no pageName/bookmark key at
+    all -- RDL reports have neither dimension, so passing empty-string/None
+    values would mimic a real page or bookmark rather than the absence of
+    one."""
+    config = build_embed_config(
+        report_id="rdl-1",
+        embed_url="https://app.powerbi.com/reportEmbed",
+        embed_token="token-1",
+        report_type="paginated",
+    )
+
+    data = config.to_dict()
+
+    assert "pageName" not in data
+    assert "bookmark" not in data
+    assert "report_type" not in data
+
+
+def test_build_embed_config_non_paginated_keeps_page_and_bookmark_keys() -> None:
+    """An interactive report's embed config keeps pageName/bookmark keys
+    (even when empty/None) -- only paginated reports drop them."""
+    config = build_embed_config(
+        report_id="rpt-1",
+        embed_url="https://app.powerbi.com/reportEmbed",
+        embed_token="token-1",
+    )
+
+    data = config.to_dict()
+
+    assert data["pageName"] == ""
+    assert data["bookmark"] is None
 
 
 def test_embed_config_to_dict() -> None:

@@ -16,12 +16,12 @@ from pathlib import Path
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts._telemetry import (
+from fab_test.scripts._telemetry import (
     ENABLE_VAR,
     EVENTHOUSE_DATABASE_VAR,
     EVENTHOUSE_URI_VAR,
 )
-from fabric_ci_cd_dataops.scripts.fab_test import _telemetry_readiness
+from fab_test.scripts.fab_test import _telemetry_readiness
 
 _URI = "https://trd-abc123.z9.kusto.fabric.microsoft.com"
 _CONFIGURED = {"telemetry": {"eventhouse": {"uri": _URI, "database": "fabric_ops"}}}
@@ -70,14 +70,14 @@ def _without_ambient(monkeypatch):
     is *available* even with no principal set. A test that means "no
     credentials at all" has to say so.
     """
-    from fabric_ci_cd_dataops.scripts import _credentials
+    from fab_test.scripts import _credentials
 
     monkeypatch.setattr(_credentials, "ambient_credential_available", lambda: False)
 
 
 def _with_extra(monkeypatch, installed: bool):
     """Pretend the [telemetry] extra is or is not importable."""
-    from fabric_ci_cd_dataops.scripts import eventhouse_logger
+    from fab_test.scripts import eventhouse_logger
 
     def _load():
         if not installed:

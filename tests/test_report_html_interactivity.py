@@ -23,7 +23,7 @@ from pathlib import Path
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts._report_html import render_index, render_report
+from fab_test.scripts._report_html import render_index, render_report
 from tests.conftest import (
     _BPA_FAILED_RULE,
     _BPA_PASSED_RULE,

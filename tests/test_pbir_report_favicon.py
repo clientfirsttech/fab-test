@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts.invoke_pbir_inspector import fix_favicon_link
+from fab_test.scripts.invoke_pbir_inspector import fix_favicon_link
 
 _BROKEN_LINK = '<link rel="icon" href="../icon/pbiinspector.png">'
 
