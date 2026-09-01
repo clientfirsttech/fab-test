@@ -40,7 +40,7 @@ pip install -e .
 From an index — **`pip install fab-test` does not work yet.** The name is
 unregistered on PyPI. The pre-release lives on TestPyPI, and both flags below are
 required: TestPyPI carries `pql-test` 0.1.11 and `fabric-cicd` 0.1.7 where this
-project needs `pql-test==0.1.12` and a current `fabric-cicd`, so without the
+project needs `pql-test==0.1.13` and a current `fabric-cicd`, so without the
 extra index the install fails to resolve; and pip skips PEP 440 dev releases
 unless the version is named exactly.
 

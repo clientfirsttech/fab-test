@@ -125,7 +125,7 @@ retries for that reason, and a manual install may need the same patience.
 ### Why the install command looks like that
 
 - **`--extra-index-url https://pypi.org/simple`** — TestPyPI carries
-  `pql-test` 0.1.11; this project requires `pql-test==0.1.12`. Without the
+  `pql-test` 0.1.11; this project requires `pql-test==0.1.13`. Without the
   production index alongside it the install fails to resolve, which reads
   as a broken package and is not one.
 - **The exact pin** — `1.0.0.0.dev1` is a PEP 440 dev release. pip skips
