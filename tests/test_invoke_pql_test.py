@@ -341,8 +341,13 @@ class TestRunPqlTest:
     """Tests for run_pql_test entry function."""
 
     @mock.patch("fab_test.scripts._analyzer_process.subprocess.run")
-    def test_run_passes_no_findings(self, mock_run, tmp_path: Path):
-        """Successful execution creates a passed result."""
+    def test_run_warns_when_a_clean_exit_ran_no_tests(self, mock_run, tmp_path: Path):
+        """A clean exit having run nothing is a warning, not a pass.
+
+        Zero tests passing is not a pass. A model that declares no tests --
+        or one whose tests were never reached -- must not show the same
+        green check as a model whose tests actually ran and passed.
+        """
         artifact = tmp_path / "SalesModel.SemanticModel"
         artifact.mkdir()
         output = tmp_path / "out.json"
@@ -360,8 +365,53 @@ class TestRunPqlTest:
         exit_code = run_pql_test(Args())
         assert exit_code == 0
         data = json.loads(output.read_text(encoding="utf-8"))
-        assert data["status"] == "passed"
+        assert data["status"] == "warning"
         assert data["test_results"] == []
+
+    @mock.patch("fab_test.scripts.invoke_pql_test.native_output_path")
+    @mock.patch("fab_test.scripts._analyzer_process.subprocess.run")
+    def test_run_passes_when_tests_actually_ran_and_passed(
+        self, mock_run, mock_native_path, tmp_path: Path
+    ):
+        """Tests that ran and passed still report passed."""
+        artifact = tmp_path / "SalesModel.SemanticModel"
+        artifact.mkdir()
+        output = tmp_path / "out.json"
+        nat_out = tmp_path / "native.json"
+        mock_native_path.return_value = nat_out
+
+        def _fake_run(*_a, **_k):
+            nat_out.write_text(
+                json.dumps(
+                    {
+                        "passed": 2,
+                        "failed": 0,
+                        "skipped": 0,
+                        "total": 2,
+                        "results": [
+                            {"test_name": "T1", "suite_name": "S", "passed": True},
+                            {"test_name": "T2", "suite_name": "S", "passed": True},
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            return mock.Mock(returncode=0, stdout="", stderr="")
+
+        mock_run.side_effect = _fake_run
+
+        class Args:
+            artifact_path = str(artifact)
+            artifact_name = "SalesModel"
+            output_path = str(output)
+            workspace_id = ""
+            env = ""
+
+        exit_code = run_pql_test(Args())
+        assert exit_code == 0
+        data = json.loads(output.read_text(encoding="utf-8"))
+        assert data["status"] == "passed"
+        assert data["test_summary"]["passed"] == 2
 
     @mock.patch("fab_test.scripts._analyzer_process.subprocess.run")
     def test_run_writes_desktop_binding_to_envelope(self, mock_run, tmp_path: Path):
@@ -411,6 +461,182 @@ class TestRunPqlTest:
         data = json.loads(output.read_text(encoding="utf-8"))
         assert data["status"] == "failed"
         assert len(data["findings"]) == 1
+
+    @mock.patch("fab_test.scripts._analyzer_process.subprocess.run")
+    def test_run_warns_when_no_results_and_nonzero_exit(
+        self, mock_run, tmp_path: Path
+    ):
+        """A run that produced no test results at all warns rather than failing.
+
+        pql-test exits non-zero with no parsed test results when it never
+        connected to a model -- most commonly a local Desktop session that
+        closed or was never open. Nothing asserted wrong, so this is not a
+        failure; nothing ran either, so it is not a pass.
+        """
+        artifact = tmp_path / "SalesModel.SemanticModel"
+        artifact.mkdir()
+        output = tmp_path / "out.json"
+        mock_run.return_value = mock.Mock(
+            returncode=1, stdout="", stderr="could not connect to model"
+        )
+
+        class Args:
+            artifact_path = str(artifact)
+            artifact_name = "SalesModel"
+            output_path = str(output)
+            workspace_id = ""
+            env = ""
+
+        exit_code = run_pql_test(Args())
+        assert exit_code == 0
+        data = json.loads(output.read_text(encoding="utf-8"))
+        assert data["status"] == "warning"
+        assert data["findings"] == []
+
+    @mock.patch("fab_test.scripts.invoke_pql_test.native_output_path")
+    @mock.patch("fab_test.scripts._analyzer_process.subprocess.run")
+    def test_run_warns_and_reports_no_tests_when_none_could_execute(
+        self, mock_run, mock_native_path, tmp_path: Path
+    ):
+        """A closed Desktop file: pql-test finds tests statically but every
+        execution fails with an ADOMD connection-refused error.
+
+        The discovered count comes from scanning the model's TMDL, not from
+        running anything, so the honest report is that no tests ran -- and
+        that is a warning rather than a green pass, because a developer who
+        believes their tests ran when they did not is worse off than one who
+        is told nothing ran.
+        """
+        artifact = tmp_path / "SalesModel.SemanticModel"
+        artifact.mkdir()
+        output = tmp_path / "out.json"
+        nat_out = tmp_path / "native.json"
+        mock_native_path.return_value = nat_out
+
+        connection_error = (
+            "A connection cannot be made. Ensure that the server is running. "
+            "---> System.Net.Sockets.SocketException: No connection could be "
+            "made because the target machine actively refused it 127.0.0.1:61774"
+        )
+        native_payload = {
+            "passed": 0,
+            "failed": 2,
+            "skipped": 0,
+            "total": 2,
+            "results": [
+                {
+                    "test_name": "Example.DEV.Tests",
+                    "suite_name": "Example.DEV.Tests",
+                    "passed": False,
+                    "skipped": False,
+                    "error": connection_error,
+                },
+                {
+                    "test_name": "Schema.DEV.Tests",
+                    "suite_name": "Schema.DEV.Tests",
+                    "passed": False,
+                    "skipped": False,
+                    "error": connection_error,
+                },
+            ],
+        }
+
+        def _fake_run(*_a, **_k):
+            nat_out.parent.mkdir(parents=True, exist_ok=True)
+            nat_out.write_text(json.dumps(native_payload), encoding="utf-8")
+            return mock.Mock(returncode=1, stdout="", stderr="")
+
+        mock_run.side_effect = _fake_run
+
+        class Args:
+            artifact_path = str(artifact)
+            artifact_name = "SalesModel"
+            output_path = str(output)
+            workspace_id = ""
+            env = ""
+
+        exit_code = run_pql_test(Args())
+        # A platform gap must not turn CI red.
+        assert exit_code == 0
+        data = json.loads(output.read_text(encoding="utf-8"))
+        assert data["status"] == "warning"
+        assert data["findings"] == []
+        # Nothing executed, so no number of tests is the honest count.
+        assert data["test_summary"] == {
+            "passed": 0,
+            "failed": 0,
+            "skipped": 0,
+            "total": 0,
+        }
+        assert data["test_results"] == []
+        # The reason still has to reach the reader.
+        assert "connect" in data["message"].lower()
+
+    @mock.patch("fab_test.scripts.invoke_pql_test.native_output_path")
+    @mock.patch("fab_test.scripts._analyzer_process.subprocess.run")
+    def test_run_reports_failed_when_a_real_failure_accompanies_connection_errors(
+        self, mock_run, mock_native_path, tmp_path: Path
+    ):
+        """A genuine assertion failure must never hide behind a connection skip.
+
+        Even when other tests in the same run failed to connect, one real
+        failure (no connection-error signature) means the run stays failed.
+        """
+        artifact = tmp_path / "SalesModel.SemanticModel"
+        artifact.mkdir()
+        output = tmp_path / "out.json"
+        nat_out = tmp_path / "native.json"
+        mock_native_path.return_value = nat_out
+
+        connection_error = (
+            "A connection cannot be made. Ensure that the server is running. "
+            "---> System.Net.Sockets.SocketException: No connection could be "
+            "made because the target machine actively refused it 127.0.0.1:61774"
+        )
+        native_payload = {
+            "passed": 0,
+            "failed": 2,
+            "skipped": 0,
+            "total": 2,
+            "results": [
+                {
+                    "test_name": "Example.DEV.Tests",
+                    "suite_name": "Example.DEV.Tests",
+                    "passed": False,
+                    "skipped": False,
+                    "error": connection_error,
+                },
+                {
+                    "test_name": "Schema.DEV.Tests",
+                    "suite_name": "Schema.DEV.Tests",
+                    "passed": False,
+                    "skipped": False,
+                    "expected": "5",
+                    "actual": "3",
+                    "error": "",
+                },
+            ],
+        }
+
+        def _fake_run(*_a, **_k):
+            nat_out.parent.mkdir(parents=True, exist_ok=True)
+            nat_out.write_text(json.dumps(native_payload), encoding="utf-8")
+            return mock.Mock(returncode=1, stdout="", stderr="")
+
+        mock_run.side_effect = _fake_run
+
+        class Args:
+            artifact_path = str(artifact)
+            artifact_name = "SalesModel"
+            output_path = str(output)
+            workspace_id = ""
+            env = ""
+
+        exit_code = run_pql_test(Args())
+        assert exit_code == 1
+        data = json.loads(output.read_text(encoding="utf-8"))
+        assert data["status"] == "failed"
+        assert len(data["findings"]) == 2
 
     @mock.patch("fab_test.scripts.invoke_pql_test.native_output_path")
     @mock.patch("fab_test.scripts._analyzer_process.subprocess.run")

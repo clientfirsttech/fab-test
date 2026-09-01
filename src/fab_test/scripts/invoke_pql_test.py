@@ -226,6 +226,35 @@ def _summarize_results(
     }
 
 
+_CONNECTION_ERROR_MARKER = "a connection cannot be made"
+
+
+def _is_connection_error(result: dict[str, Any]) -> bool:
+    """Whether a failing result's error is pql-test being unable to reach the model.
+
+    pql-test discovers tests statically from the .SemanticModel's PQL
+    definitions -- no live connection needed -- then tries to execute each
+    one. When the model is unreachable (e.g. a closed Desktop session), each
+    execution fails with this ADOMD.NET message rather than an assertion
+    mismatch.
+    """
+    error = result.get("error") or ""
+    return _CONNECTION_ERROR_MARKER in str(error).lower()
+
+
+def _is_connection_skip(findings: list[dict[str, Any]]) -> bool:
+    """Whether every failure in this run was pql-test failing to reach the model.
+
+    One genuine assertion failure among connection errors still fails the
+    run -- a real failure must never hide behind a platform-availability
+    skip.
+    """
+    return bool(findings) and all(_is_connection_error(f) for f in findings)
+
+
+_NOTHING_RAN = {"passed": 0, "failed": 0, "skipped": 0, "total": 0}
+
+
 def _pql_status(
     test_summary: "dict[str, int] | None",
     findings: list[dict[str, Any]],
@@ -237,6 +266,23 @@ def _pql_status(
     platform or workspace was unavailable, and vision.md is explicit that
     platform gaps degrade to skips -- so CI does not go red for missing
     credentials, while a real assertion failure still does.
+
+    A non-zero exit with no test results at all -- no native output, or a
+    total of zero -- means pql-test never connected to the model (most
+    commonly a local Desktop session that closed). There is nothing to
+    report as a finding, so this degrades to skipped the same way, instead
+    of the misleading "0 tests, 0 passed, 0 failed, 0 skipped" failed
+    message a bare fall-through would produce.
+
+    A run can also have results -- pql-test discovers tests statically from
+    the model's TMDL, so it reports a count of tests it never managed to
+    run, each failing with the same connection-refused error rather than an
+    assertion mismatch. Nothing executed, so that is reported as a warning
+    with no tests: not `failed` (nothing asserted wrong), not `passed`
+    (a green check over an empty run is how a developer comes to believe
+    tests ran when they did not). Only when every failure shares that
+    signature, though -- one genuine assertion failure among connection
+    errors must still fail the run.
     """
     counts = test_summary or {}
     passed = counts.get("passed", 0)
@@ -245,6 +291,13 @@ def _pql_status(
     total = counts.get("total", 0)
     counter_msg = f"{total} tests, {passed} passed, {failed} failed, {skipped} skipped"
 
+    # "Did anything run?" is asked before "did it pass?": zero tests passing
+    # is not a pass, and a green check is how a developer comes to believe
+    # tests ran when none did.
+    if total == 0 and not findings:
+        if returncode == 0:
+            return "warning", "pql-test found no tests to run in this model"
+        return "warning", "pql-test ran no tests"
     if returncode == 0 and not findings:
         return "passed", f"pql-test passed: {counter_msg}"
     all_skipped = (
@@ -253,6 +306,8 @@ def _pql_status(
     )
     if all_skipped:
         return "skipped", f"pql-test skipped: {counter_msg}"
+    if _is_connection_skip(findings):
+        return "warning", "pql-test ran no tests: could not connect to the model"
     return "failed", f"pql-test failed: {counter_msg}"
 
 
@@ -282,15 +337,21 @@ def _narrate_outcome(
     """Print the result lines, and the CI annotation when the run failed.
 
     The annotation goes to stderr regardless of verbosity: it is what a CI
-    system reads, not what a person chose to see.
+    system reads, not what a person chose to see. A warning annotates as
+    `::warning::` rather than `::error::` -- nothing asserted wrong, but
+    nothing ran either, so it must not read as a clean pass.
     """
     level = _verbosity()
+    icons = {"passed": "✅", "skipped": "⏭️", "warning": "⚠️"}
     if level >= _VERBOSITY_LEVELS["default"]:
-        if status in {"passed", "skipped"}:
-            log(f"{'✅' if status == 'passed' else '⏭️'} {message}")
+        if status in icons:
+            log(f"{icons[status]} {message}")
         log(f"📁 Envelope: {output_path}")
         log(f"📄 Native:   {nat_out}")
     if status in {"passed", "skipped"}:
+        return
+    if status == "warning":
+        print(f"::warning::{message}", file=sys.stderr)
         return
     if level >= _VERBOSITY_LEVELS["verbose"]:
         for f in findings:
@@ -370,6 +431,14 @@ def run_pql_test(args: argparse.Namespace) -> int:
     test_summary = test_summary or _summarize_results(test_results)
     status, message = _pql_status(test_summary, findings, proc.returncode)
 
+    # pql-test's counts describe tests it discovered from the TMDL, not tests
+    # it ran. When none of them executed, reporting any count overstates what
+    # happened -- and the counts are what a reader believes, so they have to
+    # agree with the status above. native.json keeps pql-test's own numbers.
+    if _is_connection_skip(findings):
+        test_results = []
+        test_summary = dict(_NOTHING_RAN)
+
     # One call for every outcome: the branch below differs only in narration
     # and exit code. `findings if status == "failed" else []` covers both --
     # a passed or skipped run has nothing to report as a finding.
@@ -390,7 +459,9 @@ def run_pql_test(args: argparse.Namespace) -> int:
         desktop_model_name=desktop_model_name,
     )
     _narrate_outcome(status, message, output_path, nat_out, findings, proc.stderr)
-    if status in {"passed", "skipped"}:
+    # A warning exits 0 like pbir-a11y's: nothing asserted wrong, so a
+    # platform gap does not turn CI red -- the annotation carries the news.
+    if status in {"passed", "skipped", "warning"}:
         return 0
     return 1
 

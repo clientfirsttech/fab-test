@@ -14,11 +14,13 @@ from pathlib import Path
 
 import pytest
 
+from fab_test.scripts._analyzer_envelope import finding_status
 from fab_test.scripts.fab_test import _print_all_summary, _print_summary
 from fab_test.scripts.fab_test_summary import (
+    _artifact_status,
+    _artifact_summary_prefix,
     _format_findings,
     _is_pql_test_finding,
-    _pql_test_status,
 )
 
 # --------------------------------------------------------------------------- #
@@ -191,11 +193,31 @@ def test_is_pql_test_finding_detects_result_shape():
 
 @pytest.mark.fab_test
 def test_pql_test_status_labels():
-    """_pql_test_status maps result fields to PASS/FAIL/SKIPPED/ERROR."""
-    assert _pql_test_status({"passed": True}) == "PASS"
-    assert _pql_test_status({"passed": False}) == "FAIL"
-    assert _pql_test_status({"passed": False, "skipped": True}) == "SKIPPED"
-    assert _pql_test_status({"passed": False, "error": "x"}) == "ERROR"
+    """finding_status maps result fields to PASS/FAIL/SKIPPED/ERROR."""
+    assert finding_status({"passed": True}) == "PASS"
+    assert finding_status({"passed": False}) == "FAIL"
+    assert finding_status({"passed": False, "skipped": True}) == "SKIPPED"
+    assert finding_status({"passed": False, "error": "x"}) == "ERROR"
+
+
+@pytest.mark.fab_test
+def test_artifact_status_reports_a_warning_envelope_as_a_warning():
+    """A warning envelope that exited 0 is a warning, not a pass.
+
+    pql-test writes this when nothing could execute. Falling through to
+    "passed" would show a green check over a run in which no test ran.
+    """
+    assert _artifact_status({"status": "warning"}, code=0, errors=0, warnings=0) == (
+        "warning"
+    )
+
+
+@pytest.mark.fab_test
+def test_artifact_summary_prefix_marks_a_warning_run():
+    """A warning run gets its own icon rather than the green check."""
+    assert _artifact_summary_prefix(0, "warning") == "⚠️"
+    assert _artifact_summary_prefix(0, "passed") == "✅"
+    assert _artifact_summary_prefix(1, "failed") == "❌"
 
 
 @pytest.mark.fab_test

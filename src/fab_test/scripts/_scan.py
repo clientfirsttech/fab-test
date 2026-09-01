@@ -28,7 +28,11 @@ from typing import NamedTuple
 
 # Never worth walking, and expensive when walked: a virtualenv or a
 # node_modules can hold tens of thousands of directories and cannot hold a
-# Fabric artifact anyone meant to test.
+# Fabric artifact anyone meant to test. .github and .claude are a different
+# reason for the same rule: they hold agent tooling -- skill instructions,
+# worked examples, worktrees, scratch config -- not this project's own
+# artifacts, so anything suffix-matching found there is documentation about
+# the project, never the project itself.
 EXCLUDED_DIR_NAMES: frozenset[str] = frozenset(
     {
         ".git",
@@ -44,6 +48,8 @@ EXCLUDED_DIR_NAMES: frozenset[str] = frozenset(
         "dist",
         "build",
         ".fab-test-tools",
+        ".github",
+        ".claude",
     }
 )
 

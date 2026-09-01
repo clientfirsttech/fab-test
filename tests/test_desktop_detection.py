@@ -95,6 +95,39 @@ def test_detect_leaves_file_path_unresolved_when_multiple_instances(tmp_path, mo
 
 
 @pytest.mark.fab_test
+def test_detect_caches_powershell_call_across_repeated_calls(tmp_path, monkeypatch):
+    """Calling detection twice for the same root shells out to PowerShell once.
+
+    A `local/` run calls this once per artifact during preflight, then again
+    when building the pql-test command -- without caching, each call re-pays
+    the PowerShell startup cost for state that cannot change mid-run.
+    """
+    from fab_test.scripts import _desktop
+
+    monkeypatch.setattr(_desktop.platform, "system", lambda: "Windows")
+    _write_port_file(tmp_path, "AnalysisServicesWorkspace_1", 51234)
+
+    calls = []
+
+    class _FakeProc:
+        stdout = 'powershell.exe "C:\\Reports\\Foo.pbix"\n'
+
+    def _fake_run(*_a, **_k):
+        calls.append(1)
+        return _FakeProc()
+
+    monkeypatch.setattr(_desktop.subprocess, "run", _fake_run)
+
+    first = detect_desktop_instances(tmp_path)
+    second = detect_desktop_instances(tmp_path)
+
+    assert first == second == [
+        DesktopInstance(port=51234, open_file_path=Path("C:\\Reports\\Foo.pbix"))
+    ]
+    assert len(calls) == 1
+
+
+@pytest.mark.fab_test
 def test_detect_returns_none_file_path_when_powershell_unavailable(tmp_path, monkeypatch):
     """A single instance whose command line can't be read still reports its port."""
     from fab_test.scripts import _desktop

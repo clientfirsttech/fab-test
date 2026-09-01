@@ -82,8 +82,17 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
         ),
     ),
     "src/fab_test/scripts/fab_test_summary.py": (
-        920,
+        925,
         (
+            "2026-09-01: +5 net lines teaching the summary that an analyzer can "
+            "exit 0 and still be warning us -- _artifact_status now reads a "
+            "`warning` envelope as a warning instead of falling through to "
+            "passed, and _artifact_summary_prefix takes the status so such a "
+            "run gets its own icon rather than a green check (pql-test "
+            "Connection-Failure Reporting epic, Task 4). Net of deleting "
+            "_pql_test_status, a byte-identical twin of _analyzer_envelope's "
+            "finding_status that the one-definition guard missed because the "
+            "copy had been renamed. "
             "2026-08-23: 12 lines over hard, from unrelated feature work landing "
             "since this file was last at 793; not yet worth a forced split for "
             "12 lines. Revisit if it keeps growing. "
