@@ -120,7 +120,7 @@ Documentation follows the same three callers as the CLI itself. Shipping for one
 ## Non-Goals
 
 - Replacing the analyzers it wraps, or reimplementing their rules.
-- Being a general-purpose Fabric deployment tool — deployment lives in `fabric-cicd-deployment`.
+- Being a general-purpose Fabric deployment tool. (An earlier attempt at deployment automation, `fabric-cicd-deployment`, is retired — see that skill's own note. This project stays static-analysis and rendered-report validation only.)
 - Requiring a Fabric workspace or service principal for local static analysis.
 
 ## Current Plan
