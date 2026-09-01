@@ -36,7 +36,7 @@ jobs:
             # Matches build.yml. The agent and CI disagreeing about the
             # interpreter is a class of bug that only shows up in one of them.
             - name: Set up Python
-              uses: actions/setup-python@v5
+              uses: actions/setup-python@v7
               with:
                   python-version: "3.12"
 
