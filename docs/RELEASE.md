@@ -128,7 +128,7 @@ retries for that reason, and a manual install may need the same patience.
   `pql-test` 0.1.11; this project requires `pql-test==0.1.13`. Without the
   production index alongside it the install fails to resolve, which reads
   as a broken package and is not one.
-- **The exact pin** — `1.0.0.0.dev1` is a PEP 440 dev release. pip skips
+- **The exact pin** — `1.0.0.0.dev15` is a PEP 440 dev release. pip skips
   pre-releases unless you name a version exactly or pass `--pre`, so a bare
   `pip install fab-test` finds no acceptable version even once the project
   exists.
@@ -173,7 +173,7 @@ resolvable:
     pip install \
       --index-url https://test.pypi.org/simple/ \
       --extra-index-url https://pypi.org/simple \
-      "fab-test==1.0.0.0.dev1"
+      "fab-test==1.0.0.0.dev15"
 
 - name: Check readiness
   run: fab-test doctor --format json
@@ -200,7 +200,7 @@ The optional telemetry extra resolves from the same indexes and needs the same
 pip install \
   --index-url https://test.pypi.org/simple/ \
   --extra-index-url https://pypi.org/simple \
-  "fab-test[telemetry]==1.0.0.0.dev1"
+  "fab-test[telemetry]==1.0.0.0.dev15"
 ```
 
 Keep `--artifact-dir` explicit in CI, and see
