@@ -13,9 +13,9 @@ and always passes on any machine.
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts._config import ConfigError, validate_config
-from fabric_ci_cd_dataops.scripts._target import parse_target, workspace_conflict
-from fabric_ci_cd_dataops.scripts.playwright_validation.resolver import (
+from fab_test.scripts._config import ConfigError, validate_config
+from fab_test.scripts._target import parse_target, workspace_conflict
+from fab_test.scripts.playwright_validation.resolver import (
     ServiceResolutionError,
     resolve_workspace_id,
 )

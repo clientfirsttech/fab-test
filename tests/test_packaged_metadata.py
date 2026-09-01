@@ -30,11 +30,11 @@ from pathlib import Path
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts._metadata import PACKAGED_METADATA
+from fab_test.scripts._metadata import PACKAGED_METADATA
 
 _ROOT = Path(__file__).resolve().parent.parent
 _SRC = _ROOT / "src"
-_PACKAGE = _SRC / "fabric_ci_cd_dataops"
+_PACKAGE = _SRC / "fab_test"
 
 # Every metadata file an analyzer needs before it can do anything.
 _REQUIRED = (
@@ -76,7 +76,7 @@ def test_every_required_metadata_file_is_shipped(relative, package_data):
     This is the half that failed before: the files were declared by a
     pattern that did not reach them, and the build said nothing.
     """
-    expected = Path("fabric_ci_cd_dataops") / "metadata" / relative
+    expected = Path("fab_test") / "metadata" / relative
 
     assert expected in _shipped_files(package_data), f"package-data does not ship {expected.as_posix()}"
 

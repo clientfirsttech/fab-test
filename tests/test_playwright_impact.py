@@ -7,12 +7,12 @@ from typing import Any
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts.playwright_validation.impact import (
+from fab_test.scripts.playwright_validation.impact import (
     ImpactManifest,
     build_impact_manifest,
     load_changed_artifacts,
 )
-from fabric_ci_cd_dataops.scripts.playwright_validation.resolver import (
+from fab_test.scripts.playwright_validation.resolver import (
     ResolvedReport,
     ServiceResolutionError,
 )

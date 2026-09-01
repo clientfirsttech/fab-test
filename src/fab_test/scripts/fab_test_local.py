@@ -13,7 +13,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from fabric_ci_cd_dataops import __version__ as _FAB_TEST_VERSION
+from fab_test import __version__ as _FAB_TEST_VERSION
 
 from ._cli_utils import narrate
 from ._pbip_discovery import discover_pbip_projects as _discover_pbip_projects

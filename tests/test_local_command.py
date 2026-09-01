@@ -14,7 +14,7 @@ import subprocess
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts.fab_test import _LOCAL_ANALYZERS, _run_local
+from fab_test.scripts.fab_test import _LOCAL_ANALYZERS, _run_local
 
 
 def _write_pbip_project(root, name):
@@ -54,7 +54,7 @@ def _local_args(tmp_path, output_dir):
 @pytest.mark.fab_test
 def test_local_runs_every_analyzer_when_all_are_ready(tmp_path, monkeypatch):
     """Every analyzer in _LOCAL_ANALYZERS runs when its prerequisite is met."""
-    from fabric_ci_cd_dataops.scripts import fab_test_local
+    from fab_test.scripts import fab_test_local
 
     called = []
     monkeypatch.setattr(
@@ -78,7 +78,7 @@ def test_local_runs_every_analyzer_when_all_are_ready(tmp_path, monkeypatch):
 @pytest.mark.fab_test
 def test_local_skips_analyzer_with_missing_prerequisite_without_failing(tmp_path, monkeypatch):
     """A missing prerequisite is skipped, not run, and doesn't fail the exit code."""
-    from fabric_ci_cd_dataops.scripts import fab_test_local
+    from fab_test.scripts import fab_test_local
 
     def _readiness(name, _args):
         if name == "bpa":
@@ -104,7 +104,7 @@ def test_local_skips_analyzer_with_missing_prerequisite_without_failing(tmp_path
 @pytest.mark.fab_test
 def test_local_exit_code_is_one_when_any_analyzer_fails(tmp_path, monkeypatch):
     """A real finding (nonzero exit from a ran analyzer) fails the run."""
-    from fabric_ci_cd_dataops.scripts import fab_test_local
+    from fab_test.scripts import fab_test_local
 
     monkeypatch.setattr(
         fab_test_local,
@@ -126,7 +126,7 @@ def test_local_exit_code_is_one_when_any_analyzer_fails(tmp_path, monkeypatch):
 @pytest.mark.fab_test
 def test_local_exit_code_is_zero_when_every_analyzer_is_skipped(tmp_path, monkeypatch):
     """Every prerequisite missing degrades to a clean, successful no-op."""
-    from fabric_ci_cd_dataops.scripts import fab_test_local
+    from fab_test.scripts import fab_test_local
 
     monkeypatch.setattr(
         fab_test_local,
@@ -148,7 +148,7 @@ def test_local_exit_code_is_zero_when_every_analyzer_is_skipped(tmp_path, monkey
 @pytest.mark.fab_test
 def test_local_writes_run_manifest(tmp_path, monkeypatch):
     """fab-test local still writes fab-test-results/run.json."""
-    from fabric_ci_cd_dataops.scripts import fab_test_local
+    from fab_test.scripts import fab_test_local
 
     monkeypatch.setattr(
         fab_test_local,
@@ -197,7 +197,7 @@ def test_local_dry_run_exits_zero_with_no_projects(tmp_path):
 @pytest.mark.fab_test
 def test_local_dry_run_plan_lists_projects_and_ready_analyzers(tmp_path, monkeypatch):
     """The plan lists which projects were discovered and which analyzers would run."""
-    from fabric_ci_cd_dataops.scripts import fab_test_local
+    from fab_test.scripts import fab_test_local
 
     _write_pbip_project(tmp_path, "SampleModel")
     monkeypatch.setattr(
@@ -218,7 +218,7 @@ def test_local_dry_run_plan_lists_projects_and_ready_analyzers(tmp_path, monkeyp
 @pytest.mark.fab_test
 def test_local_dry_run_emits_single_json_plan(tmp_path, monkeypatch, capsys):
     """--format json emits exactly one JSON document describing the plan."""
-    from fabric_ci_cd_dataops.scripts import fab_test_local
+    from fab_test.scripts import fab_test_local
 
     _write_pbip_project(tmp_path, "SampleModel")
 
@@ -251,7 +251,7 @@ def test_local_dry_run_emits_single_json_plan(tmp_path, monkeypatch, capsys):
 @pytest.mark.fab_test
 def test_local_dry_run_never_spawns_a_subprocess(tmp_path, monkeypatch):
     """--dry-run never spawns a subprocess for any analyzer."""
-    from fabric_ci_cd_dataops.scripts import fab_test_execution, fab_test_local
+    from fab_test.scripts import fab_test_execution, fab_test_local
 
     _write_pbip_project(tmp_path, "SampleModel")
     monkeypatch.setattr(
@@ -276,7 +276,7 @@ def test_local_dry_run_never_spawns_a_subprocess(tmp_path, monkeypatch):
 @pytest.mark.fab_test
 def test_local_dry_run_never_detects_desktop_instances(tmp_path, monkeypatch):
     """--dry-run never touches Desktop detection."""
-    from fabric_ci_cd_dataops.scripts import fab_test_registry
+    from fab_test.scripts import fab_test_registry
 
     _write_pbip_project(tmp_path, "SampleModel")
 

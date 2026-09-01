@@ -20,7 +20,7 @@ from unittest import mock
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts.invoke_tabular_editor_bpa import run_bpa
+from fab_test.scripts.invoke_tabular_editor_bpa import run_bpa
 
 _TRX = (
     '<?xml version="1.0" encoding="utf-8"?>\n'
@@ -102,7 +102,7 @@ def _run(tmp_path: Path, trx: str):
         output_path = str(output)
         native_output_path = str(native_out)
 
-    with mock.patch("fabric_ci_cd_dataops.scripts._analyzer_process.subprocess.run") as mock_run:
+    with mock.patch("fab_test.scripts._analyzer_process.subprocess.run") as mock_run:
         mock_run.return_value = mock.Mock(returncode=0, stdout="", stderr="")
         exit_code = run_bpa(Args())
     return exit_code, json.loads(output.read_text(encoding="utf-8"))

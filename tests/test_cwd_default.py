@@ -34,7 +34,7 @@ def _run(args: list[str], cwd: Path) -> subprocess.CompletedProcess:
     env = {**os.environ, "PYTHONPATH": str(_ROOT / "src"), "PYTHONIOENCODING": "utf-8"}
     env.pop("GITHUB_WORKSPACE", None)
     return subprocess.run(
-        [sys.executable, "-m", "fabric_ci_cd_dataops.scripts.fab_test", *args],
+        [sys.executable, "-m", "fab_test.scripts.fab_test", *args],
         cwd=cwd,
         env=env,
         check=False,

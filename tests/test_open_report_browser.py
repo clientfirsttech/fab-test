@@ -12,8 +12,8 @@ is invoked.
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts import _report_html
-from fabric_ci_cd_dataops.scripts._report_html import open_report_in_browser
+from fab_test.scripts import _report_html
+from fab_test.scripts._report_html import open_report_in_browser
 
 
 @pytest.mark.fab_test

@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts.playwright_validation.service_client import (
+from fab_test.scripts.playwright_validation.service_client import (
     FabricRestClient,
     FabricToken,
     ServiceClientError,
@@ -38,7 +38,7 @@ def test_list_items_filters_by_type(client: FabricRestClient) -> None:
         ]
     }
     with patch(
-        "fabric_ci_cd_dataops.scripts.playwright_validation.service_client.requests.request",
+        "fab_test.scripts.playwright_validation.service_client.requests.request",
         return_value=_mock_response(data),
     ):
         items = client.list_items("ws-1", "Report")
@@ -57,7 +57,7 @@ def test_get_report_pages_returns_normalized_ids(client: FabricRestClient) -> No
         ]
     }
     with patch(
-        "fabric_ci_cd_dataops.scripts.playwright_validation.service_client.requests.request",
+        "fab_test.scripts.playwright_validation.service_client.requests.request",
         return_value=_mock_response(data),
     ):
         pages = client.get_report_pages("ws-1", "rpt-1")
@@ -99,7 +99,7 @@ def test_get_report_bookmarks_parses_flat_definition(client: FabricRestClient) -
         }
     }
     with patch(
-        "fabric_ci_cd_dataops.scripts.playwright_validation.service_client.requests.request",
+        "fab_test.scripts.playwright_validation.service_client.requests.request",
         return_value=_mock_response(data),
     ):
         bookmarks = client.get_report_bookmarks("ws-1", "rpt-1")
@@ -145,7 +145,7 @@ def test_get_report_bookmarks_expands_a_group_into_its_children(
         }
     }
     with patch(
-        "fabric_ci_cd_dataops.scripts.playwright_validation.service_client.requests.request",
+        "fab_test.scripts.playwright_validation.service_client.requests.request",
         return_value=_mock_response(data),
     ):
         bookmarks = client.get_report_bookmarks("ws-1", "rpt-1")
@@ -187,7 +187,7 @@ def test_get_report_bookmarks_parses_pbir_bookmark_files(
         }
     }
     with patch(
-        "fabric_ci_cd_dataops.scripts.playwright_validation.service_client.requests.request",
+        "fab_test.scripts.playwright_validation.service_client.requests.request",
         return_value=_mock_response(data),
     ):
         bookmarks = client.get_report_bookmarks("ws-1", "rpt-1")
@@ -227,7 +227,7 @@ def test_get_report_bookmarks_parses_a_bom_prefixed_pbir_bookmark_file(
         }
     }
     with patch(
-        "fabric_ci_cd_dataops.scripts.playwright_validation.service_client.requests.request",
+        "fab_test.scripts.playwright_validation.service_client.requests.request",
         return_value=_mock_response(data),
     ):
         bookmarks = client.get_report_bookmarks("ws-1", "rpt-1")
@@ -266,7 +266,7 @@ def test_get_report_bookmarks_skips_a_pbir_group_files_own_part(
         }
     }
     with patch(
-        "fabric_ci_cd_dataops.scripts.playwright_validation.service_client.requests.request",
+        "fab_test.scripts.playwright_validation.service_client.requests.request",
         return_value=_mock_response(data),
     ):
         bookmarks = client.get_report_bookmarks("ws-1", "rpt-1")
@@ -290,7 +290,7 @@ def test_get_semantic_model_roles_reads_role_file_names(
         }
     }
     with patch(
-        "fabric_ci_cd_dataops.scripts.playwright_validation.service_client.requests.request",
+        "fab_test.scripts.playwright_validation.service_client.requests.request",
         return_value=_mock_response(data),
     ):
         roles = client.get_semantic_model_roles("ws-1", "sm-1")
@@ -309,7 +309,7 @@ def test_get_report_bookmarks_calls_the_fabric_getdefinition_endpoint(
     report (masked because the caller only treats a 404 as "no bookmarks")."""
     data = {"definition": {"parts": []}}
     with patch(
-        "fabric_ci_cd_dataops.scripts.playwright_validation.service_client.requests.request",
+        "fab_test.scripts.playwright_validation.service_client.requests.request",
         return_value=_mock_response(data),
     ) as mock_request:
         client.get_report_bookmarks("ws-1", "rpt-1")
@@ -354,15 +354,15 @@ def test_request_polls_a_long_running_operation_to_completion(
 
     with (
         patch(
-            "fabric_ci_cd_dataops.scripts.playwright_validation.service_client.requests.request",
+            "fab_test.scripts.playwright_validation.service_client.requests.request",
             return_value=accepted,
         ),
         patch(
-            "fabric_ci_cd_dataops.scripts.playwright_validation.service_client.requests.get",
+            "fab_test.scripts.playwright_validation.service_client.requests.get",
             side_effect=[running, succeeded, result],
         ) as mock_get,
         patch(
-            "fabric_ci_cd_dataops.scripts.playwright_validation.service_client.time.sleep"
+            "fab_test.scripts.playwright_validation.service_client.time.sleep"
         ),
     ):
         data = client.get_report_bookmarks("ws-1", "rpt-1")
@@ -392,15 +392,15 @@ def test_request_raises_when_long_running_operation_fails(
 
     with (
         patch(
-            "fabric_ci_cd_dataops.scripts.playwright_validation.service_client.requests.request",
+            "fab_test.scripts.playwright_validation.service_client.requests.request",
             return_value=accepted,
         ),
         patch(
-            "fabric_ci_cd_dataops.scripts.playwright_validation.service_client.requests.get",
+            "fab_test.scripts.playwright_validation.service_client.requests.get",
             return_value=failed,
         ),
         patch(
-            "fabric_ci_cd_dataops.scripts.playwright_validation.service_client.time.sleep"
+            "fab_test.scripts.playwright_validation.service_client.time.sleep"
         ),
         pytest.raises(ServiceClientError, match="boom"),
     ):
@@ -412,7 +412,7 @@ def test_get_semantic_model_roles_returns_empty_on_404(
 ) -> None:
     """A semantic model with no PBIP definition yields no roles, not an error."""
     with patch(
-        "fabric_ci_cd_dataops.scripts.playwright_validation.service_client.requests.request",
+        "fab_test.scripts.playwright_validation.service_client.requests.request",
         return_value=_mock_response({}, status_code=404),
     ):
         roles = client.get_semantic_model_roles("ws-1", "sm-1")
@@ -424,7 +424,7 @@ def test_get_report_bookmarks_returns_empty_on_404(client: FabricRestClient) -> 
     """A report with no PBIR definition yields no bookmarks, not an error --
     pages and roles are still worth testing without it."""
     with patch(
-        "fabric_ci_cd_dataops.scripts.playwright_validation.service_client.requests.request",
+        "fab_test.scripts.playwright_validation.service_client.requests.request",
         return_value=_mock_response({}, status_code=404),
     ):
         bookmarks = client.get_report_bookmarks("ws-1", "rpt-1")
@@ -444,7 +444,7 @@ def test_get_dependent_reports_returns_reports(client: FabricRestClient) -> None
         ]
     }
     with patch(
-        "fabric_ci_cd_dataops.scripts.playwright_validation.service_client.requests.request",
+        "fab_test.scripts.playwright_validation.service_client.requests.request",
         return_value=_mock_response(data),
     ):
         reports = client.get_dependent_reports("ws-1", "sm-1")
@@ -457,7 +457,7 @@ def test_get_dependent_reports_returns_reports(client: FabricRestClient) -> None
 def test_request_raises_on_http_error(client: FabricRestClient) -> None:
     """HTTP errors are raised as ServiceClientError with status and body."""
     with patch(
-        "fabric_ci_cd_dataops.scripts.playwright_validation.service_client.requests.request",
+        "fab_test.scripts.playwright_validation.service_client.requests.request",
         return_value=_mock_response({}, status_code=401),
     ), pytest.raises(ServiceClientError) as exc_info:
         client.list_items("ws-1", "Report")

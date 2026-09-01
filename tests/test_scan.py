@@ -16,13 +16,13 @@ from pathlib import Path
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts._scan import (
+from fab_test.scripts._scan import (
     EXCLUDED_DIR_NAMES,
     find_artifact_dirs,
     find_rdl_files,
     scan,
 )
-from fabric_ci_cd_dataops.scripts.fab_test import RESULTS_ROOT
+from fab_test.scripts.fab_test import RESULTS_ROOT
 
 SUFFIXES = (".SemanticModel", ".Report")
 

@@ -35,9 +35,12 @@ TEST_HARD = 900
 # test_the_ceiling_is_not_left_slack_after_a_cleanup in
 # test_complexity_budget.py.
 EXEMPTIONS: dict[str, tuple[int, str]] = {
-    "src/fabric_ci_cd_dataops/scripts/fab_test_parser.py": (
-        1039,
+    "src/fab_test/scripts/fab_test_parser.py": (
+        1050,
         (
+            "2026-08-31: +11 lines adding a `name` positional and --list to "
+            "the skill subparser, so `fab-test skill` can list known skills "
+            "and print one by name (fab-test Skill Listing). "
             "2026-08-31: +12 lines adding --report-parameters to the "
             "playwright subparser, an internal override for the JSON list "
             "of report parameters otherwise derived from a local .rdl "
@@ -78,7 +81,7 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
             "Report Flag epic, Task 1)."
         ),
     ),
-    "src/fabric_ci_cd_dataops/scripts/fab_test_summary.py": (
+    "src/fab_test/scripts/fab_test_summary.py": (
         883,
         (
             "2026-08-23: 12 lines over hard, from unrelated feature work landing "
@@ -93,7 +96,7 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
             "shrinkage, since the decision logic itself is unchanged)."
         ),
     ),
-    "src/fabric_ci_cd_dataops/scripts/fab_test_registry.py": (
+    "src/fab_test/scripts/fab_test_registry.py": (
         977,
         (
             "2026-08-31: +28 lines adding _report_parameters_for_command, "
@@ -143,7 +146,7 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
             "when explicitly set on the outer CLI."
         ),
     ),
-    "src/fabric_ci_cd_dataops/scripts/invoke_playwright.py": (
+    "src/fab_test/scripts/invoke_playwright.py": (
         920,
         (
             "2026-08-31: +11 lines adding --report-parameters and threading "

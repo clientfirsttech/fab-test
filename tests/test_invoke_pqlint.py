@@ -10,8 +10,8 @@ import pytest
 pytestmark = [pytest.mark.pql_lint, pytest.mark.analyzers]
 
 
-from fabric_ci_cd_dataops.scripts._analyzer_envelope import ENVELOPE_REQUIRED_KEYS
-from fabric_ci_cd_dataops.scripts.invoke_pqlint import (
+from fab_test.scripts._analyzer_envelope import ENVELOPE_REQUIRED_KEYS
+from fab_test.scripts.invoke_pqlint import (
     build_command,
     log,
     main,
@@ -110,7 +110,7 @@ class TestWriteResults:
 class TestVerbosity:
     """Tests for ANALYZER_VERBOSITY handling in run_pqlint."""
 
-    @mock.patch("fabric_ci_cd_dataops.scripts.invoke_pqlint.subprocess.run")
+    @mock.patch("fab_test.scripts.invoke_pqlint.subprocess.run")
     def test_summary_suppresses_header(self, mock_run, tmp_path: Path, monkeypatch, capsys):
         """Given ANALYZER_VERBOSITY=summary, wrapper prints no pqlint header."""
         monkeypatch.setenv("ANALYZER_VERBOSITY", "summary")
@@ -129,7 +129,7 @@ class TestVerbosity:
         assert exit_code == 0
         assert "pqlint" not in captured.out.lower()
 
-    @mock.patch("fabric_ci_cd_dataops.scripts.invoke_pqlint.subprocess.run")
+    @mock.patch("fab_test.scripts.invoke_pqlint.subprocess.run")
     def test_debug_includes_command(self, mock_run, tmp_path: Path, monkeypatch, capsys):
         """Given ANALYZER_VERBOSITY=debug, wrapper prints the executed command."""
         monkeypatch.setenv("ANALYZER_VERBOSITY", "debug")
@@ -153,7 +153,7 @@ class TestVerbosity:
 class TestRunPqlint:
     """Tests for run_pqlint entry function."""
 
-    @mock.patch("fabric_ci_cd_dataops.scripts.invoke_pqlint.subprocess.run")
+    @mock.patch("fab_test.scripts.invoke_pqlint.subprocess.run")
     def test_run_passes_no_findings(self, mock_run, tmp_path: Path):
         """Successful execution creates a passed result."""
         artifact = tmp_path / "SalesModel.SemanticModel"
@@ -172,7 +172,7 @@ class TestRunPqlint:
         assert data["status"] == "passed"
         assert data["findings"] == []
 
-    @mock.patch("fabric_ci_cd_dataops.scripts.invoke_pqlint.subprocess.run")
+    @mock.patch("fab_test.scripts.invoke_pqlint.subprocess.run")
     def test_run_fails_with_findings(self, mock_run, tmp_path: Path):
         """Failed execution writes a failed result with findings."""
         artifact = tmp_path / "SalesModel.SemanticModel"
@@ -191,7 +191,7 @@ class TestRunPqlint:
         assert data["status"] == "failed"
         assert len(data["findings"]) == 1
 
-    @mock.patch("fabric_ci_cd_dataops.scripts.invoke_pqlint.subprocess.run")
+    @mock.patch("fab_test.scripts.invoke_pqlint.subprocess.run")
     def test_run_timeout(self, mock_run, tmp_path: Path):
         """A pqlint subprocess timeout writes a timeout envelope and exits 1."""
         import subprocess
@@ -211,7 +211,7 @@ class TestRunPqlint:
         data = json.loads(output.read_text(encoding="utf-8"))
         assert data["status"] == "timeout"
 
-    @mock.patch("fabric_ci_cd_dataops.scripts.invoke_pqlint.subprocess.run")
+    @mock.patch("fab_test.scripts.invoke_pqlint.subprocess.run")
     def test_run_missing_binary(self, mock_run, tmp_path: Path):
         """A missing pqlint executable writes an error envelope and exits 1."""
         artifact = tmp_path / "SalesModel.SemanticModel"
@@ -230,7 +230,7 @@ class TestRunPqlint:
         assert data["status"] == "error"
         assert "not found" in data["message"]
 
-    @mock.patch("fabric_ci_cd_dataops.scripts.invoke_pqlint.subprocess.run")
+    @mock.patch("fab_test.scripts.invoke_pqlint.subprocess.run")
     def test_run_unexpected_exception(self, mock_run, tmp_path: Path):
         """An unexpected exception is named in the error envelope rather than escaping."""
         artifact = tmp_path / "SalesModel.SemanticModel"
@@ -262,7 +262,7 @@ class TestMain:
             sys, "argv",
             ["invoke_pqlint.py", "--artifact-path", str(artifact), "--output-path", str(output)],
         )
-        with mock.patch("fabric_ci_cd_dataops.scripts.invoke_pqlint.subprocess.run") as mock_run:
+        with mock.patch("fab_test.scripts.invoke_pqlint.subprocess.run") as mock_run:
             mock_run.return_value = mock.Mock(returncode=0, stdout='{"findings": []}', stderr="")
             with pytest.raises(SystemExit) as exc_info:
                 main()

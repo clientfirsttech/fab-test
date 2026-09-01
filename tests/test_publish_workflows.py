@@ -258,6 +258,6 @@ def test_a_wheel_carrying_repository_internals_is_refused():
 def test_a_wheel_with_everything_required_and_nothing_forbidden_passes():
     """The shape the build actually produces."""
     checker = _load_script("check_wheel_contents.py")
-    names = [*checker.REQUIRED, "fabric_ci_cd_dataops/scripts/fab_test.py"]
+    names = [*checker.REQUIRED, "fab_test/scripts/fab_test.py"]
 
     assert checker.wheel_problems(names) == []

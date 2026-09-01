@@ -19,7 +19,7 @@ import subprocess
 import tomllib
 from pathlib import Path
 
-from fabric_ci_cd_dataops.scripts.invoke_playwright import (
+from fab_test.scripts.invoke_playwright import (
     _XDIST_MAX_WORKERS,
     _resolve_max_workers,
     _resolve_xdist_workers,
@@ -93,7 +93,7 @@ class TestRunPytestXdistArgs:
             return subprocess.CompletedProcess(args=command, returncode=0, stdout="", stderr="")
 
         monkeypatch.setattr(
-            "fabric_ci_cd_dataops.scripts.invoke_playwright._stream_subprocess",
+            "fab_test.scripts.invoke_playwright._stream_subprocess",
             _fake_stream_subprocess,
         )
         return captured
@@ -151,7 +151,7 @@ class TestBuildPlaywrightCommandForwardsWorkers:
     def test_explicit_workers_is_forwarded(self, tmp_path: Path) -> None:
         import argparse
 
-        from fabric_ci_cd_dataops.scripts.fab_test_registry import build_playwright_command
+        from fab_test.scripts.fab_test_registry import build_playwright_command
 
         artifact = tmp_path / "Sales.Report"
         artifact.mkdir()
@@ -170,7 +170,7 @@ class TestBuildPlaywrightCommandForwardsWorkers:
         PLAYWRIGHT_XDIST_WORKERS/the packaged default on its own."""
         import argparse
 
-        from fabric_ci_cd_dataops.scripts.fab_test_registry import build_playwright_command
+        from fab_test.scripts.fab_test_registry import build_playwright_command
 
         artifact = tmp_path / "Sales.Report"
         artifact.mkdir()

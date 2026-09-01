@@ -13,8 +13,8 @@ from pathlib import Path
 
 import pytest
 
-from fabric_ci_cd_dataops import __version__ as fab_test_version
-from fabric_ci_cd_dataops.scripts.fab_test import (
+from fab_test import __version__ as fab_test_version
+from fab_test.scripts.fab_test import (
     _build_telemetry_payload,
     _detect_origin,
     _git_context,
@@ -32,7 +32,7 @@ from tests.conftest import _clear_github_env, _fake_git_run
 @pytest.mark.fab_test
 def test_git_context_prefers_github_env_vars(monkeypatch):
     """GitHub Actions env vars are used as-is when present."""
-    from fabric_ci_cd_dataops.scripts import _git_context as _git_context_module
+    from fab_test.scripts import _git_context as _git_context_module
 
     monkeypatch.setenv("GITHUB_REPOSITORY", "kerski/fab-test")
     monkeypatch.setenv("GITHUB_REF_NAME", "main")
@@ -58,7 +58,7 @@ def test_git_context_prefers_github_env_vars(monkeypatch):
 @pytest.mark.fab_test
 def test_git_context_falls_back_to_local_git_branch_and_commit(monkeypatch):
     """Outside GitHub Actions, branch and commit come from local git."""
-    from fabric_ci_cd_dataops.scripts import _git_context as _git_context_module
+    from fab_test.scripts import _git_context as _git_context_module
 
     _clear_github_env(monkeypatch)
     monkeypatch.setattr(
@@ -81,7 +81,7 @@ def test_git_context_falls_back_to_local_git_branch_and_commit(monkeypatch):
 @pytest.mark.fab_test
 def test_git_context_falls_back_to_local_git_user_email_for_actor(monkeypatch):
     """When GITHUB_ACTOR is unset, the actor falls back to git config user.email."""
-    from fabric_ci_cd_dataops.scripts import _git_context as _git_context_module
+    from fab_test.scripts import _git_context as _git_context_module
 
     _clear_github_env(monkeypatch)
     monkeypatch.setattr(
@@ -103,7 +103,7 @@ def test_git_context_falls_back_to_local_git_user_email_for_actor(monkeypatch):
 @pytest.mark.fab_test
 def test_git_context_falls_back_to_local_git_remote_for_repository_https(monkeypatch):
     """Outside GitHub Actions, repository is parsed from an HTTPS origin remote."""
-    from fabric_ci_cd_dataops.scripts import _git_context as _git_context_module
+    from fab_test.scripts import _git_context as _git_context_module
 
     _clear_github_env(monkeypatch)
     monkeypatch.setattr(
@@ -123,7 +123,7 @@ def test_git_context_falls_back_to_local_git_remote_for_repository_https(monkeyp
 @pytest.mark.fab_test
 def test_git_context_falls_back_to_local_git_remote_for_repository_ssh(monkeypatch):
     """Outside GitHub Actions, repository is parsed from an SSH origin remote."""
-    from fabric_ci_cd_dataops.scripts import _git_context as _git_context_module
+    from fab_test.scripts import _git_context as _git_context_module
 
     _clear_github_env(monkeypatch)
     monkeypatch.setattr(
@@ -143,7 +143,7 @@ def test_git_context_falls_back_to_local_git_remote_for_repository_ssh(monkeypat
 @pytest.mark.fab_test
 def test_git_context_repository_empty_when_no_origin_remote(monkeypatch):
     """No origin remote configured leaves repository empty, not crashing."""
-    from fabric_ci_cd_dataops.scripts import _git_context as _git_context_module
+    from fab_test.scripts import _git_context as _git_context_module
 
     _clear_github_env(monkeypatch)
     monkeypatch.setattr(
@@ -157,7 +157,7 @@ def test_git_context_repository_empty_when_no_origin_remote(monkeypatch):
 @pytest.mark.fab_test
 def test_git_context_repository_not_overridden_by_git_when_github_repository_set(monkeypatch):
     """GITHUB_REPOSITORY wins over the local origin remote even if both resolve."""
-    from fabric_ci_cd_dataops.scripts import _git_context as _git_context_module
+    from fab_test.scripts import _git_context as _git_context_module
 
     _clear_github_env(monkeypatch)
     monkeypatch.setenv("GITHUB_REPOSITORY", "kerski/fab-test")
@@ -176,7 +176,7 @@ def test_git_context_repository_not_overridden_by_git_when_github_repository_set
 @pytest.mark.fab_test
 def test_git_context_actor_empty_when_git_config_has_no_email(monkeypatch):
     """A git config with no user.email set leaves actor empty, not crashing."""
-    from fabric_ci_cd_dataops.scripts import _git_context as _git_context_module
+    from fab_test.scripts import _git_context as _git_context_module
 
     _clear_github_env(monkeypatch)
     monkeypatch.setattr(
@@ -192,7 +192,7 @@ def test_git_context_actor_empty_when_git_config_has_no_email(monkeypatch):
 @pytest.mark.fab_test
 def test_git_context_returns_empty_strings_when_git_is_unavailable(monkeypatch):
     """If git itself is missing, _git_context degrades to empty fields, no crash."""
-    from fabric_ci_cd_dataops.scripts import _git_context as _git_context_module
+    from fab_test.scripts import _git_context as _git_context_module
 
     _clear_github_env(monkeypatch)
     monkeypatch.setattr(
@@ -214,7 +214,7 @@ def test_git_context_returns_empty_strings_when_git_is_unavailable(monkeypatch):
 @pytest.mark.fab_test
 def test_git_context_actor_not_overridden_by_git_when_github_actor_set(monkeypatch):
     """GITHUB_ACTOR wins over the local git user.email even if both are set."""
-    from fabric_ci_cd_dataops.scripts import _git_context as _git_context_module
+    from fab_test.scripts import _git_context as _git_context_module
 
     _clear_github_env(monkeypatch)
     monkeypatch.setenv("GITHUB_ACTOR", "ci-bot")
@@ -318,7 +318,7 @@ def test_machine_context_includes_platform_python_and_fab_test_version():
 @pytest.mark.fab_test
 def test_machine_context_omits_platform_when_undetectable(monkeypatch):
     """If the OS platform can't be read, the field is omitted, not a crash."""
-    from fabric_ci_cd_dataops.scripts import fab_test_telemetry
+    from fab_test.scripts import fab_test_telemetry
 
     monkeypatch.setattr(
         fab_test_telemetry,
@@ -366,7 +366,7 @@ def test_build_telemetry_payload_records_the_actor_as_given(monkeypatch):
     paths inside the embedded `results` envelope, which the redaction never
     touched. See tests/test_telemetry_identity.py.
     """
-    from fabric_ci_cd_dataops.scripts import fab_test_telemetry
+    from fab_test.scripts import fab_test_telemetry
 
     monkeypatch.setattr(
         fab_test_telemetry, "_git_context", lambda: {"actor": "dev@example.com"}
@@ -383,7 +383,7 @@ def test_build_telemetry_payload_records_the_actor_as_given(monkeypatch):
 @pytest.mark.fab_test
 def test_build_telemetry_payload_actor_unchanged_when_not_email(monkeypatch):
     """A non-email actor (e.g. GITHUB_ACTOR) passes through unredacted."""
-    from fabric_ci_cd_dataops.scripts import fab_test_telemetry
+    from fab_test.scripts import fab_test_telemetry
 
     monkeypatch.setattr(fab_test_telemetry, "_git_context", lambda: {"actor": "ci-bot"})
     payload = _build_telemetry_payload(

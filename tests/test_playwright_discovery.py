@@ -12,20 +12,20 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts.playwright_validation.config import PlaywrightValidationConfig
-from fabric_ci_cd_dataops.scripts.playwright_validation.discovery import (
+from fab_test.scripts.playwright_validation.config import PlaywrightValidationConfig
+from fab_test.scripts.playwright_validation.discovery import (
     _discover_pages,
     _discover_roles,
     acquire_embed_configs,
     resolve_discovery,
 )
-from fabric_ci_cd_dataops.scripts.playwright_validation.power_bi_api import (
+from fab_test.scripts.playwright_validation.power_bi_api import (
     EmbedContext,
     PowerBiApiError,
 )
-from fabric_ci_cd_dataops.scripts.playwright_validation.service_client import ServiceClientError
+from fab_test.scripts.playwright_validation.service_client import ServiceClientError
 
-_DISCOVERY = "fabric_ci_cd_dataops.scripts.playwright_validation.discovery"
+_DISCOVERY = "fab_test.scripts.playwright_validation.discovery"
 
 
 def _config(**overrides) -> PlaywrightValidationConfig:

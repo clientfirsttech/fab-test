@@ -9,7 +9,7 @@ reserved for the machine-readable payload), and nowhere at all when --quiet.
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts._cli_utils import narrate
+from fab_test.scripts._cli_utils import narrate
 
 
 @pytest.mark.fab_test

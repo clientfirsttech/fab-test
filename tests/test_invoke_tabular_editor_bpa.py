@@ -8,9 +8,9 @@ from unittest import mock
 
 import pytest
 
-import fabric_ci_cd_dataops.scripts.invoke_tabular_editor_bpa as invoke_tabular_editor_bpa
-from fabric_ci_cd_dataops.scripts._analyzer_envelope import ENVELOPE_REQUIRED_KEYS, WrapperResult
-from fabric_ci_cd_dataops.scripts.invoke_tabular_editor_bpa import (
+import fab_test.scripts.invoke_tabular_editor_bpa as invoke_tabular_editor_bpa
+from fab_test.scripts._analyzer_envelope import ENVELOPE_REQUIRED_KEYS, WrapperResult
+from fab_test.scripts.invoke_tabular_editor_bpa import (
     _format_bpa_message,
     _parse_vstest_counters,
     build_bpa_command,
@@ -114,7 +114,7 @@ class TestWriteResults:
 class TestVerbosity:
     """Tests for ANALYZER_VERBOSITY handling in run_bpa."""
 
-    @mock.patch("fabric_ci_cd_dataops.scripts._analyzer_process.subprocess.run")
+    @mock.patch("fab_test.scripts._analyzer_process.subprocess.run")
     def test_summary_suppresses_per_artifact_output(
         self, mock_run, tmp_path: Path, monkeypatch, capsys
     ):
@@ -143,7 +143,7 @@ class TestVerbosity:
         assert exit_code == 0
         assert "Tabular Editor BPA" not in captured.out
 
-    @mock.patch("fabric_ci_cd_dataops.scripts._analyzer_process.subprocess.run")
+    @mock.patch("fab_test.scripts._analyzer_process.subprocess.run")
     def test_debug_includes_command(
         self, mock_run, tmp_path: Path, monkeypatch, capsys
     ):
@@ -176,7 +176,7 @@ class TestVerbosity:
         assert "TabularEditor.exe" in captured.out
         assert "debug stdout" in captured.out
 
-    @mock.patch("fabric_ci_cd_dataops.scripts._analyzer_process.subprocess.run")
+    @mock.patch("fab_test.scripts._analyzer_process.subprocess.run")
     def test_verbosity_does_not_change_envelope(
         self, mock_run, tmp_path: Path, monkeypatch
     ):
@@ -314,7 +314,7 @@ class TestRunBpa:
 
 
 
-    @mock.patch("fabric_ci_cd_dataops.scripts._analyzer_process.subprocess.run")
+    @mock.patch("fab_test.scripts._analyzer_process.subprocess.run")
     def test_run_passes_no_findings(self, mock_run, tmp_path: Path):
         """Tool exits 0 and output file parses as empty findings."""
         tmdl = tmp_path / "SalesModel.SemanticModel"
@@ -343,7 +343,7 @@ class TestRunBpa:
         # Envelope must contain every required key.
         missing = ENVELOPE_REQUIRED_KEYS - data.keys()
         assert not missing, f"Envelope missing keys: {missing}"
-    @mock.patch("fabric_ci_cd_dataops.scripts._analyzer_process.subprocess.run")
+    @mock.patch("fab_test.scripts._analyzer_process.subprocess.run")
     def test_run_fails_with_findings(self, mock_run, tmp_path: Path):
         """Tool exits 0 but JSON findings with severity 3 result in failure."""
         tmdl = tmp_path / "SalesModel.SemanticModel"
@@ -373,7 +373,7 @@ class TestRunBpa:
         assert data["status"] == "failed"
         assert len(data["findings"]) == 1
 
-    @mock.patch("fabric_ci_cd_dataops.scripts._analyzer_process.subprocess.run")
+    @mock.patch("fab_test.scripts._analyzer_process.subprocess.run")
     def test_run_warns_with_vstest_xml(self, mock_run, tmp_path: Path):
         """VSTest XML output from TE2 -T flag is parsed into per-object findings.
         Severities <= 2 warn but do not fail the executable."""
@@ -450,7 +450,7 @@ class TestRunBpa:
         assert "[Profit Margin]" in data["findings"][1]["ObjectName"]
         assert data["findings"][0]["Category"] == "Maintenance"
 
-    @mock.patch("fabric_ci_cd_dataops.scripts._analyzer_process.subprocess.run")
+    @mock.patch("fab_test.scripts._analyzer_process.subprocess.run")
     def test_severity_3_fails_build(self, mock_run, tmp_path: Path):
         """Severity 3 findings fail the build (exit 1, status failed)."""
         tmdl = tmp_path / "SalesModel.SemanticModel"
@@ -480,7 +480,7 @@ class TestRunBpa:
         data = json.loads(output.read_text(encoding="utf-8"))
         assert data["status"] == "failed"
 
-    @mock.patch("fabric_ci_cd_dataops.scripts._analyzer_process.subprocess.run")
+    @mock.patch("fab_test.scripts._analyzer_process.subprocess.run")
     def test_severity_2_warns_but_passes(self, mock_run, tmp_path: Path):
         """Severity 2 findings warn but do not fail the executable (exit 0)."""
         tmdl = tmp_path / "SalesModel.SemanticModel"
@@ -510,7 +510,7 @@ class TestRunBpa:
         data = json.loads(output.read_text(encoding="utf-8"))
         assert data["status"] == "warning"
 
-    @mock.patch("fabric_ci_cd_dataops.scripts._analyzer_process.subprocess.run")
+    @mock.patch("fab_test.scripts._analyzer_process.subprocess.run")
     def test_mixed_severities_fails_on_max(self, mock_run, tmp_path: Path):
         """Mixed severities fail if any finding is severity 3 or higher."""
         tmdl = tmp_path / "SalesModel.SemanticModel"
@@ -543,7 +543,7 @@ class TestRunBpa:
         data = json.loads(output.read_text(encoding="utf-8"))
         assert data["status"] == "failed"
 
-    @mock.patch("fabric_ci_cd_dataops.scripts._analyzer_process.subprocess.run")
+    @mock.patch("fab_test.scripts._analyzer_process.subprocess.run")
     def test_run_warns_with_low_severity_findings(self, mock_run, tmp_path: Path):
         """Findings with severity <= 2 produce warning status and exit 0."""
         tmdl = tmp_path / "SalesModel.SemanticModel"
@@ -572,7 +572,7 @@ class TestRunBpa:
         assert data["status"] == "warning"
         assert len(data["findings"]) == 1
 
-    @mock.patch("fabric_ci_cd_dataops.scripts._analyzer_process.subprocess.run")
+    @mock.patch("fab_test.scripts._analyzer_process.subprocess.run")
     def test_run_fails_via_exit_code_fallback(self, mock_run, tmp_path: Path):
         """When TE2 exits non-zero and writes no native output file, findings
         are synthesized from the exit code. Unknown severity is treated as error
@@ -605,7 +605,7 @@ class TestRunBpa:
         assert data["findings"][0]["RuleName"] == "BPA violation"
         assert data["findings"][0]["count"] == 3
 
-    @mock.patch("fabric_ci_cd_dataops.scripts._analyzer_process.subprocess.run")
+    @mock.patch("fab_test.scripts._analyzer_process.subprocess.run")
     def test_run_timeout(self, mock_run, tmp_path: Path):
         """Timeout is handled gracefully."""
         tmdl = tmp_path / "SalesModel.SemanticModel"
@@ -630,7 +630,7 @@ class TestRunBpa:
         data = json.loads(output.read_text(encoding="utf-8"))
         assert data["status"] == "timeout"
 
-    @mock.patch("fabric_ci_cd_dataops.scripts._analyzer_process.subprocess.run")
+    @mock.patch("fab_test.scripts._analyzer_process.subprocess.run")
     def test_run_missing_executable(self, mock_run, tmp_path: Path):
         """Missing executable is handled gracefully."""
         tmdl = tmp_path / "SalesModel.SemanticModel"
@@ -690,7 +690,7 @@ class TestSeverityThreshold:
         """The module exposes a threshold of 3 for error-level findings."""
         assert invoke_tabular_editor_bpa.BPA_ERROR_SEVERITY_THRESHOLD == 3
 
-    @mock.patch("fabric_ci_cd_dataops.scripts._analyzer_process.subprocess.run")
+    @mock.patch("fab_test.scripts._analyzer_process.subprocess.run")
     def test_threshold_severity_fails_build(self, mock_run, tmp_path: Path):
         """Severity equal to the threshold fails the build."""
         tmdl = tmp_path / "SalesModel.SemanticModel"
@@ -729,7 +729,7 @@ class TestSeverityThreshold:
         data = json.loads(output.read_text(encoding="utf-8"))
         assert data["status"] == "failed"
 
-    @mock.patch("fabric_ci_cd_dataops.scripts._analyzer_process.subprocess.run")
+    @mock.patch("fab_test.scripts._analyzer_process.subprocess.run")
     def test_below_threshold_severity_warns(self, mock_run, tmp_path: Path):
         """Severity one below the threshold warns but does not fail."""
         tmdl = tmp_path / "SalesModel.SemanticModel"
@@ -797,7 +797,7 @@ class TestMain:
         # main() calls run_bpa via LOAD_GLOBAL in the module's namespace.
         # Replacing the module-level binding in sys.modules is the most
         # reliable way to intercept that call during testing.
-        module = sys.modules["fabric_ci_cd_dataops.scripts.invoke_tabular_editor_bpa"]
+        module = sys.modules["fab_test.scripts.invoke_tabular_editor_bpa"]
         original_run_bpa = module.run_bpa
         module.run_bpa = lambda args: 42
         try:

@@ -21,11 +21,11 @@ from pathlib import Path
 import pytest
 from packaging.version import InvalidVersion, Version
 
-from fabric_ci_cd_dataops import __version__
+from fab_test import __version__
 
 _ROOT = Path(__file__).resolve().parent.parent
 _DISTRIBUTION = "fab-test"
-_VERSION_ATTR = "fabric_ci_cd_dataops.__version__"
+_VERSION_ATTR = "fab_test.__version__"
 
 
 @pytest.fixture(scope="module")

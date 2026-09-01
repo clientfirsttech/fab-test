@@ -12,12 +12,12 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-from fabric_ci_cd_dataops.scripts.invoke_playwright import (
+from fab_test.scripts.invoke_playwright import (
     _build_config_from_args,
     parse_args,
 )
-from fabric_ci_cd_dataops.scripts.playwright_validation.config import PlaywrightValidationConfig
-from fabric_ci_cd_dataops.scripts.playwright_validation.resolver import (
+from fab_test.scripts.playwright_validation.config import PlaywrightValidationConfig
+from fab_test.scripts.playwright_validation.resolver import (
     ResolvedEnvironment,
     ResolvedReport,
 )
@@ -59,22 +59,22 @@ def test_dataset_workspace_id_flag_is_resolved_as_a_display_name() -> None:
 
     with (
         patch(
-            "fabric_ci_cd_dataops.scripts.invoke_playwright.load_config",
+            "fab_test.scripts.invoke_playwright.load_config",
             return_value=_base_config(),
         ),
         patch(
-            "fabric_ci_cd_dataops.scripts.invoke_playwright.resolve_environment"
+            "fab_test.scripts.invoke_playwright.resolve_environment"
         ) as mock_env,
         patch(
-            "fabric_ci_cd_dataops.scripts.invoke_playwright.resolve_report",
+            "fab_test.scripts.invoke_playwright.resolve_report",
             return_value=resolved,
         ),
         patch(
-            "fabric_ci_cd_dataops.scripts.invoke_playwright.build_fabric_service_client",
+            "fab_test.scripts.invoke_playwright.build_fabric_service_client",
             return_value=client,
         ),
         patch(
-            "fabric_ci_cd_dataops.scripts.invoke_playwright.resolve_workspace_id",
+            "fab_test.scripts.invoke_playwright.resolve_workspace_id",
             return_value="ws-dataset-resolved",
         ) as mock_resolve_workspace,
     ):
@@ -111,22 +111,22 @@ def test_dataset_workspace_id_stays_empty_when_never_given() -> None:
 
     with (
         patch(
-            "fabric_ci_cd_dataops.scripts.invoke_playwright.load_config",
+            "fab_test.scripts.invoke_playwright.load_config",
             return_value=_base_config(),
         ),
         patch(
-            "fabric_ci_cd_dataops.scripts.invoke_playwright.resolve_environment"
+            "fab_test.scripts.invoke_playwright.resolve_environment"
         ) as mock_env,
         patch(
-            "fabric_ci_cd_dataops.scripts.invoke_playwright.resolve_report",
+            "fab_test.scripts.invoke_playwright.resolve_report",
             return_value=resolved,
         ),
         patch(
-            "fabric_ci_cd_dataops.scripts.invoke_playwright.build_fabric_service_client",
+            "fab_test.scripts.invoke_playwright.build_fabric_service_client",
             return_value=client,
         ),
         patch(
-            "fabric_ci_cd_dataops.scripts.invoke_playwright.resolve_workspace_id"
+            "fab_test.scripts.invoke_playwright.resolve_workspace_id"
         ) as mock_resolve_workspace,
     ):
         mock_env.return_value = ResolvedEnvironment(

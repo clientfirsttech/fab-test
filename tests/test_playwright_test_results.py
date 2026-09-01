@@ -23,9 +23,9 @@ from unittest.mock import patch
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts.invoke_playwright import main
-from fabric_ci_cd_dataops.scripts.playwright_validation.config import PlaywrightValidationConfig
-from fabric_ci_cd_dataops.scripts.playwright_validation.power_bi_api import EmbedContext
+from fab_test.scripts.invoke_playwright import main
+from fab_test.scripts.playwright_validation.config import PlaywrightValidationConfig
+from fab_test.scripts.playwright_validation.power_bi_api import EmbedContext
 
 pytestmark = pytest.mark.playwright
 
@@ -74,19 +74,19 @@ def _run_main(tmp_path: Path, output_path: Path, test_cases_dir: Path):
 
     with (
         patch(
-            "fabric_ci_cd_dataops.scripts.invoke_playwright.load_config",
+            "fab_test.scripts.invoke_playwright.load_config",
             return_value=_config(),
         ),
         patch(
-            "fabric_ci_cd_dataops.scripts.playwright_validation.discovery.get_embed_context",
+            "fab_test.scripts.playwright_validation.discovery.get_embed_context",
             return_value=embed_context,
         ),
         patch(
-            "fabric_ci_cd_dataops.scripts.invoke_playwright._run_pytest",
+            "fab_test.scripts.invoke_playwright._run_pytest",
             return_value=completed,
         ),
         patch(
-            "fabric_ci_cd_dataops.scripts.invoke_playwright._repo_root",
+            "fab_test.scripts.invoke_playwright._repo_root",
             return_value=tmp_path,
         ),
     ):

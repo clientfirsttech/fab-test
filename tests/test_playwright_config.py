@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts.playwright_validation.config import (
+from fab_test.scripts.playwright_validation.config import (
     PlaywrightValidationConfig,
     load_config,
 )

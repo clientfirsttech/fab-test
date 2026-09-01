@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts._desktop import (
+from fab_test.scripts._desktop import (
     DesktopInstance,
     DesktopMatchError,
     _extract_file_arg,
@@ -31,7 +31,7 @@ def _write_port_file(workspaces_root, workspace_name, port):
 @pytest.mark.fab_test
 def test_detect_returns_empty_list_on_non_windows_platform(tmp_path, monkeypatch):
     """Detection returns empty rather than failing on a non-Windows platform."""
-    from fabric_ci_cd_dataops.scripts import _desktop
+    from fab_test.scripts import _desktop
 
     monkeypatch.setattr(_desktop.platform, "system", lambda: "Linux")
     _write_port_file(tmp_path, "AnalysisServicesWorkspace_1", 12345)
@@ -42,7 +42,7 @@ def test_detect_returns_empty_list_on_non_windows_platform(tmp_path, monkeypatch
 @pytest.mark.fab_test
 def test_detect_returns_empty_list_when_workspaces_root_missing(tmp_path, monkeypatch):
     """A nonexistent workspaces root returns an empty list without raising."""
-    from fabric_ci_cd_dataops.scripts import _desktop
+    from fab_test.scripts import _desktop
 
     monkeypatch.setattr(_desktop.platform, "system", lambda: "Windows")
 
@@ -52,7 +52,7 @@ def test_detect_returns_empty_list_when_workspaces_root_missing(tmp_path, monkey
 @pytest.mark.fab_test
 def test_detect_returns_empty_list_when_no_instance_running(tmp_path, monkeypatch):
     """An existing but empty workspaces root returns an empty list."""
-    from fabric_ci_cd_dataops.scripts import _desktop
+    from fab_test.scripts import _desktop
 
     monkeypatch.setattr(_desktop.platform, "system", lambda: "Windows")
 
@@ -62,7 +62,7 @@ def test_detect_returns_empty_list_when_no_instance_running(tmp_path, monkeypatc
 @pytest.mark.fab_test
 def test_detect_returns_single_instance_with_port_and_file_path(tmp_path, monkeypatch):
     """A single running instance resolves both its port and open file path."""
-    from fabric_ci_cd_dataops.scripts import _desktop
+    from fab_test.scripts import _desktop
 
     monkeypatch.setattr(_desktop.platform, "system", lambda: "Windows")
     _write_port_file(tmp_path, "AnalysisServicesWorkspace_1", 51234)
@@ -82,7 +82,7 @@ def test_detect_returns_single_instance_with_port_and_file_path(tmp_path, monkey
 @pytest.mark.fab_test
 def test_detect_leaves_file_path_unresolved_when_multiple_instances(tmp_path, monkeypatch):
     """Multiple simultaneous instances report every port but no guessed file path."""
-    from fabric_ci_cd_dataops.scripts import _desktop
+    from fab_test.scripts import _desktop
 
     monkeypatch.setattr(_desktop.platform, "system", lambda: "Windows")
     _write_port_file(tmp_path, "AnalysisServicesWorkspace_1", 111)
@@ -97,7 +97,7 @@ def test_detect_leaves_file_path_unresolved_when_multiple_instances(tmp_path, mo
 @pytest.mark.fab_test
 def test_detect_returns_none_file_path_when_powershell_unavailable(tmp_path, monkeypatch):
     """A single instance whose command line can't be read still reports its port."""
-    from fabric_ci_cd_dataops.scripts import _desktop
+    from fab_test.scripts import _desktop
 
     monkeypatch.setattr(_desktop.platform, "system", lambda: "Windows")
     _write_port_file(tmp_path, "AnalysisServicesWorkspace_1", 999)
@@ -115,7 +115,7 @@ def test_detect_returns_none_file_path_when_powershell_unavailable(tmp_path, mon
 @pytest.mark.fab_test
 def test_detect_ignores_unreadable_port_file(tmp_path, monkeypatch):
     """A malformed port file is skipped rather than raising."""
-    from fabric_ci_cd_dataops.scripts import _desktop
+    from fab_test.scripts import _desktop
 
     monkeypatch.setattr(_desktop.platform, "system", lambda: "Windows")
     data_dir = tmp_path / "AnalysisServicesWorkspace_1" / "Data"
@@ -217,7 +217,7 @@ def test_match_ignores_instances_with_unresolved_file_path(tmp_path):
 @pytest.mark.fab_test
 def test_bridge_cli_path_returns_none_when_absent(monkeypatch):
     """No powerbi-desktop on PATH returns None, never raises."""
-    from fabric_ci_cd_dataops.scripts import _desktop
+    from fab_test.scripts import _desktop
 
     monkeypatch.setattr(_desktop.shutil, "which", lambda _name: None)
 
@@ -227,7 +227,7 @@ def test_bridge_cli_path_returns_none_when_absent(monkeypatch):
 @pytest.mark.fab_test
 def test_bridge_cli_path_returns_resolved_path_when_present(monkeypatch):
     """powerbi-desktop on PATH returns its resolved path -- never invoked."""
-    from fabric_ci_cd_dataops.scripts import _desktop
+    from fab_test.scripts import _desktop
 
     monkeypatch.setattr(
         _desktop.shutil, "which", lambda name: "/usr/local/bin/powerbi-desktop" if name == "powerbi-desktop" else None

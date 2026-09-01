@@ -10,7 +10,7 @@ import argparse
 import difflib
 import re
 
-from fabric_ci_cd_dataops import __version__ as _FAB_TEST_VERSION
+from fab_test import __version__ as _FAB_TEST_VERSION
 
 from ._config import CONFIG_FILENAME
 from ._fab_test_context import (
@@ -841,6 +841,17 @@ def _add_skill_subparser(subs: argparse._SubParsersAction) -> None:
     skill_p = subs.add_parser(
         "skill",
         help="Print fab-test's own skill resource, or install it into an agent harness",
+    )
+    skill_p.add_argument(
+        "name",
+        nargs="?",
+        default=None,
+        help="Skill name to print (default: fab-test, the only one currently packaged)",
+    )
+    skill_p.add_argument(
+        "--list",
+        action="store_true",
+        help="List available skill names with their descriptions instead of printing content",
     )
     skill_p.add_argument(
         "--install",

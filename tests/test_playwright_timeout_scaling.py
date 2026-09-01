@@ -21,10 +21,10 @@ from pathlib import Path
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts import (
+from fab_test.scripts import (
     _playwright_timeout_scaling as scaling,
 )
-from fabric_ci_cd_dataops.scripts import fab_test_execution
+from fab_test.scripts import fab_test_execution
 
 
 @pytest.mark.fab_test

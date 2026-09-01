@@ -18,7 +18,7 @@ from pathlib import Path
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts._analyzer_tool_bootstrap import (
+from fab_test.scripts._analyzer_tool_bootstrap import (
     _current_platform,
     _run_npm_build,
     probe_executable,
@@ -125,10 +125,10 @@ def test_npm_build_reuses_cache_without_rebuilding(tmp_path, monkeypatch):
         raise AssertionError("must not rebuild when the versioned cache already has a hit")
 
     monkeypatch.setattr(
-        "fabric_ci_cd_dataops.scripts._analyzer_tool_bootstrap._download", _fail_if_called
+        "fab_test.scripts._analyzer_tool_bootstrap._download", _fail_if_called
     )
     monkeypatch.setattr(
-        "fabric_ci_cd_dataops.scripts._analyzer_tool_bootstrap._run_npm_build", _fail_if_called
+        "fab_test.scripts._analyzer_tool_bootstrap._run_npm_build", _fail_if_called
     )
 
     second = resolve_executable(analyzer_name, metadata, repo_root)
@@ -211,7 +211,7 @@ def test_npm_build_reports_npm_missing_with_install_instructions(tmp_path, monke
     monkeypatch.delenv("PBIR_A11Y_PATH", raising=False)
     monkeypatch.delenv("PBIR_A11Y_INSTALL_URL", raising=False)
     monkeypatch.setattr(
-        "fabric_ci_cd_dataops.scripts._analyzer_tool_bootstrap.shutil.which", lambda _name: None
+        "fab_test.scripts._analyzer_tool_bootstrap.shutil.which", lambda _name: None
     )
 
     with pytest.raises(RuntimeError, match="npm not found on PATH"):
@@ -240,9 +240,9 @@ def test_npm_build_installs_declared_extra_dependencies(tmp_path):
         return _Result()
 
     with unittest.mock.patch(
-        "fabric_ci_cd_dataops.scripts._analyzer_tool_bootstrap.subprocess.run", _fake_run
+        "fab_test.scripts._analyzer_tool_bootstrap.subprocess.run", _fake_run
     ), unittest.mock.patch(
-        "fabric_ci_cd_dataops.scripts._analyzer_tool_bootstrap.shutil.which",
+        "fab_test.scripts._analyzer_tool_bootstrap.shutil.which",
         lambda name: f"/usr/bin/{name}",
     ):
         _run_npm_build("pbir_a11y", build_root, {"build_extra_dependencies": ["docx@^9.6.1"]})
@@ -262,7 +262,7 @@ def test_probe_executable_reports_node_missing_for_npm_build(tmp_path, monkeypat
 
     monkeypatch.delenv("PBIR_A11Y_PATH", raising=False)
     monkeypatch.setattr(
-        "fabric_ci_cd_dataops.scripts._analyzer_tool_bootstrap.shutil.which", lambda _name: None
+        "fab_test.scripts._analyzer_tool_bootstrap.shutil.which", lambda _name: None
     )
 
     result = probe_executable(analyzer_name, metadata, repo_root)
@@ -282,7 +282,7 @@ def test_probe_executable_reports_npm_missing_distinctly_from_node(tmp_path, mon
 
     monkeypatch.delenv("PBIR_A11Y_PATH", raising=False)
     monkeypatch.setattr(
-        "fabric_ci_cd_dataops.scripts._analyzer_tool_bootstrap.shutil.which",
+        "fab_test.scripts._analyzer_tool_bootstrap.shutil.which",
         lambda name: ("/usr/bin/node" if name == "node" else None),
     )
 
@@ -307,7 +307,7 @@ def test_probe_executable_reports_not_yet_built_when_toolchain_is_ready(tmp_path
 
     monkeypatch.delenv("PBIR_A11Y_PATH", raising=False)
     monkeypatch.setattr(
-        "fabric_ci_cd_dataops.scripts._analyzer_tool_bootstrap.shutil.which",
+        "fab_test.scripts._analyzer_tool_bootstrap.shutil.which",
         lambda name: f"/usr/bin/{name}",
     )
 

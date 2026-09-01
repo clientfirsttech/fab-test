@@ -28,7 +28,7 @@ import sys
 from collections.abc import Callable
 from pathlib import Path
 
-from fabric_ci_cd_dataops import __version__ as _FAB_TEST_VERSION
+from fab_test import __version__ as _FAB_TEST_VERSION
 
 from ._cli_utils import narrate
 from ._config import (

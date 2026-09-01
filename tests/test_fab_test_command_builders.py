@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts.fab_test_registry import (
+from fab_test.scripts.fab_test_registry import (
     _DEFAULT_A11Y_PATH,
     _DEFAULT_BPA_RULES,
     _DEFAULT_PBIR_RULES,
@@ -53,8 +53,8 @@ def _pbip_project_dir(tmp_path, name):
 @pytest.mark.fab_test
 def test_build_pql_test_command_adds_desktop_flags_when_instance_matches(tmp_path, monkeypatch):
     """A matched Desktop instance's port and model name are added to the command."""
-    from fabric_ci_cd_dataops.scripts import fab_test_registry
-    from fabric_ci_cd_dataops.scripts._desktop import DesktopInstance
+    from fab_test.scripts import fab_test_registry
+    from fab_test.scripts._desktop import DesktopInstance
 
     model_dir = _pbip_project_dir(tmp_path, "SampleModel")
     pbip_path = (tmp_path / "SampleModel.pbip").resolve()
@@ -76,7 +76,7 @@ def test_build_pql_test_command_adds_desktop_flags_when_instance_matches(tmp_pat
 @pytest.mark.fab_test
 def test_build_pql_test_command_skips_detection_when_workspace_id_given(tmp_path, monkeypatch):
     """--workspace-id skips Desktop detection entirely, even if a match exists."""
-    from fabric_ci_cd_dataops.scripts import fab_test_registry
+    from fab_test.scripts import fab_test_registry
 
     model_dir = _pbip_project_dir(tmp_path, "SampleModel")
 
@@ -95,7 +95,7 @@ def test_build_pql_test_command_skips_detection_when_workspace_id_given(tmp_path
 @pytest.mark.fab_test
 def test_build_pql_test_command_omits_desktop_flags_when_no_instance_running(tmp_path, monkeypatch):
     """No running Desktop instance leaves the command unchanged from today."""
-    from fabric_ci_cd_dataops.scripts import fab_test_registry
+    from fab_test.scripts import fab_test_registry
 
     model_dir = _pbip_project_dir(tmp_path, "SampleModel")
     monkeypatch.setattr(fab_test_registry, "detect_desktop_instances", list)
@@ -110,8 +110,8 @@ def test_build_pql_test_command_omits_desktop_flags_when_no_instance_running(tmp
 @pytest.mark.fab_test
 def test_build_pql_test_command_omits_desktop_flags_when_artifact_has_no_pbip(tmp_path, monkeypatch):
     """An artifact with no paired .pbip never attempts Desktop matching."""
-    from fabric_ci_cd_dataops.scripts import fab_test_registry
-    from fabric_ci_cd_dataops.scripts._desktop import DesktopInstance
+    from fab_test.scripts import fab_test_registry
+    from fab_test.scripts._desktop import DesktopInstance
 
     model_dir = tmp_path / "Orphan.SemanticModel"
     model_dir.mkdir(parents=True)

@@ -21,7 +21,7 @@ from pathlib import Path
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts._artifact_types import (
+from fab_test.scripts._artifact_types import (
     PACKAGED_ARTIFACT_MAP,
     artifact_types,
     load_artifact_map,
@@ -73,7 +73,7 @@ def test_the_packaged_copy_is_declared_as_package_data():
     import tomllib
 
     config = tomllib.loads((_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    patterns = config["tool"]["setuptools"]["package-data"]["fabric_ci_cd_dataops"]
+    patterns = config["tool"]["setuptools"]["package-data"]["fab_test"]
 
     assert any("metadata" in p for p in patterns), patterns
 

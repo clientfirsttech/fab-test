@@ -14,8 +14,8 @@ from pathlib import Path
 
 import pytest
 
-from fabric_ci_cd_dataops import __version__ as fab_test_version
-from fabric_ci_cd_dataops.scripts.fab_test_registry import build_pql_test_command
+from fab_test import __version__ as fab_test_version
+from fab_test.scripts.fab_test_registry import build_pql_test_command
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 ARTIFACT_ROOT = REPO_ROOT / ".fabric" / "artifacts"

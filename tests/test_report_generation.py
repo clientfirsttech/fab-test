@@ -20,8 +20,8 @@ import sys
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts._analyzer_envelope import EnvelopeIdentity, build_envelope
-from fabric_ci_cd_dataops.scripts._report_html import attach_report, report_enabled
+from fab_test.scripts._analyzer_envelope import EnvelopeIdentity, build_envelope
+from fab_test.scripts._report_html import attach_report, report_enabled
 
 _FINDING = {"rule": "R1", "severity": "warning", "object": "o", "message": "m"}
 
@@ -40,7 +40,7 @@ def _envelope(**overrides):
 
 def _run_cli(*argv, env=None):
     return subprocess.run(
-        [sys.executable, "-m", "fabric_ci_cd_dataops.scripts.fab_test", *argv],
+        [sys.executable, "-m", "fab_test.scripts.fab_test", *argv],
         capture_output=True,
         text=True,
         encoding="utf-8",
@@ -124,7 +124,7 @@ def test_an_upstream_report_is_never_overwritten(tmp_path, monkeypatch):
 def test_a_render_failure_never_raises(tmp_path, monkeypatch):
     """A broken report must not fail a passing build."""
     monkeypatch.setenv("ANALYZER_REPORT", "1")
-    from fabric_ci_cd_dataops.scripts import _report_html
+    from fab_test.scripts import _report_html
 
     def _boom(*args, **kwargs):
         raise RuntimeError("render exploded")
@@ -210,14 +210,14 @@ def test_a_single_analyzer_run_writes_no_index(artifact_tree):
 
 @pytest.mark.fab_test
 def test_report_is_a_valid_config_key():
-    from fabric_ci_cd_dataops.scripts._config import validate_config
+    from fab_test.scripts._config import validate_config
 
     validate_config({"report": True})
 
 
 @pytest.mark.fab_test
 def test_report_config_key_must_be_a_boolean():
-    from fabric_ci_cd_dataops.scripts._config import ConfigError, validate_config
+    from fab_test.scripts._config import ConfigError, validate_config
 
     with pytest.raises(ConfigError):
         validate_config({"report": "yes"})
@@ -228,10 +228,10 @@ def test_report_key_is_in_the_published_schema():
     """The schema and the loader's key list must not drift."""
     from pathlib import Path
 
-    import fabric_ci_cd_dataops
+    import fab_test
 
     schema_path = (
-        Path(fabric_ci_cd_dataops.__file__).parent / "schemas" / "fab-test.schema.json"
+        Path(fab_test.__file__).parent / "schemas" / "fab-test.schema.json"
     )
     schema = json.loads(schema_path.read_text(encoding="utf-8"))
 

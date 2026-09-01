@@ -17,9 +17,9 @@ import json
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
-from fabric_ci_cd_dataops.scripts._analyzer_envelope import EnvelopeIdentity, build_envelope
-from fabric_ci_cd_dataops.scripts.fab_test_summary import (
+from fab_test.scripts import fab_test as fab_test_module
+from fab_test.scripts._analyzer_envelope import EnvelopeIdentity, build_envelope
+from fab_test.scripts.fab_test_summary import (
     _artifact_status,
     build_all_summary_rows,
 )

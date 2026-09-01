@@ -12,7 +12,7 @@ import json
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts._pbip_discovery import discover_pbip_projects
+from fab_test.scripts._pbip_discovery import discover_pbip_projects
 
 
 def _write_pbip(root, name, report_relpath):

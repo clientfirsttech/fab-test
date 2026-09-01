@@ -10,11 +10,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fabric_ci_cd_dataops.scripts.invoke_playwright import (
+from fab_test.scripts.invoke_playwright import (
     _report_deep_link,
     _test_results_rows,
 )
-from fabric_ci_cd_dataops.scripts.playwright_validation.test_cases import TestCase
+from fab_test.scripts.playwright_validation.test_cases import TestCase
 
 
 def test_report_deep_link_is_empty_for_a_paginated_case() -> None:

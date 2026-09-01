@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fabric_ci_cd_dataops.scripts.playwright_validation.rdl_datasource import (
+from fab_test.scripts.playwright_validation.rdl_datasource import (
     RdlPowerBiDataSource,
     RdlReportParameter,
     parse_rdl_power_bi_datasource,

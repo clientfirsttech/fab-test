@@ -13,7 +13,7 @@ import pytest
 
 _ROOT = Path(__file__).resolve().parent.parent
 _THIRD_PARTY = _ROOT / "THIRD-PARTY.md"
-_ANALYZERS_JSON = _ROOT / "src" / "fabric_ci_cd_dataops" / "metadata" / "analyzers.json"
+_ANALYZERS_JSON = _ROOT / "src" / "fab_test" / "metadata" / "analyzers.json"
 _PYPROJECT = _ROOT / "pyproject.toml"
 
 # (registry key, expected substring naming the tool in THIRD-PARTY.md)

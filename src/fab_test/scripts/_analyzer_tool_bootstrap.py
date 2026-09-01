@@ -27,7 +27,7 @@ from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
 _READER_CHUNK_SIZE = 8192
-_USER_AGENT = "fabric-ci-cd-dataops-fab-test/1.0"
+_USER_AGENT = "fab-test/1.0"
 
 # npm install can fetch a nontrivial dependency tree on a cold cache; build is
 # just tsc over a small source tree and finishes in seconds once deps exist.

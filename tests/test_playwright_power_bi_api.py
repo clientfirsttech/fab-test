@@ -6,8 +6,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts.playwright_validation.config import PlaywrightValidationConfig
-from fabric_ci_cd_dataops.scripts.playwright_validation.power_bi_api import (
+from fab_test.scripts.playwright_validation.config import PlaywrightValidationConfig
+from fab_test.scripts.playwright_validation.power_bi_api import (
     PowerBiApiError,
     ReportIdentity,
     _api_root_for,
@@ -62,7 +62,7 @@ def test_get_report_embed_url_success() -> None:
     mock_response.json.return_value = {"embedUrl": "https://app.powerbi.com/embed?rpt"}
 
     with patch(
-        "fabric_ci_cd_dataops.scripts.playwright_validation.power_bi_api.requests.get",
+        "fab_test.scripts.playwright_validation.power_bi_api.requests.get",
         return_value=mock_response,
     ):
         url = get_report_embed_url("token", "ws-1", "rpt-1")
@@ -78,7 +78,7 @@ def test_get_report_embed_url_raises_on_missing_url() -> None:
 
     with (
         patch(
-            "fabric_ci_cd_dataops.scripts.playwright_validation.power_bi_api.requests.get",
+            "fab_test.scripts.playwright_validation.power_bi_api.requests.get",
             return_value=mock_response,
         ),
         pytest.raises(PowerBiApiError),
@@ -94,7 +94,7 @@ def test_get_report_embed_url_raises_on_http_error() -> None:
 
     with (
         patch(
-            "fabric_ci_cd_dataops.scripts.playwright_validation.power_bi_api.requests.get",
+            "fab_test.scripts.playwright_validation.power_bi_api.requests.get",
             return_value=mock_response,
         ),
         pytest.raises(PowerBiApiError) as exc_info,
@@ -111,7 +111,7 @@ def test_generate_embed_token_success() -> None:
     mock_response.json.return_value = {"token": "embed-token-1"}
 
     with patch(
-        "fabric_ci_cd_dataops.scripts.playwright_validation.power_bi_api.requests.post",
+        "fab_test.scripts.playwright_validation.power_bi_api.requests.post",
         return_value=mock_response,
     ):
         token = generate_embed_token("token", ReportIdentity("ws-1", "rpt-1", "ds-1"))
@@ -128,7 +128,7 @@ def test_generate_embed_token_target_workspaces_defaults_to_the_report_workspace
     mock_response.json.return_value = {"token": "embed-token-1"}
 
     with patch(
-        "fabric_ci_cd_dataops.scripts.playwright_validation.power_bi_api.requests.post",
+        "fab_test.scripts.playwright_validation.power_bi_api.requests.post",
         return_value=mock_response,
     ) as mock_post:
         generate_embed_token("token", ReportIdentity("ws-1", "rpt-1", "ds-1"))
@@ -149,7 +149,7 @@ def test_generate_embed_token_names_both_workspaces_for_a_cross_workspace_datase
     mock_response.json.return_value = {"token": "embed-token-1"}
 
     with patch(
-        "fabric_ci_cd_dataops.scripts.playwright_validation.power_bi_api.requests.post",
+        "fab_test.scripts.playwright_validation.power_bi_api.requests.post",
         return_value=mock_response,
     ) as mock_post:
         generate_embed_token(
@@ -170,7 +170,7 @@ def test_generate_embed_token_does_not_duplicate_a_matching_dataset_workspace() 
     mock_response.json.return_value = {"token": "embed-token-1"}
 
     with patch(
-        "fabric_ci_cd_dataops.scripts.playwright_validation.power_bi_api.requests.post",
+        "fab_test.scripts.playwright_validation.power_bi_api.requests.post",
         return_value=mock_response,
     ) as mock_post:
         generate_embed_token(
@@ -197,7 +197,7 @@ def test_generate_embed_token_payload_is_minimal_for_a_paginated_report() -> Non
     mock_response.json.return_value = {"token": "embed-token-1"}
 
     with patch(
-        "fabric_ci_cd_dataops.scripts.playwright_validation.power_bi_api.requests.post",
+        "fab_test.scripts.playwright_validation.power_bi_api.requests.post",
         return_value=mock_response,
     ) as mock_post:
         generate_embed_token(
@@ -221,7 +221,7 @@ def test_generate_embed_token_interactive_dataset_has_no_xmla_permissions_field(
     mock_response.json.return_value = {"token": "embed-token-1"}
 
     with patch(
-        "fabric_ci_cd_dataops.scripts.playwright_validation.power_bi_api.requests.post",
+        "fab_test.scripts.playwright_validation.power_bi_api.requests.post",
         return_value=mock_response,
     ) as mock_post:
         generate_embed_token("token", ReportIdentity("ws-1", "rpt-1", "ds-1"))
@@ -238,7 +238,7 @@ def test_generate_embed_token_omits_datasets_when_none_bound() -> None:
     mock_response.json.return_value = {"token": "embed-token-1"}
 
     with patch(
-        "fabric_ci_cd_dataops.scripts.playwright_validation.power_bi_api.requests.post",
+        "fab_test.scripts.playwright_validation.power_bi_api.requests.post",
         return_value=mock_response,
     ) as mock_post:
         generate_embed_token("token", ReportIdentity("ws-1", "rdl-1", ""))
@@ -254,7 +254,7 @@ def test_generate_embed_token_includes_rls_identity() -> None:
     mock_response.json.return_value = {"token": "embed-token-1"}
 
     with patch(
-        "fabric_ci_cd_dataops.scripts.playwright_validation.power_bi_api.requests.post",
+        "fab_test.scripts.playwright_validation.power_bi_api.requests.post",
         return_value=mock_response,
     ) as mock_post:
         generate_embed_token(
@@ -278,7 +278,7 @@ def test_generate_embed_token_omits_identity_when_rls_disabled() -> None:
     mock_response.json.return_value = {"token": "embed-token-1"}
 
     with patch(
-        "fabric_ci_cd_dataops.scripts.playwright_validation.power_bi_api.requests.post",
+        "fab_test.scripts.playwright_validation.power_bi_api.requests.post",
         return_value=mock_response,
     ) as mock_post:
         generate_embed_token(
@@ -301,7 +301,7 @@ def test_generate_embed_token_raises_on_http_error() -> None:
 
     with (
         patch(
-            "fabric_ci_cd_dataops.scripts.playwright_validation.power_bi_api.requests.post",
+            "fab_test.scripts.playwright_validation.power_bi_api.requests.post",
             return_value=mock_response,
         ),
         pytest.raises(PowerBiApiError) as exc_info,
@@ -330,11 +330,11 @@ def test_get_embed_context_returns_all_fields(
     with (
         patch("msal.ConfidentialClientApplication", return_value=mock_app),
         patch(
-            "fabric_ci_cd_dataops.scripts.playwright_validation.power_bi_api.requests.get",
+            "fab_test.scripts.playwright_validation.power_bi_api.requests.get",
             return_value=mock_token_response,
         ),
         patch(
-            "fabric_ci_cd_dataops.scripts.playwright_validation.power_bi_api.requests.post",
+            "fab_test.scripts.playwright_validation.power_bi_api.requests.post",
             return_value=mock_generate_response,
         ),
     ):

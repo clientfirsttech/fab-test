@@ -20,7 +20,7 @@ the real library.
 
 from __future__ import annotations
 
-from fabric_ci_cd_dataops.scripts.playwright_validation.embed_config import EmbedConfig, build_embed_config
+from fab_test.scripts.playwright_validation.embed_config import EmbedConfig, build_embed_config
 
 
 def test_build_embed_config_defaults() -> None:

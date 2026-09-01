@@ -9,7 +9,7 @@ import pytest
 pytestmark = [pytest.mark.prompt_lint, pytest.mark.analyzers]
 
 
-from fabric_ci_cd_dataops.scripts.invoke_prompt_lint import main, run_prompt_lint, validate_path
+from fab_test.scripts.invoke_prompt_lint import main, run_prompt_lint, validate_path
 
 
 class TestValidatePath:

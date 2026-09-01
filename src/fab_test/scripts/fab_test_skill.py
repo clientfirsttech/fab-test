@@ -17,7 +17,7 @@ import json
 import re
 from pathlib import Path
 
-from fabric_ci_cd_dataops import __version__ as _FAB_TEST_VERSION
+from fab_test import __version__ as _FAB_TEST_VERSION
 
 from ._cli_utils import narrate
 from ._fab_test_context import REPO_ROOT
@@ -124,6 +124,46 @@ def _skill_status(harness: str) -> dict[str, str]:
 
 def _print_json(payload: dict) -> None:
     print(json.dumps(payload, indent=2))
+
+
+_KNOWN_SKILL_NAMES = ("fab-test",)
+
+
+def _skill_frontmatter_description(main_content: str) -> str:
+    for line in main_content.splitlines():
+        if line.startswith("description:"):
+            return line.split(":", 1)[1].strip()
+    return ""
+
+
+def _skill_list(output_format: str, resolved) -> int:
+    main_content = (resolved.path / "SKILL.md").read_text(encoding="utf-8")
+    rows = [
+        {
+            "name": name,
+            "description": _skill_frontmatter_description(main_content),
+            "source_path": str(resolved.path / "SKILL.md"),
+        }
+        for name in _KNOWN_SKILL_NAMES
+    ]
+    if output_format == "json":
+        print(json.dumps(rows, indent=2))
+    else:
+        for row in rows:
+            narrate(f"  {row['name']}: {row['description']}", output_format=output_format)
+    return 0
+
+
+def _skill_print_named(name: str | None, output_format: str, resolved) -> int:
+    """Validate an explicit `name` positional, then print -- split out of
+    `_skill` to keep its own branch count under the complexity ratchet."""
+    if name is not None and name not in _KNOWN_SKILL_NAMES:
+        narrate(
+            f"fab-test skill: unknown skill '{name}' -- available: {', '.join(_KNOWN_SKILL_NAMES)}",
+            output_format=output_format,
+        )
+        return 2
+    return _skill_print(output_format, resolved)
 
 
 def _skill_print(output_format: str, resolved) -> int:
@@ -246,15 +286,21 @@ def _skill_uninstall(harness: str | None, output_format: str) -> int:
 
 
 def _skill(args: argparse.Namespace) -> int:
-    """`fab-test skill`: print the resolved skill content, or install it.
+    """`fab-test skill`: print the resolved skill content, list, or install it.
 
     Bare, prints the repo-override-first resolved main SKILL.md (`--format
     json` wraps it with version/source metadata and the reference file
-    paths). `--install <harness>` writes or updates every component
-    (SKILL.md/instructions file plus references/*.md) for that harness;
-    `--show` reports install state per harness; `--uninstall` (paired
-    with `--install <harness>`) removes only a directory this command's
-    own marker text identifies as its.
+    paths) -- unchanged from before `--list`/`name` existed, so existing
+    callers (docs, the `document` skill) keep working. `--list` prints the
+    known skill names with their descriptions instead (today a one-row
+    list; fab-test packages only its own skill). An explicit `name`
+    positional prints that skill's content -- currently only "fab-test" is
+    valid, so this is symmetry for a future second skill rather than new
+    behavior today. `--install <harness>` writes or updates every
+    component (SKILL.md/instructions file plus references/*.md) for that
+    harness; `--show` reports install state per harness; `--uninstall`
+    (paired with `--install <harness>`) removes only a directory this
+    command's own marker text identifies as its.
     """
     output_format = getattr(args, "output_format", "text")
 
@@ -280,4 +326,8 @@ def _skill(args: argparse.Namespace) -> int:
             dry_run=getattr(args, "dry_run", False),
             force=getattr(args, "force", False),
         )
-    return _skill_print(output_format, resolved)
+
+    if getattr(args, "list", False):
+        return _skill_list(output_format, resolved)
+
+    return _skill_print_named(getattr(args, "name", None), output_format, resolved)

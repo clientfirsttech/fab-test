@@ -15,8 +15,8 @@ from pathlib import Path
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts.fab_test import _load_fab_test_all_analyzers
-from fabric_ci_cd_dataops.scripts.fab_test_registry import (
+from fab_test.scripts.fab_test import _load_fab_test_all_analyzers
+from fab_test.scripts.fab_test_registry import (
     applicable_analyzers,
     discover_artifacts,
     discover_pbip_sources,

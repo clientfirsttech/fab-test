@@ -14,8 +14,8 @@ from pathlib import Path
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts import fab_test_summary
-from fabric_ci_cd_dataops.scripts.fab_test_summary import _print_all_summary, _print_summary
+from fab_test.scripts import fab_test_summary
+from fab_test.scripts.fab_test_summary import _print_all_summary, _print_summary
 
 
 class _FakeArgs:
