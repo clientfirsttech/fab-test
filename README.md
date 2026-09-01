@@ -16,14 +16,14 @@ locally built wheel, or an editable checkout.
 
 ### From TestPyPI (pre-release)
 
-The current pre-release is `1.0.0.0.dev1`. Two things about the command below are
+The current pre-release is `1.0.0.0.dev15`. Two things about the command below are
 not optional:
 
 - **`--extra-index-url https://pypi.org/simple`.** TestPyPI does not carry
   `pql-test==0.1.13`; it has 0.1.11. Without the production index alongside
   it, the install fails to resolve that dependency, not because anything is
   wrong with `fab-test`.
-- **The exact pin.** `1.0.0.0.dev1` is a PEP 440 dev release, and pip skips
+- **The exact pin.** `1.0.0.0.dev15` is a PEP 440 dev release, and pip skips
   pre-releases unless you name one or pass `--pre`. A bare `pip install fab-test`
   against TestPyPI finds no acceptable version.
 
@@ -34,7 +34,7 @@ source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install \
   --index-url https://test.pypi.org/simple/ \
   --extra-index-url https://pypi.org/simple \
-  "fab-test==1.0.0.0.dev1"
+  "fab-test==1.0.0.0.dev15"
 
 fab-test --version
 ```
@@ -108,9 +108,13 @@ what an artifact looks like. A `.fab-test/metadata/artifact-map.json` (or
 the legacy `.github/metadata/artifact-map.json`) overrides it when present.
 
 Skipped while walking: nested git checkouts (worktrees, vendored clones),
-`.venv`, `node_modules`, `__pycache__`, `dist`, `build`, and the run's own
-`--output-dir`. Without those exclusions a scan of this repository returns
-eight artifacts where three are real.
+`.venv`, `node_modules`, `__pycache__`, `dist`, `build`, `.github`, `.claude`,
+and the run's own `--output-dir`. `.github` and `.claude` hold agent
+tooling -- skill instructions, worked examples, worktrees -- not this
+project's own artifacts, so a suffix-matching folder placed there for
+documentation purposes is never mistaken for one to test. Without those
+exclusions a scan of this repository returns eight artifacts where three
+are real.
 
 One consequence is worth knowing: run `fab-test` from a folder that holds
 *repositories* rather than artifacts and it finds nothing, because every

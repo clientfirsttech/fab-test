@@ -13,6 +13,7 @@ but `open_file_path` is left unresolved rather than guessed.
 
 from __future__ import annotations
 
+import functools
 import os
 import platform
 import re
@@ -125,11 +126,18 @@ def bridge_cli_path() -> str | None:
     return shutil.which("powerbi-desktop")
 
 
+@functools.cache
 def detect_desktop_instances(workspaces_root: Path | None = None) -> list[DesktopInstance]:
     """Return every running Power BI Desktop instance's port and open file.
 
     Returns an empty list on a non-Windows platform or when nothing is
     running, without raising.
+
+    Cached per ``workspaces_root`` for the life of the process: which file a
+    running instance has open cannot change meaningfully within one CLI
+    invocation, but this is called once per artifact during preflight and
+    again when building the pql-test command -- without caching, each call
+    re-pays the PowerShell startup cost this incurs.
     """
     if platform.system() != "Windows":
         return []

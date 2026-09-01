@@ -18,7 +18,7 @@ from typing import Any
 
 from tabulate import tabulate
 
-from ._analyzer_envelope import normalize_findings, severity_counts
+from ._analyzer_envelope import finding_status, normalize_findings, severity_counts
 from ._cli_utils import CHECKOUT_REMEDIATION, skipped_checkout_lines
 from ._report_html import (
     open_report_in_browser,
@@ -294,17 +294,6 @@ def _is_pql_test_finding(finding: dict) -> bool:
     )
 
 
-def _pql_test_status(finding: dict) -> str:
-    """Map a pql-test result dict to a terminal status label."""
-    if finding.get("error"):
-        return "ERROR"
-    if finding.get("skipped"):
-        return "SKIPPED"
-    if finding.get("passed"):
-        return "PASS"
-    return "FAIL"
-
-
 def _build_findings_table(
     findings: list[dict],
     max_width: int,
@@ -364,7 +353,7 @@ def _build_pql_test_table(
         test = f.get("test_name") or "?"
         expected = f.get("expected") or ""
         actual = f.get("actual") or ""
-        status = _pql_test_status(f)
+        status = finding_status(f)
         rows.append((suite, test, expected, actual, status))
 
     # Sort by status severity (ERROR > FAIL > SKIPPED > PASS), then suite/test.
@@ -475,9 +464,15 @@ def _print_findings_for_artifact(name: str, stem: str, output_dir: Path) -> None
         print("\n".join(f"      {line}" for line in table.splitlines()))
 
 
-def _artifact_summary_prefix(code: int) -> str:
-    """Return the icon for an artifact summary line."""
-    return "✅" if code == 0 else "❌"
+def _artifact_summary_prefix(code: int, status: str = "") -> str:
+    """Return the icon for an artifact summary line.
+
+    ``status`` distinguishes the one case an exit code cannot: an analyzer
+    that exited 0 while warning it did no work.
+    """
+    if code != 0:
+        return "❌"
+    return "⚠️" if status == "warning" else "✅"
 
 
 def _read_artifact_envelope(
@@ -542,6 +537,10 @@ def _artifact_status(data: dict[str, Any] | None, code: int, errors: int, warnin
         return "failed"
     if data and data.get("status") == "skipped":
         return "skipped"
+    # An analyzer that exited 0 can still be warning us -- pql-test does when
+    # no test managed to run. Falling through would paint that green.
+    if data and data.get("status") == "warning":
+        return "warning"
     return "warning" if warnings > 0 else "passed"
 
 
@@ -758,23 +757,29 @@ def _print_all_summary(
 
 def _artifact_line(
     name: str, stem: str, output_dir: Path | None
-) -> tuple[str, str | None]:
-    """Return one artifact's summary suffix and its report path, if any.
+) -> tuple[str, str | None, str]:
+    """Return one artifact's summary suffix, its report path, and its status.
 
     Split out of `_print_summary` so that reading an envelope and deciding
-    how to describe it is one job, and printing is another.
+    how to describe it is one job, and printing is another. The status rides
+    along because the caller needs it to pick an icon, and reading the
+    envelope twice to learn it would be the same file read done twice.
     """
     if output_dir is None:
-        return "", None
+        return "", None, ""
     envelope = output_dir / name / stem / "envelope.json"
     if not envelope.exists():
-        return "", None
+        return "", None, ""
     try:
         data = json.loads(envelope.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError):
-        return "  — (could not parse envelope)", None
+        return "  — (could not parse envelope)", None, ""
     report = _report_path_for(data)
-    return f"  — {_artifact_summary_line(data)}", _display_path(report) if report else None
+    return (
+        f"  — {_artifact_summary_line(data)}",
+        _display_path(report) if report else None,
+        str(data.get("status", "")),
+    )
 
 
 def _print_summary(
@@ -804,8 +809,8 @@ def _print_summary(
             if output_dir is not None:
                 data = _read_artifact_envelope(output_dir, name, stem)
             errors, warnings = _envelope_error_warning_counts(data)
-            if data and data.get("status") == "skipped" and code == 0:
-                row_status = "skipped"
+            if data and data.get("status") in {"skipped", "warning"} and code == 0:
+                row_status = data["status"]
             else:
                 row_status = "failed" if code != 0 else "passed"
             rows.append({
@@ -831,10 +836,10 @@ def _print_summary(
     verbose = verbosity in ("verbose", "debug")
     reports: list[str] = []
     for stem, code in results:
-        summary, report = _artifact_line(name, stem, output_dir)
+        summary, report, status = _artifact_line(name, stem, output_dir)
         if report:
             reports.append(report)
-        print(f"  {_artifact_summary_prefix(code)}  {stem}{summary}")
+        print(f"  {_artifact_summary_prefix(code, status)}  {stem}{summary}")
         if code != 0:
             any_failed = True
             if verbose and output_dir is not None:

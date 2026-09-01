@@ -70,11 +70,15 @@ Adding a type means editing the map, not the code.
 **What is pruned, and why it is load-bearing.** Nested git checkouts
 (worktrees, vendored clones), `.venv`, `venv`, `env`, `node_modules`,
 `__pycache__`, `.mypy_cache`, `.pytest_cache`, `.ruff_cache`, `.tox`, `dist`,
-`build`, `.fab-test-tools`, and the run's own `--output-dir`. Without these a
-scan of this repository returns eight artifacts where three are real, the
-other five being worktree copies. Results are pruned because envelopes land
-in folders named after the artifacts that produced them, which a scan would
-otherwise rediscover as artifacts.
+`build`, `.fab-test-tools`, `.github`, `.claude`, and the run's own
+`--output-dir`. `.github` and `.claude` hold agent tooling — skill
+instructions, worked examples, worktrees — not this project's own
+artifacts, so a suffix-matching folder placed there for documentation
+purposes is never mistaken for one to test. Without these a scan of this
+repository returns eight artifacts where three are real, the other five
+being worktree copies. Results are pruned because envelopes land in folders
+named after the artifacts that produced them, which a scan would otherwise
+rediscover as artifacts.
 
 A matched folder is not descended into: Fabric artifacts do not nest, and
 `Sales.SemanticModel/definition` is a matched artifact's contents.
