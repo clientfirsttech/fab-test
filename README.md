@@ -134,9 +134,10 @@ Every analyzer is built on that assumption:
 
 | Analyzer | Discovers | Reads on disk | Format it requires |
 |----------|-----------|---------------|--------------------|
-| `bpa` (Tabular Editor) | `*.SemanticModel` | `definition/` | TMDL |
-| `pql-test` | `*.SemanticModel` | `definition/` | TMDL |
-| `pbir` (PBIR Inspector) | `*.Report` | `definition/` | PBIR |
+| `bpa` ([Tabular Editor](https://github.com/TabularEditor/TabularEditor)) | `*.SemanticModel` | `definition/` | TMDL |
+| `pql-test` ([PQL.Assert](https://github.com/clientfirsttech/PQL.Assert)) | `*.SemanticModel` | `definition/` | TMDL |
+| `pbir` ([PBIR Inspector](https://github.com/NatVanG/fab-inspector)) | `*.Report` | `definition/` | PBIR |
+| `a11y` ([pbir-a11y](https://github.com/Juls-BI/pbir-a11y)) | `*.Report` | `definition/` | PBIR |
 | `playwright` | `*.Report` | none (renders the deployed report) | folder naming only |
 
 Deployment and dependency discovery read the report's `definition.pbir` to resolve which semantic model it points at, so that file is what pairs a report with its model.
@@ -541,6 +542,23 @@ for the weekly job that watches upstream for you.
 ## AI agent guidance
 
 The AIDD agent instructions and skills live in the repository, not in the wheel: [`.github/agents/`](https://github.com/kerski/fab-test/tree/main/.github/agents/) and [`.github/skills/`](https://github.com/kerski/fab-test/tree/main/.github/skills/). Clone the repository to get them. The `fab-test` CLI reference an agent needs is [`.github/skills/fab-test/SKILL.md`](https://github.com/kerski/fab-test/blob/main/.github/skills/fab-test/SKILL.md).
+
+### The `fab-test` skill
+
+Unlike the other repository-only skills, the `fab-test` CLI reference skill (`SKILL.md` plus `references/*.md`) is also packaged inside the wheel, so a plain `pip install fab-test` -- no checkout, no clone -- can still hand it to an agent harness, and the copy it installs can never drift from the CLI version actually installed:
+
+```bash
+fab-test skill                    # list the main skill and its reference topics
+fab-test skill fab-test           # print the resolved main SKILL.md
+fab-test skill flags              # print one reference topic (e.g. flags, credentials)
+
+fab-test skill --install claude   # write .claude/skills/fab-test/ (SKILL.md + references/)
+fab-test skill --install copilot  # write .github/instructions/fab-test/ (Copilot's applyTo shape)
+fab-test skill --show             # report install state for every known harness
+fab-test skill --install claude --uninstall   # remove a directory this command created
+```
+
+A repo-level override (`.fab-test/skill/SKILL.md` or `.github/skills/fab-test/SKILL.md`) is resolved ahead of the packaged copy when present, so a fork can customize the skill without patching the wheel. `--install` is idempotent and never clobbers a differing local copy without `--force`; `--dry-run` reports the plan first.
 
 What the distribution *does* carry is the metadata the analyzers need, so `bpa`, `pbir`, and `doctor` work from a plain `pip install` with no checkout:
 
