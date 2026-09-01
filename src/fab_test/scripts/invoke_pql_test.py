@@ -237,6 +237,13 @@ def _pql_status(
     platform or workspace was unavailable, and vision.md is explicit that
     platform gaps degrade to skips -- so CI does not go red for missing
     credentials, while a real assertion failure still does.
+
+    A non-zero exit with no test results at all -- no native output, or a
+    total of zero -- means pql-test never connected to the model (most
+    commonly a local Desktop session that closed). There is nothing to
+    report as a finding, so this degrades to skipped the same way, instead
+    of the misleading "0 tests, 0 passed, 0 failed, 0 skipped" failed
+    message a bare fall-through would produce.
     """
     counts = test_summary or {}
     passed = counts.get("passed", 0)
@@ -253,6 +260,8 @@ def _pql_status(
     )
     if all_skipped:
         return "skipped", f"pql-test skipped: {counter_msg}"
+    if total == 0 and not findings:
+        return "skipped", "pql-test skipped: no tests ran (could not connect to the model)"
     return "failed", f"pql-test failed: {counter_msg}"
 
 
