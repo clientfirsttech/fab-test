@@ -14,7 +14,7 @@ The project must be saved in PBIP format with the semantic model in **TMDL** and
 pip install \
   --index-url https://test.pypi.org/simple/ \
   --extra-index-url https://pypi.org/simple \
-  "fab-test==1.0.0.0.dev1"
+  "fab-test==1.0.0.0.dev15"
 
 # 2. Check what's ready
 fab-test doctor --local
