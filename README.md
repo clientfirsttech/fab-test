@@ -369,6 +369,14 @@ That table also has a **search box and sortable column headers**: type to narrow
 
 The index also shows when the run happened and, in CI, who ran it and from which branch/commit (falling back to local `git`, or an em-dash outside a git checkout).
 
+Running locally and don't want to go find the file? Add `--open-report` and it opens in your default browser when the run finishes:
+
+```bash
+fab-test bpa --open-report
+```
+
+`--open-report` implies `--report`, so you never have to pass both. This is a local convenience for a human at a terminal, not something to add to a pipeline YAML: it is automatically suppressed under CI, falling back to just printing the path.
+
 Status and non-zero counts are coloured in a terminal. Colour is off when output is redirected, off whenever `NO_COLOR` is set, and never present under `--format json`.
 
 ### The machine-readable workflow (agents and pipelines)

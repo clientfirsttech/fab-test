@@ -79,11 +79,18 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
         ),
     ),
     "src/fabric_ci_cd_dataops/scripts/fab_test_summary.py": (
-        812,
+        883,
         (
             "2026-08-23: 12 lines over hard, from unrelated feature work landing "
             "since this file was last at 793; not yet worth a forced split for "
-            "12 lines. Revisit if it keeps growing."
+            "12 lines. Revisit if it keeps growing. "
+            "2026-08-31: +71 lines wiring --open-report into _print_all_summary "
+            "(open the run index once) and _print_summary (open a single "
+            "analyzer's sole report, or note when there are several with "
+            "nothing single to open) -- Open Report Flag epic, Task 3. Split "
+            "into _write_and_open_index/_open_single_analyzer_report to keep "
+            "both callers under the branch budget (net new lines, not "
+            "shrinkage, since the decision logic itself is unchanged)."
         ),
     ),
     "src/fabric_ci_cd_dataops/scripts/fab_test_registry.py": (

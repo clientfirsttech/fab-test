@@ -58,6 +58,22 @@ The `all` summary lists one path per artifact beneath the table — the report w
 
 Paths are relative to the working directory and never truncated, so they stay clickable in a terminal that linkifies them. Under `--format json` each artifact row carries `report_path` (null when absent) alongside `output_path`, which keeps its existing meaning.
 
+## Open Report
+
+`--open-report` closes the "find it in Explorer, double-click" gap after a local run: it opens the produced report/index in the default browser instead of leaving you to find the path yourself.
+
+```bash
+fab-test bpa --open-report          # runs bpa, opens report.html when it's done
+fab-test all --open-report          # runs every configured analyzer, opens the run's index.html
+fab-test bpa --no-report --open-report   # invalid: --open-report needs a report to open, exits 2
+```
+
+- **Implies `--report`.** Passing `--open-report` alone still turns report generation on for that run — it is never a silent no-op, and you never have to pass both flags.
+- **Which path it opens** depends on the run shape, the same one [The per-run index](#the-per-run-index) and [Finding the paths](#finding-the-paths) already describe: the index for `fab-test all` (more than one analyzer), the single `report.html`/native report for a single-analyzer command against exactly one artifact. A single analyzer against *several* artifacts has neither an index nor one report to single out — `fab-test` prints a note instead of guessing which one to open.
+- **A no-op under CI.** `--open-report` is suppressed whenever `GITHUB_ACTIONS` or `CI` is set: a build agent has no display to pop a browser onto, so it falls back to printing the path exactly like a run without `--open-report` would. Do not add it to a pipeline YAML — the guard means it does nothing there anyway.
+- **Never fails a run.** No browser available, no display, `webbrowser.open()` raising — every one of these prints the path instead of raising, matching the report renderer's own "a failure to render is a warning, never a failed build" contract above.
+- **Env var**: `ANALYZER_OPEN_REPORT=1` behaves like passing the flag, one level below the CLI flag in precedence (same chain as `ANALYZER_REPORT`).
+
 ## Colour
 
 Status and non-zero error/warning counts are coloured in text output. Colour is **off** when stdout is not a terminal, **off** whenever `NO_COLOR` is set (any value), always **off** under `--format json`, and can be forced on with `FORCE_COLOR=1` for a CI job that renders ANSI.

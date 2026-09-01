@@ -780,4 +780,5 @@ def _run_analyzer(
         # here as well printed each one twice. Same condition as
         # emit_own_json above, and for the same reason.
         show_reports=getattr(args, "analyzer", None) != "all",
+        args=args,
     )

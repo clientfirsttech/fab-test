@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import os
 import sys
+import webbrowser
 from datetime import UTC, datetime
 from html import escape
 from pathlib import Path
@@ -520,6 +521,43 @@ def open_report_conflict(args: Any) -> str | None:
             "a report to open. Drop --no-report or --open-report."
         )
     return None
+
+
+def _is_ci() -> bool:
+    """Same check `fab_test_execution.py`/`_analyzer_tool_bootstrap.py` already use.
+
+    Not imported from either -- both import `_report_html` already, and
+    this module has no reason to import the CLI layer back. Consolidating
+    the (now four) copies is a real but separate cleanup (see the Open
+    Report Flag epic's overview).
+    """
+    return bool(os.environ.get("GITHUB_ACTIONS") or os.environ.get("CI"))
+
+
+def open_report_in_browser(path: Path | str) -> bool:
+    """Open ``path`` in the default browser, or print it when that's not possible.
+
+    Never raises: a convenience failing must not fail the run, matching
+    `attach_report`'s own contract. Skips opening a path that doesn't exist
+    on disk (report generation failed upstream -- the caller already prints
+    that failure) and CI, where nothing has a display to open onto; in both
+    the CI case and a browser that fails to open, falls back to printing
+    the path so it is never silently lost. Returns whether a browser was
+    actually launched.
+    """
+    target = Path(path)
+    if not target.exists():
+        return False
+    if _is_ci():
+        print(f"  Report: {target}")
+        return False
+    try:
+        opened = webbrowser.open(target.resolve().as_uri())
+    except Exception:  # noqa: BLE001 -- a convenience failing must not fail the run
+        opened = False
+    if not opened:
+        print(f"  Report: {target}")
+    return opened
 
 
 def _format_run_metadata(metadata: dict[str, str]) -> str:

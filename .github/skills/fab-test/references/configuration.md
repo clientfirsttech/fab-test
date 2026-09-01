@@ -33,6 +33,7 @@ If both `fab-test.yml` and `[tool.fab-test]` are present, `fab-test.yml` wins pe
 | `environment` | string | `FABRIC_ENVIRONMENT` | (none) |
 | `workspace` | string | `FABRIC_WORKSPACE_ID` | (none) — display name or GUID |
 | `report` | boolean | `ANALYZER_REPORT` | `false` — see [Reports](reports.md) |
+| `open_report` | boolean | `ANALYZER_OPEN_REPORT` | `false` — implies `report`; no-op under CI — see [Open Report](reports.md#open-report) |
 | `rules` | object | — | (none) — see Rule Overlays below |
 | `telemetry` | object | — | (none) — see Telemetry below |
 

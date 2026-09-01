@@ -11,6 +11,7 @@
 | `--dry-run` | off | List matching artifacts without running any analyzer |
 | `--telemetry` / `--no-telemetry` | config-driven | Force/suppress Eventhouse telemetry. A configured destination already enables it; `--telemetry` with none configured exits `2` — see [Telemetry](configuration.md#telemetry) |
 | `--report` / `--no-report` | off | Write a readable HTML report beside each envelope [env: `ANALYZER_REPORT`] |
+| `--open-report` | off | Open the produced report/index in the default browser after the run; implies `--report`; a no-op under CI [env: `ANALYZER_OPEN_REPORT`] — see [Reports](reports.md#open-report) |
 | `--format {text,json}` | `text` | Aggregate summary output format (see the main SKILL.md's Agent Contract section for the stdout guarantee) |
 | `-v`, `--verbose` | off | Increase output verbosity (one `-v` = per-finding detail, two `-v` = command + stdout/stderr) |
 | `--timeout SECONDS` | `200` | Per-artifact subprocess timeout [env: `ANALYZER_TIMEOUT`] |
