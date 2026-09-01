@@ -31,7 +31,7 @@ jobs:
 
         steps:
             - name: Checkout code
-              uses: actions/checkout@v4
+              uses: actions/checkout@v7
 
             # Matches build.yml. The agent and CI disagreeing about the
             # interpreter is a class of bug that only shows up in one of them.
