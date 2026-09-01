@@ -45,7 +45,6 @@ When the user invokes you with any of these phrases, execute the corresponding w
 | **pipeline**, **step-by-step pipeline** | `aidd-pipeline`, `aidd-please` | Run a markdown task list as a pipeline |
 | **upskill**, **create skill** | `aidd-upskill`, `aidd-sudolang-syntax` | Author a new AIDD skill |
 | **security**, **jwt**, **timing** | `aidd-jwt-security` or `aidd-timing-safe-compare` | Targeted security review |
-| **deploy**, **fabric deploy** | `fabric-cicd-deployment` | Fabric artifact deployment pattern |
 
 This table mirrors the Command Map in `.github/skills/aidd-workflow/SKILL.md`, which is
 the authority. If the two ever disagree, the workflow skill wins — and fix this table.
@@ -147,7 +146,6 @@ Brief task description
 This project's agent customization lives under `.github/`:
 - `.github/agents/aidd.agent.md` - This file
 - `.github/skills/aidd-workflow/SKILL.md` - Project-specific command resolver (the authority)
-- `.github/skills/fabric-cicd-deployment/SKILL.md` - Fabric deployment pattern
 - `.github/skills/document/SKILL.md` - Doc sync across the three callers
 - `.github/skills/fab-test/SKILL.md` - fab-test CLI reference
 - `.github/copilot-instructions.md` - VS Code Copilot guidelines
@@ -175,7 +173,6 @@ All skills are in `.github/skills/<name>/SKILL.md`:
 - `aidd-upskill` / `aidd-sudolang-syntax` - Authoring new skills
 - `document` - Sync README, QUICK-VALIDATION, and the fab-test skill
 - `fab-test` - fab-test CLI reference (subcommands, targeting grammar, auth, exit codes)
-- `fabric-cicd-deployment` - Fabric artifact deployment
 
 This project is Python: skip the JS/TS skills (`aidd-javascript`, `aidd-lit`,
 `aidd-react`, `aidd-autodux`, `aidd-ecs`) and load `aidd-python` instead for any
