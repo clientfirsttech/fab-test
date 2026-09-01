@@ -46,7 +46,6 @@ dependencies = [
     "pql-test==0.1.12",
     "playwright",
     "pyyaml",
-    "fabric-cicd",
     "azure-identity",
 ]
 
@@ -196,8 +195,6 @@ max-args = 8
 # a scan. fab_test.py was once listed here too, which was wrong: it is the CLI
 # orchestrator, not a scanner, and the exemption meant each new blind except
 # landed unexamined. Its three are now justified individually.
-"src/fab_test/scripts/scan_credentials.py" = ["BLE001", "S110"]
-"src/fab_test/scripts/scan_entropy.py" = ["BLE001", "S110"]
 "src/fab_test/scripts/invoke_tabular_editor_bpa.py" = ["S314"]
 # Tests: asserts are the point, stub callables ignore their arguments, fake
 # credentials are not secrets, and sys.path setup runs before imports.

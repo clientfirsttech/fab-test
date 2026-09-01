@@ -20,9 +20,9 @@ The current pre-release is `1.0.0.0.dev1`. Two things about the command below ar
 not optional:
 
 - **`--extra-index-url https://pypi.org/simple`.** TestPyPI does not carry
-  `pql-test==0.1.12` or a current `fabric-cicd`; it has 0.1.11 and 0.1.7. Without
-  the production index alongside it, the install fails to resolve dependencies,
-  not because anything is wrong with `fab-test`.
+  `pql-test==0.1.12`; it has 0.1.11. Without the production index alongside
+  it, the install fails to resolve that dependency, not because anything is
+  wrong with `fab-test`.
 - **The exact pin.** `1.0.0.0.dev1` is a PEP 440 dev release, and pip skips
   pre-releases unless you name one or pass `--pre`. A bare `pip install fab-test`
   against TestPyPI finds no acceptable version.

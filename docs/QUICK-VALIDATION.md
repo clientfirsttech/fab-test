@@ -131,7 +131,7 @@ fab-test pql-test SampleModel-PQLAssert --env DEV
 fab-test bpa --open-report
 ```
 
-`--open-report` implies `--report` and opens the produced report (or, for `fab-test all`, the run's `index.html`) in your default browser once the run finishes — skip the "find it in Explorer, double-click" step. This is a local convenience only: it is automatically suppressed under CI (falls back to printing the path), so there is no reason to add it to a pipeline YAML.
+`--open-report` implies `--report` and opens the produced report (or, whenever more than one artifact ran — `fab-test all`, or one analyzer against several artifacts — the run's `index.html`) in your default browser once the run finishes — skip the "find it in Explorer, double-click" step. This is a local convenience only: it is automatically suppressed under CI (falls back to printing the path), so there is no reason to add it to a pipeline YAML.
 
 ### Naming what to test
 

@@ -133,17 +133,20 @@ def find_artifact_dirs(
     return scan(root, suffixes, excluded_paths=excluded_paths).artifacts
 
 
-def find_rdl_files(
+def find_files_by_suffix(
     root: Path,
+    suffix: str,
     *,
     excluded_paths: Iterable[Path] = (),
 ) -> list[Path]:
-    """Walk ``root`` once for ``.rdl`` files, pruned the same way `scan` prunes directories.
+    """Walk ``root`` once for files ending in ``suffix``, pruned the same way
+    `scan` prunes directories.
 
-    A paginated (RDL) report is a flat ``NAME.rdl`` file, not a folder with a
-    Fabric type suffix -- `scan` cannot find it, since it only ever looks at
-    directory names in `os.walk`'s ``dirnames``, never ``filenames``. This
-    mirrors `scan`'s own pruning (nested checkouts, `EXCLUDED_DIR_NAMES`,
+    Some file shapes aren't a folder with a Fabric type suffix -- a
+    paginated (RDL) report is a flat ``NAME.rdl`` file, a `.pbip` project
+    file sits beside its paired folders rather than being one -- so
+    `scan`'s directory-suffix matching can't find them. This mirrors
+    `scan`'s own pruning (nested checkouts, `EXCLUDED_DIR_NAMES`,
     caller-supplied ``excluded_paths``) rather than walking unfiltered, at
     the cost of a second small walk alongside a suffix-based one -- files
     and directories are different enough shapes of "artifact" that forcing
@@ -166,9 +169,18 @@ def find_rdl_files(
                 continue
             keep.append(name)
         dirnames[:] = keep
-        files.extend(current / name for name in filenames if name.endswith(".rdl"))
+        files.extend(current / name for name in filenames if name.endswith(suffix))
 
     return sorted(set(files))
+
+
+def find_rdl_files(
+    root: Path,
+    *,
+    excluded_paths: Iterable[Path] = (),
+) -> list[Path]:
+    """Return every ``.rdl`` file under ``root``, pruned like `scan`."""
+    return find_files_by_suffix(root, ".rdl", excluded_paths=excluded_paths)
 
 
 def find_skipped_checkouts(root: Path) -> list[Path]:

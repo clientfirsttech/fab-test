@@ -2,8 +2,8 @@
 """
 Validate the unified environments.yml metadata file.
 
-Enforces the schema contract used by scripts/deploy.py,
-scripts/generate_fabric_cicd_config.py, and scripts/check_promotion_safety.py.
+Enforces the schema contract every consumer of `environments.yml` relies on
+(the schema validator, `playwright_validation`'s workspace resolver).
 
 Usage:
     python scripts/validate_environments_yaml.py [--path PATH]

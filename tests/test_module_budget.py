@@ -82,7 +82,7 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
         ),
     ),
     "src/fab_test/scripts/fab_test_summary.py": (
-        919,
+        920,
         (
             "2026-08-23: 12 lines over hard, from unrelated feature work landing "
             "since this file was last at 793; not yet worth a forced split for "

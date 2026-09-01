@@ -12,6 +12,8 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
+from ._scan import find_files_by_suffix
+
 
 @dataclass
 class PbipProject:
@@ -28,37 +30,15 @@ class PbipProject:
         return self.report_path is not None and self.semantic_model_path is not None
 
 
-def _under_nested_repo(path: Path, resolved_root: Path) -> bool:
-    """Whether ``path`` sits inside a separate git checkout nested under
-    ``resolved_root`` (a worktree, a vendored clone, ...). The root's own
-    ``.git`` never disqualifies root's direct contents.
-    """
-    current = path.resolve().parent
-    while current != resolved_root:
-        if (current / ".git").exists():
-            return True
-        parent = current.parent
-        if parent == current:
-            return False
-        current = parent
-    return False
-
-
 def discover_pbip_projects(root: Path) -> list[PbipProject]:
     """Find every *.pbip file under root and resolve its paired folders.
 
-    Skips anything inside a separate git checkout nested under root (a
-    worktree, a vendored clone, ...) so a broad repo-root walk doesn't
-    double-count the same fixture living in two checkouts.
+    Prunes the same directories `_scan.scan` prunes (`.venv`,
+    `node_modules`, nested git checkouts, ...) instead of walking
+    everything and filtering afterward -- a `.pbip` deserves the same
+    "do not descend" treatment as a folder-suffix artifact.
     """
-    if not root.exists():
-        return []
-    resolved_root = root.resolve()
-    return [
-        _resolve_project(pbip_path)
-        for pbip_path in sorted(root.rglob("*.pbip"))
-        if not _under_nested_repo(pbip_path, resolved_root)
-    ]
+    return [_resolve_project(pbip_path) for pbip_path in find_files_by_suffix(root, ".pbip")]
 
 
 def _resolve_project(pbip_path: Path) -> PbipProject:

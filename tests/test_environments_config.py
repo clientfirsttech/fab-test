@@ -1,4 +1,4 @@
-"""Unit tests for environment configuration validators and generators."""
+"""Unit tests for environment configuration validators."""
 
 import sys
 from pathlib import Path
@@ -7,8 +7,6 @@ from unittest import mock
 
 import pytest
 
-from fab_test.scripts.generate_fabric_cicd_config import build_environment_config, load_config
-from fab_test.scripts.generate_fabric_cicd_config import main as generate_main
 from fab_test.scripts.validate_environments_yaml import validate_environments_yaml
 
 
@@ -180,67 +178,3 @@ class TestValidateEnvBlock:
             and "Missing required deployment_window key" in e.message
             for e in errors
         )
-
-
-class TestGenerateFabricCicdConfig:
-    """Tests for generate_fabric_cicd_config."""
-
-    def test_load_config(self, valid_environments: Path, tmp_path: Path):
-        """load_config reads environments.yml from repo root."""
-        repo = tmp_path
-        metadata = repo / ".github" / "metadata"
-        metadata.mkdir(parents=True)
-        (metadata / "environments.yml").write_text(valid_environments.read_text())
-        config = load_config(repo)
-        assert "environments" in config
-        assert config["environments"]["dev"]["workspace_id"] == "ws-dev"
-
-    def test_build_environment_config(self, valid_environments: Path):
-        """build_environment_config merges defaults and strips metadata keys."""
-        import yaml
-
-        config = yaml.safe_load(valid_environments.read_text())
-        env_config = build_environment_config(config, "dev", "")
-        assert env_config["workspace_id"] == "ws-dev"
-        assert "allowed_branches" not in env_config
-        assert "requires_validation" not in env_config
-
-    def test_build_with_override_workspace(self, valid_environments: Path):
-        """CLI workspace ID overrides the configured value."""
-        import yaml
-
-        config = yaml.safe_load(valid_environments.read_text())
-        env_config = build_environment_config(config, "dev", "override-ws")
-        assert env_config["workspace_id"] == "override-ws"
-
-    def test_missing_environment_exits(self, valid_environments: Path):
-        """Unknown environment causes sys.exit(1)."""
-        import yaml
-
-        config = yaml.safe_load(valid_environments.read_text())
-        with pytest.raises(SystemExit) as exc_info:
-            build_environment_config(config, "prod", "")
-        assert exc_info.value.code == 1
-
-    def test_main_generates_output(self, valid_environments: Path, tmp_path: Path, monkeypatch):
-        """Main writes a YAML config file for the requested environment."""
-        repo = tmp_path
-        metadata = repo / ".github" / "metadata"
-        metadata.mkdir(parents=True)
-        (metadata / "environments.yml").write_text(valid_environments.read_text())
-
-        output = tmp_path / "fabric-cicd-env-config.yml"
-        argv = [
-            "generate_fabric_cicd_config.py",
-            "--environment",
-            "dev",
-            "--output",
-            str(output),
-        ]
-        monkeypatch.setattr(sys, "argv", argv)
-        monkeypatch.setenv("GITHUB_WORKSPACE", str(repo))
-        generate_main()
-
-        assert output.exists()
-        generated = output.read_text()
-        assert "workspace_id: ws-dev" in generated
