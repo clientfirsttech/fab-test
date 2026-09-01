@@ -857,15 +857,17 @@ def _open_single_analyzer_report(
     reports: list[str],
     output_dir: Path | None,
 ) -> None:
-    """Open a single-analyzer run's report(s) under `--open-report`.
+    """Build and/or open a single-analyzer run's report(s).
 
     Split out of `_print_summary` to keep that function under the branch
     budget -- this is one self-contained decision (open the sole report,
-    or build and open an index), not several the caller needs to see.
-    Mirrors `_write_and_open_index` so `fab-test a11y` (or `bpa`, `pbir`,
-    ...) with several artifacts behaves the same as `fab-test all` with
-    several analyzers: one index, one thing to open, instead of a warning
-    that nothing launches automatically.
+    or build and maybe open an index), not several the caller needs to
+    see. Mirrors `_write_and_open_index` exactly: an index is written
+    whenever a report is on and there is more than one artifact,
+    independent of `--open-report`, so `fab-test a11y` (or `bpa`, `pbir`,
+    ...) with several artifacts gets the same `fab-test-results/index.html`
+    that `fab-test all` gets with several analyzers -- not only when the
+    browser-opening flag happens to be set too.
     """
     report_on = resolve_report(args)
     open_wanted = resolve_open_report(args)
@@ -878,13 +880,11 @@ def _open_single_analyzer_report(
             "resolved off; skipping"
         )
         return
-    if not open_wanted:
-        return
     if len(results) == 1:
-        if reports:
+        if open_wanted and reports:
             open_report_in_browser(reports[0])
         return
-    if len(results) > 1 and output_dir is not None:
+    if len(results) > 1 and report_on and output_dir is not None:
         rows = [
             {
                 "analyzer": name,
@@ -896,7 +896,8 @@ def _open_single_analyzer_report(
         index = write_index(rows, output_dir)
         if index:
             print(f"  Index:  {_display_path(index)}")
-            open_report_in_browser(index)
+            if open_wanted:
+                open_report_in_browser(index)
 
 
 def _index_row_fields(

@@ -131,6 +131,27 @@ def test_discover_finds_multiple_projects_in_nested_directories(tmp_path):
 
 
 @pytest.mark.fab_test
+def test_discover_skips_pbip_files_inside_excluded_directories(tmp_path):
+    """A `.pbip` inside a directory `_scan.EXCLUDED_DIR_NAMES` prunes (`.venv`,
+    `node_modules`, ...) is not discovered -- a vendored sample or cached
+    wheel should not surface as a project any more than a folder-suffix
+    artifact would (pbip Discovery Shared Pruning epic)."""
+    excluded = tmp_path / ".venv" / "lib"
+    excluded.mkdir(parents=True)
+    _write_pbip(excluded, "Vendored", "Vendored.Report")
+
+    visible = tmp_path / "workspace"
+    visible.mkdir()
+    _write_pbip(visible, "Real", "Real.Report")
+    _write_report(visible, "Real", "../Real.SemanticModel")
+    _write_semantic_model(visible, "Real")
+
+    projects = discover_pbip_projects(tmp_path)
+
+    assert [p.name for p in projects] == ["Real"]
+
+
+@pytest.mark.fab_test
 def test_discover_skips_projects_inside_a_nested_git_checkout(tmp_path):
     """A .pbip inside a separate git checkout (e.g. a worktree under
     .claude/worktrees/<branch>) is not discovered -- a broad repo-root walk

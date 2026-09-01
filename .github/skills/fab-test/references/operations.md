@@ -27,7 +27,7 @@ All results follow the same layout regardless of analyzer:
 ```
 fab-test-results/
   run.json            ← one manifest per invocation
-  index.html          ← per-run index, only with --report on a multi-analyzer run
+  index.html          ← per-run index, with --report whenever more than one artifact ran
   bpa/
     <artifact-stem>/
       envelope.json   ← standardized result (status, findings, duration_ms)

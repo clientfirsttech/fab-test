@@ -187,9 +187,8 @@ def resolve_environments_yml(repo_root: Path | None = None) -> ResolvedMetadata:
     """Return `environments.yml` from a repository layer, never from the wheel.
 
     The one place ``packaged=False`` is spelled for this file, so that no
-    caller among `deploy`, `check_promotion_safety`,
-    `generate_fabric_cicd_config`, the two schema validators, and the
-    Playwright resolver can get the rule wrong on its own.
+    caller among the two schema validators and the Playwright resolver can
+    get the rule wrong on its own.
 
     Raises `MetadataNotFoundError` naming both places the file could go.
     """

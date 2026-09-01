@@ -125,10 +125,9 @@ retries for that reason, and a manual install may need the same patience.
 ### Why the install command looks like that
 
 - **`--extra-index-url https://pypi.org/simple`** — TestPyPI carries
-  `pql-test` 0.1.11 and `fabric-cicd` 0.1.7; this project requires
-  `pql-test==0.1.12` and a current `fabric-cicd`. Without the production index
-  alongside it the install fails to resolve, which reads as a broken package and
-  is not one.
+  `pql-test` 0.1.11; this project requires `pql-test==0.1.12`. Without the
+  production index alongside it the install fails to resolve, which reads
+  as a broken package and is not one.
 - **The exact pin** — `1.0.0.0.dev1` is a PEP 440 dev release. pip skips
   pre-releases unless you name a version exactly or pass `--pre`, so a bare
   `pip install fab-test` finds no acceptable version even once the project

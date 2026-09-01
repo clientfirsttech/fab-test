@@ -207,6 +207,32 @@ def test_multiple_artifacts_builds_and_opens_an_index(tmp_path, monkeypatch, cap
     assert "Index:" in out
 
 
+@pytest.mark.fab_test
+def test_multiple_artifacts_write_an_index_without_open_report(tmp_path, monkeypatch, capsys):
+    """Mirrors `fab-test all`: the index is written whenever `--report` is on
+    and there is more than one artifact, whether or not `--open-report` is
+    also set -- opening is a separate decision from building the page."""
+    output_dir = tmp_path / "fab-test-results"
+    _write_envelope(output_dir, "bpa", "First", report_path=str(tmp_path / "first.html"))
+    _write_envelope(output_dir, "bpa", "Second", report_path=str(tmp_path / "second.html"))
+    artifact_dir = tmp_path / "artifacts"
+
+    calls = []
+    monkeypatch.setattr(
+        fab_test_summary, "open_report_in_browser", lambda path: calls.append(path) or True
+    )
+    args = _FakeArgs(artifact_dir, report=True, open_report=None)
+
+    _print_summary(
+        "bpa", [("First", 0), ("Second", 0)], output_dir=output_dir, args=args
+    )
+
+    assert calls == []
+    out = capsys.readouterr().out
+    assert "Index:" in out
+    assert (output_dir / "index.html").exists()
+
+
 # --------------------------------------------------------------------------- #
 # The guard: --open-report resolves true, resolve_report somehow doesn't
 # --------------------------------------------------------------------------- #

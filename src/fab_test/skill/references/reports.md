@@ -34,7 +34,7 @@ The full list also has a **search box and clickable, sortable column headers** (
 
 ## The per-run index
 
-`fab-test all --report` also writes `fab-test-results/index.html` linking every report and envelope, so one run means one page to open rather than four. It is built from the same rows the terminal summary prints, so its counts cannot disagree with them. Written only for a multi-analyzer run — indexing one analyzer is a page pointing at a single link.
+`fab-test all --report` also writes `fab-test-results/index.html` linking every report and envelope, so one run means one page to open rather than four. It is built from the same rows the terminal summary prints, so its counts cannot disagree with them. A single-analyzer command with more than one artifact (`fab-test a11y`, `bpa`, `pbir`, ...) gets the same treatment under `--report`: an index is written for that run too. Only a single analyzer against exactly one artifact skips the index, since that shape already has one report to point at.
 
 The index header also shows **when the run happened and who ran it**: a UTC timestamp, plus branch/commit/actor sourced from `GITHUB_*` environment variables in CI, falling back to local `git` (branch, commit, `git config user.email`) outside CI, and to an em-dash (`—`) placeholder outside a git checkout entirely — it never raises. Per-analyzer `report.html` deliberately has no timestamp (see above): the index is scoped to one run, not a reusable artifact, which is why only it gained one.
 
@@ -69,7 +69,7 @@ fab-test bpa --no-report --open-report   # invalid: --open-report needs a report
 ```
 
 - **Implies `--report`.** Passing `--open-report` alone still turns report generation on for that run — it is never a silent no-op, and you never have to pass both flags.
-- **Which path it opens** depends on the run shape, the same one [The per-run index](#the-per-run-index) and [Finding the paths](#finding-the-paths) already describe: the index for `fab-test all` (more than one analyzer), the single `report.html`/native report for a single-analyzer command against exactly one artifact. A single analyzer against *several* artifacts has neither an index nor one report to single out — `fab-test` prints a note instead of guessing which one to open.
+- **Which path it opens** depends on the run shape, the same one [The per-run index](#the-per-run-index) and [Finding the paths](#finding-the-paths) already describe: the index for any run with more than one artifact (`fab-test all` across analyzers, or one analyzer across several artifacts), the single `report.html`/native report for a single-analyzer command against exactly one artifact. Every shape with more than one report to choose from opens the same kind of page, rather than only some of them opening anything.
 - **A no-op under CI.** `--open-report` is suppressed whenever `GITHUB_ACTIONS` or `CI` is set: a build agent has no display to pop a browser onto, so it falls back to printing the path exactly like a run without `--open-report` would. Do not add it to a pipeline YAML — the guard means it does nothing there anyway.
 - **Never fails a run.** No browser available, no display, `webbrowser.open()` raising — every one of these prints the path instead of raising, matching the report renderer's own "a failure to render is a warning, never a failed build" contract above.
 - **Env var**: `ANALYZER_OPEN_REPORT=1` behaves like passing the flag, one level below the CLI flag in precedence (same chain as `ANALYZER_REPORT`).
