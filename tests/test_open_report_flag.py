@@ -18,7 +18,7 @@ import sys
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts._report_html import (
+from fab_test.scripts._report_html import (
     open_report_conflict,
     resolve_open_report,
     resolve_report,
@@ -27,7 +27,7 @@ from fabric_ci_cd_dataops.scripts._report_html import (
 
 def _run_cli(*argv, env=None):
     return subprocess.run(
-        [sys.executable, "-m", "fabric_ci_cd_dataops.scripts.fab_test", *argv],
+        [sys.executable, "-m", "fab_test.scripts.fab_test", *argv],
         capture_output=True,
         text=True,
         encoding="utf-8",
@@ -175,14 +175,14 @@ def test_open_report_flag_exists_on_an_analyzer_subcommand():
 
 @pytest.mark.fab_test
 def test_open_report_is_a_valid_config_key():
-    from fabric_ci_cd_dataops.scripts._config import validate_config
+    from fab_test.scripts._config import validate_config
 
     validate_config({"open_report": True})
 
 
 @pytest.mark.fab_test
 def test_open_report_config_key_must_be_a_boolean():
-    from fabric_ci_cd_dataops.scripts._config import ConfigError, validate_config
+    from fab_test.scripts._config import ConfigError, validate_config
 
     with pytest.raises(ConfigError):
         validate_config({"open_report": "yes"})
@@ -194,9 +194,9 @@ def test_open_report_key_is_in_the_published_schema():
     import json
     from pathlib import Path
 
-    import fabric_ci_cd_dataops
+    import fab_test
 
-    schema_path = Path(fabric_ci_cd_dataops.__file__).parent / "schemas" / "fab-test.schema.json"
+    schema_path = Path(fab_test.__file__).parent / "schemas" / "fab-test.schema.json"
     schema = json.loads(schema_path.read_text(encoding="utf-8"))
 
     assert "open_report" in schema["properties"]

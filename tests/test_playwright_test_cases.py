@@ -8,14 +8,14 @@ from pathlib import Path
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts.playwright_validation.config import PlaywrightValidationConfig
-from fabric_ci_cd_dataops.scripts.playwright_validation.test_cases import (
+from fab_test.scripts.playwright_validation.config import PlaywrightValidationConfig
+from fab_test.scripts.playwright_validation.test_cases import (
     DiscoveredBookmark,
     DiscoveredPage,
     generate_test_cases,
     write_test_cases,
 )
-from fabric_ci_cd_dataops.scripts.playwright_validation.test_cases import (
+from fab_test.scripts.playwright_validation.test_cases import (
     TestCase as PlaywrightTestCase,
 )
 

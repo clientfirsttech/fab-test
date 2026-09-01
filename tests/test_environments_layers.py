@@ -22,14 +22,14 @@ from pathlib import Path
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts import (
+from fab_test.scripts import (
     check_promotion_safety,
     deploy,
     generate_fabric_cicd_config,
     validate_environments_schema,
     validate_environments_yaml,
 )
-from fabric_ci_cd_dataops.scripts.playwright_validation import resolver
+from fab_test.scripts.playwright_validation import resolver
 
 # Valid for the stricter of the two validators, so a resolution test that
 # reaches the right file reports success rather than a schema complaint.

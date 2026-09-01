@@ -7,7 +7,7 @@ from unittest import mock
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts.run_analyzer import AnalyzerRunner, main
+from fab_test.scripts.run_analyzer import AnalyzerRunner, main
 
 
 class TestAnalyzerRunner:
@@ -80,7 +80,7 @@ class TestAnalyzerRunner:
             analyzer_name="tabular_editor_bpa",
         )
 
-        from fabric_ci_cd_dataops.scripts._metadata import BPA_RULES
+        from fab_test.scripts._metadata import BPA_RULES
 
         # The resolved path must not be the literal placeholder, and must
         # name a real rules file under some metadata layer.

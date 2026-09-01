@@ -22,7 +22,7 @@ import sys
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts.fab_test_summary import (
+from fab_test.scripts.fab_test_summary import (
     _paint,
     _print_all_summary,
     color_enabled,
@@ -45,7 +45,7 @@ class _FakeStream:
 
 def _run_cli(*argv, env=None):
     return subprocess.run(
-        [sys.executable, "-m", "fabric_ci_cd_dataops.scripts.fab_test", *argv],
+        [sys.executable, "-m", "fab_test.scripts.fab_test", *argv],
         capture_output=True,
         text=True,
         encoding="utf-8",
@@ -143,7 +143,7 @@ def _summary_args(artifact_dir, output_dir, output_format="text"):
 
 
 def _envelope_with(output_dir, analyzer, stem, findings):
-    from fabric_ci_cd_dataops.scripts._analyzer_envelope import EnvelopeIdentity, build_envelope
+    from fab_test.scripts._analyzer_envelope import EnvelopeIdentity, build_envelope
 
     path = output_dir / analyzer / stem
     path.mkdir(parents=True, exist_ok=True)

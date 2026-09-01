@@ -7,7 +7,7 @@ from typing import Any
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts.playwright_validation.resolver import (
+from fab_test.scripts.playwright_validation.resolver import (
     ItemNotFoundError,
     ResolvedItem,
     ResolvedReport,
@@ -498,7 +498,7 @@ def test_resolve_environment_names_both_routes_when_neither_is_available(
     monkeypatch,
 ) -> None:
     """No workspace and no environments.yml names both ways to fix it."""
-    from fabric_ci_cd_dataops.scripts import _metadata
+    from fab_test.scripts import _metadata
 
     monkeypatch.setattr(
         _metadata,
@@ -510,7 +510,7 @@ def test_resolve_environment_names_both_routes_when_neither_is_available(
             )
         ),
     )
-    import fabric_ci_cd_dataops.scripts.playwright_validation.resolver as resolver_module
+    import fab_test.scripts.playwright_validation.resolver as resolver_module
 
     monkeypatch.setattr(
         resolver_module, "resolve_environments_yml", _metadata.resolve_environments_yml

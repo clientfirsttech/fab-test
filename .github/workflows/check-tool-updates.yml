@@ -72,7 +72,7 @@ jobs:
                   (r.url ? ` ([release](${r.url}))` : "")
               ),
               "",
-              "Edit `src/fabric_ci_cd_dataops/metadata/analyzers.json` to bump the pin(s) above,",
+              "Edit `src/fab_test/metadata/analyzers.json` to bump the pin(s) above,",
               "then follow the release procedure in `docs/RELEASE.md` -- including recording a",
               "fresh `install_sha256` per platform for the new download.",
             ].join("\n");

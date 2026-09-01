@@ -17,7 +17,7 @@ from pathlib import Path
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts.invoke_pbir_inspector import fix_screenshot_images
+from fab_test.scripts.invoke_pbir_inspector import fix_screenshot_images
 
 _TEMPLATE_SNIPPET = (
     '{ "<>": "img", "src": function () { if (this.ParentName != null) { '

@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts._analyzer_tool_bootstrap import (
+from fab_test.scripts._analyzer_tool_bootstrap import (
     UnsupportedPlatformError,
     _verify_checksum,
     resolve_executable,
@@ -586,7 +586,7 @@ def test_resolve_executable_reuses_cache_at_the_same_version_without_network(
         raise AssertionError("must not download when the versioned cache already has a hit")
 
     monkeypatch.setattr(
-        "fabric_ci_cd_dataops.scripts._analyzer_tool_bootstrap._download", _fail_if_called
+        "fab_test.scripts._analyzer_tool_bootstrap._download", _fail_if_called
     )
 
     with unittest.mock.patch("sys.platform", "win32"):
@@ -637,7 +637,7 @@ def test_no_declared_version_uses_the_pre_epic_unversioned_cache_path(tmp_path, 
 @pytest.mark.fab_test
 def test_probe_executable_reports_the_declared_version_on_a_cache_hit(tmp_path, monkeypatch):
     """`doctor`'s engine names the resolved version alongside a cached-download hit."""
-    from fabric_ci_cd_dataops.scripts._analyzer_tool_bootstrap import probe_executable
+    from fab_test.scripts._analyzer_tool_bootstrap import probe_executable
 
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
@@ -662,7 +662,7 @@ def test_probe_executable_reports_the_declared_version_on_a_cache_hit(tmp_path, 
 @pytest.mark.fab_test
 def test_probe_executable_names_the_env_var_shadowing_a_pinned_version(tmp_path, monkeypatch):
     """A local env-var override says so and names the variable to unset."""
-    from fabric_ci_cd_dataops.scripts._analyzer_tool_bootstrap import probe_executable
+    from fab_test.scripts._analyzer_tool_bootstrap import probe_executable
 
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
@@ -684,7 +684,7 @@ def test_probe_executable_names_the_env_var_shadowing_a_pinned_version(tmp_path,
 @pytest.mark.fab_test
 def test_probe_executable_cli_argument_never_gets_a_shadow_note(tmp_path, monkeypatch):
     """An explicit --path flag is a per-invocation choice, not a silent trap."""
-    from fabric_ci_cd_dataops.scripts._analyzer_tool_bootstrap import probe_executable
+    from fab_test.scripts._analyzer_tool_bootstrap import probe_executable
 
     repo_root = tmp_path / "repo"
     repo_root.mkdir()

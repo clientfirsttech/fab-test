@@ -21,8 +21,8 @@ from pathlib import Path
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts._telemetry import EventhouseConfig
-from fabric_ci_cd_dataops.scripts.eventhouse_logger import EventhouseSink
+from fab_test.scripts._telemetry import EventhouseConfig
+from fab_test.scripts.eventhouse_logger import EventhouseSink
 
 _URI = "https://trd-abc123.z9.kusto.fabric.microsoft.com"
 
@@ -218,7 +218,7 @@ def test_ingest_references_the_payload_mapping():
     it Kusto maps by column name and every field but `Data` is dropped on the
     floor, silently.
     """
-    from fabric_ci_cd_dataops.scripts.eventhouse_logger import (
+    from fab_test.scripts.eventhouse_logger import (
         PAYLOAD_MAPPING,
         IngestDependencies,
     )
@@ -270,7 +270,7 @@ def test_the_ingest_endpoint_carries_the_ingest_prefix():
 
     Queued ingest against the query endpoint is refused by the cluster.
     """
-    from fabric_ci_cd_dataops.scripts.eventhouse_logger import _ingest_uri
+    from fab_test.scripts.eventhouse_logger import _ingest_uri
 
     assert _ingest_uri("https://trd-abc.z2.kusto.fabric.microsoft.com").startswith(
         "https://ingest-trd-abc"
@@ -284,7 +284,7 @@ def test_an_ingest_uri_is_not_prefixed_twice():
     Fabric shows people the `ingest-` URI, so it is what they paste into
     `fab-test.yml`. Prefixing it again produces a host that does not exist.
     """
-    from fabric_ci_cd_dataops.scripts.eventhouse_logger import _ingest_uri
+    from fab_test.scripts.eventhouse_logger import _ingest_uri
 
     already = "https://ingest-trd-abc.z2.kusto.fabric.microsoft.com"
     assert _ingest_uri(already) == already
@@ -299,7 +299,7 @@ def test_the_placeholder_banner_is_gone():
     """
     source = (
         Path(__file__).resolve().parents[1]
-        / "src/fabric_ci_cd_dataops/scripts/eventhouse_logger.py"
+        / "src/fab_test/scripts/eventhouse_logger.py"
     ).read_text(encoding="utf-8")
 
     for banished in ("SIMULATION", "Placeholder Implementation", "to be implemented"):

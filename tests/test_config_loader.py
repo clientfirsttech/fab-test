@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts._config import (
+from fab_test.scripts._config import (
     _VALID_KEYS,
     CONFIG_FILENAME,
     ConfigError,
@@ -31,7 +31,7 @@ from fabric_ci_cd_dataops.scripts._config import (
 _SCHEMA_PATH = (
     Path(__file__).resolve().parents[1]
     / "src"
-    / "fabric_ci_cd_dataops"
+    / "fab_test"
     / "schemas"
     / "fab-test.schema.json"
 )
@@ -656,7 +656,7 @@ def test_cli_flag_wins_over_config_for_every_argparse_backed_setting(monkeypatch
     """A CLI flag wins over [tool.fab-test] for jobs/format/artifact-dir/output-dir --
     the settings that still use baked-in argparse defaults rather than the resolver.
     """
-    from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
+    from fab_test.scripts import fab_test as fab_test_module
 
     monkeypatch.setattr(
         fab_test_module,

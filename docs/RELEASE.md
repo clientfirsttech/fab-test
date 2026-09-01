@@ -72,7 +72,7 @@ before it reaches the upload step.
 
 ### 1. Bump the version — one file
 
-`src/fabric_ci_cd_dataops/__init__.py` is the only place the version is written.
+`src/fab_test/__init__.py` is the only place the version is written.
 `pyproject.toml` reads it through `[tool.setuptools.dynamic]`, so there is no
 second place to keep in step.
 
@@ -282,7 +282,7 @@ upstream has moved past the pin — that issue is normally what starts this
 procedure, though `python tools/check_tool_updates.py` can be run by hand too.
 
 1. **Edit the pin** in
-   [`src/fabric_ci_cd_dataops/metadata/analyzers.json`](../src/fabric_ci_cd_dataops/metadata/analyzers.json):
+   [`src/fab_test/metadata/analyzers.json`](../src/fab_test/metadata/analyzers.json):
    bump `tool_install.version` to the new release.
 2. **Record a fresh checksum per platform.** Download each platform's asset for
    the new version and hash it:

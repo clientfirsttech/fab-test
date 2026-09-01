@@ -5,7 +5,7 @@ fab-test Skill Componentization epic) is hand-authored and synced to the
 CLI only by the `document` skill's discipline -- nothing stops a `pip
 install`d fab-test from running a version its own skill files were never
 updated for. These tests guard the two halves of the fix: the packaged
-copy under `src/fabric_ci_cd_dataops/skill/` never drifts from the
+copy under `src/fab_test/skill/` never drifts from the
 authored source, file for file, and the main file's frontmatter names the
 version it was packaged with so a hand-copy outside this repo still shows
 its age. See the fab-test Skill Distribution and Skill Componentization
@@ -19,8 +19,8 @@ from pathlib import Path
 
 import pytest
 
-from fabric_ci_cd_dataops import __version__
-from fabric_ci_cd_dataops.scripts._metadata import (
+from fab_test import __version__
+from fab_test.scripts._metadata import (
     PACKAGED_ORIGIN,
     PACKAGED_SKILL_DIR,
     resolve_skill_dir,

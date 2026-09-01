@@ -13,7 +13,7 @@ import json
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts._rule_overlay import (
+from fab_test.scripts._rule_overlay import (
     RuleOverlayError,
     apply_overlay,
     apply_pbir_overlay,

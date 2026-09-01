@@ -21,9 +21,9 @@ import sys
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts import fab_test as fab_test_module
-from fabric_ci_cd_dataops.scripts import fab_test_admin
-from fabric_ci_cd_dataops.scripts._credentials import CredentialStatus
+from fab_test.scripts import fab_test as fab_test_module
+from fab_test.scripts import fab_test_admin
+from fab_test.scripts._credentials import CredentialStatus
 
 _GUID = "33333333-3333-3333-3333-333333333333"
 _SECRET = "s3cr3t-do-not-print"
@@ -58,7 +58,7 @@ def _resolved(**overrides):
 
 def _run_cli(*argv, env=None, cwd=None):
     return subprocess.run(
-        [sys.executable, "-m", "fabric_ci_cd_dataops.scripts.fab_test", *argv],
+        [sys.executable, "-m", "fab_test.scripts.fab_test", *argv],
         capture_output=True,
         text=True,
         encoding="utf-8",

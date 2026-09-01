@@ -18,7 +18,7 @@ import json
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts.eventhouse_logger import (
+from fab_test.scripts.eventhouse_logger import (
     VALID_TABLES,
     load_payload,
     main,

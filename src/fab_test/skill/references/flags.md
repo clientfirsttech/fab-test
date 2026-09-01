@@ -356,7 +356,7 @@ fab-test playwright --artifact "Not Working Visuals" --env dev --env-file .env
 fab-test playwright --artifact SalesReport --env test --env-file .env
 ```
 
-When [`resolve_item`](../../../../src/fabric_ci_cd_dataops/scripts/playwright_validation/resolver.py)
+When [`resolve_item`](../../../../src/fab_test/scripts/playwright_validation/resolver.py)
 finds no match, the message names the closest candidates the workspace actually has
 (capped for an 80-column terminal), says plainly when the workspace has no items of
 that type at all, and lists the workspace once rather than twice:

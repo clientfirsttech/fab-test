@@ -97,7 +97,7 @@ Update only the **"Run analyzers locally before pushing"** section. Do not touch
 
 That directory is also fab-test's own packaged skill resource (fab-test Skill
 Distribution and Skill Componentization epics) — every file under
-`src/fabric_ci_cd_dataops/skill/` (`SKILL.md` and each `references/*.md`) must
+`src/fab_test/skill/` (`SKILL.md` and each `references/*.md`) must
 carry an identical copy of its authored counterpart, and the main `SKILL.md`'s
 frontmatter `description` must name the current `__version__`. Copy whichever
 files changed and re-stamp the version by hand; do not diff the two trees side

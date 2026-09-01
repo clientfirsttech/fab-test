@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts._telemetry import (
+from fab_test.scripts._telemetry import (
     ENABLE_VAR,
     EVENTHOUSE_DATABASE_VAR,
     EVENTHOUSE_URI_VAR,

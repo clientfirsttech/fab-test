@@ -18,8 +18,8 @@ from pathlib import Path
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts.fab_test import _resolve_timeout, _run_analyzer, build_parser
-from fabric_ci_cd_dataops.scripts.fab_test_registry import build_pbir_command
+from fab_test.scripts.fab_test import _resolve_timeout, _run_analyzer, build_parser
+from fab_test.scripts.fab_test_registry import build_pbir_command
 from tests.conftest import _RunAnalyzerArgs, _stub_subprocess_run, _TimeoutArgs
 
 # --------------------------------------------------------------------------- #
@@ -81,7 +81,7 @@ def test_bpa_help_shows_timeout_flag():
 @pytest.mark.fab_test
 def test_run_analyzer_passes_resolved_timeout_to_subprocess(tmp_path, monkeypatch):
     """_run_analyzer forwards the resolved timeout to subprocess.run."""
-    from fabric_ci_cd_dataops.scripts import fab_test_execution
+    from fab_test.scripts import fab_test_execution
 
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
@@ -132,7 +132,7 @@ def test_run_analyzer_default_jobs_runs_artifacts_sequentially(tmp_path, monkeyp
     import threading
     import time
 
-    from fabric_ci_cd_dataops.scripts import fab_test_execution
+    from fab_test.scripts import fab_test_execution
 
     artifact_dir = tmp_path / "artifacts"
     for i in range(3):
@@ -169,7 +169,7 @@ def test_run_analyzer_jobs_n_runs_artifacts_concurrently(tmp_path, monkeypatch):
     """--jobs 3 runs up to 3 artifacts of the same analyzer in parallel."""
     import threading
 
-    from fabric_ci_cd_dataops.scripts import fab_test_execution
+    from fab_test.scripts import fab_test_execution
 
     artifact_dir = tmp_path / "artifacts"
     for i in range(3):
@@ -197,7 +197,7 @@ def test_run_analyzer_jobs_n_runs_artifacts_concurrently(tmp_path, monkeypatch):
 @pytest.mark.fab_test
 def test_run_analyzer_parallel_writes_one_envelope_per_artifact(tmp_path, monkeypatch):
     """Each artifact still writes its own envelope; the summary waits for all."""
-    from fabric_ci_cd_dataops.scripts import fab_test_execution
+    from fab_test.scripts import fab_test_execution
 
     artifact_dir = tmp_path / "artifacts"
     stems = [f"Model{i}" for i in range(3)]
@@ -238,7 +238,7 @@ def test_run_analyzer_parallel_writes_one_envelope_per_artifact(tmp_path, monkey
 @pytest.mark.fab_test
 def test_progress_shown_non_ci_multiple_artifacts(tmp_path, monkeypatch, capsys):
     """A non-CI run with multiple artifacts shows 'artifact N of M'."""
-    from fabric_ci_cd_dataops.scripts import fab_test_execution
+    from fab_test.scripts import fab_test_execution
 
     artifact_dir = tmp_path / "artifacts"
     for i in range(3):
@@ -262,7 +262,7 @@ def test_progress_shown_non_ci_multiple_artifacts(tmp_path, monkeypatch, capsys)
 @pytest.mark.fab_test
 def test_progress_not_shown_for_single_artifact(tmp_path, monkeypatch, capsys):
     """A single-artifact run shows no 'N of 1' progress noise."""
-    from fabric_ci_cd_dataops.scripts import fab_test_execution
+    from fab_test.scripts import fab_test_execution
 
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
@@ -283,7 +283,7 @@ def test_progress_not_shown_for_single_artifact(tmp_path, monkeypatch, capsys):
 @pytest.mark.fab_test
 def test_progress_emitted_as_ci_notice(tmp_path, monkeypatch, capsys):
     """In CI (GITHUB_ACTIONS), progress is a ::notice:: annotation, not plain text."""
-    from fabric_ci_cd_dataops.scripts import fab_test_execution
+    from fab_test.scripts import fab_test_execution
 
     artifact_dir = tmp_path / "artifacts"
     for i in range(2):
@@ -309,7 +309,7 @@ def test_progress_emitted_as_ci_notice(tmp_path, monkeypatch, capsys):
 @pytest.mark.fab_test
 def test_artifact_start_line_still_printed_alongside_progress(tmp_path, monkeypatch, capsys):
     """The per-artifact '▶ fab-test ... → stem' line still prints as artifacts start."""
-    from fabric_ci_cd_dataops.scripts import fab_test_execution
+    from fab_test.scripts import fab_test_execution
 
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
@@ -355,7 +355,7 @@ def _make_warning_envelope(output_dir: Path, analyzer: str, stem: str) -> None:
 @pytest.mark.fab_test
 def test_run_analyzer_warning_no_name_error_outside_ci(tmp_path, monkeypatch):
     """Regression: warning-level findings must not raise NameError outside CI."""
-    from fabric_ci_cd_dataops.scripts import fab_test_execution
+    from fab_test.scripts import fab_test_execution
 
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
@@ -378,7 +378,7 @@ def test_run_analyzer_warning_no_name_error_outside_ci(tmp_path, monkeypatch):
 @pytest.mark.fab_test
 def test_run_analyzer_warning_emits_pr_review_comment_in_ci(tmp_path, monkeypatch):
     """Warning-level findings trigger PR review comments when running in CI."""
-    from fabric_ci_cd_dataops.scripts import fab_test_execution
+    from fab_test.scripts import fab_test_execution
 
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
@@ -416,7 +416,7 @@ def test_run_analyzer_playwright_with_impact_manifest_is_repository_scoped(
     tmp_path, monkeypatch
 ):
     """Playwright with --impact-manifest runs once, not per local Report artifact."""
-    from fabric_ci_cd_dataops.scripts import fab_test_execution
+    from fab_test.scripts import fab_test_execution
 
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "ReportOne.Report").mkdir(parents=True)
@@ -451,7 +451,7 @@ def test_run_analyzer_playwright_with_impact_manifest_is_repository_scoped(
 @pytest.mark.fab_test
 def test_run_analyzer_error_does_not_emit_pr_review_comment(tmp_path, monkeypatch):
     """Error-level findings are annotations only; PR comments are reserved for warnings."""
-    from fabric_ci_cd_dataops.scripts import fab_test_execution
+    from fab_test.scripts import fab_test_execution
 
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)

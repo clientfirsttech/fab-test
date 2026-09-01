@@ -8,9 +8,9 @@ import pytest
 
 pytestmark = [pytest.mark.a11y, pytest.mark.analyzers]
 
-import fabric_ci_cd_dataops.scripts.invoke_pbir_a11y as invoke_pbir_a11y
-from fabric_ci_cd_dataops.scripts._analyzer_envelope import ENVELOPE_REQUIRED_KEYS
-from fabric_ci_cd_dataops.scripts.invoke_pbir_a11y import (
+import fab_test.scripts.invoke_pbir_a11y as invoke_pbir_a11y
+from fab_test.scripts._analyzer_envelope import ENVELOPE_REQUIRED_KEYS
+from fab_test.scripts.invoke_pbir_a11y import (
     _classify_a11y_result,
     _map_a11y_severity,
     build_a11y_command,
@@ -233,8 +233,8 @@ class TestRunA11y:
         Args.fail_on = fail_on
         return Args()
 
-    @mock.patch("fabric_ci_cd_dataops.scripts.invoke_pbir_a11y.shutil.which", return_value="node")
-    @mock.patch("fabric_ci_cd_dataops.scripts.invoke_pbir_a11y.subprocess.run")
+    @mock.patch("fab_test.scripts.invoke_pbir_a11y.shutil.which", return_value="node")
+    @mock.patch("fab_test.scripts.invoke_pbir_a11y.subprocess.run")
     def test_run_passes_with_no_findings(self, mock_run, _mock_which, tmp_path: Path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         artifact = tmp_path / "R.Report"
@@ -252,8 +252,8 @@ class TestRunA11y:
         assert data["findings"] == []
         assert set(ENVELOPE_REQUIRED_KEYS) <= set(data.keys())
 
-    @mock.patch("fabric_ci_cd_dataops.scripts.invoke_pbir_a11y.shutil.which", return_value="node")
-    @mock.patch("fabric_ci_cd_dataops.scripts.invoke_pbir_a11y.subprocess.run")
+    @mock.patch("fab_test.scripts.invoke_pbir_a11y.shutil.which", return_value="node")
+    @mock.patch("fab_test.scripts.invoke_pbir_a11y.subprocess.run")
     def test_run_fails_with_error_findings(self, mock_run, _mock_which, tmp_path: Path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         artifact = tmp_path / "R.Report"
@@ -270,8 +270,8 @@ class TestRunA11y:
         assert data["status"] == "failed"
         assert len(data["findings"]) == 2
 
-    @mock.patch("fabric_ci_cd_dataops.scripts.invoke_pbir_a11y.shutil.which", return_value="node")
-    @mock.patch("fabric_ci_cd_dataops.scripts.invoke_pbir_a11y.subprocess.run")
+    @mock.patch("fab_test.scripts.invoke_pbir_a11y.shutil.which", return_value="node")
+    @mock.patch("fab_test.scripts.invoke_pbir_a11y.subprocess.run")
     def test_run_reports_tool_error_distinctly_from_findings(self, mock_run, _mock_which, tmp_path: Path, monkeypatch):
         """Exit code 2 (bad/unreadable path) is a tool error, never a rule violation."""
         monkeypatch.chdir(tmp_path)
@@ -289,8 +289,8 @@ class TestRunA11y:
         assert data["status"] == "error"
         assert data["findings"] == []
 
-    @mock.patch("fabric_ci_cd_dataops.scripts.invoke_pbir_a11y.shutil.which", return_value="node")
-    @mock.patch("fabric_ci_cd_dataops.scripts.invoke_pbir_a11y.subprocess.run")
+    @mock.patch("fab_test.scripts.invoke_pbir_a11y.shutil.which", return_value="node")
+    @mock.patch("fab_test.scripts.invoke_pbir_a11y.subprocess.run")
     def test_run_forwards_fail_on_to_the_command(self, mock_run, _mock_which, tmp_path: Path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         artifact = tmp_path / "R.Report"
@@ -305,8 +305,8 @@ class TestRunA11y:
         called_command = mock_run.call_args[0][0]
         assert called_command[-2:] == ["--fail-on", "warn"]
 
-    @mock.patch("fabric_ci_cd_dataops.scripts.invoke_pbir_a11y.shutil.which", return_value="node")
-    @mock.patch("fabric_ci_cd_dataops.scripts.invoke_pbir_a11y.subprocess.run")
+    @mock.patch("fab_test.scripts.invoke_pbir_a11y.shutil.which", return_value="node")
+    @mock.patch("fab_test.scripts.invoke_pbir_a11y.subprocess.run")
     def test_run_uses_utf8_explicitly_for_subprocess_decoding(self, mock_run, _mock_which, tmp_path: Path, monkeypatch):
         """Node writes UTF-8 regardless of platform; a locale-default decode
         corrupts non-ASCII output (discovered live: 'Card · fields' via
@@ -323,8 +323,8 @@ class TestRunA11y:
         run_a11y(self._args(artifact, a11y_path, output))
         assert mock_run.call_args.kwargs["encoding"] == "utf-8"
 
-    @mock.patch("fabric_ci_cd_dataops.scripts.invoke_pbir_a11y.shutil.which", return_value="node")
-    @mock.patch("fabric_ci_cd_dataops.scripts.invoke_pbir_a11y.subprocess.run")
+    @mock.patch("fab_test.scripts.invoke_pbir_a11y.shutil.which", return_value="node")
+    @mock.patch("fab_test.scripts.invoke_pbir_a11y.subprocess.run")
     def test_run_writes_a_report_when_enabled_even_with_zero_findings(
         self, mock_run, _mock_which, tmp_path: Path, monkeypatch
     ):
@@ -347,9 +347,9 @@ class TestRunA11y:
         assert report.exists()
         assert "R.Report" in report.read_text(encoding="utf-8")
 
-    @mock.patch("fabric_ci_cd_dataops.scripts.invoke_pbir_a11y.shutil.which", return_value="node")
+    @mock.patch("fab_test.scripts.invoke_pbir_a11y.shutil.which", return_value="node")
     @mock.patch(
-        "fabric_ci_cd_dataops.scripts.invoke_pbir_a11y.subprocess.run",
+        "fab_test.scripts.invoke_pbir_a11y.subprocess.run",
         side_effect=FileNotFoundError,
     )
     def test_run_handles_a_run_time_missing_node(self, _mock_run, _mock_which, tmp_path: Path, monkeypatch):
@@ -369,7 +369,7 @@ class TestRunA11y:
 
 
 class TestMain:
-    @mock.patch("fabric_ci_cd_dataops.scripts.invoke_pbir_a11y.run_a11y", return_value=0)
+    @mock.patch("fab_test.scripts.invoke_pbir_a11y.run_a11y", return_value=0)
     def test_main_accepts_verbose_flag(self, mock_run_a11y, monkeypatch):
         monkeypatch.setattr(
             "sys.argv",
@@ -379,7 +379,7 @@ class TestMain:
         args = mock_run_a11y.call_args[0][0]
         assert args.verbose is True
 
-    @mock.patch("fabric_ci_cd_dataops.scripts.invoke_pbir_a11y.run_a11y", return_value=1)
+    @mock.patch("fab_test.scripts.invoke_pbir_a11y.run_a11y", return_value=1)
     def test_main_returns_run_a11y_code(self, _mock_run_a11y, monkeypatch):
         monkeypatch.setattr(
             "sys.argv",

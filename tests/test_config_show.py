@@ -14,7 +14,7 @@ import subprocess
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts.fab_test_summary import _print_config_show
+from fab_test.scripts.fab_test_summary import _print_config_show
 
 _EXPECTED_KEYS = {
     "artifact_dir",

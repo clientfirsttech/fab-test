@@ -10,12 +10,12 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-from fabric_ci_cd_dataops.scripts.invoke_playwright import (
+from fab_test.scripts.invoke_playwright import (
     _build_config_from_args,
     parse_args,
 )
-from fabric_ci_cd_dataops.scripts.playwright_validation.config import PlaywrightValidationConfig
-from fabric_ci_cd_dataops.scripts.playwright_validation.resolver import (
+from fab_test.scripts.playwright_validation.config import PlaywrightValidationConfig
+from fab_test.scripts.playwright_validation.resolver import (
     ResolvedEnvironment,
     ResolvedReport,
 )
@@ -52,11 +52,11 @@ def test_build_config_from_args_report_type_flag_overrides_auto_detection() -> N
     client = object()
 
     with (
-        patch("fabric_ci_cd_dataops.scripts.invoke_playwright.load_config", return_value=config),
-        patch("fabric_ci_cd_dataops.scripts.invoke_playwright.resolve_environment") as mock_env,
-        patch("fabric_ci_cd_dataops.scripts.invoke_playwright.resolve_report", return_value=resolved) as mock_report,
+        patch("fab_test.scripts.invoke_playwright.load_config", return_value=config),
+        patch("fab_test.scripts.invoke_playwright.resolve_environment") as mock_env,
+        patch("fab_test.scripts.invoke_playwright.resolve_report", return_value=resolved) as mock_report,
         patch(
-            "fabric_ci_cd_dataops.scripts.invoke_playwright.build_fabric_service_client",
+            "fab_test.scripts.invoke_playwright.build_fabric_service_client",
             return_value=client,
         ),
     ):

@@ -10,10 +10,10 @@ from pathlib import Path
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts.aggregate_security_findings import load_findings
-from fabric_ci_cd_dataops.scripts.aggregate_security_findings import main as aggregate_main
-from fabric_ci_cd_dataops.scripts.scan_credentials import PATTERNS, scan_file_for_credentials
-from fabric_ci_cd_dataops.scripts.scan_entropy import calculate_entropy, scan_file_for_high_entropy
+from fab_test.scripts.aggregate_security_findings import load_findings
+from fab_test.scripts.aggregate_security_findings import main as aggregate_main
+from fab_test.scripts.scan_credentials import PATTERNS, scan_file_for_credentials
+from fab_test.scripts.scan_entropy import calculate_entropy, scan_file_for_high_entropy
 
 
 class TestAggregateSecurityFindings:

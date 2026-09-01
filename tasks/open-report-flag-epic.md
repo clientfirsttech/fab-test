@@ -9,10 +9,10 @@ A human running `fab-test` locally with `--report` on gets a path printed to std
 
 Discovery findings that shaped scope (see vision.md's Blast Radius — `--report` surfacing already bit this codebase twice: once for not saying where the file went, once for saying it twice):
 
-- **Report location varies by run shape.** `fab-test all` (>1 analyzer) writes a per-run `index.html` via `write_index` ([_report_html.py](../src/fabric_ci_cd_dataops/scripts/_report_html.py)); a single analyzer with one artifact has exactly one `report.html`/native report (`_report_path_for` in [fab_test_summary.py](../src/fabric_ci_cd_dataops/scripts/fab_test_summary.py)); a single analyzer with *multiple* artifacts has neither today — `_print_summary` never calls `write_index`, only the `all` path does. Decision: open the index when one exists, open the single report when there's exactly one, and print a note (no browser launch) for the multi-artifact/single-analyzer case rather than building a second index path this epic doesn't need.
+- **Report location varies by run shape.** `fab-test all` (>1 analyzer) writes a per-run `index.html` via `write_index` ([_report_html.py](../src/fab_test/scripts/_report_html.py)); a single analyzer with one artifact has exactly one `report.html`/native report (`_report_path_for` in [fab_test_summary.py](../src/fab_test/scripts/fab_test_summary.py)); a single analyzer with *multiple* artifacts has neither today — `_print_summary` never calls `write_index`, only the `all` path does. Decision: open the index when one exists, open the single report when there's exactly one, and print a note (no browser launch) for the multi-artifact/single-analyzer case rather than building a second index path this epic doesn't need.
 - **`--open-report` implies `--report`.** Passing it alone should not be a silent no-op or a hard error; it turns report generation on for that run so the flag always does something.
 - **CI must not attempt to open anything.** `fab_test_execution.py`, `_analyzer_annotations.py`, and `_analyzer_tool_bootstrap.py` each already carry their own `_is_ci()` (`GITHUB_ACTIONS` or `CI` env var) — this epic reuses that exact check rather than inventing a fourth detection strategy. Consolidating the four copies into one shared helper is a real but separate cleanup, deferred below.
-- **Scope of the flag**: lives in the same mutually-exclusive `report_group` in [fab_test_parser.py](../src/fabric_ci_cd_dataops/scripts/fab_test_parser.py) as `--report`/`--no-report`, so every subcommand that accepts one accepts the other — no per-command special-casing.
+- **Scope of the flag**: lives in the same mutually-exclusive `report_group` in [fab_test_parser.py](../src/fab_test/scripts/fab_test_parser.py) as `--report`/`--no-report`, so every subcommand that accepts one accepts the other — no per-command special-casing.
 
 ---
 
@@ -21,7 +21,7 @@ Discovery findings that shaped scope (see vision.md's Blast Radius — `--report
 `fab-test <cmd> --open-report` should turn on both opening and (if not already on) report generation, resolved through the same CLI > env > config-file > default precedence every other setting uses.
 
 **Requirements**:
-- Given `--open-report` is passed, should resolve `open_report=True` via `resolve_setting("open_report", cli_value=..., env_var="ANALYZER_OPEN_REPORT", ...)`, mirroring `resolve_report`'s shape in [_report_html.py](../src/fabric_ci_cd_dataops/scripts/_report_html.py)
+- Given `--open-report` is passed, should resolve `open_report=True` via `resolve_setting("open_report", cli_value=..., env_var="ANALYZER_OPEN_REPORT", ...)`, mirroring `resolve_report`'s shape in [_report_html.py](../src/fab_test/scripts/_report_html.py)
 - Given `--open-report` is passed without `--report`/`--no-report`, should still resolve `report=True` for that invocation (auto-enable), without requiring the user to pass both flags
 - Given `--no-report --open-report` (explicit conflict), should refuse with a clear error naming both flags, rather than silently picking one
 - Given neither flag is passed, should resolve `open_report=False` (default off), matching `--report`'s existing default-off behavior

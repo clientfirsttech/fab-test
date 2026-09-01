@@ -48,12 +48,12 @@ SCRIPTS_DIR = REPO_ROOT / "scripts"
 def _script_module(script_name: str) -> str:
     """Return the module name used to invoke an analyzer script.
 
-    Runs the script via ``python -m fabric_ci_cd_dataops.scripts.<name>`` so
+    Runs the script via ``python -m fab_test.scripts.<name>`` so
     relative imports inside the package work correctly. This works for both
     editable/source installs and wheel installs because the script is always
-    part of the installed ``fabric_ci_cd_dataops.scripts`` package.
+    part of the installed ``fab_test.scripts`` package.
     """
-    return f"fabric_ci_cd_dataops.scripts.{script_name}"
+    return f"fab_test.scripts.{script_name}"
 
 
 # Default tool locations (match analyzers.json registry)

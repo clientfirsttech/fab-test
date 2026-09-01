@@ -18,8 +18,8 @@ import sys
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts._run_manifest import RunManifest
-from fabric_ci_cd_dataops.scripts._target import parse_target
+from fab_test.scripts._run_manifest import RunManifest
+from fab_test.scripts._target import parse_target
 
 _GUID = "33333333-3333-3333-3333-333333333333"
 
@@ -33,7 +33,7 @@ def artifact_tree(tmp_path):
 
 def _run_cli(*argv, env=None):
     return subprocess.run(
-        [sys.executable, "-m", "fabric_ci_cd_dataops.scripts.fab_test", *argv],
+        [sys.executable, "-m", "fab_test.scripts.fab_test", *argv],
         capture_output=True,
         text=True,
         encoding="utf-8",

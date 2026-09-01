@@ -102,7 +102,7 @@ A folder is an artifact because its name ends in a Fabric type suffix:
 CI rather than opened in Desktop: `deployed/Sales.SemanticModel` on its own
 is found.
 
-The suffixes come from [`artifact-map.json`](https://github.com/kerski/fab-test/blob/main/src/fabric_ci_cd_dataops/metadata/artifact-map.json),
+The suffixes come from [`artifact-map.json`](https://github.com/kerski/fab-test/blob/main/src/fab_test/metadata/artifact-map.json),
 packaged with the distribution so an install outside this repository knows
 what an artifact looks like. A `.fab-test/metadata/artifact-map.json` (or
 the legacy `.github/metadata/artifact-map.json`) overrides it when present.
@@ -547,7 +547,7 @@ What the distribution *does* carry is the metadata the analyzers need, so `bpa`,
 ```python
 import importlib.resources as resources
 
-metadata = resources.files("fabric_ci_cd_dataops").joinpath("metadata")
+metadata = resources.files("fab_test").joinpath("metadata")
 print(metadata.joinpath("rules/BPARules.json"))  # packaged BPA ruleset
 print(metadata.joinpath("analyzers.json"))       # tool install URLs doctor reads
 ```

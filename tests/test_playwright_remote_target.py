@@ -20,7 +20,7 @@ from pathlib import Path
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts.fab_test_execution import (
+from fab_test.scripts.fab_test_execution import (
     _discover_for,
     _playwright_remote_target,
 )

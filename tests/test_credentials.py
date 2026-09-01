@@ -22,8 +22,8 @@ from pathlib import Path
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts import _credentials
-from fabric_ci_cd_dataops.scripts._credentials import probe_credentials
+from fab_test.scripts import _credentials
+from fab_test.scripts._credentials import probe_credentials
 
 # A path guaranteed not to exist, so `.env` discovery in this module never
 # picks up a real `.fab-test/.env` or `.env` a developer keeps in their own
@@ -234,7 +234,7 @@ def test_playwright_config_loader_shares_the_same_default_discovery(
 ):
     """`playwright_validation.config.load_config` resolves the same file
     `_credentials` does -- the exact fork this task exists to fix."""
-    from fabric_ci_cd_dataops.scripts.playwright_validation.config import load_config
+    from fab_test.scripts.playwright_validation.config import load_config
 
     monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("PLAYWRIGHT_ENV_FILE", raising=False)

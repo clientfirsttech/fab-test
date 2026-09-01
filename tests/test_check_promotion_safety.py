@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts.check_promotion_safety import PromotionSafetyChecker, main
+from fab_test.scripts.check_promotion_safety import PromotionSafetyChecker, main
 
 
 @pytest.fixture

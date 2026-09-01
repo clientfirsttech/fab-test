@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts.playwright_validation.fabric_service_client import (
+from fab_test.scripts.playwright_validation.fabric_service_client import (
     FabricServiceClient,
     FabricServiceClientError,
     ServicePrincipalCredentials,
@@ -15,7 +15,7 @@ from fabric_ci_cd_dataops.scripts.playwright_validation.fabric_service_client im
     _authenticate_service_principal,
     build_fabric_service_client,
 )
-from fabric_ci_cd_dataops.scripts.playwright_validation.resolver import ServiceResolutionError
+from fab_test.scripts.playwright_validation.resolver import ServiceResolutionError
 
 
 @pytest.fixture
@@ -32,7 +32,7 @@ def credentials() -> ServicePrincipalCredentials:
 def client(credentials: ServicePrincipalCredentials) -> FabricServiceClient:
     """Return a FabricServiceClient with mocked auth."""
     with patch(
-        "fabric_ci_cd_dataops.scripts.playwright_validation.fabric_service_client._authenticate_service_principal",
+        "fab_test.scripts.playwright_validation.fabric_service_client._authenticate_service_principal",
         return_value="fake-token",
     ):
         return FabricServiceClient(credentials)
@@ -67,7 +67,7 @@ def test_build_client_fails_without_credentials(monkeypatch) -> None:
     ):
         monkeypatch.delenv(var, raising=False)
     with patch(
-        "fabric_ci_cd_dataops.scripts.playwright_validation.fabric_service_client._authenticate_ambient",
+        "fab_test.scripts.playwright_validation.fabric_service_client._authenticate_ambient",
         side_effect=FabricServiceClientError("no ambient credential"),
     ), pytest.raises(ServiceResolutionError) as exc_info:
         build_fabric_service_client(
@@ -91,7 +91,7 @@ def test_build_client_reads_env_file(tmp_path: Path) -> None:
     )
 
     with patch(
-        "fabric_ci_cd_dataops.scripts.playwright_validation.fabric_service_client._authenticate_service_principal",
+        "fab_test.scripts.playwright_validation.fabric_service_client._authenticate_service_principal",
         return_value="token",
     ):
         client = build_fabric_service_client(env_file=env_file)
@@ -106,7 +106,7 @@ def test_list_items_uses_fabric_api(
 ) -> None:
     """Given a Fabric REST items response, should return normalized items."""
     with patch(
-        "fabric_ci_cd_dataops.scripts.playwright_validation.fabric_service_client.requests.request"
+        "fab_test.scripts.playwright_validation.fabric_service_client.requests.request"
     ) as mock_request:
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -143,7 +143,7 @@ def test_get_dependent_reports_normalizes_rest_response(
 ) -> None:
     """Given a dependents REST response, should return normalized reports."""
     with patch(
-        "fabric_ci_cd_dataops.scripts.playwright_validation.fabric_service_client.requests.request"
+        "fab_test.scripts.playwright_validation.fabric_service_client.requests.request"
     ) as mock_request:
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -206,7 +206,7 @@ def test_get_dependent_reports_falls_back_to_reports_on_404(
         return mock_response
 
     with patch(
-        "fabric_ci_cd_dataops.scripts.playwright_validation.fabric_service_client.requests.request",
+        "fab_test.scripts.playwright_validation.fabric_service_client.requests.request",
         side_effect=_fake_request,
     ):
         reports = client.get_dependent_reports("ws-1", "sm-1")
@@ -247,7 +247,7 @@ def test_get_dependent_reports_returns_empty_when_fallback_has_no_matches(
         return mock_response
 
     with patch(
-        "fabric_ci_cd_dataops.scripts.playwright_validation.fabric_service_client.requests.request",
+        "fab_test.scripts.playwright_validation.fabric_service_client.requests.request",
         side_effect=_fake_request,
     ):
         reports = client.get_dependent_reports("ws-1", "sm-1")
@@ -260,7 +260,7 @@ def test_get_dependent_reports_raises_on_other_errors(
 ) -> None:
     """Given a non-404 REST error, should raise FabricServiceClientError."""
     with patch(
-        "fabric_ci_cd_dataops.scripts.playwright_validation.fabric_service_client.requests.request"
+        "fab_test.scripts.playwright_validation.fabric_service_client.requests.request"
     ) as mock_request:
         mock_response = MagicMock()
         mock_response.status_code = 500
@@ -278,7 +278,7 @@ def test_rest_request_raises_on_non_json(
 ) -> None:
     """Given a non-JSON success response, should raise FabricServiceClientError."""
     with patch(
-        "fabric_ci_cd_dataops.scripts.playwright_validation.fabric_service_client.requests.request"
+        "fab_test.scripts.playwright_validation.fabric_service_client.requests.request"
     ) as mock_request:
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -335,7 +335,7 @@ def test_build_client_falls_back_to_ambient_when_no_service_principal_vars(monke
     _clear_service_principal_env(monkeypatch)
 
     with patch(
-        "fabric_ci_cd_dataops.scripts.playwright_validation.fabric_service_client._authenticate_ambient",
+        "fab_test.scripts.playwright_validation.fabric_service_client._authenticate_ambient",
         return_value="ambient-token",
     ):
         client = build_fabric_service_client(tenant_id="", client_id="", client_secret="")
@@ -351,10 +351,10 @@ def test_build_client_prefers_service_principal_over_ambient(monkeypatch) -> Non
         raise AssertionError("_authenticate_ambient must not be called when a service principal is configured")
 
     with patch(
-        "fabric_ci_cd_dataops.scripts.playwright_validation.fabric_service_client._authenticate_ambient",
+        "fab_test.scripts.playwright_validation.fabric_service_client._authenticate_ambient",
         side_effect=_fail_if_called,
     ), patch(
-        "fabric_ci_cd_dataops.scripts.playwright_validation.fabric_service_client._authenticate_service_principal",
+        "fab_test.scripts.playwright_validation.fabric_service_client._authenticate_service_principal",
         return_value="sp-token",
     ):
         client = build_fabric_service_client(
@@ -372,7 +372,7 @@ def test_build_client_partial_service_principal_does_not_fall_back_to_ambient(mo
         raise AssertionError("_authenticate_ambient must not be called for a partial service principal")
 
     with patch(
-        "fabric_ci_cd_dataops.scripts.playwright_validation.fabric_service_client._authenticate_ambient",
+        "fab_test.scripts.playwright_validation.fabric_service_client._authenticate_ambient",
         side_effect=_fail_if_called,
     ), pytest.raises(ServiceResolutionError) as exc_info:
         build_fabric_service_client(tenant_id="t", client_id="", client_secret="")

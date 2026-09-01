@@ -22,7 +22,7 @@ from typing import Any
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts.playwright_validation.test_cases import sanitize_case_id
+from fab_test.scripts.playwright_validation.test_cases import sanitize_case_id
 
 pytestmark = pytest.mark.playwright
 

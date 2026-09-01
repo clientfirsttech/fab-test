@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "fab-test"
-# Read from fabric_ci_cd_dataops.__version__ -- see [tool.setuptools.dynamic].
+# Read from fab_test.__version__ -- see [tool.setuptools.dynamic].
 dynamic = ["version"]
 requires-python = ">=3.12"
 description = "Unified CLI for validating Microsoft Fabric artifacts: Best Practice Analyzer rules, PBIR report structure, DAX tests, and rendered-report checks behind one command and one result contract"
@@ -78,31 +78,31 @@ Changelog = "https://github.com/kerski/fab-test/releases"
 Issues = "https://github.com/kerski/fab-test/issues"
 
 [project.scripts]
-fab-test = "fabric_ci_cd_dataops.scripts.fab_test:main"
-tabular-editor-bpa = "fabric_ci_cd_dataops.scripts.invoke_tabular_editor_bpa:main"
-validate-environments-yaml = "fabric_ci_cd_dataops.scripts.validate_environments_yaml:main"
+fab-test = "fab_test.scripts.fab_test:main"
+tabular-editor-bpa = "fab_test.scripts.invoke_tabular_editor_bpa:main"
+validate-environments-yaml = "fab_test.scripts.validate_environments_yaml:main"
 
 [tool.setuptools.dynamic]
-# One place writes the version: src/fabric_ci_cd_dataops/__init__.py. A static
+# One place writes the version: src/fab_test/__init__.py. A static
 # version here would be the second, and a release bump reaches it first --
 # leaving the CLI's --version reporting a string that was never published.
 # TestPyPI refuses a repeat upload of a version, so bumps are frequent enough
 # for that drift to be a matter of when, not whether.
-version = { attr = "fabric_ci_cd_dataops.__version__" }
+version = { attr = "fab_test.__version__" }
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["fabric_ci_cd_dataops*"]
+include = ["fab_test*"]
 
 [tool.setuptools.package-data]
-"fabric_ci_cd_dataops.scripts" = ["**/*.py"]
+"fab_test.scripts" = ["**/*.py"]
 # The analyzers cannot run on what the wheel does not carry: `bpa` and
 # `pbir` are handed a rules path, and `doctor` reads analyzers.json for the
 # install URL of a missing tool. `metadata/*.json` alone left rules/ behind.
 # A glob matching nothing is not a build error, which is how "agents/*" and
 # "skills/*/*" were declared for months against directories that do not
 # exist here -- tests/test_packaged_metadata.py now fails on a dead pattern.
-"fabric_ci_cd_dataops" = [
+"fab_test" = [
     "schemas/*.json",
     "metadata/*.json",
     "metadata/rules/*.json",
@@ -115,7 +115,7 @@ include = ["fabric_ci_cd_dataops*"]
 # "How Coverage Is Measured" table in vision.md. The 80% floor lives in the
 # CI invocation (--cov-fail-under=80), never here and never in pytest.ini,
 # where it would fail every granular `pytest -m <marker>` run.
-source = ["src/fabric_ci_cd_dataops"]
+source = ["src/fab_test"]
 branch = false
 
 # Operational scripts, not library code. Each needs a live service to
@@ -131,7 +131,7 @@ branch = false
 omit = [
     # Connects to Fabric to prove credentials work; there is nothing to
     # assert offline that build_fabric_service_client's tests do not.
-    "src/fabric_ci_cd_dataops/scripts/validate_fabric_service_client.py",
+    "src/fab_test/scripts/validate_fabric_service_client.py",
 ]
 
 [tool.coverage.report]
@@ -196,9 +196,9 @@ max-args = 8
 # a scan. fab_test.py was once listed here too, which was wrong: it is the CLI
 # orchestrator, not a scanner, and the exemption meant each new blind except
 # landed unexamined. Its three are now justified individually.
-"src/fabric_ci_cd_dataops/scripts/scan_credentials.py" = ["BLE001", "S110"]
-"src/fabric_ci_cd_dataops/scripts/scan_entropy.py" = ["BLE001", "S110"]
-"src/fabric_ci_cd_dataops/scripts/invoke_tabular_editor_bpa.py" = ["S314"]
+"src/fab_test/scripts/scan_credentials.py" = ["BLE001", "S110"]
+"src/fab_test/scripts/scan_entropy.py" = ["BLE001", "S110"]
+"src/fab_test/scripts/invoke_tabular_editor_bpa.py" = ["S314"]
 # Tests: asserts are the point, stub callables ignore their arguments, fake
 # credentials are not secrets, and sys.path setup runs before imports.
 "tests/**" = [

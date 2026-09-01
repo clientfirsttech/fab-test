@@ -16,13 +16,13 @@ import re
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts._analyzer_envelope import (
+from fab_test.scripts._analyzer_envelope import (
     ENVELOPE_OPTIONAL_KEYS,
     EnvelopeIdentity,
     Timer,
     build_envelope,
 )
-from fabric_ci_cd_dataops.scripts._report_html import render_report
+from fab_test.scripts._report_html import render_report
 
 _ISO_UTC = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+00:00$")
 
@@ -137,7 +137,7 @@ def test_rendering_stays_deterministic_with_a_timestamp():
 @pytest.mark.fab_test
 def test_summary_tables_use_the_boxed_style():
     """Boxed borders make column boundaries unambiguous."""
-    from fabric_ci_cd_dataops.scripts.fab_test_summary import _print_list
+    from fab_test.scripts.fab_test_summary import _print_list
 
     rows = [{
         "analyzer": "bpa", "aliases": (), "glob": "*.SemanticModel",
@@ -157,7 +157,7 @@ def test_summary_tables_use_the_boxed_style():
 def test_status_labels_carry_no_emoji():
     """Emoji with variation selectors are counted as one column but drawn as
     two, which is what pushed the Status column out of alignment."""
-    from fabric_ci_cd_dataops.scripts.fab_test_summary import _status_label
+    from fab_test.scripts.fab_test_summary import _status_label
 
     for status in ("passed", "failed", "warning", "skipped", "dry-run"):
         label = _status_label(status)

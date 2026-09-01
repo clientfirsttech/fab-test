@@ -10,7 +10,7 @@ upstream response.
 
 Never touches the network -- every upstream call goes through
 `_get_json`, monkeypatched to a fixture or a raising stub. Outside
-`src/fabric_ci_cd_dataops`, so not counted toward the coverage floor (see
+`src/fab_test`, so not counted toward the coverage floor (see
 the module's own docstring for why that tradeoff is accepted here).
 
     pytest tests/test_check_tool_updates.py

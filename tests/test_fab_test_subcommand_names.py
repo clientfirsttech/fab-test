@@ -14,7 +14,7 @@ import subprocess
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts.fab_test import _SUBCOMMAND_ALIASES
+from fab_test.scripts.fab_test import _SUBCOMMAND_ALIASES
 
 # The telemetry preview in `--dry-run` output stamps the current time, so
 # two subprocess invocations a few milliseconds apart never print byte-

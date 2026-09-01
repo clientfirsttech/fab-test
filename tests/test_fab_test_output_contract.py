@@ -15,7 +15,7 @@ import subprocess
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts.fab_test import _run_analyzer, build_parser
+from fab_test.scripts.fab_test import _run_analyzer, build_parser
 from tests.conftest import _RunAnalyzerArgs, _stub_subprocess_run
 
 # --------------------------------------------------------------------------- #
@@ -28,7 +28,7 @@ def test_json_format_real_run_has_no_narration_on_stdout(tmp_path, monkeypatch, 
     """A real (non-dry-run) analyzer run under --format json narrates only to
     stderr; stdout carries just the final JSON summary from _print_summary.
     """
-    from fabric_ci_cd_dataops.scripts import fab_test_execution
+    from fab_test.scripts import fab_test_execution
 
     artifact_dir = tmp_path / "artifacts"
     for i in range(2):
@@ -53,7 +53,7 @@ def test_json_format_real_run_has_no_narration_on_stdout(tmp_path, monkeypatch, 
 @pytest.mark.fab_test
 def test_text_format_narration_still_on_stdout(tmp_path, monkeypatch, capsys):
     """--format text keeps narration on stdout exactly as before (regression)."""
-    from fabric_ci_cd_dataops.scripts import fab_test_execution
+    from fab_test.scripts import fab_test_execution
 
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
@@ -99,7 +99,7 @@ def test_missing_artifacts_warning_narrated_by_format(tmp_path, capsys):
 @pytest.mark.fab_test
 def test_json_format_passes_stdout_pipe_to_subprocess(tmp_path, monkeypatch):
     """--format json captures the analyzer subprocess's stdout via PIPE."""
-    from fabric_ci_cd_dataops.scripts import fab_test_execution
+    from fab_test.scripts import fab_test_execution
 
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
@@ -124,7 +124,7 @@ def test_json_format_passes_stdout_pipe_to_subprocess(tmp_path, monkeypatch):
 @pytest.mark.fab_test
 def test_text_format_does_not_capture_subprocess_stdout(tmp_path, monkeypatch):
     """--format text leaves subprocess stdout inherited: no capture, no added latency."""
-    from fabric_ci_cd_dataops.scripts import fab_test_execution
+    from fab_test.scripts import fab_test_execution
 
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
@@ -151,7 +151,7 @@ def test_json_format_reemits_captured_subprocess_stdout_to_stderr(tmp_path, monk
     """The analyzer's own stdout banner is re-emitted on stderr under --format json,
     leaving stdout as a single parseable JSON document.
     """
-    from fabric_ci_cd_dataops.scripts import fab_test_execution
+    from fab_test.scripts import fab_test_execution
 
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
@@ -179,7 +179,7 @@ def test_json_format_reemits_captured_subprocess_stdout_to_stderr(tmp_path, monk
 @pytest.mark.fab_test
 def test_json_format_verbose_still_narrates_and_stdout_stays_valid(tmp_path, monkeypatch, capsys):
     """--format json -v still narrates captured output to stderr; stdout still parses."""
-    from fabric_ci_cd_dataops.scripts import fab_test_execution
+    from fab_test.scripts import fab_test_execution
 
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
@@ -210,7 +210,7 @@ def test_json_format_timeout_reemits_captured_stdout_before_timeout(
     tmp_path, monkeypatch, capsys
 ):
     """A subprocess timeout still re-emits whatever stdout was captured before it fired."""
-    from fabric_ci_cd_dataops.scripts import fab_test_execution
+    from fab_test.scripts import fab_test_execution
 
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
@@ -241,7 +241,7 @@ def test_json_format_timeout_reemits_captured_stdout_before_timeout(
 @pytest.mark.fab_test
 def test_json_format_sets_analyzer_output_mode_env_for_subprocess(tmp_path, monkeypatch):
     """--format json sets ANALYZER_OUTPUT_MODE=json in the subprocess environment."""
-    from fabric_ci_cd_dataops.scripts import fab_test_execution
+    from fab_test.scripts import fab_test_execution
 
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
@@ -266,7 +266,7 @@ def test_json_format_sets_analyzer_output_mode_env_for_subprocess(tmp_path, monk
 @pytest.mark.fab_test
 def test_text_format_leaves_analyzer_output_mode_env_unset(tmp_path, monkeypatch):
     """--format text does not set ANALYZER_OUTPUT_MODE, matching direct invocation."""
-    from fabric_ci_cd_dataops.scripts import fab_test_execution
+    from fab_test.scripts import fab_test_execution
 
     artifact_dir = tmp_path / "artifacts"
     (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)

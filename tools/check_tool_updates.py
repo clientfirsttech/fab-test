@@ -43,7 +43,7 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
-_ANALYZERS_JSON = _REPO_ROOT / "src" / "fabric_ci_cd_dataops" / "metadata" / "analyzers.json"
+_ANALYZERS_JSON = _REPO_ROOT / "src" / "fab_test" / "metadata" / "analyzers.json"
 _PYPROJECT_TOML = _REPO_ROOT / "pyproject.toml"
 _USER_AGENT = "fab-test-tool-currency-checker/1.0"
 _TIMEOUT = 15

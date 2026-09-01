@@ -7,7 +7,7 @@ from unittest import mock
 
 import pytest
 
-from fabric_ci_cd_dataops.scripts.deploy import (
+from fab_test.scripts.deploy import (
     build_dependency_graph,
     build_environment_config,
     build_plan,
@@ -309,7 +309,7 @@ class TestMain:
         mock_result = mock.MagicMock()
         mock_result.status.value = "completed"
 
-        with mock.patch("fabric_ci_cd_dataops.scripts.deploy.deploy_with_config") as mock_deploy:
+        with mock.patch("fab_test.scripts.deploy.deploy_with_config") as mock_deploy:
             mock_deploy.return_value = mock_result
             with pytest.raises(SystemExit) as exc_info:
                 main()
@@ -356,7 +356,7 @@ class TestMain:
         mock_result = mock.MagicMock()
         mock_result.status.value = "failed"
 
-        with mock.patch("fabric_ci_cd_dataops.scripts.deploy.deploy_with_config") as mock_deploy:
+        with mock.patch("fab_test.scripts.deploy.deploy_with_config") as mock_deploy:
             mock_deploy.return_value = mock_result
             with pytest.raises(SystemExit) as exc_info:
                 main()

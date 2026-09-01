@@ -14,7 +14,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from fabric_ci_cd_dataops import __version__ as _FAB_TEST_VERSION
+from fab_test import __version__ as _FAB_TEST_VERSION
 
 from ._analyzer_envelope import severity_counts
 from ._cli_utils import narrate

@@ -15,8 +15,8 @@ import json
 
 import pytest
 
-from fabric_ci_cd_dataops import __version__
-from fabric_ci_cd_dataops.scripts import fab_test_skill as skill_module
+from fab_test import __version__
+from fab_test.scripts import fab_test_skill as skill_module
 
 
 def _args(**overrides) -> argparse.Namespace:
@@ -27,6 +27,8 @@ def _args(**overrides) -> argparse.Namespace:
         "uninstall": False,
         "dry_run": False,
         "force": False,
+        "list": False,
+        "name": None,
     }
     defaults.update(overrides)
     return argparse.Namespace(**defaults)
@@ -62,6 +64,41 @@ def test_bare_skill_prints_the_main_files_content(capsys):
 
     assert exit_code == 0
     assert "name: fab-test" in capsys.readouterr().out
+
+
+def test_named_skill_prints_the_same_content_as_bare(capsys):
+    exit_code = skill_module._skill(_args(name="fab-test"))
+
+    assert exit_code == 0
+    assert "name: fab-test" in capsys.readouterr().out
+
+
+def test_unknown_name_errors_with_available_skills_listed(capsys):
+    exit_code = skill_module._skill(_args(name="does-not-exist"))
+
+    assert exit_code == 2
+    err = capsys.readouterr().out
+    assert "does-not-exist" in err
+    assert "fab-test" in err
+
+
+def test_list_flag_reports_the_known_skill_text(capsys):
+    exit_code = skill_module._skill(_args(list=True))
+
+    assert exit_code == 0
+    out = capsys.readouterr().out
+    assert "fab-test" in out
+
+
+def test_list_flag_format_json_reports_name_and_description(capsys):
+    exit_code = skill_module._skill(_args(list=True, output_format="json"))
+
+    assert exit_code == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert len(payload) == 1
+    assert payload[0]["name"] == "fab-test"
+    assert payload[0]["source_path"].endswith("SKILL.md")
+    assert payload[0]["description"]
 
 
 def test_skill_format_json_wraps_version_source_and_reference_paths(capsys):

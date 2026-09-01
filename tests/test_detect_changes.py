@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 from unittest import mock
 
-from fabric_ci_cd_dataops.scripts.detect_changes import (
+from fab_test.scripts.detect_changes import (
     detect_artifact_type,
     group_changes_by_artifact,
     load_artifact_map,
@@ -114,7 +114,7 @@ class TestMain:
         ]
         argv = ["detect_changes.py"]
         with (
-            mock.patch("fabric_ci_cd_dataops.scripts.detect_changes.get_changed_files", return_value=changed),
+            mock.patch("fab_test.scripts.detect_changes.get_changed_files", return_value=changed),
             mock.patch.object(sys, "argv", argv),
             mock.patch.dict(os.environ, {"GITHUB_WORKSPACE": str(tmp_path)}, clear=False),
         ):
