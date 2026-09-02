@@ -119,6 +119,31 @@ For local runs, `pql-test` connects to a locally-open Power BI Desktop instance 
 
 `desktop` is absent from the envelope when nothing is bound (no Desktop instance running, or more than one running — `fab-test` never guesses which one). Passing `--workspace-id` skips this Desktop-matching step entirely and uses the remote XMLA path instead.
 
+**When the model is unreachable, nothing ran — and that is a `warning`, not a
+pass or a failure.** `pql-test` enumerates its tests statically from the
+`.SemanticModel`'s TMDL and `DAXQueries`, so it reports a test count even with
+no connection, then fails each one with an ADOMD "a connection cannot be made"
+error. `fab-test` recognizes that signature and does not let it read as either
+outcome:
+
+```
+Constraints {
+  (exit 0, zero tests discovered)          => "warning", "pql-test found no tests to run in this model"
+  (exit non-zero, zero tests discovered)   => "warning", "pql-test ran no tests"
+  (every failure is a connection error)    => "warning", "pql-test ran no tests: could not connect to the model"
+  (any failure is a real assertion)        => "failed"   // never hidden behind a platform skip
+  (every test reported skipped)            => "skipped"
+  (tests ran, none failed)                 => "passed"
+}
+```
+
+Each `warning` case reports `0 tests, 0 passed, 0 failed, 0 skipped` in the
+envelope's `test_summary` — the statically-discovered count would overstate what
+happened — renders as `⚠️` in the per-artifact line and the aggregate table,
+emits `::warning::` on stderr, and exits 0, so a closed Desktop session does not
+turn CI red. `native.json` keeps `pql-test`'s own unmodified numbers. One genuine
+assertion failure among connection errors still fails the run.
+
 ### playwright
 
 Playwright validation can run in three modes: static `.env` mode, service-resolved mode, or impact-manifest mode.
