@@ -1,6 +1,6 @@
 # pql-test Connection-Failure Reporting Epic
 
-**Status**: 📋 PLANNED
+**Status**: ✅ COMPLETED (2026-09-02) — 5/5 tasks, verified live through the installed CLI against real artifacts.
 **Goal**: A `pql-test` run that never connects to a model reports `skipped`, not `failed`.
 
 ## Overview
@@ -137,3 +137,43 @@ comes to believe their tests ran when none did.
 
 **Files**: `src/fab_test/scripts/invoke_pql_test.py` (`_pql_status`)
 **Tests**: `pytest -m pql_test tests/test_invoke_pql_test.py`
+
+---
+
+## Closeout (2026-09-02)
+
+All five tasks implemented and verified. Tasks 1 and 3 were superseded in part by
+tasks 4 and 5: a run that reached no tests reports `warning`, not `skipped` —
+`skipped` stays reserved for a run pql-test itself reported as all-skipped, and
+`warning` covers "nothing executed", so a zero-count line can never sit under a
+green check. `_pql_status`'s ordering encodes that: "did anything run?" is asked
+before "did it pass?"
+
+Verified through the real entry point across every caller of the changed code
+(vision.md Blast Radius):
+
+| Caller | Observed |
+|--------|----------|
+| `fab-test pql-test` | `⚠️ pql-test found no tests to run in this model`, exit 0 |
+| `fab-test pql-test --report` | `index.html` status column reads `warning` |
+| `fab-test local` | `⚠️` on the zero-run artifact, `❌` on the genuinely failing one |
+| `fab-test all` | aggregate table renders `warning` alongside `FAILED` rows |
+| `fab-test doctor --local` | unaffected by the `detect_desktop_instances` cache |
+
+A real assertion failure still fails: the same run reported
+`SampleModel-PQLAssert — 86 tests, 78 passed, 8 failed` as `FAILED` with exit 1,
+confirming a genuine failure is never hidden behind the platform skip.
+
+**1681 passed, 3 skipped**, coverage **88%**, `ruff check src/` clean.
+Documented for all three callers: README (local workflow), `docs/QUICK-VALIDATION.md`
+(the CI snippet's degradation note, which still said `skipped`),
+`references/flags.md` (pql-test connection semantics as a SudoLang `Constraints`
+block), and `references/operations.md` (the envelope `status` list had only four
+of the seven values the code emits) — both authored and packaged skill copies in
+sync per `tests/test_skill_resource.py`.
+
+**Found, not fixed** (pre-existing, out of scope): `--output-dir` is not honored
+for `native.json`. `native_output_path` resolves through `results_dir`, which
+reads the fixed results root, so an envelope lands under `--output-dir` while its
+native output lands under `fab-test-results/`. Consistent across all six
+analyzer wrappers, so it is a design question, not a regression from this epic.
