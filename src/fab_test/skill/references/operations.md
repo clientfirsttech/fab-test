@@ -68,7 +68,24 @@ Optional keys — **absent, never null**, so a consumer tests presence:
 
 For `pql_test`, the envelope also contains `test_results` (full result array from pql-test, native shape). For `bpa`, it contains one entry per rule TE2 evaluated (`RuleName`/`RuleID`/`Severity`/`Category`/`ObjectName` plus a computed `status` of `pass`/`error`/`warning`), passed and failed alike — unlike `findings`, which stays failure-only. `pbir` matches the same idea in the shared `rule`/`severity`/`object`/`message` shape (each with a `status`), so telemetry can see every rule PBIR Inspector evaluated, not only the ones that failed — `pbir`'s own `TestRun.html` still has its own filter UI, so this field feeds telemetry, not the shared report's full-list filter, for that analyzer specifically. `playwright` uses the pql-test-shaped `test_results` too (one row per generated report x page x bookmark case), plus an `evidence` map per row (`screenshot`/`console`/`network` paths, whichever exist) that the shared renderer turns into links when `--report` is on (see the `playwright` section in [Flags](flags.md)). All four are `[]` when the analyzer produced no per-test breakdown.
 
-`status` values: `passed` | `failed` | `error` | `timeout`.
+`status` values: `passed` | `failed` | `warning` | `skipped` | `error` | `timeout` | `dry-run`.
+
+`warning` and `skipped` both mean "no finding to report", and both exit 0 — they
+differ in whether the analyzer ran:
+
+| Status | Meaning | Exit code | CI annotation |
+|--------|---------|-----------|---------------|
+| `passed` | Ran, nothing failed | 0 | — |
+| `warning` | Ran nothing, or findings below the fail threshold | 0 | `::warning::` |
+| `skipped` | A prerequisite was absent, so the analyzer never ran | 0 | — |
+| `failed` | Real findings at or above the fail threshold | 1 | `::error::` |
+| `error` | The wrapped tool itself failed | 1 | `::error::` |
+| `timeout` | The tool exceeded `ANALYZER_TIMEOUT` | 1 | `::error::` |
+| `dry-run` | `--dry-run`: the plan only, nothing executed | 0 | — |
+
+A run that executed no tests is `warning`, never `passed`: zero tests passing is
+not a pass, and a green check is how a caller comes to believe tests ran when
+none did.
 
 ## Tool Resolution and Local Caching
 

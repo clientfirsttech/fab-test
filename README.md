@@ -162,7 +162,7 @@ fab-test local --dry-run    # see the plan first
 fab-test local              # BPA, PBIR Inspector, and Desktop-bound pql-test
 ```
 
-A missing prerequisite (e.g. `pqlint` not installed) is reported as skipped with a remediation hint, not a failure. See [`docs/QUICKSTART-LOCAL.md`](https://github.com/kerski/fab-test/blob/main/docs/QUICKSTART-LOCAL.md) for the full walkthrough.
+A missing prerequisite (e.g. `pqlint` not installed) is reported as skipped with a remediation hint, not a failure. Likewise, if Power BI Desktop is not open, `pql-test` cannot reach the model and no DAX tests execute — that artifact reports `warning` with zero counts and exits 0, rather than a misleading `failed` or a green `passed` over a run in which nothing happened. See [`docs/QUICKSTART-LOCAL.md`](https://github.com/kerski/fab-test/blob/main/docs/QUICKSTART-LOCAL.md) for the full walkthrough.
 
 ### Wrapper contract tests with pytest
 
