@@ -503,7 +503,7 @@ table alongside each payload.
     path: fab-test-results/run.json
 ```
 
-The difference from running it on a laptop: no Power BI Desktop instance is open in CI, so `pql-test`'s DAX tests connect to nothing and degrade to a `skipped` status on that artifact (never a failure — see vision.md's "platform gaps degrade to skips") rather than binding to a `desktop` port. BPA and PBIR Inspector are unaffected — they don't depend on Desktop at all.
+The difference from running it on a laptop: no Power BI Desktop instance is open in CI, so `pql-test`'s DAX tests connect to nothing rather than binding to a `desktop` port. That artifact reports status `warning` with `0 tests, 0 passed, 0 failed, 0 skipped`, emits a `::warning::` annotation, and exits 0 — never a failure (see vision.md's "platform gaps degrade to skips"), and never a green `passed` either, so the log cannot be misread as "the DAX tests ran and were fine." BPA and PBIR Inspector are unaffected — they don't depend on Desktop at all.
 
 ## Clean up
 
