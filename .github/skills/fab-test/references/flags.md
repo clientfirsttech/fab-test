@@ -71,6 +71,8 @@ fab-test bpa
 | `--inspector-path PATH` | `PBIR_INSPECTOR_PATH` | `PBIR-Inspector/PBIRInspectorCLI` |
 | `--rules-path PATH` | — | resolved via the metadata layers (`.fab-test/metadata/rules/pbi-inspector-custom-rules.json` > `.github/metadata/...` > packaged) |
 
+**Requires the .NET 8 runtime.** The `fab-inspector` release is a framework-dependent build (`.NET 8.0 dependency not included`, per its release notes) — the binary can be present, executable, and correctly versioned and still be unable to run. `fab-test doctor --analyzer pbir` checks for an installed .NET 8+ runtime (via `dotnet --list-runtimes`) and reports not-ready, with a link to the .NET download page, rather than reporting the binary alone as sufficient. If the runtime check somehow passes on a machine where the tool still can't run, the wrapper's own exit code and stderr are surfaced as an `error` envelope status (never a silent `passed` with zero findings) — see [Envelope schema keys](operations.md) for how `error` differs from `passed`.
+
 ### a11y
 
 Accessibility checks for `.Report` artifacts — contrast, alt text, tab order, target size, page/visual titles, font scaling, and more — via [pbir-a11y](https://github.com/Juls-BI/pbir-a11y), a Node CLI built from source at a pinned ref rather than downloaded pre-built (see [Node toolchain and the pbir-a11y build cache](#node-toolchain-and-the-pbir-a11y-build-cache) below). **Requires Node.js >= 18 and npm** the first time it runs; `fab-test doctor --analyzer a11y` reports whether both are present before anything is built.
@@ -95,7 +97,7 @@ fab-test a11y --format json             # machine-readable
 
 Every other bootstrapped analyzer (`bpa`, `pbir`) downloads a pre-built binary and caches it. `a11y` is the one exception: pbir-a11y ships no pre-built release artifact, only source, so the first run clones its pinned tag, runs `npm install` and `npm run build` inside `.fab-test-tools/pbir_a11y/<platform>/<version>/`, and caches the resulting `dist/cli.js` — after that, resolution is instant and touches no network, exactly like the other two. A version bump in `analyzers.json` forces a fresh build the same way it forces a fresh download for `bpa`/`pbir`; nothing has to be cleared by hand (`fab-test clean-tools` still works if you want to).
 
-If `npm` or `node` is missing, `doctor` says which one distinctly (Node absent vs. npm absent are different remediations) rather than a generic "tool not found." If a build is already cached but the *current* machine running the check lacks `node` — a cache copied from elsewhere, or Node uninstalled after the fact — the wrapper reports a clear envelope error rather than a traceback, the same way a missing binary is handled for every other analyzer.
+If `npm` or `node` is missing before the first build, `doctor` says which one distinctly (Node absent vs. npm absent are different remediations) rather than a generic "tool not found." `doctor` also checks for Node.js >= 18 on every run, not only the first — a cache copied from elsewhere, or Node uninstalled after the fact, is reported as not-ready by `doctor` itself rather than only surfacing once `fab-test a11y` is actually run. If it somehow still runs without Node present, the wrapper reports a clear envelope error rather than a traceback, the same way a missing binary is handled for every other analyzer.
 
 ### pql-test
 

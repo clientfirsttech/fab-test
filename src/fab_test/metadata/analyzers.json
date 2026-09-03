@@ -55,6 +55,10 @@
           },
           "asset_suffix": "-FabInspCLI.zip",
           "allow_prerelease": false
+        },
+        "requires_runtime": {
+          "name": "dotnet",
+          "min_major": 8
         }
       }
     },
@@ -76,7 +80,11 @@
         "build_entrypoint": "dist/cli.js",
         "build_extra_dependencies": ["docx@^9.6.1"],
         "version": "0.3.2",
-        "install_sha256": "403a2ab0ae1648d0b385201a3b5b57ae10a16d71eda7584cafd8391fe81d5e77"
+        "install_sha256": "403a2ab0ae1648d0b385201a3b5b57ae10a16d71eda7584cafd8391fe81d5e77",
+        "requires_runtime": {
+          "name": "node",
+          "min_major": 18
+        }
       }
     },
     "prompt_lint": {
