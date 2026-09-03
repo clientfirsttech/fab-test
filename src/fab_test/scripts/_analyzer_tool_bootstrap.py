@@ -16,6 +16,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -319,6 +320,90 @@ def _probe_pending_install(
     }
 
 
+_DOTNET_RUNTIME_PATTERN = re.compile(r"Microsoft\.NETCore\.App (\d+)\.")
+_NODE_VERSION_PATTERN = re.compile(r"v?(\d+)\.")
+
+
+def _installed_dotnet_majors() -> list[int]:
+    """Return the major versions of every .NET *runtime* (not SDK) installed,
+    via ``dotnet --list-runtimes``. Empty when dotnet is absent or unreadable.
+    """
+    exe = shutil.which("dotnet")
+    if exe is None:
+        return []
+    try:
+        proc = subprocess.run(
+            [exe, "--list-runtimes"], capture_output=True, text=True, timeout=10, check=False
+        )
+    except (OSError, subprocess.SubprocessError):
+        return []
+    return sorted({int(m) for m in _DOTNET_RUNTIME_PATTERN.findall(proc.stdout or "")})
+
+
+def _installed_node_major() -> int | None:
+    """Return Node's major version via ``node --version``, or None if absent."""
+    exe = shutil.which("node")
+    if exe is None:
+        return None
+    try:
+        proc = subprocess.run([exe, "--version"], capture_output=True, text=True, timeout=10, check=False)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    match = _NODE_VERSION_PATTERN.search((proc.stdout or "").strip())
+    return int(match.group(1)) if match else None
+
+
+def _dotnet_runtime_gap(min_major: int) -> dict[str, Any] | None:
+    majors = _installed_dotnet_majors()
+    if any(m >= min_major for m in majors):
+        return None
+    installed = ", ".join(f"{m}.x" for m in majors) if majors else "none found"
+    return {
+        "ready": False,
+        "resolved_path": None,
+        "version": None,
+        "reason": f".NET {min_major}+ runtime not found (installed: {installed})",
+        "remediation": f"Install the .NET {min_major} runtime: "
+        f"https://dotnet.microsoft.com/download/dotnet/{min_major}.0",
+    }
+
+
+def _node_runtime_gap(min_major: int) -> dict[str, Any] | None:
+    major = _installed_node_major()
+    if major is not None and major >= min_major:
+        return None
+    installed = str(major) if major is not None else "not found"
+    return {
+        "ready": False,
+        "resolved_path": None,
+        "version": None,
+        "reason": f"Node.js {min_major}+ not found (installed: {installed})",
+        "remediation": f"Install Node.js >= {min_major} (https://nodejs.org).",
+    }
+
+
+_RUNTIME_GAP_CHECKS = {"dotnet": _dotnet_runtime_gap, "node": _node_runtime_gap}
+
+
+def _runtime_gap(tool_install: dict[str, Any]) -> dict[str, Any] | None:
+    """Return a not-ready dict when ``tool_install``'s declared ``requires_runtime``
+    is missing or older than its ``min_major``, else None.
+
+    A resolved, executable, correctly-versioned binary is still unrunnable
+    without its language runtime -- ``dotnet`` for the PBIR Inspector's
+    framework-dependent build, ``node`` for pbir-a11y once already built.
+    This is checked ahead of local-candidate/cache resolution so it applies
+    whether the tool is on disk, cached, or would still need downloading.
+    """
+    requirement = tool_install.get("requires_runtime")
+    if not requirement:
+        return None
+    check = _RUNTIME_GAP_CHECKS.get(requirement.get("name"))
+    if check is None:
+        return None
+    return check(requirement.get("min_major"))
+
+
 def probe_executable(
     analyzer_name: str,
     metadata_path: Path,
@@ -327,10 +412,14 @@ def probe_executable(
 ) -> dict[str, Any]:
     """Check whether ``analyzer_name``'s tool is (or would be) resolvable.
 
-    Mirrors ``resolve_executable``'s resolution order but never downloads,
-    extracts, or spawns a subprocess — it is the engine behind
-    ``fab-test doctor``. When a download would be needed, the install URL
-    that *would* be used is reported instead of being fetched.
+    Mirrors ``resolve_executable``'s resolution order but never downloads
+    or extracts an archive — it is the engine behind ``fab-test doctor``.
+    When a download would be needed, the install URL that *would* be used
+    is reported instead of being fetched. It does run a cheap, local,
+    read-only subprocess (``dotnet --list-runtimes`` / ``node --version``)
+    when the analyzer declares a ``requires_runtime`` -- a present binary is
+    not the same as a runnable one, and that distinction cannot be made by
+    reading the filesystem alone.
 
     Returns a dict with:
       ready: bool
@@ -360,6 +449,10 @@ def probe_executable(
             ),
             "version": None,
         }
+
+    runtime_gap = _runtime_gap(tool_install)
+    if runtime_gap is not None:
+        return runtime_gap
 
     committed_install_url = _platform_specific(tool_install, "install_url", platform)
 

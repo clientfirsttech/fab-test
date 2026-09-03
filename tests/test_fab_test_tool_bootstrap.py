@@ -701,3 +701,157 @@ def test_probe_executable_cli_argument_never_gets_a_shadow_note(tmp_path, monkey
     assert "shadows" not in result["reason"]
     assert result["remediation"] is None
 
+
+
+# --------------------------------------------------------------------------- #
+# requires_runtime: a resolved binary can still be unrunnable without its
+# language runtime (Analyzer Runtime Readiness epic, Defect 1)
+# --------------------------------------------------------------------------- #
+
+
+def _metadata_with_runtime(
+    repo_root: Path, analyzer_name: str, executable: Path, requires_runtime: dict
+) -> Path:
+    """A tool that already resolves locally (an explicit binary on disk), so any
+    not-ready result can only come from the runtime check, not from a missing
+    executable."""
+    metadata = repo_root / ".github" / "metadata" / "analyzers.json"
+    metadata.parent.mkdir(parents=True, exist_ok=True)
+    metadata.write_text(
+        json.dumps(
+            {
+                "analyzer_registry": {
+                    analyzer_name: {
+                        "tool_install": {
+                            "env_var": "PBIR_INSPECTOR_PATH",
+                            "default_path": str(executable),
+                            "requires_runtime": requires_runtime,
+                        }
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    return metadata
+
+
+@pytest.mark.fab_test
+def test_probe_executable_not_ready_when_runtime_missing_from_path(tmp_path, monkeypatch):
+    """A resolved binary is still reported not-ready when its declared runtime
+    (e.g. dotnet) is absent -- a present executable is not the same as a
+    runnable one."""
+    from fab_test.scripts._analyzer_tool_bootstrap import probe_executable
+
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    executable = tmp_path / "PBIRInspectorCLI.exe"
+    executable.write_text("binary", encoding="utf-8")
+    metadata = _metadata_with_runtime(
+        repo_root, "pbir_inspector", executable, {"name": "dotnet", "min_major": 8}
+    )
+
+    monkeypatch.delenv("PBIR_INSPECTOR_PATH", raising=False)
+    monkeypatch.setattr(
+        "fab_test.scripts._analyzer_tool_bootstrap.shutil.which", lambda _name: None
+    )
+
+    result = probe_executable("pbir_inspector", metadata, repo_root)
+
+    assert result["ready"] is False
+    assert ".NET 8" in result["reason"]
+    assert "dotnet.microsoft.com" in result["remediation"]
+
+
+@pytest.mark.fab_test
+def test_probe_executable_not_ready_when_installed_runtime_is_too_old(tmp_path, monkeypatch):
+    """dotnet is on PATH but only ships an older runtime than declared --
+    reported not-ready, not silently accepted."""
+    from fab_test.scripts._analyzer_tool_bootstrap import probe_executable
+
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    executable = tmp_path / "PBIRInspectorCLI.exe"
+    executable.write_text("binary", encoding="utf-8")
+    metadata = _metadata_with_runtime(
+        repo_root, "pbir_inspector", executable, {"name": "dotnet", "min_major": 8}
+    )
+
+    monkeypatch.delenv("PBIR_INSPECTOR_PATH", raising=False)
+
+    class _Result:
+        stdout = "Microsoft.NETCore.App 6.0.30 [/x]\nMicrosoft.AspNetCore.App 6.0.30 [/x]\n"
+        stderr = ""
+
+    monkeypatch.setattr(
+        "fab_test.scripts._analyzer_tool_bootstrap.shutil.which",
+        lambda name: "/usr/bin/dotnet" if name == "dotnet" else None,
+    )
+    monkeypatch.setattr(
+        "fab_test.scripts._analyzer_tool_bootstrap.subprocess.run",
+        lambda *a, **k: _Result(),
+    )
+
+    result = probe_executable("pbir_inspector", metadata, repo_root)
+
+    assert result["ready"] is False
+    assert "6" in result["reason"]
+
+
+@pytest.mark.fab_test
+def test_probe_executable_ready_when_declared_runtime_is_installed(tmp_path, monkeypatch):
+    """dotnet 8 is on PATH and reports an 8.x runtime -- resolves ready as
+    before the runtime check existed."""
+    from fab_test.scripts._analyzer_tool_bootstrap import probe_executable
+
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    executable = tmp_path / "PBIRInspectorCLI.exe"
+    executable.write_text("binary", encoding="utf-8")
+    metadata = _metadata_with_runtime(
+        repo_root, "pbir_inspector", executable, {"name": "dotnet", "min_major": 8}
+    )
+
+    monkeypatch.delenv("PBIR_INSPECTOR_PATH", raising=False)
+
+    class _Result:
+        stdout = "Microsoft.NETCore.App 8.0.8 [/x]\n"
+        stderr = ""
+
+    monkeypatch.setattr(
+        "fab_test.scripts._analyzer_tool_bootstrap.shutil.which",
+        lambda name: "/usr/bin/dotnet" if name == "dotnet" else None,
+    )
+    monkeypatch.setattr(
+        "fab_test.scripts._analyzer_tool_bootstrap.subprocess.run",
+        lambda *a, **k: _Result(),
+    )
+
+    result = probe_executable("pbir_inspector", metadata, repo_root)
+
+    assert result["ready"] is True
+    assert result["resolved_path"] is not None
+
+
+@pytest.mark.fab_test
+def test_probe_executable_without_requires_runtime_is_unaffected(tmp_path, monkeypatch):
+    """An analyzer with no `requires_runtime` key behaves exactly as before --
+    no dotnet/node probe is ever attempted."""
+    from fab_test.scripts._analyzer_tool_bootstrap import probe_executable
+
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    analyzer_name = "pbir_inspector"
+    executable = tmp_path / "PBIRInspectorCLI"
+    executable.write_text("binary", encoding="utf-8")
+    metadata = _metadata_with_version(repo_root, analyzer_name, "https://example.com/tool.zip", "3.4.0")
+
+    monkeypatch.setenv("PBIR_INSPECTOR_PATH", str(executable))
+    monkeypatch.setattr(
+        "fab_test.scripts._analyzer_tool_bootstrap.shutil.which",
+        lambda _name: (_ for _ in ()).throw(AssertionError("runtime probe should not run")),
+    )
+
+    result = probe_executable(analyzer_name, metadata, repo_root)
+
+    assert result["ready"] is True

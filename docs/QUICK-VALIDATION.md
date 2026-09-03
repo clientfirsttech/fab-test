@@ -6,7 +6,7 @@ Validate the `fab-test` package and its analyzers on your local machine before p
 
 - Python 3.12 or later
 - A clone of this repository
-- (Optional) External analyzer tools such as Tabular Editor or PBIR Inspector if you plan to run `fab-test` against real artifacts
+- (Optional) External analyzer tools such as Tabular Editor or PBIR Inspector if you plan to run `fab-test` against real artifacts. PBIR Inspector additionally needs the .NET 8 runtime installed (it is a framework-dependent build) — `fab-test doctor --analyzer pbir` reports whether it's present
 - Artifacts saved as PBIP projects — semantic models in TMDL, reports in PBIR (see [Assumed project format](../README.md#assumed-project-format)). The wrapper contract tests below need none of this; only the `fab-test` runs against real artifacts do.
 
 ## Virtual environments used by this project
