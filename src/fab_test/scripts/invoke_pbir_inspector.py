@@ -543,11 +543,31 @@ def _locate_native_html(native_out: Path, emit_html: bool, inspector_path: Path)
     return native_html_out
 
 
-def _classify_inspector_result(findings: list[dict[str, Any]], returncode: int) -> dict[str, Any]:
-    """Derive status/message/counts from findings alone -- no I/O."""
+def _classify_inspector_result(
+    findings: list[dict[str, Any]], returncode: int, has_output: bool = True
+) -> dict[str, Any]:
+    """Derive status/message/counts from findings and the process outcome -- no I/O.
+
+    ``has_output`` distinguishes "ran clean, nothing to report" from "never
+    produced output" -- a nonzero exit with no output means the tool did not
+    run at all (e.g. the .NET runtime is missing), which reads as a broken
+    installation, not a pass. A zero exit with no output is still a pass,
+    exactly as before this distinction existed.
+    """
     error_count = sum(1 for f in findings if f.get("severity") == "error")
     warning_count = sum(1 for f in findings if f.get("severity") == "warning")
     if not findings:
+        if returncode != 0 and not has_output:
+            return {
+                "status": "error",
+                "message": (
+                    f"PBIR Inspector failed to run and produced no output "
+                    f"(exit code {returncode}); see stderr for the underlying cause"
+                ),
+                "has_errors": True,
+                "error_count": 0,
+                "warning_count": 0,
+            }
         return {
             "status": "passed",
             "message": "PBIR Inspector passed with no findings",
@@ -582,7 +602,8 @@ def _log_inspector_outcome(
     if level < _VERBOSITY_LEVELS["default"]:
         return
     if not findings:
-        log(f"✅ {outcome['message']}")
+        icon = "✅" if outcome["status"] == "passed" else "❌"
+        log(f"{icon} {outcome['message']}")
     log(f"📁 Envelope:    {output_path}")
     log(f"📄 Native JSON: {native_out}")
     if native_html_out:
@@ -643,7 +664,7 @@ def run_inspector(args: argparse.Namespace) -> int:
     test_results = _pbir_test_results(raw_findings)
     native_html_out = _locate_native_html(native_out, emit_html, inspector_path)
 
-    outcome = _classify_inspector_result(findings, proc.returncode)
+    outcome = _classify_inspector_result(findings, proc.returncode, has_output=bool(raw_findings))
     write_results(
         WrapperResult(
             output_path,
@@ -660,7 +681,7 @@ def run_inspector(args: argparse.Namespace) -> int:
     )
     _log_inspector_outcome(outcome, findings, output_path, native_out, native_html_out, level)
 
-    if not findings:
+    if outcome["status"] == "passed":
         return 0
 
     if proc.stderr:
