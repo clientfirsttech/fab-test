@@ -531,10 +531,22 @@ def _read_native_output(native_out: Path, fallback_stdout: str) -> str:
 
 
 def _locate_native_html(native_out: Path, emit_html: bool, inspector_path: Path) -> Path | None:
-    """Return the generated HTML report, fixing up its embedded assets, if any."""
+    """Return the generated HTML report, fixing up its embedded assets, if any.
+
+    ``native_out`` is reused run over run for the same artifact, so an
+    older report (e.g. from a prior invocation, or one that predates the
+    screenshot fix) can linger alongside the fresh one. Sorted newest-first
+    by mtime -- the same rule `_read_native_output` already applies to its
+    ``*.json`` glob, and for the same reason -- an unsorted glob's order is
+    filesystem-dependent and can silently pick the stale file instead.
+    """
     if not (emit_html and native_out.is_dir()):
         return None
-    html_files = list(native_out.glob("*.html"))
+    html_files = sorted(
+        native_out.glob("*.html"),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )
     if not html_files:
         return None
     native_html_out = html_files[0]
