@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-09-08
+
+- 📝 - Stale four-segment version pin - `README.md`, `docs/RELEASE.md`, `docs/QUICKSTART-LOCAL.md`, and both `fab-test` skill copies pinned an install example (`fab-test==1.0.0.0.dev1`/`dev15`) that violated vision.md's three-part-semver rule and was stale against `__version__`. Corrected to `fab-test==1.1.0.dev2`; doc-only, no version bump. Found during the Promptfoo Skill Evaluation epic's discovery.
+
 ## 2026-09-05
 
 - 🐛 - BPA Object Details - `tabular_editor_bpa`'s Object column now shows table, column, and relationship names, not just measures. TE2 only brackets measure names (`[Total Sales]`); tables, columns, and relationships are single-quoted DAX (`'Sales'`, `'Sales'[Amount]`), so filtering StackTrace lines by a leading `[` silently dropped every one of those, leaving the report's Object column blank for the affected rules.

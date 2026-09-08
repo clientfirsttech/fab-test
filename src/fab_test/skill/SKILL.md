@@ -48,7 +48,7 @@ unless the version is named exactly.
 pip install \
   --index-url https://test.pypi.org/simple/ \
   --extra-index-url https://pypi.org/simple \
-  "fab-test==1.0.0.0.dev1"
+  "fab-test==1.1.0.dev2"
 ```
 
 Either way this registers the `fab-test` console script. The `.venv` is searched automatically for tool binaries (e.g. `pql-test`) even when not on `PATH`.
