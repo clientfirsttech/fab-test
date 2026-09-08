@@ -308,17 +308,25 @@ def _bpa_rules_map(root: Any, ns: dict[str, str]) -> dict[str, dict[str, str]]:
 def _bpa_violating_objects(result: Any, ns: dict[str, str]) -> list[str]:
     """Return the model objects a failed rule names, from its StackTrace.
 
-    TE2 puts them one per line in bracketed form; anything else on those
-    lines is narration, not an object.
+    TE2's own formatter (`Analyzer.cs`) always writes a fixed one-line
+    header ("Objects in violation:") followed by one indented line per
+    violating object -- never brackets specifically. A measure's object
+    name is bracketed (``[Total Sales]``), but a table's, column's, or
+    relationship's is single-quoted DAX (``'Sales'``, ``'Sales'[Amount]``),
+    so a bracket-only filter silently drops every one of those, rendering
+    the report's Object column blank without ever failing. Dropping the
+    header line and keeping every remaining non-blank line -- whatever its
+    punctuation -- tracks what TE2 actually emits instead of guessing at
+    one object type's formatting.
     """
     stack_el = result.find(".//vs:ErrorInfo/vs:StackTrace", ns)
     if stack_el is None or not stack_el.text:
         return []
-    return [
-        line.strip()
-        for line in stack_el.text.strip().splitlines()
-        if line.strip().startswith("[")
-    ]
+    lines = [line.strip() for line in stack_el.text.strip().splitlines()]
+    lines = [line for line in lines if line]
+    if lines and lines[0].endswith(":"):
+        lines = lines[1:]
+    return lines
 
 
 def _bpa_findings(
