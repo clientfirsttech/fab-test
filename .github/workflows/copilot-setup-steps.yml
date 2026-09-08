@@ -65,3 +65,19 @@ jobs:
                   ruff --version
                   pytest --version
                   ruff check .
+
+            # .github/hooks/rtk-rewrite.json calls `rtk hook copilot` on every
+            # Bash tool call. Without rtk actually present, that hook used to
+            # deny every tool call in the session outright -- fixed short-term
+            # by deleting the hook, but that also gave up rtk's token savings
+            # for every Copilot session. Installing it here restores them
+            # (RTK Cloud Agent Blocking epic). The hook itself still fails
+            # open if this step is skipped or errors, so a broken install
+            # degrades to "no rewriting," never to a blocked session.
+            - name: Install rtk (token-optimizing CLI hook)
+              run: |
+                  curl -fsSL https://raw.githubusercontent.com/rtk-ai/rtk/refs/heads/master/install.sh | sh
+                  echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+            - name: Verify rtk is on PATH
+              run: rtk --version

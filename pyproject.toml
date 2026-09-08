@@ -43,7 +43,7 @@ classifiers = [
 ]
 dependencies = [
     "tabulate",
-    "pql-test==0.1.13",
+    "pql-test==0.1.17",
     "playwright",
     "pyyaml",
     "azure-identity",
@@ -57,6 +57,13 @@ dependencies = [
 telemetry = [
     "azure-kusto-data",
     "azure-kusto-ingest",
+]
+# The OneLake (ADLS Gen2) client, for shipping analyzer telemetry to a
+# Fabric Lakehouse. A second extra for the same reason `telemetry` is one:
+# egress capability nobody who doesn't configure a destination should have
+# to install. `azure-identity` is already a base dependency.
+telemetry-lakehouse = [
+    "azure-storage-file-datalake",
 ]
 dev = [
     "ruff>=0.15",
