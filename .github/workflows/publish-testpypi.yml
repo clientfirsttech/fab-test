@@ -62,7 +62,7 @@ jobs:
       # Verifying the upload is the point of a rehearsal: the wheel that
       # builds here is not proof that the wheel an index serves installs.
       # TestPyPI carries none of our dependencies at the pinned versions
-      # (pql-test 0.1.11 there vs the 0.1.13 we require), so the extra index
+      # (pql-test 0.1.11 there vs the 0.1.17 we require), so the extra index
       # is not optional -- it is what makes the install resolvable at all.
       - name: Install from TestPyPI and run the console script
         run: |

@@ -79,6 +79,21 @@
               "description": "KQL database holding the telemetry tables [env: EVENTHOUSE_DATABASE]. The table itself is derived from the analyzer and is not configurable."
             }
           }
+        },
+        "lakehouse": {
+          "type": "object",
+          "description": "Fabric Lakehouse ingest destination via OneLake. Requires the [telemetry-lakehouse] extra (pip install fab-test[telemetry-lakehouse]) and a service principal with write access to the Lakehouse.",
+          "additionalProperties": false,
+          "properties": {
+            "workspace": {
+              "type": "string",
+              "description": "Workspace name or GUID holding the Lakehouse [env: LAKEHOUSE_WORKSPACE]."
+            },
+            "lakehouse": {
+              "type": "string",
+              "description": "Lakehouse name [env: LAKEHOUSE_NAME]. Telemetry lands under Files/fab-test-telemetry/<table>/ as JSONL, one file per run."
+            }
+          }
         }
       }
     }
