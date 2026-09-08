@@ -20,7 +20,7 @@ The current pre-release is `1.0.0.0.dev15`. Two things about the command below a
 not optional:
 
 - **`--extra-index-url https://pypi.org/simple`.** TestPyPI does not carry
-  `pql-test==0.1.13`; it has 0.1.11. Without the production index alongside
+  `pql-test==0.1.17`; it has 0.1.11. Without the production index alongside
   it, the install fails to resolve that dependency, not because anything is
   wrong with `fab-test`.
 - **The exact pin.** `1.0.0.0.dev15` is a PEP 440 dev release, and pip skips
@@ -34,7 +34,7 @@ source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install \
   --index-url https://test.pypi.org/simple/ \
   --extra-index-url https://pypi.org/simple \
-  "fab-test==1.0.0.0.dev15"
+  "fab-test==1.2.0.dev1"
 
 fab-test --version
 ```

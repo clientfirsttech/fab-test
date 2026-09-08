@@ -37,6 +37,7 @@ from pathlib import Path
 from typing import Any
 
 from ._cli_utils import terse_print
+from ._telemetry import TelemetryDependencyError
 
 VALID_TABLES = [
     "fabric_static_analysis",
@@ -103,15 +104,6 @@ def _unreachable_message(database: str, exc: Exception) -> str:
     return f"telemetry destination could not be inspected on database {database}: {detail}"
 
 
-class TelemetryDependencyError(Exception):
-    """The Kusto ingest client is not installed.
-
-    Deliberately not an ``ImportError``: the caller turns this into a warning
-    rather than a crash, and catching a bare ImportError there would swallow
-    unrelated import bugs in the same handler.
-    """
-
-
 @dataclass(frozen=True)
 class IngestDependencies:
     """The Kusto symbols ingest needs, loaded on demand."""
@@ -156,28 +148,10 @@ def describe_ingest_failure(exc: Exception) -> str:
 
 
 def build_ingest_credential(env_file: Path | str | None = None) -> Any:
-    """Return an Azure credential for Kusto ingest.
+    """Return an Azure credential for Kusto ingest. See `_credentials.build_azure_credential`."""
+    from ._credentials import build_azure_credential
 
-    The service principal the CLI already resolves, or
-    `DefaultAzureCredential` when none is set -- the rule
-    `build_fabric_service_client` documents, applied to a different endpoint.
-    A partially configured principal raises rather than falling back.
-    """
-    from ._credentials import resolve_service_principal
-
-    principal = resolve_service_principal(env_file)
-    if principal is None:
-        from azure.identity import DefaultAzureCredential
-
-        return DefaultAzureCredential()
-
-    from azure.identity import ClientSecretCredential
-
-    return ClientSecretCredential(
-        tenant_id=principal.tenant_id,
-        client_id=principal.client_id,
-        client_secret=principal.client_secret,
-    )
+    return build_azure_credential(env_file)
 
 
 def load_ingest_dependencies() -> IngestDependencies:

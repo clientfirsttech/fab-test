@@ -196,4 +196,11 @@ is exactly what an under-specified skill fails at.
 **four-segment** version, which vision.md's Versioning section explicitly
 forbids ("Three-part semver ... no fourth segment"), and stale besides
 (`__version__` is `1.1.0.dev1`). Both authored and packaged copies carry it.
-Not fixed here: it is a documentation defect, not an eval-scope question.
+
+**Fixed 2026-09-08** (doc-only, no version bump per vision.md): corrected to
+`"fab-test==1.1.0.dev2"` in both `SKILL.md` copies, plus the same stale
+four-segment example (`1.0.0.0.dev15`) in `README.md`, `docs/RELEASE.md`, and
+`docs/QUICKSTART-LOCAL.md`. No test pins these example strings to
+`__version__`, so nothing else needed to change; `.github/workflows/publish.yml`
+intentionally still accepts a four-component tag for backward compatibility
+with pre-migration releases, which is unrelated and untouched.

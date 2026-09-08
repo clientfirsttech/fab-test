@@ -28,6 +28,7 @@ import importlib.util
 import os
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 _TENANT_VAR = "FABRIC_TENANT_ID"
 # Either spelling of the client pair is accepted, matching
@@ -217,6 +218,31 @@ def resolve_service_principal(env_file: Path | str | None = None) -> ServicePrin
             _missing_variable_remediation(tenant, client_id, client_secret)
         )
     return None
+
+
+def build_azure_credential(env_file: Path | str | None = None) -> Any:
+    """Return an Azure credential for a caller that already resolves via `resolve_service_principal`.
+
+    The service principal the CLI already resolves, or `DefaultAzureCredential`
+    when none is set -- the rule `build_fabric_service_client` documents,
+    applied to whichever endpoint the caller is about to authenticate
+    against. A partially configured principal raises rather than falling
+    back. Shared by every telemetry sink so a second destination is not a
+    second credential-resolution path to get out of sync with the first.
+    """
+    principal = resolve_service_principal(env_file)
+    if principal is None:
+        from azure.identity import DefaultAzureCredential
+
+        return DefaultAzureCredential()
+
+    from azure.identity import ClientSecretCredential
+
+    return ClientSecretCredential(
+        tenant_id=principal.tenant_id,
+        client_id=principal.client_id,
+        client_secret=principal.client_secret,
+    )
 
 
 def probe_credentials(env_file: Path | str | None = None) -> CredentialStatus:
