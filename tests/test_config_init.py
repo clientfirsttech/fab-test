@@ -208,6 +208,31 @@ def test_init_scaffolds_a_commented_telemetry_block(tmp_path):
 
 
 @pytest.mark.fab_test
+def test_init_scaffolds_a_commented_lakehouse_telemetry_block(tmp_path):
+    """The scaffolded fab-test.yml documents `telemetry.lakehouse` alongside `.eventhouse`.
+
+    Lakehouse Telemetry Sink §2: a user discovering telemetry via `init`
+    should see both destinations are optional and independent, not just
+    the Eventhouse one that shipped first.
+    """
+    result = subprocess.run(
+        ["fab-test", "init"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        cwd=tmp_path,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+
+    content = (tmp_path / "fab-test.yml").read_text(encoding="utf-8")
+    assert "lakehouse:" in content
+    assert "workspace:" in content
+    assert "LAKEHOUSE_WORKSPACE" in content
+    assert "LAKEHOUSE_NAME" in content
+
+
+@pytest.mark.fab_test
 def test_init_json_format_lists_created_files(tmp_path):
     """--format json reports which files were created."""
     result = subprocess.run(

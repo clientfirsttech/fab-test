@@ -4,7 +4,7 @@ Guiding vision and constraints: [vision.md](vision.md)
 
 ## Active Epics
 
-None currently — see Standalone Tasks below for what's queued next.
+- **Lakehouse Telemetry Sink** — let fab-test ship telemetry to a Fabric Lakehouse (via the OneLake ADLS Gen2 SDK, `azure-storage-file-datalake` + `azure-identity`) as a second, independently-configurable destination alongside Eventhouse, so the team can query run data without KQL. In progress: Task 1 (Lakehouse Config Resolution). See [tasks/lakehouse-telemetry-sink-epic.md](tasks/lakehouse-telemetry-sink-epic.md).
 
 ## Standalone Tasks
 

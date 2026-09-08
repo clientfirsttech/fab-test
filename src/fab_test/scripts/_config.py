@@ -137,6 +137,11 @@ def _validate_rule_overlay(analyzer: str, overlay: Any) -> None:
 
 
 _EVENTHOUSE_KEYS: dict[str, type] = {"uri": str, "database": str}
+_LAKEHOUSE_KEYS: dict[str, type] = {"workspace": str, "lakehouse": str}
+_TELEMETRY_SECTIONS: dict[str, dict[str, type]] = {
+    "eventhouse": _EVENTHOUSE_KEYS,
+    "lakehouse": _LAKEHOUSE_KEYS,
+}
 
 
 def _validate_telemetry(telemetry: Any) -> None:
@@ -144,27 +149,29 @@ def _validate_telemetry(telemetry: Any) -> None:
 
     `eventhouse.table` is deliberately not a key: the table follows from
     which analyzer ran, so accepting one here would only let the config and
-    the derivation disagree.
+    the derivation disagree. `eventhouse` and `lakehouse` are independent,
+    optional destinations -- either, both, or neither may be present.
     """
     if not isinstance(telemetry, dict):
         raise ConfigError(
             f"config key 'telemetry' must be of type dict, got {type(telemetry).__name__}"
         )
     for section, block in telemetry.items():
-        if section != "eventhouse":
-            raise ConfigError(_unknown_key(f"telemetry.{section}", ("eventhouse",)))
+        if section not in _TELEMETRY_SECTIONS:
+            raise ConfigError(_unknown_key(f"telemetry.{section}", _TELEMETRY_SECTIONS))
         if not isinstance(block, dict):
             raise ConfigError(
-                f"config key 'telemetry.eventhouse' must be of type dict, "
+                f"config key 'telemetry.{section}' must be of type dict, "
                 f"got {type(block).__name__}"
             )
+        section_keys = _TELEMETRY_SECTIONS[section]
         for key, value in block.items():
-            path = f"telemetry.eventhouse.{key}"
-            if key not in _EVENTHOUSE_KEYS:
-                raise ConfigError(_unknown_key(path, _EVENTHOUSE_KEYS))
-            if not isinstance(value, _EVENTHOUSE_KEYS[key]):
+            path = f"telemetry.{section}.{key}"
+            if key not in section_keys:
+                raise ConfigError(_unknown_key(path, section_keys))
+            if not isinstance(value, section_keys[key]):
                 raise ConfigError(
-                    f"config key '{path}' must be of type {_EVENTHOUSE_KEYS[key].__name__}, "
+                    f"config key '{path}' must be of type {section_keys[key].__name__}, "
                     f"got {type(value).__name__}"
                 )
 
