@@ -2,6 +2,7 @@
 
 ## 2026-09-08
 
+- 🐛 - RTK Cloud Agent Blocking - `.github/hooks/rtk-rewrite.json`'s PreToolUse hook denied every Copilot coding agent tool call (Bash, file reads, sub-agent delegation) when `rtk` wasn't installed, since Copilot's hook runner fails closed on any hook error. `copilot-setup-steps.yml` now installs rtk from `rtk-ai/rtk` before the agent's session starts; the hook's command now guards with `command -v rtk` and exits clean if it's still missing, restoring rtk's token savings in Copilot sessions without reopening the blocking risk. `.claude/settings.json`'s equivalent hook needed no change — Claude Code's own `PreToolUse` semantics already fail open on anything but exit code 2.
 - 📝 - Stale four-segment version pin - `README.md`, `docs/RELEASE.md`, `docs/QUICKSTART-LOCAL.md`, and both `fab-test` skill copies pinned an install example (`fab-test==1.0.0.0.dev1`/`dev15`) that violated vision.md's three-part-semver rule and was stale against `__version__`. Corrected to `fab-test==1.1.0.dev2`; doc-only, no version bump. Found during the Promptfoo Skill Evaluation epic's discovery.
 
 ## 2026-09-05

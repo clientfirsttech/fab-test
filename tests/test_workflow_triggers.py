@@ -215,18 +215,40 @@ def test_every_path_the_copilot_setup_checks_exists():
     """It verified two scripts under a top-level `scripts/` that does not exist.
 
     A baseline check that names a missing file does not verify a baseline;
-    it just fails.
+    it just fails. A URL is not a local path, and neither is a shell-expanded
+    path like `$HOME/.local/bin` -- both are exempt, since installing rtk
+    from its GitHub-hosted script and putting its install dir on PATH are
+    not claims that a local file exists in this repository.
     """
     runs = "\n".join(str(step.get("run", "")) for step in _steps("copilot-setup-steps.yml"))
     referenced = [
         token
         for line in runs.splitlines()
         for token in line.split()
-        if ("/" in token or token.endswith(".md")) and not token.startswith("-")
+        if ("/" in token or token.endswith(".md"))
+        and not token.startswith("-")
+        and "://" not in token
+        and "$" not in token
     ]
     missing = sorted({t for t in referenced if t.count(".") and not (_ROOT / t).exists()})
 
     assert missing == [], missing
+
+
+@pytest.mark.fab_test
+def test_copilot_setup_installs_rtk():
+    """The agent's own session should get rtk's token savings, not just CI.
+
+    Regression: `.github/hooks/rtk-rewrite.json` used to call `rtk hook
+    copilot` with no bootstrap step at all, so a Copilot sandbox with no rtk
+    installed had every tool call denied. Installing rtk here, before the
+    agent's first tool call, is the fix that keeps the hook actually useful
+    instead of just harmless (RTK Cloud Agent Blocking epic).
+    """
+    runs = "\n".join(str(step.get("run", "")) for step in _steps("copilot-setup-steps.yml"))
+
+    assert "rtk-ai/rtk" in runs, runs
+    assert "GITHUB_PATH" in runs, "installed rtk must land on PATH for the agent's own session"
 
 
 @pytest.mark.fab_test
