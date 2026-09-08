@@ -173,7 +173,7 @@ resolvable:
     pip install \
       --index-url https://test.pypi.org/simple/ \
       --extra-index-url https://pypi.org/simple \
-      "fab-test==1.1.0.dev2"
+      "fab-test==1.2.0.dev1"
 
 - name: Check readiness
   run: fab-test doctor --format json
