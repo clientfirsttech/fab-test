@@ -626,6 +626,27 @@ def _log_inspector_outcome(
             _print_findings_table(findings)
 
 
+def _clear_stale_screenshot_folder(native_out: Path) -> None:
+    """Remove a leftover ``PBIInspectorPNG`` folder before invoking FabInspCLI.
+
+    ``native_out`` is reused run-over-run for the same artifact, but
+    FabInspCLI does not regenerate ``PBIInspectorPNG`` against an
+    already-populated output directory -- while it does randomize every
+    finding's ``Id`` on every run. Left in place, a second run's report
+    ends up pointing `fix_screenshot_images`'s lookup at the first run's
+    screenshots (PBIR Screenshot Correlation epic: confirmed live, 22/22
+    keys matched on a clean run, 0/22 once a stale folder was reused).
+    Removing it here forces FabInspCLI to write a fresh set that matches
+    the run it belongs to.
+
+    Never raises: a folder that can't be removed is a convenience lost,
+    not a reason to fail the run before the inspector has even started.
+    """
+    folder = native_out / "PBIInspectorPNG"
+    with contextlib.suppress(OSError):
+        shutil.rmtree(folder)
+
+
 def run_inspector(args: argparse.Namespace) -> int:
     """Run the PBIR Inspector analyzer and return an exit code."""
     artifact_path = validate_path(args.artifact_path, "Report artifact path")
@@ -644,6 +665,9 @@ def run_inspector(args: argparse.Namespace) -> int:
     # Ensure output directories exist before invoking the tool.
     native_out.parent.mkdir(parents=True, exist_ok=True)
     output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if emit_html:
+        _clear_stale_screenshot_folder(native_out)
 
     formats = "JSON,HTML" if emit_html else "JSON"
     command = build_inspector_command(
