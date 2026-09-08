@@ -1,0 +1,12 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "type": "command",
+        "command": "command -v rtk >/dev/null 2>&1 && rtk hook copilot || exit 0",
+        "cwd": ".",
+        "timeout": 5
+      }
+    ]
+  }
+}
