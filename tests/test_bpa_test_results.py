@@ -84,6 +84,68 @@ _ALL_PASSED_TRX = (
 )
 
 
+_TRX_TABLE_AND_RELATIONSHIP_OBJECTS = (
+    '<?xml version="1.0" encoding="utf-8"?>\n'
+    '<TestRun id="abc" name="model" runUser="user"'
+    ' xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">\n'
+    '  <ResultSummary outcome="Failed">\n'
+    '    <Counters total="2" executed="2" passed="0" failed="2" />\n'
+    "  </ResultSummary>\n"
+    "  <TestDefinitions>\n"
+    '    <UnitTest name="Ensure tables have relationships" id="1">\n'
+    "      <Properties>\n"
+    "        <Property><Key>RuleID</Key><Value>MAINT_01</Value></Property>\n"
+    "        <Property><Key>Severity</Key><Value>2</Value></Property>\n"
+    "        <Property><Key>Category</Key><Value>Maintenance</Value></Property>\n"
+    "      </Properties>\n"
+    "    </UnitTest>\n"
+    '    <UnitTest name="Do not use floating point data types" id="2">\n'
+    "      <Properties>\n"
+    "        <Property><Key>RuleID</Key><Value>PERF_02</Value></Property>\n"
+    "        <Property><Key>Severity</Key><Value>2</Value></Property>\n"
+    "        <Property><Key>Category</Key><Value>Performance</Value></Property>\n"
+    "      </Properties>\n"
+    "    </UnitTest>\n"
+    "  </TestDefinitions>\n"
+    "  <Results>\n"
+    '    <UnitTestResult testId="1" testName="Ensure tables have relationships"'
+    ' outcome="Failed">\n'
+    "      <Output><ErrorInfo>\n"
+    "        <Message>1 object(s) in violation of rule</Message>\n"
+    "        <StackTrace>Objects in violation:\n"
+    "  'Orphan Table'</StackTrace>\n"
+    "      </ErrorInfo></Output>\n"
+    "    </UnitTestResult>\n"
+    '    <UnitTestResult testId="2" testName="Do not use floating point data types"'
+    ' outcome="Failed">\n'
+    "      <Output><ErrorInfo>\n"
+    "        <Message>1 object(s) in violation of rule</Message>\n"
+    "        <StackTrace>Objects in violation:\n"
+    "  'Sales'[Amount]</StackTrace>\n"
+    "      </ErrorInfo></Output>\n"
+    "    </UnitTestResult>\n"
+    "  </Results>\n"
+    "</TestRun>"
+)
+
+
+@pytest.mark.bpa
+def test_failed_result_carries_a_table_or_column_object_not_just_bracketed_measures(
+    tmp_path,
+):
+    """TE2 formats table/column object names with single quotes, not brackets.
+
+    A bracket-only filter would silently drop these, leaving the report's
+    Object column blank for any rule that names a table or column instead
+    of a measure.
+    """
+    _exit_code, data = _run(tmp_path, _TRX_TABLE_AND_RELATIONSHIP_OBJECTS)
+
+    by_rule = {r["RuleID"]: r for r in data["test_results"]}
+    assert "'Orphan Table'" in by_rule["MAINT_01"]["ObjectName"]
+    assert "'Sales'[Amount]" in by_rule["PERF_02"]["ObjectName"]
+
+
 def _run(tmp_path: Path, trx: str):
     tmdl = tmp_path / "SalesModel.SemanticModel"
     tmdl.mkdir()

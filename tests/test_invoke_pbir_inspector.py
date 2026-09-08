@@ -353,3 +353,55 @@ class TestVerbosity:
             ), f"{key} varied across verbosity levels"
 
 
+class TestLocateNativeHtml:
+    """Tests for `_locate_native_html`'s pick among a reused native-output folder.
+
+    ``native_out`` is the same directory across runs of the same artifact,
+    so a stale HTML report (e.g. left over from a run before a bug fix, or
+    from a previous invocation) can sit alongside the fresh one. Picking
+    the wrong one is exactly what caused `fab-test all --open-report`'s
+    broken images while a standalone `fab-test pbir --open-report` (a
+    clean, single-HTML folder) was unaffected.
+    """
+
+    def test_picks_the_newest_html_not_the_first_glob_match(self, tmp_path: Path):
+        native_out = tmp_path / "native.json"
+        native_out.mkdir()
+        stale = native_out / "aaa-stale.html"
+        fresh = native_out / "zzz-fresh.html"
+        stale.write_text("<html>stale</html>", encoding="utf-8")
+        fresh.write_text("<html>fresh</html>", encoding="utf-8")
+        # Force filesystem mtimes to disagree with alphabetical glob order,
+        # so a naive `glob("*.html")[0]` would return the stale file.
+        stale_time = 1_000_000
+        fresh_time = 2_000_000
+        os.utime(stale, (stale_time, stale_time))
+        os.utime(fresh, (fresh_time, fresh_time))
+
+        result = invoke_pbir_inspector._locate_native_html(
+            native_out, emit_html=True, inspector_path=tmp_path / "PBIRInspectorCLI"
+        )
+
+        assert result == fresh
+
+    def test_returns_none_when_emit_html_is_false(self, tmp_path: Path):
+        native_out = tmp_path / "native.json"
+        native_out.mkdir()
+        (native_out / "TestRun.html").write_text("<html></html>", encoding="utf-8")
+
+        result = invoke_pbir_inspector._locate_native_html(
+            native_out, emit_html=False, inspector_path=tmp_path / "PBIRInspectorCLI"
+        )
+
+        assert result is None
+
+    def test_returns_none_when_no_html_files_exist(self, tmp_path: Path):
+        native_out = tmp_path / "native.json"
+        native_out.mkdir()
+
+        result = invoke_pbir_inspector._locate_native_html(
+            native_out, emit_html=True, inspector_path=tmp_path / "PBIRInspectorCLI"
+        )
+
+        assert result is None
+
