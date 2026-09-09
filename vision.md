@@ -127,6 +127,8 @@ Documentation follows the same three callers as the CLI itself. Shipping for one
 
 Three-part semver (`MAJOR.MINOR.PATCH`) — no fourth segment. Until the first final release ships (see "Cutting a final release" in [docs/RELEASE.md](docs/RELEASE.md)), every version stays a pre-release: append `.devN`, restarting at `.dev1` whenever the base `MAJOR.MINOR.PATCH` itself changes to a value that has never been published. A doc-only change with no `src/` edit does not need a bump on its own.
 
+Every bump must also re-stamp the version named in the fab-test skill's own frontmatter `description` (both `.github/skills/fab-test/SKILL.md` and its packaged copy `src/fab_test/skill/SKILL.md`) — see the `document` skill's "After editing `.github/skills/fab-test/`" section for the exact rule and the test that guards it.
+
 ## Non-Goals
 
 - Replacing the analyzers it wraps, or reimplementing their rules.
