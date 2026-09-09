@@ -468,6 +468,13 @@
                     {
                       "!": [
                         {
+                          "var": "visualGroup"
+                        }
+                      ]
+                    },
+                    {
+                      "!": [
+                        {
                           "var": "isHidden"
                         }
                       ]
