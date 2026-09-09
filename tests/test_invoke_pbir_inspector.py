@@ -405,3 +405,96 @@ class TestLocateNativeHtml:
 
         assert result is None
 
+
+class TestClearStaleScreenshotFolder:
+    """PBIR Screenshot Correlation epic: FabInspCLI does not regenerate
+    ``PBIInspectorPNG`` on a second run against an already-populated
+    ``native_out``, while it does randomize every finding's ``Id`` each
+    run -- confirmed live (22/22 matched on a clean run, 0/22 after a
+    second run left the old folder in place). The wrapper must clear that
+    folder itself before invoking the inspector binary so FabInspCLI is
+    always forced to write a fresh set that matches the run it belongs to.
+    """
+
+    def test_removes_an_existing_folder_and_its_contents(self, tmp_path: Path):
+        native_out = tmp_path / "native.json"
+        folder = native_out / "PBIInspectorPNG"
+        folder.mkdir(parents=True)
+        (folder / "stale-id.png").write_bytes(b"stale")
+
+        invoke_pbir_inspector._clear_stale_screenshot_folder(native_out)
+
+        assert not folder.exists()
+
+    def test_missing_folder_does_not_raise(self, tmp_path: Path):
+        native_out = tmp_path / "native.json"
+        native_out.mkdir()
+
+        invoke_pbir_inspector._clear_stale_screenshot_folder(native_out)  # no exception
+
+    @mock.patch("fab_test.scripts.invoke_pbir_inspector.subprocess.run")
+    def test_run_inspector_clears_a_stale_screenshot_folder_before_invoking(
+        self, mock_run, tmp_path: Path, monkeypatch
+    ):
+        """A stale ``PBIInspectorPNG`` left from a prior run must not survive
+        into the next invocation -- the mocked subprocess writes nothing back,
+        so the folder's absence afterward proves it was cleared beforehand."""
+        monkeypatch.chdir(tmp_path)
+        artifact = tmp_path / "SalesReport.Report"
+        artifact.mkdir()
+        rules = tmp_path / "rules.json"
+        rules.write_text("[]", encoding="utf-8")
+        inspector = tmp_path / "PBIRInspectorCLI"
+        inspector.write_text("fake", encoding="utf-8")
+        inspector.chmod(0o755)
+        output = tmp_path / "out.json"
+        # FabInspCLI treats the "-output" path as a directory when emitting
+        # HTML too, e.g. .../SalesReport/native.json/PBIInspectorPNG/*.png --
+        # matching the real on-disk layout this fix targets.
+        native_out_dir = tmp_path / "fab-test-results" / "pbir" / "SalesReport" / "native.json"
+        stale_folder = native_out_dir / "PBIInspectorPNG"
+        stale_folder.mkdir(parents=True, exist_ok=True)
+        (stale_folder / "stale-id.png").write_bytes(b"stale")
+        mock_run.return_value = mock.Mock(returncode=0, stdout="", stderr="")
+
+        class Args:
+            artifact_path = str(artifact)
+            rules_path = str(rules)
+            inspector_path = str(inspector)
+            output_path = str(output)
+            emit_html = True
+
+        run_inspector(Args())
+
+        assert not stale_folder.exists()
+
+    @mock.patch("fab_test.scripts.invoke_pbir_inspector.subprocess.run")
+    def test_run_inspector_leaves_no_folder_untouched_when_none_existed(
+        self, mock_run, tmp_path: Path, monkeypatch
+    ):
+        """First-ever run against a fresh native_out: nothing to clear, no error."""
+        monkeypatch.chdir(tmp_path)
+        artifact = tmp_path / "SalesReport.Report"
+        artifact.mkdir()
+        rules = tmp_path / "rules.json"
+        rules.write_text("[]", encoding="utf-8")
+        inspector = tmp_path / "PBIRInspectorCLI"
+        inspector.write_text("fake", encoding="utf-8")
+        inspector.chmod(0o755)
+        output = tmp_path / "out.json"
+        native_dir = tmp_path / "fab-test-results" / "pbir" / "SalesReport"
+        native_dir.mkdir(parents=True, exist_ok=True)
+        (native_dir / "native.json").write_text("[]", encoding="utf-8")
+        mock_run.return_value = mock.Mock(returncode=0, stdout="", stderr="")
+
+        class Args:
+            artifact_path = str(artifact)
+            rules_path = str(rules)
+            inspector_path = str(inspector)
+            output_path = str(output)
+            emit_html = True
+
+        exit_code = run_inspector(Args())
+
+        assert exit_code == 0
+

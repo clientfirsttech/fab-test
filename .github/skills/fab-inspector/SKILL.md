@@ -128,13 +128,13 @@ Rules are defined in JSON with the structure:
 
 ```json
 {
-  "Rules": [
+  "rules": [
     {
       "id": "RULE_ID",
       "name": "Human readable name",
       "description": "What the rule checks",
       "disabled": false,
-      "logType": 1,
+      "logType": "warning",
       "itemType": "report_deprecated",
       "parameters": { "paramName": "value" }
     }
@@ -143,8 +143,9 @@ Rules are defined in JSON with the structure:
 ```
 
 RuleLogTypes {
-  0 => Warning (informational, non-blocking)
-  1 => Error (test failure)
+  // The rules JSON's own "logType" field is a string, not this enum.
+  "warning" => non-blocking (default)
+  "error" => test failure
 }
 
 ### Disabling a rule
@@ -165,7 +166,7 @@ TestResult {
   RuleId: String           // e.g. "REDUCE_VISUALS_ON_PAGE"
   RuleName: String
   RuleDescription: String
-  LogType: 0 | 1          // 0=Warning, 1=Error
+  LogType: 0 | 1          // 0=Error, 1=Warning (MessageTypeEnum ordinals)
   RuleItemType: String
   RuleSetName: String
   RuleSetPath: String
