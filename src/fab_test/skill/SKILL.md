@@ -1,6 +1,6 @@
 ---
 name: fab-test
-description: fab-test CLI reference for running Fabric artifact analyzers locally (fab-test 1.4.0.dev1). Covers all subcommands, flags, artifact isolation, result locations, and how fab-test differs from pytest. Use when invoking, troubleshooting, or extending local artifact validation.
+description: fab-test CLI reference for running Fabric artifact analyzers locally (fab-test 1.4.1.dev1). Covers all subcommands, flags, artifact isolation, result locations, and how fab-test differs from pytest. Use when invoking, troubleshooting, or extending local artifact validation.
 ---
 
 # fab-test
@@ -39,16 +39,15 @@ pip install -e .
 
 From an index — **`pip install fab-test` does not work yet.** The name is
 unregistered on PyPI. The pre-release lives on TestPyPI, and both flags below are
-required: TestPyPI carries `pql-test` 0.1.11 and `fabric-cicd` 0.1.7 where this
-project needs `pql-test==0.1.17` and a current `fabric-cicd`, so without the
-extra index the install fails to resolve; and pip skips PEP 440 dev releases
-unless the version is named exactly.
+required: TestPyPI carries `pql-test` 0.1.11 where this project needs
+`pql-test==0.1.17`, so without the extra index the install fails to resolve;
+and pip skips PEP 440 dev releases unless the version is named exactly.
 
 ```bash
 pip install \
   --index-url https://test.pypi.org/simple/ \
   --extra-index-url https://pypi.org/simple \
-  "fab-test==1.2.0.dev1"
+  "fab-test==1.4.0.dev1"
 ```
 
 Either way this registers the `fab-test` console script. The `.venv` is searched automatically for tool binaries (e.g. `pql-test`) even when not on `PATH`.
