@@ -1,0 +1,91 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.12.0/schema.json",
+  "name": "df89a190bca70b12b743",
+  "position": {
+    "x": 406,
+    "y": 0,
+    "z": 0,
+    "height": 741.17647058823525,
+    "width": 280
+  },
+  "visual": {
+    "visualType": "cardVisual",
+    "query": {
+      "queryState": {
+        "Rows": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Mock-Fact"
+                    }
+                  },
+                  "Property": "Date ID"
+                }
+              },
+              "queryRef": "Mock-Fact.Date ID",
+              "nativeQueryRef": "Date ID"
+            }
+          ]
+        }
+      }
+    },
+    "visualContainerObjects": {
+      "title": [
+        {
+          "properties": {
+            "show": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            },
+            "text": {
+              "expr": {
+                "Literal": {
+                  "Value": "'Card with Title 2'"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "general": [
+        {
+          "properties": {
+            "altText": {
+              "expr": {
+                "Literal": {
+                  "Value": "'Test me'"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "drillFilterOtherVisuals": true
+  },
+  "parentGroupName": "7a1f92c4d8b344e0a112",
+  "filterConfig": {
+    "filters": [
+      {
+        "name": "4c19a4e12d0108913740",
+        "field": {
+          "Column": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "Mock-Fact"
+              }
+            },
+            "Property": "Date ID"
+          }
+        },
+        "type": "Advanced"
+      }
+    ]
+  }
+}
