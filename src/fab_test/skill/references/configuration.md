@@ -41,29 +41,46 @@ An unknown key exits `2` naming the key and the closest valid key (e.g. `artifac
 
 ## Telemetry
 
-Optional. `fab-test` ships one record per analyzer/artifact to a Fabric Eventhouse.
+Optional. `fab-test` ships one record per analyzer/artifact to a Fabric Eventhouse and/or a Fabric Lakehouse — two independent, optional destinations. Configure either, both, or neither; a run ships to whichever is configured, and one destination failing to deliver never blocks the other.
 
 ```yaml
 telemetry:
   eventhouse:
     uri: https://<cluster>.kusto.fabric.microsoft.com   # env: EVENTHOUSE_URI
     database: fabric_ops                                 # env: EVENTHOUSE_DATABASE
+  lakehouse:
+    workspace: <workspace-name-or-guid>                  # env: LAKEHOUSE_WORKSPACE
+    lakehouse: <lakehouse-name>                           # env: LAKEHOUSE_NAME
 ```
 
-**Configuring a complete destination is what enables shipping.** There is no separate on switch. `eventhouse.table` is not a key — the table is derived from the analyzer (`pql-test` → `fabric_dynamic_analysis`, everything else → `fabric_static_analysis`).
+**Configuring a complete destination is what enables shipping it.** There is no separate on switch, and each destination is judged independently. `eventhouse.table` is not a key — the table is derived from the analyzer (`pql-test` → `fabric_dynamic_analysis`, everything else → `fabric_static_analysis`). Lakehouse telemetry writes one JSONL file per table per run to `Files/fab-test-telemetry/<table>/<run_id>.jsonl` via the OneLake ADLS Gen2 endpoint, using the same credential resolution as the Fabric/Power BI REST calls (`resolve_service_principal`/`DefaultAzureCredential`) — no separate Lakehouse credential exists.
 
-`fab-test init` scaffolds this block commented out in the generated `fab-test.yml`, alongside the `rules:` example, so it's discoverable without reading this skill.
+**`telemetry.lakehouse.lakehouse` accepts either a friendly display name or the item's GUID**, and which one you need depends on your tenant. OneLake addresses a friendly name as `<name>.Lakehouse` (the `.Lakehouse` suffix disambiguates it from another item type sharing the name); a tenant with the OneLake friendly-names tenant setting disabled rejects that form outright (`FriendlyNameSupportDisabled: WorkspaceId and ArtifactId should be either valid Guids or valid Names`, confirmed live) and needs the bare item GUID instead — found in the Fabric portal URL when the Lakehouse item is open. `fab-test` detects a GUID automatically and addresses it bare, with no suffix; anything else is treated as a friendly name.
+
+`fab-test init` scaffolds both blocks commented out in the generated `fab-test.yml`, alongside the `rules:` example, so they're discoverable without reading this skill.
+
+**Getting the JSONL files into a queryable table.** The Lakehouse's "Load to Tables" point-and-click wizard only recognizes CSV and Parquet — JSON/JSONL is not one of its options, confirmed live. Load it with a short Spark notebook attached to the Lakehouse instead:
+
+```python
+table = "fabric_static_analysis"  # or fabric_dynamic_analysis
+df = spark.read.json(f"Files/fab-test-telemetry/{table}/")
+df.write.format("delta").mode("overwrite").saveAsTable(table)
+```
+
+`overwrite` (not `append`) is deliberate: it re-reads every JSONL file under the table's folder each run, so re-running the notebook never double-counts a record. `append` would need to track which run files were already loaded to avoid that. Schedule the notebook (or run it after each CI job) to keep the table current; there is no "Load to Tables" button involved.
 
 Resolution order for whether a run ships, highest first:
 
 | Precedence | Signal | Effect |
 |---|---|---|
 | 1 | `--no-telemetry` | Never ships; no payload is built |
-| 2 | `--telemetry` | Ships — or exits `2` if no destination is configured |
+| 2 | `--telemetry` | Ships to every configured destination — or exits `2` if neither is configured |
 | 3 | `ENABLE_EVENTHOUSE_LOGGING=false` | Never ships, even with a destination configured |
-| 4 | `ENABLE_EVENTHOUSE_LOGGING=true` | Ships if a destination is configured; warns if not |
-| 5 | A complete `telemetry.eventhouse` | Ships |
-| 6 | Nothing | Does not ship, and says nothing about it |
+| 4 | `ENABLE_EVENTHOUSE_LOGGING=true` | Ships to every configured destination; warns if none is |
+| 5 | A complete `telemetry.eventhouse` and/or `telemetry.lakehouse` | Ships to whichever is complete |
+| 6 | Nothing configured | Does not ship, and says nothing about it |
+
+`LAKEHOUSE_WORKSPACE`/`LAKEHOUSE_NAME`, like `EVENTHOUSE_URI`/`EVENTHOUSE_DATABASE`, are plain environment variables checked against the real process environment — they are **not** read from a `.env` file. Put a real, personal destination in your shell environment or an untracked local config for ad-hoc testing; `fab-test.yml` is committed and shared, so a live destination there applies to every contributor and every CI run.
 
 **Table setup is automatic.** Before each run's first send, `fab-test` checks that the target table and its `fab_test_payload` ingestion mapping exist and creates whatever is missing — once per table per run, against the *query* endpoint. A run against a healthy destination issues no schema commands.
 
@@ -90,26 +107,35 @@ A destination that cannot be reached or built is a **failed** flush, never a del
 
 Filesystem paths in the payload, including those inside the embedded `results` envelope, are rewritten **repository-relative** (`.fabric\artifacts\Sales.SemanticModel`, not `C:\Users\<name>\...`). A path outside the repository is reduced to its final component rather than a `../../..` traversal. This is deliberate and worth knowing when querying: `Data.results.artifact_path` is relative, while the same field in the envelope on disk stays absolute, because a human clicking a result wants the full path and an Eventhouse row does not.
 
-Prerequisites, all reported by `fab-test doctor`'s `telemetry` row:
+Prerequisites, each destination reported by its own `fab-test doctor` row:
 
+**Eventhouse (`telemetry-eventhouse` row)**
 - `pip install 'fab-test[telemetry]'` — the Kusto ingest client is **not** in the base package.
 - Credentials: the same `FABRIC_TENANT_ID` / `FABRIC_SERVICE_PRINCIPAL_ID` / `FABRIC_SERVICE_PRINCIPAL_SECRET` the analyzers use, falling back to `DefaultAzureCredential` when none are set. A *partially* set principal is refused rather than silently falling back. There are no `EVENTHOUSE_*` credential variables.
-- The **Database Ingestor** role on the KQL database. `doctor` never reports telemetry as ✅ ready — a resolvable credential is not proof it may ingest, so the row shows `ℹ` with `configured; ingest permission unverified`.
+- The **Database Ingestor** role on the KQL database. `doctor` never reports it ✅ ready — a resolvable credential is not proof it may ingest, so the row shows `ℹ` with `configured; ingest permission unverified`.
+
+**Lakehouse (`telemetry-lakehouse` row)**
+- `pip install 'fab-test[telemetry-lakehouse]'` — the OneLake (ADLS Gen2) client is **not** in the base package.
+- The same service-principal credentials as above; there are no `LAKEHOUSE_*` credential variables either.
+- A workspace role (e.g. Contributor) or a direct share on the Lakehouse item. `doctor` never reports it ✅ ready either — the row shows `ℹ` with `configured; write permission unverified`.
+
+**Only a configured destination gets a row.** With neither `telemetry.eventhouse` nor `telemetry.lakehouse` configured, `doctor` shows a single plain `telemetry` row (`not configured`) rather than two identical ones. Configuring only one shows only that destination's row.
 
 Failure modes an agent should expect:
 
 | Situation | What happens |
 |---|---|
-| `--telemetry`, nothing configured | Exit `2` before any analyzer runs, naming the config key and the env var |
-| Requested, nothing configured (via `ENABLE_EVENTHOUSE_LOGGING=true`) | Runs normally; one `::warning::`; `run.json` `telemetry_error` set |
-| Extra not installed | One warning naming `pip install 'fab-test[telemetry]'`; exit code unchanged |
-| Ingest rejected (403) | One warning naming the Database Ingestor role; exit code unchanged |
-| Cluster unreachable | One warning per **run**, not per artifact; exit code unchanged |
-| Table or mapping missing and uncreatable | Flush reported **failed**, nothing sent, error carries the KQL; exit code unchanged |
+| `--telemetry`, neither destination configured | Exit `2` before any analyzer runs, naming both config keys and both sets of env vars |
+| Requested, neither configured (via `ENABLE_EVENTHOUSE_LOGGING=true`) | Runs normally; one `::warning::` naming both destinations; `run.json` `telemetry_error` set |
+| Extra not installed | One warning naming the destination's install extra; exit code unchanged |
+| Ingest/write rejected (403) | One warning naming the missing role; exit code unchanged |
+| Cluster/OneLake unreachable | One warning per **run** per failed destination, not per artifact; exit code unchanged |
+| Table or mapping missing and uncreatable (Eventhouse only) | Flush reported **failed**, nothing sent, error carries the KQL; exit code unchanged |
+| Both destinations configured, one fails | The other still delivers; `run.json` `telemetry_error` names only the failed one(s), prefixed by destination when more than one failed |
 
 **What a record identifies.** `actor` is the git email (`git config user.email`, or `GITHUB_ACTOR` in a pipeline), recorded as given — the same address the repository stores on every commit — or an empty string when nothing resolves. Every filesystem path in the payload, including those inside the embedded `results` envelope, is rewritten relative to the repository root; a path outside the repository is reduced to its final component. Neither is cosmetic: an absolute path on a laptop is `C:\Users\<name>\…`, so before this the operating-system username shipped in plaintext in every record while `actor` was hashed into something nobody could resolve — identifying people by accident and failing to identify them on purpose.
 
-Telemetry never changes a run's exit code, never writes to stdout under `--format json`, and never carries a credential value into the payload, the log, or `run.json` — failure text is redacted before it is reported. `--dry-run` prints the resolved cluster, database, and table alongside each payload without sending anything.
+Telemetry never changes a run's exit code, never writes to stdout under `--format json`, and never carries a credential value into the payload, the log, or `run.json` — failure text is redacted before it is reported. `--dry-run` prints every configured destination (Eventhouse's cluster/database/table, Lakehouse's workspace/name) alongside each payload without sending anything.
 
 ## Rule Overlays
 

@@ -1,6 +1,6 @@
 # Lakehouse Telemetry Sink Epic
 
-**Status**: 📋 PLANNED
+**Status**: ✅ COMPLETED (2026-09-10, 5/5 tasks)
 **Goal**: Let fab-test ship telemetry to a Fabric Lakehouse (via the OneLake ADLS Gen2 SDK) as a second, independently-configurable destination alongside Eventhouse.
 
 ## Overview
