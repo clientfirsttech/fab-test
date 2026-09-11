@@ -2,7 +2,10 @@
 
 Publishes analyzer telemetry to a Fabric Lakehouse via OneLake's ADLS Gen2
 endpoint, as JSONL files under
-``<lakehouse>.Lakehouse/Files/fab-test-telemetry/<table>/<run_id>.jsonl``.
+``<lakehouse>.Lakehouse/Files/fab-test-telemetry/<table>/<run_id>.jsonl`` when
+``telemetry.lakehouse.lakehouse`` is a friendly name, or
+``<lakehouse-guid>/Files/fab-test-telemetry/<table>/<run_id>.jsonl`` when it is
+the item's GUID (required on a tenant with OneLake friendly names disabled).
 Mirrors `eventhouse_logger.py`'s `EventhouseSink` shape: a run-scoped batch,
 nothing imported/authenticated until `flush` has something to send, and a
 flush that never raises into the analyzer run -- see the Lakehouse Telemetry
@@ -156,7 +159,7 @@ class LakehouseSink:
         deps = self._dependencies()
         client = deps.service_client_cls(ONELAKE_ENDPOINT, credential=self._credential())
         filesystem = client.get_file_system_client(self.config.workspace)
-        directory_path = f"{self.config.lakehouse}.Lakehouse/Files/fab-test-telemetry/{table}"
+        directory_path = f"{_item_path(self.config.lakehouse)}/Files/fab-test-telemetry/{table}"
         directory = filesystem.get_directory_client(directory_path)
         directory.create_directory()
         file_client = directory.get_file_client(f"{self._run_id}.jsonl")
@@ -169,6 +172,24 @@ class LakehouseSink:
     def _credential(self) -> Any:
         """Resolve the write credential. A seam, so a test need not authenticate."""
         return build_lakehouse_credential(self.env_file)
+
+
+def _item_path(lakehouse: str) -> str:
+    """Return how to address the Lakehouse item in a OneLake path.
+
+    A friendly display name needs the `.Lakehouse` item-type suffix to
+    disambiguate it from another item type sharing the same name -- OneLake's
+    documented friendly-name convention. A GUID already identifies the item
+    uniquely and must be used bare: a tenant with friendly names disabled
+    rejects `<guid>.Lakehouse` outright (`FriendlyNameSupportDisabled`,
+    confirmed live), and no tenant setting makes a bare GUID plus a type
+    suffix meaningful.
+    """
+    try:
+        uuid.UUID(lakehouse)
+    except ValueError:
+        return f"{lakehouse}.Lakehouse"
+    return lakehouse
 
 
 def _json_lines_bytes(rows: list[dict]) -> bytes:

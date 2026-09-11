@@ -62,8 +62,15 @@ telemetry = [
 # Fabric Lakehouse. A second extra for the same reason `telemetry` is one:
 # egress capability nobody who doesn't configure a destination should have
 # to install. `azure-identity` is already a base dependency.
+#
+# Pinned below the latest release: azure-storage-file-datalake>=12.22.0
+# requires azure-storage-blob>=12.27.0, which conflicts with
+# azure-kusto-ingest's own exact azure-storage-blob==12.26.0 pin -- both
+# `telemetry` and `telemetry-lakehouse` installed together would otherwise
+# fail to resolve. 12.21.0 needs only azure-storage-blob>=12.26.0, which the
+# Kusto pin satisfies exactly.
 telemetry-lakehouse = [
-    "azure-storage-file-datalake",
+    "azure-storage-file-datalake==12.21.0",
 ]
 dev = [
     "ruff>=0.15",

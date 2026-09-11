@@ -33,7 +33,7 @@ from ._metadata import (
 )
 from ._scan import find_skipped_checkouts as _find_skipped_checkouts
 from ._target import TargetError
-from ._telemetry import eventhouse_rows
+from ._telemetry import eventhouse_rows, lakehouse_rows
 from .fab_test_execution import _manifest_target, _target_of
 from .fab_test_local import _LOCAL_ANALYZERS, _local_readiness
 from .fab_test_parser import _aliases_for, _canonical_name
@@ -78,7 +78,7 @@ from .fab_test_summary import (
     _print_list,
     _print_local_doctor,
 )
-from .fab_test_telemetry import _telemetry_readiness
+from .fab_test_telemetry import _telemetry_readiness_rows
 
 
 def _print_help(parser: argparse.ArgumentParser, topic: str | None) -> int:
@@ -226,6 +226,7 @@ def _config_show(args: argparse.Namespace) -> int:
         rows.append({"key": key, "value": display_value, "origin": origin})
     rows.extend(_ruleset_rows())
     rows.extend(eventhouse_rows(file_config))
+    rows.extend(lakehouse_rows(file_config))
     return _print_config_show(rows, output_format)
 
 
@@ -444,7 +445,7 @@ def _doctor(args: argparse.Namespace) -> int:
         # a missing tool, a missing credential -- but never counted toward
         # whether doctor passes: telemetry is optional, and a run that never
         # wanted it is not a broken installation.
-        rows.append(_telemetry_readiness(args))
+        rows.extend(_telemetry_readiness_rows(args))
     return _print_doctor(rows, output_format)
 
 
