@@ -139,7 +139,7 @@ def test_a_requested_run_with_no_destination_says_so(tmp_path, monkeypatch, caps
     _run(tmp_path, monkeypatch, config=None)
 
     captured = capsys.readouterr()
-    assert "no Eventhouse destination is configured" in captured.err + captured.out
+    assert "no Eventhouse or Lakehouse destination is configured" in captured.err + captured.out
 
 
 @pytest.mark.telemetry

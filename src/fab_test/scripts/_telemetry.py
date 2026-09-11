@@ -275,3 +275,26 @@ def _lakehouse_block(file_config: dict) -> dict:
         return {}
     block = telemetry.get("lakehouse")
     return block if isinstance(block, dict) else {}
+
+
+def lakehouse_rows(file_config: dict) -> list[dict[str, str]]:
+    """Return `config --show` rows for Lakehouse telemetry, or none when unconfigured.
+
+    Mirrors `eventhouse_rows`: an absent optional section is a default, not
+    a setting worth naming.
+    """
+    resolved = resolve_lakehouse_config(file_config)
+    if not (resolved.workspace or resolved.lakehouse):
+        return []
+    return [
+        {
+            "key": "telemetry.lakehouse.workspace",
+            "value": resolved.workspace,
+            "origin": resolved.workspace_origin,
+        },
+        {
+            "key": "telemetry.lakehouse.lakehouse",
+            "value": resolved.lakehouse,
+            "origin": resolved.lakehouse_origin,
+        },
+    ]

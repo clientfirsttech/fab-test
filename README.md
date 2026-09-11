@@ -424,9 +424,11 @@ Precedence, for every setting:
 
 ### Telemetry (optional)
 
-`fab-test` can ship each analyzer result to a Fabric Eventhouse, so findings across
-runs, branches, and people land somewhere queryable. It is off until you give it an
-address, and it never fails a build.
+`fab-test` can ship each analyzer result to a Fabric Eventhouse and/or a Fabric
+Lakehouse, so findings across runs, branches, and people land somewhere queryable.
+The two destinations are independent — configure either, both, or neither — and
+each is off until you give it an address; telemetry never fails a build, and one
+destination failing to deliver never blocks the other.
 
 **Configuring a destination is what turns it on**: there is no separate switch:
 
@@ -436,9 +438,16 @@ telemetry:
   eventhouse:
     uri: https://<cluster>.kusto.fabric.microsoft.com
     database: fabric_ops
+  lakehouse:
+    workspace: <workspace-name-or-guid>
+    lakehouse: <lakehouse-name>
 ```
 
-`fab-test init` scaffolds this block commented out, so it's discoverable in the generated `fab-test.yml` without reading these docs.
+`fab-test init` scaffolds both blocks commented out, so they're discoverable in the generated `fab-test.yml` without reading these docs. Lakehouse telemetry writes one JSONL file per table per run to `Files/fab-test-telemetry/<table>/<run_id>.jsonl` via OneLake, reusing the same credentials as Eventhouse — no separate Lakehouse credential exists. Querying it means a SQL endpoint, Direct Lake, or Power BI, no KQL required.
+
+`lakehouse:` accepts a friendly display name or the item's GUID — use the GUID if your tenant has OneLake friendly names disabled (the error looks like `FriendlyNameSupportDisabled`); `fab-test` detects which one you gave it automatically.
+
+**The Lakehouse's "Load to Tables" wizard doesn't see these files** — it only recognizes CSV and Parquet, not JSON/JSONL. Load them with a Spark notebook instead: see [the fab-test skill's Telemetry reference](https://github.com/kerski/fab-test/blob/main/.github/skills/fab-test/references/configuration.md#telemetry) for the two-line snippet.
 
 **The tables create themselves on first use.** You need an Eventhouse and a KQL
 database; `fab-test` builds the rest. Before each run's first send it checks that
@@ -465,33 +474,39 @@ is why `fab-test` checks for it rather than assuming a table that exists is usab
 
 Three more things to know before the first run:
 
-- **Install the extra.** The Kusto ingest client is not in the base package:
-  `pip install 'fab-test[telemetry]'`. Shipping an egress-capable client to
-  everyone who only reads files on a laptop is not a default worth having.
-- **It reuses your existing credentials.** The same `FABRIC_TENANT_ID`,
+- **Install the extra for each destination you use.** Neither client ships in the
+  base package: `pip install 'fab-test[telemetry]'` for Eventhouse's Kusto ingest
+  client, `pip install 'fab-test[telemetry-lakehouse]'` for Lakehouse's OneLake
+  client. Shipping egress-capable clients to everyone who only reads files on a
+  laptop is not a default worth having.
+- **Both reuse your existing credentials.** The same `FABRIC_TENANT_ID`,
   `FABRIC_SERVICE_PRINCIPAL_ID`, and `FABRIC_SERVICE_PRINCIPAL_SECRET` the
   analyzers use, falling back to `DefaultAzureCredential` (`az login`, a managed
-  identity) when none are set. There are no `EVENTHOUSE_*` credential variables.
-- **Grant the ingest role.** The credential needs **Database Ingestor** on the KQL
-  database. This is the most likely first-run failure and it looks exactly like a
-  bad secret, so `fab-test doctor` names it rather than letting you go rotate a
-  working credential.
+  identity) when none are set. There are no `EVENTHOUSE_*`/`LAKEHOUSE_*` credential
+  variables.
+- **Grant the right role on each destination.** Eventhouse needs **Database
+  Ingestor** on the KQL database; Lakehouse needs a workspace role (e.g.
+  Contributor) or a direct share on the item. This is the most likely first-run
+  failure and it looks exactly like a bad secret, so `fab-test doctor` names it per
+  destination rather than letting you go rotate a working credential.
 
 | You want | Do this |
 |---|---|
 | See where it would go, and what it would send | `fab-test bpa --dry-run` |
 | Turn it off for one run | `fab-test bpa --no-telemetry` |
 | Turn it off everywhere | `ENABLE_EVENTHOUSE_LOGGING=false` |
-| Check readiness | `fab-test doctor` (the `telemetry` row) |
-| Override the address per environment | `EVENTHOUSE_URI` / `EVENTHOUSE_DATABASE` |
+| Check readiness | `fab-test doctor` (the `telemetry-eventhouse`/`telemetry-lakehouse` rows) |
+| Override the Eventhouse address per environment | `EVENTHOUSE_URI` / `EVENTHOUSE_DATABASE` |
+| Override the Lakehouse address per environment | `LAKEHOUSE_WORKSPACE` / `LAKEHOUSE_NAME` |
 
-`--telemetry` with no destination configured is an error (exit `2`) naming the config
-key and the environment variable, rather than a run that quietly sends nothing. When
-a send fails, the run's own exit code is unchanged, one warning is printed for the
-whole run, and `run.json` records the reason in `telemetry_error`, so a pipeline
-that uploads only the manifest can still tell a run whose telemetry landed from one
-whose records were dropped. Credential values never reach the payload, the log, or
-the manifest.
+`--telemetry` with neither destination configured is an error (exit `2`) naming
+both config keys and both sets of environment variables, rather than a run that
+quietly sends nothing. When a send fails, the run's own exit code is unchanged, one
+warning is printed per failed destination for the whole run (not per artifact), and
+`run.json` records the reason(s) in `telemetry_error`, so a pipeline that uploads
+only the manifest can still tell a run whose telemetry landed from one whose
+records were dropped. One destination failing never blocks the other's delivery.
+Credential values never reach the payload, the log, or the manifest.
 
 **What each record identifies.** `actor` carries the git email (`git config
 user.email`, or `GITHUB_ACTOR` in a pipeline) as-is, so you can ask who ran what;

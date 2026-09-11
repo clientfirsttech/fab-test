@@ -22,6 +22,7 @@ from ._fab_test_context import REPO_ROOT
 from ._git_context import git_command_output, git_context
 from ._telemetry import TelemetryDecision, telemetry_decision
 from .eventhouse_logger import EventhouseSink, publish_analyzer_telemetry
+from .lakehouse_logger import LakehouseSink
 
 
 def _telemetry_table(analyzer: str) -> str:
@@ -34,13 +35,23 @@ def _telemetry_table(analyzer: str) -> str:
 
 
 def _telemetry_destination(decision: TelemetryDecision, analyzer: str) -> str:
-    """Describe where telemetry would go, for the --dry-run preview."""
-    if not decision.eventhouse.configured:
-        return "not configured (set `telemetry.eventhouse` in fab-test.yml)"
-    return (
-        f"{decision.eventhouse.uri} / {decision.eventhouse.database} "
-        f"/ {_telemetry_table(analyzer)}"
-    )
+    """Describe where telemetry would go, for the --dry-run preview.
+
+    Names every configured destination, not just one -- a run may ship to
+    Eventhouse, Lakehouse, or both, and a preview that only ever mentioned
+    Eventhouse would misdescribe a Lakehouse-only or dual-destination run.
+    """
+    destinations = []
+    if decision.eventhouse.configured:
+        destinations.append(
+            f"eventhouse: {decision.eventhouse.uri} / {decision.eventhouse.database} "
+            f"/ {_telemetry_table(analyzer)}"
+        )
+    if decision.lakehouse.configured:
+        destinations.append(f"lakehouse: {decision.lakehouse.workspace} / {decision.lakehouse.lakehouse}")
+    if not destinations:
+        return "not configured (set `telemetry.eventhouse` or `telemetry.lakehouse` in fab-test.yml)"
+    return "; ".join(destinations)
 
 
 def _telemetry_readiness(args: argparse.Namespace) -> dict[str, Any]:
@@ -115,8 +126,115 @@ def _telemetry_readiness(args: argparse.Namespace) -> dict[str, Any]:
     )
 
 
+def _telemetry_readiness_lakehouse(args: argparse.Namespace) -> dict[str, Any]:
+    """Return a `doctor` row for Lakehouse telemetry. Mirrors `_telemetry_readiness`.
+
+    A separate row, not a second branch of the Eventhouse one: the two
+    destinations are independent and optional, and a reader with only one
+    configured should see exactly one row rather than one that talks about
+    both.
+    """
+    from ._credentials import (
+        IncompleteServicePrincipalError,
+        ambient_credential_available,
+        resolve_service_principal,
+    )
+    from .lakehouse_logger import TelemetryDependencyError, load_lakehouse_dependencies
+
+    def _row(ready, reason, remediation=None, resolved_path=None):
+        return {
+            "analyzer": "telemetry-lakehouse",
+            "ready": ready,
+            "reason": reason,
+            "remediation": remediation,
+            "resolved_path": resolved_path,
+            "version": None,
+        }
+
+    lakehouse = _telemetry_decision(args).lakehouse
+    if not lakehouse.configured:
+        return _row(None, "not configured (optional; set `telemetry.lakehouse` to enable)")
+
+    destination = f"{lakehouse.workspace} / {lakehouse.lakehouse}"
+
+    try:
+        load_lakehouse_dependencies()
+    except TelemetryDependencyError as exc:
+        return _row(False, "OneLake client not installed", str(exc), destination)
+
+    env_file = getattr(args, "playwright_env_file", None)
+    try:
+        principal = resolve_service_principal(env_file)
+    except IncompleteServicePrincipalError as exc:
+        return _row(False, "service principal is incomplete", str(exc), destination)
+
+    if principal is None and not ambient_credential_available():
+        return _row(
+            False,
+            "no credentials resolved",
+            "Set FABRIC_TENANT_ID, FABRIC_SERVICE_PRINCIPAL_ID, and "
+            "FABRIC_SERVICE_PRINCIPAL_SECRET, or sign in with `az login`",
+            destination,
+        )
+
+    return _row(
+        None,
+        "configured; write permission unverified",
+        "The credential authenticated but writing to this Lakehouse is unverified. "
+        "Grant it a role (e.g. Contributor) on the workspace, or share the Lakehouse "
+        "item directly, then retry",
+        destination,
+    )
+
+
+def _telemetry_readiness_rows(args: argparse.Namespace) -> list[dict[str, Any]]:
+    """Return one `doctor` row per configured telemetry destination.
+
+    Neither configured collapses to the single legacy `telemetry` row rather
+    than two near-identical "not configured" rows -- unconfigured telemetry
+    is one fact, not two, and this keeps doctor's most common output (nobody
+    has configured telemetry) unchanged from before this destination existed.
+    """
+    decision = _telemetry_decision(args)
+    if not decision.eventhouse.configured and not decision.lakehouse.configured:
+        return [_telemetry_readiness(args)]
+
+    rows = []
+    if decision.eventhouse.configured:
+        row = dict(_telemetry_readiness(args))
+        row["analyzer"] = "telemetry-eventhouse"
+        rows.append(row)
+    if decision.lakehouse.configured:
+        rows.append(_telemetry_readiness_lakehouse(args))
+    return rows
+
+
+class _MultiSink:
+    """Fans one run's telemetry out to every configured destination.
+
+    Presents the single-sink `.add` interface `_send_telemetry` already
+    calls, so only `_open_telemetry`/`_close_telemetry` need to know more
+    than one destination can exist. Empty (no configured destination) is a
+    valid state: `_close_telemetry` still needs a non-None sink to reach its
+    "requested but nowhere to send" refusal, matching the pre-multi-sink
+    contract where a requested-but-unconfigured run was never silently
+    dropped.
+    """
+
+    def __init__(self, sinks: dict[str, Any]):
+        self._sinks = sinks
+
+    def add(self, table: str, payload: dict) -> None:
+        for sink in self._sinks.values():
+            sink.add(table, payload)
+
+    def flush(self) -> dict[str, Any]:
+        """Flush every sink, returning destination name -> its `FlushResult`."""
+        return {name: sink.flush() for name, sink in self._sinks.items()}
+
+
 def _open_telemetry(args: argparse.Namespace) -> Any:
-    """Open this run's telemetry sink, or None when nothing asked for one.
+    """Open this run's telemetry sinks, or None when nothing asked for one.
 
     Keyed off `requested` rather than `enabled` so a run that asked but has
     nowhere to send still reaches `_close_telemetry`, which is what makes a
@@ -125,39 +243,54 @@ def _open_telemetry(args: argparse.Namespace) -> Any:
     decision = _telemetry_decision(args)
     if not decision.requested:
         return None
-    return EventhouseSink(
-        decision.eventhouse, env_file=getattr(args, "playwright_env_file", None)
-    )
+    env_file = getattr(args, "playwright_env_file", None)
+    sinks: dict[str, Any] = {}
+    if decision.eventhouse.configured:
+        sinks["eventhouse"] = EventhouseSink(decision.eventhouse, env_file=env_file)
+    if decision.lakehouse.configured:
+        sinks["lakehouse"] = LakehouseSink(decision.lakehouse, env_file=env_file)
+    return _MultiSink(sinks)
 
 
 def _close_telemetry(sink: Any, args: argparse.Namespace) -> str | None:
-    """Deliver the run's telemetry and report once. Returns the failure, if any.
+    """Deliver the run's telemetry and report once per destination. Returns the failure(s), if any.
 
     Once per run, not once per artifact: N identical warnings for one
-    unreachable cluster is noise that hides the next problem.
+    unreachable cluster is noise that hides the next problem. One failed
+    destination never blocks another from delivering -- two independent,
+    optional destinations means one going down cannot take the other with it.
     """
     if sink is None:
         return None
     output_format = getattr(args, "output_format", "text")
     decision = _telemetry_decision(args)
-    if not decision.eventhouse.configured:
+    if not decision.eventhouse.configured and not decision.lakehouse.configured:
         message = (
-            "telemetry was requested but no Eventhouse destination is configured; "
-            "set `telemetry.eventhouse` in fab-test.yml or EVENTHOUSE_URI/EVENTHOUSE_DATABASE"
+            "telemetry was requested but no Eventhouse or Lakehouse destination is "
+            "configured; set `telemetry.eventhouse`/`telemetry.lakehouse` in fab-test.yml "
+            "or EVENTHOUSE_URI/EVENTHOUSE_DATABASE and LAKEHOUSE_WORKSPACE/LAKEHOUSE_NAME"
         )
         narrate(f"::warning::{message}", output_format=output_format)
         return message
 
-    result = sink.flush()
-    if result.ok:
-        if result.sent:
-            narrate(
-                f"  ✓ fab-test: telemetry delivered ({result.sent} record(s))",
-                output_format=output_format,
-            )
+    results = sink.flush()
+    sent = sum(result.sent for result in results.values() if result.ok)
+    if sent:
+        narrate(
+            f"  ✓ fab-test: telemetry delivered ({sent} record(s))",
+            output_format=output_format,
+        )
+    failures = {name: result.error for name, result in results.items() if not result.ok}
+    for name, error in failures.items():
+        narrate(f"::warning::Telemetry not delivered ({name}): {error}", output_format=output_format)
+    if not failures:
         return None
-    narrate(f"::warning::Telemetry not delivered: {result.error}", output_format=output_format)
-    return result.error
+    if len(results) == 1:
+        # Only one destination was configured: keep the original, unprefixed
+        # message shape. `telemetry_error` is a documented plain-string
+        # contract, and existing callers already parse this exact form.
+        return next(iter(failures.values()))
+    return "; ".join(f"{name}: {error}" for name, error in failures.items())
 
 
 def _telemetry_decision(args: argparse.Namespace) -> TelemetryDecision:

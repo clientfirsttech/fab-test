@@ -482,8 +482,58 @@ uploads only the manifest can still tell that records were dropped:
 
 To turn it off for a job without touching the config file, set
 `ENABLE_EVENTHOUSE_LOGGING=false` or pass `--no-telemetry`. To see what would be sent
-without sending it, add `--dry-run` — it prints the resolved cluster, database, and
-table alongside each payload.
+without sending it, add `--dry-run` — it prints every configured destination
+(Eventhouse's cluster/database/table, Lakehouse's workspace/name) alongside each
+payload.
+
+### Pipeline snippet: shipping telemetry to a Lakehouse instead (or as well)
+
+Independent of Eventhouse — configure either, both, or neither. Add a second
+`telemetry` key to the same committed `fab-test.yml`, and optionally override it per
+environment the same way:
+
+```yaml
+# fab-test.yml
+telemetry:
+  lakehouse:
+    workspace: <workspace-name-or-guid>
+    lakehouse: <lakehouse-name>
+```
+
+```yaml
+- name: Install fab-test with the Lakehouse telemetry extra
+  run: pip install 'fab-test[telemetry-lakehouse]'
+
+- name: Run analyzers
+  env:
+    FABRIC_TENANT_ID: ${{ secrets.FABRIC_TENANT_ID }}
+    FABRIC_SERVICE_PRINCIPAL_ID: ${{ secrets.FABRIC_SERVICE_PRINCIPAL_ID }}
+    FABRIC_SERVICE_PRINCIPAL_SECRET: ${{ secrets.FABRIC_SERVICE_PRINCIPAL_SECRET }}
+    # Optional: override the committed fab-test.yml address per environment.
+    LAKEHOUSE_WORKSPACE: ${{ vars.LAKEHOUSE_WORKSPACE }}
+    LAKEHOUSE_NAME: ${{ vars.LAKEHOUSE_NAME }}
+  run: fab-test all --format json --artifact-dir .fabric/artifacts
+```
+
+Records land as one JSONL file per table per run under
+`Files/fab-test-telemetry/<table>/<run_id>.jsonl` (`<lakehouse-name>.Lakehouse/...`,
+or bare `<lakehouse-guid>/...` on a tenant with OneLake friendly names disabled).
+The Lakehouse's "Load to Tables" wizard only recognizes CSV/Parquet, not
+JSON/JSONL, so load these into a real table with a Spark notebook instead:
+
+```python
+table = "fabric_static_analysis"  # or fabric_dynamic_analysis
+df = spark.read.json(f"Files/fab-test-telemetry/{table}/")
+df.write.format("delta").mode("overwrite").saveAsTable(table)
+```
+
+`overwrite` re-reads every JSONL file each run so a rerun never double-counts a
+record; schedule the notebook (or run it after each CI job) to keep the table
+current. Once loaded, query through the Lakehouse's SQL endpoint, Direct Lake, or
+Power BI — no KQL. The credential needs a workspace role (e.g. Contributor) or a
+direct share on the Lakehouse item; `fab-test doctor`'s `telemetry-lakehouse` row
+names what's missing. If both destinations are configured and one fails, the other
+still delivers, and `run.json`'s `telemetry_error` names only the failed one(s).
 
 ### Running the local-Desktop analyzer set in CI
 

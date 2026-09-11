@@ -1,6 +1,6 @@
 ---
 name: fab-test
-description: fab-test CLI reference for running Fabric artifact analyzers locally (fab-test 1.4.1.dev1). Covers all subcommands, flags, artifact isolation, result locations, and how fab-test differs from pytest. Use when invoking, troubleshooting, or extending local artifact validation.
+description: fab-test CLI reference for running Fabric artifact analyzers locally (fab-test 1.4.3.dev1). Covers all subcommands, flags, artifact isolation, result locations, and how fab-test differs from pytest. Use when invoking, troubleshooting, or extending local artifact validation.
 ---
 
 # fab-test
@@ -145,7 +145,7 @@ fab-test doctor --format json
 ```json
 {
   "analyzers": [
-    {"analyzer": "bpa", "ready": true, "resolved_path": "C:\\...\\TabularEditor.exe", "reason": "resolved via cached download (version 2.28.0)", "remediation": null, "version": "2.28.0"},
+    {"analyzer": "bpa", "ready": true, "resolved_path": "C:\\...\\TabularEditor.exe", "reason": "resolved via cached download (version 2.29.0)", "remediation": null, "version": "2.29.0"},
     {"analyzer": "pbir", "ready": true, "resolved_path": "C:\\...\\fab-inspector.exe", "reason": "resolved via cached download (version 3.4.0)", "remediation": null, "version": "3.4.0"},
     {"analyzer": "pql_test", "ready": false, "resolved_path": null, "reason": "no workspace, credentials, or running Desktop instance", "remediation": "Set FABRIC_WORKSPACE_ID ...", "version": null}
   ]
@@ -178,7 +178,7 @@ fab-test doctor --local --format json
   "checks": [
     {"check": "python", "ready": true, "reason": "3.12.10", "resolved_path": "/usr/bin/python3.12", "remediation": null},
     {"check": "desktop", "ready": false, "reason": "no running instance detected", "resolved_path": null, "remediation": "Open a .pbip file in Power BI Desktop"},
-    {"check": "bpa", "ready": true, "reason": "resolved via cached download (version 2.28.0)", "resolved_path": "C:\\...\\TabularEditor.exe", "remediation": null, "version": "2.28.0"}
+    {"check": "bpa", "ready": true, "reason": "resolved via cached download (version 2.29.0)", "resolved_path": "C:\\...\\TabularEditor.exe", "remediation": null, "version": "2.29.0"}
   ],
   "would_run": ["bpa", "pbir", "pql_test"]
 }
@@ -232,8 +232,8 @@ Constraints {
   Branch on target.scope ("path" | "desktop" | "workspace") rather than parsing target.raw
   Where origin distinguishes local from CI, target.scope distinguishes whether the run read files on disk, a running Desktop instance, or a deployed workspace item — a distinction origin alone never answers
   command has every known credential flag (--client-secret, --password, --token, --secret, --api-key) and any key=value-shaped token redacted before the file is written — no credential ever appears in the manifest
-  (this run's telemetry was delivered, or none was asked for) => telemetry_error = null
-  (telemetry failed) => telemetry_error names why: an unreachable cluster, a missing [telemetry] extra, a missing Database Ingestor grant
+  (this run's telemetry was delivered to every configured destination, or none was asked for) => telemetry_error = null
+  (telemetry failed) => telemetry_error names why: an unreachable cluster, an unreachable OneLake endpoint, a missing install extra, a missing permission grant. One destination's failure never blocks the other's delivery; if both fail, telemetry_error names both, prefixed by destination
   telemetry_error never changes exit_code — telemetry is diagnostic and must not fail a build. See [Telemetry](references/configuration.md#telemetry)
   doctor, list, explain, auth, and clean-tools never write a manifest — they don't run an analyzer
 }

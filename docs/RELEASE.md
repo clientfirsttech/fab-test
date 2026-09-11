@@ -192,15 +192,22 @@ resolvable:
 After the first final release, drop both index flags and pin normally
 (`pip install "fab-test==1.0.0.0"`).
 
-The optional telemetry extra resolves from the same indexes and needs the same
-`--extra-index-url` while the package lives on TestPyPI, because
-`azure-kusto-data` and `azure-kusto-ingest` are only on production PyPI:
+The optional telemetry extras resolve from the same indexes and need the same
+`--extra-index-url` while the package lives on TestPyPI, because their Azure SDK
+dependencies (`azure-kusto-data`/`azure-kusto-ingest` for Eventhouse,
+`azure-storage-file-datalake` for Lakehouse) are only on production PyPI. Install
+either extra alone, or both together for both destinations:
 
 ```bash
 pip install \
   --index-url https://test.pypi.org/simple/ \
   --extra-index-url https://pypi.org/simple \
-  "fab-test[telemetry]==1.4.0.dev1"
+  "fab-test[telemetry]==1.4.2.dev1"
+
+pip install \
+  --index-url https://test.pypi.org/simple/ \
+  --extra-index-url https://pypi.org/simple \
+  "fab-test[telemetry,telemetry-lakehouse]==1.4.2.dev1"
 ```
 
 Keep `--artifact-dir` explicit in CI, and see
