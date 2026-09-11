@@ -1,6 +1,6 @@
 ---
 name: fab-test
-description: fab-test CLI reference for running Fabric artifact analyzers locally (fab-test 1.4.2.dev1). Covers all subcommands, flags, artifact isolation, result locations, and how fab-test differs from pytest. Use when invoking, troubleshooting, or extending local artifact validation.
+description: fab-test CLI reference for running Fabric artifact analyzers locally (fab-test 1.4.3.dev1). Covers all subcommands, flags, artifact isolation, result locations, and how fab-test differs from pytest. Use when invoking, troubleshooting, or extending local artifact validation.
 ---
 
 # fab-test
@@ -145,7 +145,7 @@ fab-test doctor --format json
 ```json
 {
   "analyzers": [
-    {"analyzer": "bpa", "ready": true, "resolved_path": "C:\\...\\TabularEditor.exe", "reason": "resolved via cached download (version 2.28.0)", "remediation": null, "version": "2.28.0"},
+    {"analyzer": "bpa", "ready": true, "resolved_path": "C:\\...\\TabularEditor.exe", "reason": "resolved via cached download (version 2.29.0)", "remediation": null, "version": "2.29.0"},
     {"analyzer": "pbir", "ready": true, "resolved_path": "C:\\...\\fab-inspector.exe", "reason": "resolved via cached download (version 3.4.0)", "remediation": null, "version": "3.4.0"},
     {"analyzer": "pql_test", "ready": false, "resolved_path": null, "reason": "no workspace, credentials, or running Desktop instance", "remediation": "Set FABRIC_WORKSPACE_ID ...", "version": null}
   ]
@@ -178,7 +178,7 @@ fab-test doctor --local --format json
   "checks": [
     {"check": "python", "ready": true, "reason": "3.12.10", "resolved_path": "/usr/bin/python3.12", "remediation": null},
     {"check": "desktop", "ready": false, "reason": "no running instance detected", "resolved_path": null, "remediation": "Open a .pbip file in Power BI Desktop"},
-    {"check": "bpa", "ready": true, "reason": "resolved via cached download (version 2.28.0)", "resolved_path": "C:\\...\\TabularEditor.exe", "remediation": null, "version": "2.28.0"}
+    {"check": "bpa", "ready": true, "reason": "resolved via cached download (version 2.29.0)", "resolved_path": "C:\\...\\TabularEditor.exe", "remediation": null, "version": "2.29.0"}
   ],
   "would_run": ["bpa", "pbir", "pql_test"]
 }
