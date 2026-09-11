@@ -33,3 +33,11 @@
 #   eventhouse:
 #     uri: https://ingest-trd-2r5mk6nt03ycj37zre.z2.kusto.fabric.microsoft.com
 #     database: fab-test
+
+# Ship analyzer telemetry to a Fabric Lakehouse instead (or as well). Either
+# key can instead be set via LAKEHOUSE_WORKSPACE / LAKEHOUSE_NAME, which win
+# over this file.
+# telemetry:
+#   lakehouse:
+#     workspace: <workspace-name-or-guid>
+#     lakehouse: <lakehouse-name>

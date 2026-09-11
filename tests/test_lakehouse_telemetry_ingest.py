@@ -267,6 +267,71 @@ def test_write_creates_the_run_directory_and_uploads_one_file_per_table():
     assert upload[3] is True, "must overwrite rather than fail on a rerun of the same run id"
 
 
+@pytest.mark.telemetry
+def test_write_addresses_a_guid_lakehouse_without_the_friendly_name_suffix():
+    """Given the Lakehouse configured by its item GUID, should not append `.Lakehouse`.
+
+    A tenant with OneLake friendly names disabled rejects `<guid>.Lakehouse` --
+    live-verified against a real workspace ("FriendlyNameSupportDisabled:
+    WorkspaceId and ArtifactId should be either valid Guids or valid Names").
+    The `.Lakehouse` item-type suffix only makes sense to disambiguate a
+    friendly *name*; a GUID already identifies the item uniquely and must be
+    used bare.
+    """
+    from fab_test.scripts.lakehouse_logger import LakehouseDependencies
+
+    guid = "b2ce5e9c-16cc-48d0-ba52-b6d8b98eb263"
+    calls: list[tuple] = []
+
+    class _FakeFileClient:
+        def __init__(self, path):
+            self.path = path
+
+        def upload_data(self, data, overwrite):
+            calls.append(("upload", self.path, data, overwrite))
+
+    class _FakeDirectoryClient:
+        def __init__(self, path):
+            self.path = path
+
+        def create_directory(self):
+            calls.append(("create_directory", self.path))
+
+        def get_file_client(self, name):
+            return _FakeFileClient(f"{self.path}/{name}")
+
+    class _FakeFileSystemClient:
+        def get_directory_client(self, path):
+            return _FakeDirectoryClient(path)
+
+    class _FakeServiceClient:
+        def __init__(self, account_url, credential):
+            calls.append(("service_client", account_url))
+
+        def get_file_system_client(self, workspace):
+            return _FakeFileSystemClient()
+
+    config = LakehouseConfig(
+        workspace=_WORKSPACE,
+        lakehouse=guid,
+        workspace_origin="fab-test.yml:telemetry.lakehouse.workspace",
+        lakehouse_origin="fab-test.yml:telemetry.lakehouse.lakehouse",
+    )
+    sink = LakehouseSink(config, run_id="run-123")
+    sink._dependencies = lambda: LakehouseDependencies(service_client_cls=_FakeServiceClient)
+    sink._credential = object
+
+    sink.add("fabric_static_analysis", _payload("Sales"))
+    result = sink.flush()
+
+    assert result.ok is True
+    assert (
+        "create_directory",
+        f"{guid}/Files/fab-test-telemetry/fabric_static_analysis",
+    ) in calls
+    assert not any(".Lakehouse" in call[1] for call in calls if call[0] == "create_directory")
+
+
 # --------------------------------------------------------------------------
 # The [telemetry-lakehouse] optional extra
 # --------------------------------------------------------------------------
