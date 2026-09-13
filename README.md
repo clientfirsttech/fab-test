@@ -227,8 +227,18 @@ rather than authenticating partway and failing on the embed-token call.
 `fab-test doctor` reports it as not ready for the same reason, so it never
 shows a false green for a developer who is only signed in with `az login`.
 
-With a service principal set, the minimal config is `workspace:` and
-`environment:` in `fab-test.yml` -- `environments.yml` is not required at all:
+With a service principal set, a workspace resolves without `environments.yml`
+from any of -- in this order -- `--workspace-id`, `FABRIC_WORKSPACE_ID`, or
+`workspace:` in `fab-test.yml`. No `fab-test.yml` is required at all:
+
+```bash
+fab-test playwright --artifact "Not Working Visuals" --workspace-id "Sales Dev"
+# or
+FABRIC_WORKSPACE_ID="Sales Dev" fab-test playwright --artifact "Not Working Visuals"
+```
+
+A repository that already pins its workspace in committed config can rely on
+`fab-test.yml` instead and drop the flag/env var entirely:
 
 ```yaml
 # fab-test.yml
