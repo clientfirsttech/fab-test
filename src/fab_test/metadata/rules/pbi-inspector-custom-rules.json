@@ -565,25 +565,73 @@
                       ]
                     },
                     {
-                      "none": [
+                      "or": [
                         {
-                          "var": "visual.visualContainerObjects.general"
+                          "and": [
+                            {
+                              "var": "visualGroup"
+                            },
+                            {
+                              "none": [
+                                {
+                                  "var": "visualGroup.objects.general"
+                                },
+                                {
+                                  "or": [
+                                    {
+                                      "!!": [
+                                        {
+                                          "var": "properties.altText.expr.Aggregation"
+                                        }
+                                      ]
+                                    },
+                                    {
+                                      "!=": [
+                                        {
+                                          "var": "properties.altText.expr.Literal.Value"
+                                        },
+                                        "''"
+                                      ]
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
                         },
                         {
-                          "or": [
+                          "and": [
                             {
-                              "!!": [
+                              "!": [
                                 {
-                                  "var": "properties.altText.expr.Aggregation"
+                                  "var": "visualGroup"
                                 }
                               ]
                             },
                             {
-                              "!=": [
+                              "none": [
                                 {
-                                  "var": "properties.altText.expr.Literal.Value"
+                                  "var": "visual.visualContainerObjects.general"
                                 },
-                                "''"
+                                {
+                                  "or": [
+                                    {
+                                      "!!": [
+                                        {
+                                          "var": "properties.altText.expr.Aggregation"
+                                        }
+                                      ]
+                                    },
+                                    {
+                                      "!=": [
+                                        {
+                                          "var": "properties.altText.expr.Literal.Value"
+                                        },
+                                        "''"
+                                      ]
+                                    }
+                                  ]
+                                }
                               ]
                             }
                           ]
@@ -792,11 +840,11 @@
         {
           "if": [
             {
-              "==": [
+              "!=": [
                 {
                   "var": "outspacePaneVisible"
                 },
-                "true"
+                "false"
               ]
             },
             {
@@ -815,6 +863,62 @@
                           "!=": [
                             {
                               "var": "isHiddenInViewMode"
+                            },
+                            true
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "var": "name"
+                }
+              ]
+            },
+            []
+          ]
+        },
+        {
+          "outspacePaneVisible": "/objects/outspacePane/0/properties/visible/expr/Literal/Value"
+        },
+        []
+      ]
+    },
+    {
+      "id": "NO_VISUAL_LEVEL_FILTERS_UNLOCKED_IN_FILTER_PANEL",
+      "name": "No visual level filters should be unlocked in the filter panel",
+      "description": "When the filter panel is enabled, visual level filters should be locked in the filter pane in view mode. Only page level and report level filters should be available to report consumers. Returns an array of visual names that have one or more visual level filters not locked in view mode.",
+      "logType": "error",
+      "disabled": false,
+      "part": "Report",
+      "test": [
+        {
+          "if": [
+            {
+              "!=": [
+                {
+                  "var": "outspacePaneVisible"
+                },
+                "false"
+              ]
+            },
+            {
+              "map": [
+                {
+                  "filter": [
+                    {
+                      "part": "Visuals"
+                    },
+                    {
+                      "some": [
+                        {
+                          "var": "filterConfig.filters"
+                        },
+                        {
+                          "!=": [
+                            {
+                              "var": "isLockedInViewMode"
                             },
                             true
                           ]
