@@ -1,6 +1,6 @@
 # RDL Static Analysis Epic
 
-**Status**: 🔄 IN-PROGRESS (1/8 tasks: rule catalog and analyzer skeleton)
+**Status**: 🔄 IN-PROGRESS (3/8 tasks: rule catalog+skeleton, flat-file discovery, subcommand+aggregate wiring)
 **Goal**: `fab-test rdl` runs the 28 Tier A rules from [plan/rdl-rule-set.md](../plan/rdl-rule-set.md) against local `.rdl` files, with no workspace and no new dependency.
 
 ## Overview
