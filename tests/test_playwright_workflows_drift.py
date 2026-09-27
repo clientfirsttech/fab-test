@@ -51,8 +51,16 @@ def _step_text(step: dict) -> str:
 @pytest.mark.parametrize("path", [_DEMO, _EXAMPLE], ids=["demo", "example"])
 def test_the_browser_installs_before_any_fab_test_step(path: Path) -> None:
     """`playwright install` with no browser binary yet fails every case at
-    fixture setup -- it must run before the first step that invokes fab-test."""
-    steps = _steps(_load(path))
+    fixture setup -- it must run before the first step that invokes fab-test.
+
+    Not required when the job's container image already bundles the
+    browsers (see playwright.dev/python/docs/docker)."""
+    data = _load(path)
+    ((_job_id, job),) = data["jobs"].items()
+    if "playwright" in str(job.get("container", "")):
+        return
+
+    steps = _steps(data)
     browser_index = next(i for i, s in enumerate(steps) if "playwright install" in _step_text(s))
     fab_test_index = next(
         i
