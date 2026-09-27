@@ -2,9 +2,19 @@
   "fab_test_all": [
     "bpa",
     "pbir",
-    "pql_test"
+    "pql_test",
+    "rdl"
   ],
   "analyzer_registry": {
+    "rdl": {
+      "type": "static",
+      "implementation": "python",
+      "command": "python",
+      "args": ["scripts/invoke_rdl_lint.py", "--artifact-path", "{artifact_path}", "--rules-path", "{rules_path}", "--output-path", "{output_path}"],
+      "description": "fab-test's own RDL (paginated report) static analysis -- performance, correctness, and accessibility rules, no external tool",
+      "exit_code_success": 0,
+      "native_output": {"extension": "json", "format": "JSON"}
+    },
     "pqlint": {
       "type": "static",
       "implementation": "python",
@@ -180,6 +190,12 @@
       "dynamic": [
         "playwright"
       ]
+    },
+    "PaginatedReport": {
+      "static": [
+        "rdl"
+      ],
+      "dynamic": []
     },
     "Agent": {
       "static": [

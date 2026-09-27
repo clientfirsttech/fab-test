@@ -14,6 +14,7 @@ from pathlib import Path
 import pytest
 
 from fab_test.scripts._artifact_types import artifact_types
+from fab_test.scripts._target import _FILE_SUFFIX_TYPES as _RECOGNIZED_FILE_SUFFIX_TYPES
 from fab_test.scripts._target import (
     TargetError,
     parse_target,
@@ -222,15 +223,19 @@ def test_every_analyzer_glob_names_a_declared_type():
     the type list pinned at two. A type exists because Fabric has it; an
     analyzer handles it because someone wrote a wrapper. The containment
     that does matter is this direction: an analyzer cannot claim a glob
-    for a type the map has never heard of.
+    for a type the map has never heard of -- or, since rdl, for a
+    recognized flat-file suffix parse_target accepts even though
+    artifact-map.json has no folder entry for it (see
+    _FILE_SUFFIX_TYPES in _target.py).
     """
     from fab_test.scripts.fab_test_registry import ANALYZER_REGISTRY
 
     from_globs = {
         glob.lstrip("*.") for glob, _description in ANALYZER_REGISTRY.values() if glob
     }
+    known = set(artifact_types(Path.cwd())) | set(_RECOGNIZED_FILE_SUFFIX_TYPES)
 
-    assert from_globs <= set(artifact_types(Path.cwd()))
+    assert from_globs <= known
 
 
 @pytest.mark.fab_test

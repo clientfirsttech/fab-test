@@ -25,12 +25,20 @@ from .fab_test_registry import (
 from .fab_test_registry import (
     check_readiness as _check_readiness,
 )
+from .fab_test_registry import (
+    discover_artifacts as _discover_artifacts,
+)
 from .fab_test_telemetry import _close_telemetry, _detect_origin, _open_telemetry
 
 # pql_lint is excluded while it is hidden from the advertised surface
 # (see HIDDEN_ANALYZERS): a bundle should not run what the CLI does not
 # offer. It remains fully invocable on its own.
-_LOCAL_ANALYZERS = ("bpa", "pbir", "pql_test")
+_LOCAL_ANALYZERS = ("bpa", "pbir", "pql_test", "rdl")
+
+# rdl's artifact is a flat .rdl file, never part of a .pbip pairing --
+# _project_matches_glob has nothing to match it against, so its dry-run
+# preview discovers directly instead of reading it off `projects`.
+_FLAT_FILE_ANALYZERS = frozenset({"rdl"})
 
 
 def _pql_lint_path() -> str | None:
@@ -109,7 +117,10 @@ def _build_local_plan(args: argparse.Namespace) -> dict[str, Any]:
             })
             continue
         glob, _description = _ANALYZER_REGISTRY[name]
-        matching = [p.name for p in projects if _project_matches_glob(p, glob)]
+        if name in _FLAT_FILE_ANALYZERS:
+            matching = [p.name for p in _discover_artifacts(artifact_dir, glob, None)]
+        else:
+            matching = [p.name for p in projects if _project_matches_glob(p, glob)]
         plan_analyzers.append({"analyzer": name, "status": "would_run", "projects": matching})
 
     return {

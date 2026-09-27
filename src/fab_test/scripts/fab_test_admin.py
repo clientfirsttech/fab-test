@@ -28,6 +28,7 @@ from ._metadata import (
     ANALYZERS,
     BPA_RULES,
     PBIR_RULES,
+    RDL_RULES,
     metadata_path,
     resolve_metadata,
 )
@@ -40,6 +41,7 @@ from .fab_test_parser import _aliases_for, _canonical_name
 from .fab_test_registry import (
     _DEFAULT_BPA_RULES,
     _DEFAULT_PBIR_RULES,
+    _DEFAULT_RDL_RULES,
 )
 from .fab_test_registry import (
     ANALYZER_REGISTRY as _ANALYZER_REGISTRY,
@@ -194,7 +196,7 @@ def _ruleset_rows() -> list[dict[str, Any]]:
     needs to know which ruleset produced it.
     """
     rows = []
-    for key, relative in (("rules.bpa", BPA_RULES), ("rules.pbir", PBIR_RULES)):
+    for key, relative in (("rules.bpa", BPA_RULES), ("rules.pbir", PBIR_RULES), ("rules.rdl", RDL_RULES)):
         resolved, origin = resolve_metadata(relative, REPO_ROOT)
         rows.append({"key": key, "value": str(resolved), "origin": origin})
     return rows
@@ -260,6 +262,9 @@ _FAB_TEST_YML_TEMPLATE = """\
 #   pbir:
 #     disable: [RULE_ID]
 #     severity: {RULE_ID: warning}        # warning | error (PBIR Inspector has no "info" level)
+#   rdl:
+#     disable: [DS-02]
+#     severity: {QRY-07: info}            # info | warning | error
 
 # Ship analyzer telemetry to a Fabric Eventhouse and/or a Fabric Lakehouse.
 # A configured destination is the enablement -- there is no separate on/off
@@ -530,9 +535,14 @@ def _explain_analyzer(args: argparse.Namespace) -> int:
 
     command = _build_command(name, artifact, args, output_dir)
     readiness = _check_readiness(name, args)
-    default_rules_path = {"bpa": _DEFAULT_BPA_RULES, "pbir": _DEFAULT_PBIR_RULES}.get(name)
+    default_rules_path = {
+        "bpa": _DEFAULT_BPA_RULES,
+        "pbir": _DEFAULT_PBIR_RULES,
+        "rdl": _DEFAULT_RDL_RULES,
+    }.get(name)
     rules_path = (
         getattr(args, "bpa_rules_path", None)
+        or getattr(args, "rdl_rules_path", None)
         or getattr(args, "rules_path", None)
         or default_rules_path
     )
