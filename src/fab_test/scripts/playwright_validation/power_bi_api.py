@@ -201,11 +201,20 @@ def generate_embed_token(
         payload["targetWorkspaces"] = [{"id": wid} for wid in target_workspace_ids]
         payload["accessLevel"] = "View"
 
-    if use_rls and user_name and role:
+    if use_rls and user_name:
+        # An empty `role` still needs an identity attached: a dataset can
+        # require an effective identity without naming any role at all (a
+        # tenant-wide "mandatory identity" policy, or a model whose roles
+        # couldn't be discovered -- e.g. a non-PBIP-enabled semantic model,
+        # where TMDL-based discovery finds nothing). GenerateToken accepts
+        # "roles": [] for exactly this case; omitting identities outright
+        # gets "requires effective identity to be provided" instead,
+        # confirmed live. Requiring `role` too (as this used to) meant no
+        # such dataset could ever mint a token when no role was discovered.
         payload["identities"] = [
             {
                 "username": user_name,
-                "roles": [role],
+                "roles": [role] if role else [],
                 "datasets": [identity.dataset_id],
             }
         ]
