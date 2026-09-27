@@ -645,7 +645,7 @@ def _print_all_summary(
     rows = build_all_summary_rows(output_dir, analyzers, codes, args)
     total_errors = sum(int(r["errors"] or 0) for r in rows)
     total_warnings = sum(int(r["warnings"] or 0) for r in rows)
-    any_failed = any(c != 0 for c in codes)
+    worst = max(codes, default=0)
 
     if not rows or all(r["artifact"] == "(none)" for r in rows):
         if output_format == "json":
@@ -664,7 +664,7 @@ def _print_all_summary(
             "dry_run": dry_run,
         }
         print(json.dumps(summary, indent=2))
-        return 1 if any_failed else 0
+        return worst
 
     sep = "═" * 60
     print(f"\n{sep}")
@@ -752,7 +752,7 @@ def _print_all_summary(
         # run: indexing one analyzer is a page pointing at a single link.
         _write_and_open_index(rows, output_dir, args, analyzers)
     print(sep)
-    return 1 if any_failed else 0
+    return worst
 
 
 def _artifact_line(
@@ -792,7 +792,7 @@ def _print_summary(
     show_reports: bool = True,
     args: argparse.Namespace | None = None,
 ) -> int:
-    """Print the per-analyzer summary and return 0 or 1.
+    """Print the per-analyzer summary and return the worst artifact exit code.
 
     ``show_reports`` is False under `fab-test all`, which lists every
     report beneath its aggregate table -- printing them here too named
@@ -826,13 +826,12 @@ def _print_summary(
                 "report_path": _report_path_for(data),
             })
         print(json.dumps({"analyzer": name, "artifacts": rows}, indent=2))
-        return 1 if any(code != 0 for _, code in results) else 0
+        return max((code for _, code in results), default=0)
 
     sep = "─" * 52
     print(f"\n{sep}")
     print(f"  fab-test {name} — summary ({len(results)} artifact(s))")
     print(sep)
-    any_failed = False
     verbose = verbosity in ("verbose", "debug")
     reports: list[str] = []
     for stem, code in results:
@@ -840,10 +839,8 @@ def _print_summary(
         if report:
             reports.append(report)
         print(f"  {_artifact_summary_prefix(code, status)}  {stem}{summary}")
-        if code != 0:
-            any_failed = True
-            if verbose and output_dir is not None:
-                _print_findings_for_artifact(name, stem, output_dir)
+        if code != 0 and verbose and output_dir is not None:
+            _print_findings_for_artifact(name, stem, output_dir)
 
     # A report that is written but never named reads as a flag that did
     # nothing -- which is exactly how `--report` was first reported as broken.
@@ -852,7 +849,7 @@ def _print_summary(
             print(f"  Report: {report}")
         if args is not None:
             _open_single_analyzer_report(args, name, results, reports, output_dir)
-    return 1 if any_failed else 0
+    return max((code for _, code in results), default=0)
 
 
 def _open_single_analyzer_report(

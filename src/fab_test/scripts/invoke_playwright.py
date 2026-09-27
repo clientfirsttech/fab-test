@@ -442,14 +442,14 @@ def _build_config_from_args(
     if args.impact_manifest:
         return config
 
-    # Checked before the client is built: authenticating only to discover
-    # there is no environment to resolve against wastes a round trip, and
-    # reports a credential problem when the real problem is a missing flag.
-    if not args.environment:
+    # Checked before the client is built, so a missing flag isn't reported as a credential
+    # problem. A known workspace is enough: resolve_environment never reads the label then.
+    workspace_id = args.workspace_id or config.workspace_id
+    if not args.environment and not workspace_id:
         raise ServiceResolutionError(
-            "No environment given, so there is nothing to resolve "
-            f"'{args.artifact}' against. Pass --env, set FABRIC_ENVIRONMENT, "
-            "or set `environment:` in fab-test.yml."
+            f"No workspace or environment given, so there is nothing to resolve '{args.artifact}' against. "
+            "Pass --workspace-id or set FABRIC_WORKSPACE_ID (or `workspace:` in fab-test.yml); or pass --env, "
+            "set FABRIC_ENVIRONMENT, or set `environment:` in fab-test.yml to look it up in environments.yml."
         )
 
     client = build_fabric_service_client(
@@ -462,7 +462,7 @@ def _build_config_from_args(
 
     resolved_env = resolve_environment(
         args.environment,
-        workspace_id_override=args.workspace_id or config.workspace_id,
+        workspace_id_override=workspace_id,
     )
     report = resolve_report(
         args.artifact,

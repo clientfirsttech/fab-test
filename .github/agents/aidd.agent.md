@@ -166,6 +166,7 @@ All skills are in `.github/skills/<name>/SKILL.md`:
 - `aidd-workflow` - Project command resolver (load first)
 - `aidd-python` - Python practices, simplicity budgets, over-engineering review lens
 - `aidd-module-budgets` - File-level size budgets and where to split a module
+- `aidd-analyzer-contract` - Minimum requirements every analyzer subcommand/wrapper meets (loaded by the workflow skill for any analyzer work)
 - `aidd-requirements` - Functional requirements (given/should)
 - `aidd-pr` - Pull-request review triage
 - `aidd-parallel` - Sub-agent delegation

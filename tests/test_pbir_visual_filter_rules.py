@@ -48,11 +48,10 @@ def test_visual_filter_rules_are_enabled_errors_scoped_to_visible_filter_panes(
 
     assert rule["logType"] == "error"
     assert rule["disabled"] is False
-    assert rule["part"] == "Report"
+    assert rule["part"] == "Visuals"
     assert required_property in rule_json
     assert '"outspacePaneVisible"' in rule_json
     assert '"false"' in rule_json
-    assert '"Visuals"' in rule_json
 
 
 def test_visual_filter_rules_do_not_traverse_page_or_report_filter_collections():
@@ -64,7 +63,8 @@ def test_visual_filter_rules_do_not_traverse_page_or_report_filter_collections()
         "NO_VISUAL_LEVEL_FILTERS_UNLOCKED_IN_FILTER_PANEL",
     ):
         rule_json = json.dumps(rules[rule_id]["test"])
-        assert '"part": "Visuals"' in rule_json
+        assert rules[rule_id]["part"] == "Visuals"
+        assert '"part": "Visuals"' not in rule_json
         assert '"part": "Pages"' not in rule_json
 
 

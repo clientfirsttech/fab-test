@@ -832,10 +832,10 @@
     {
       "id": "NO_VISUAL_LEVEL_FILTERS_VISIBLE_IN_FILTER_PANEL",
       "name": "No visual level filters should be visible in the filter panel",
-      "description": "When the filter panel is enabled, visual level filters should be hidden from the filter pane in view mode. Only page level and report level filters should be visible in the filter panel. Returns an array of visual names that have one or more visual level filters not hidden from view mode.",
+      "description": "When the filter panel is enabled, visual level filters should be hidden from the filter pane in view mode. Only page level and report level filters should be visible in the filter panel.",
       "logType": "error",
       "disabled": false,
-      "part": "Report",
+      "part": "Visuals",
       "test": [
         {
           "if": [
@@ -848,35 +848,25 @@
               ]
             },
             {
-              "map": [
+              "!": [
                 {
-                  "filter": [
+                  "some": [
                     {
-                      "part": "Visuals"
+                      "var": "filterConfig.filters"
                     },
                     {
-                      "some": [
+                      "!=": [
                         {
-                          "var": "filterConfig.filters"
+                          "var": "isHiddenInViewMode"
                         },
-                        {
-                          "!=": [
-                            {
-                              "var": "isHiddenInViewMode"
-                            },
-                            true
-                          ]
-                        }
+                        true
                       ]
                     }
                   ]
-                },
-                {
-                  "var": "name"
                 }
               ]
             },
-            []
+            true
           ]
         },
         {
@@ -888,10 +878,10 @@
     {
       "id": "NO_VISUAL_LEVEL_FILTERS_UNLOCKED_IN_FILTER_PANEL",
       "name": "No visual level filters should be unlocked in the filter panel",
-      "description": "When the filter panel is enabled, visual level filters should be locked in the filter pane in view mode. Only page level and report level filters should be available to report consumers. Returns an array of visual names that have one or more visual level filters not locked in view mode.",
+      "description": "When the filter panel is enabled, visual level filters should be locked in the filter pane in view mode. Only page level and report level filters should be available to report consumers.",
       "logType": "error",
       "disabled": false,
-      "part": "Report",
+      "part": "Visuals",
       "test": [
         {
           "if": [
@@ -904,35 +894,25 @@
               ]
             },
             {
-              "map": [
+              "!": [
                 {
-                  "filter": [
+                  "some": [
                     {
-                      "part": "Visuals"
+                      "var": "filterConfig.filters"
                     },
                     {
-                      "some": [
+                      "!=": [
                         {
-                          "var": "filterConfig.filters"
+                          "var": "isLockedInViewMode"
                         },
-                        {
-                          "!=": [
-                            {
-                              "var": "isLockedInViewMode"
-                            },
-                            true
-                          ]
-                        }
+                        true
                       ]
                     }
                   ]
-                },
-                {
-                  "var": "name"
                 }
               ]
             },
-            []
+            true
           ]
         },
         {

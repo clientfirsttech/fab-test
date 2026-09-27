@@ -1,0 +1,25 @@
+# Personas — mirrors the three callers in vision.md
+personas:
+  - id: gtvxf8r6wn2jnzdtemvjr8n5
+    name: Report Author
+    description: >
+      Builds paginated (RDL) reports in Power BI Report Builder on a laptop.
+      No workspace or service principal needed to get findings; wants the rule,
+      the offending report item, and the fix in one line.
+    createdAt: 1790460895759
+    updatedAt: 1790460895759
+  - id: hxl1drwi9gxpwvszy63j5hla
+    name: CI Pipeline
+    description: >
+      Runs fab-test on every change to .fabric/artifacts. Needs deterministic
+      exit codes, a stable result path, and no prompts.
+    createdAt: 1790460895759
+    updatedAt: 1790460895759
+  - id: vzm8qmbzgyzjoh0d42xuf7ch
+    name: AI Agent
+    description: >
+      Reads the result envelope and edits the .rdl to resolve findings. Needs
+      a parseable finding with rule ID, element location, and remediation it
+      can act on without guessing.
+    createdAt: 1790460895759
+    updatedAt: 1790460895759
