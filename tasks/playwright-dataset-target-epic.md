@@ -38,3 +38,33 @@ principal commonly has no access to, instead of a fast, clear refusal.
   should refuse before any artifact runs, naming both flags
 - Given `--dataset-workspace-id` with `--dataset-id` (dataset-targeted mode) or `--artifact` (single-report
   override) or `--impact-manifest`, should keep today's behavior unchanged
+
+## Every dataset in a workspace, and --artifact scoped by workspace instead of refused
+
+Live use surfaced two more gaps in the same shape as the two tasks above, both reported directly against a
+real workspace: `--dataset-workspace-id` alone refuses rather than doing anything useful, and `--artifact
+NAME` with `--dataset-workspace-id` but no `--workspace-id`/`--env` falls into local discovery and reports
+"no *.Report artifacts found" -- because nothing before this task ever read `--dataset-workspace-id` as a
+workspace to resolve `--artifact` against; it is applied only as the *dataset's* workspace override
+(`_dataset_override_for_command`), never as the report's own workspace. This task supersedes the refusal
+requirement above: `--dataset-workspace-id` alone stops being an error and becomes real behavior.
+
+**Requirements**:
+- Given `--dataset-workspace-id` alone -- no `--dataset-id`, `--artifact`, target, or `--impact-manifest` --
+  should list every semantic model in that workspace via the service principal and run Playwright once per
+  model against its own dependent reports (the same dependent-report resolution `--dataset-id` mode already
+  uses), rather than refusing
+- Given `--dataset-workspace-id` and `--artifact NAME` where `NAME` resolves to a `Report`/`PaginatedReport`
+  item in that workspace, should refine to that one report -- the workspace named by `--dataset-workspace-id`
+  now also resolves a bare `--artifact`, closing the "no *.Report artifacts found" gap for a caller who has
+  no other way to name the report's workspace
+- Given `--dataset-workspace-id` and `--artifact NAME` where `NAME` instead resolves to a `SemanticModel` in
+  that workspace, should run the dependent reports of that one named dataset (the single-dataset case of the
+  bullet above, named by display name instead of `--dataset-id`)
+- Given `--env` in place of (or alongside) `--dataset-workspace-id`, should resolve the workspace from
+  `environments.yml` the same way every other workspace-consuming flag already does, so `--env` alone is
+  enough to drive both the "every dataset" and the "--artifact scoped by workspace" cases above
+- Given a workspace with no semantic models at all, should exit 0 with a notice that nothing was found,
+  matching the existing empty-dependents behavior for a single named dataset
+- Given the reports discovered this way, should cover RDL/paginated reports exactly as `--dataset-id` mode
+  already does -- a semantic model's dependents are not only interactive `Report` items
