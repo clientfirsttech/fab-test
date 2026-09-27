@@ -56,6 +56,17 @@ jobs:
     # Protected Environment: required reviewers gate every dispatch, and
     # only this Environment's secrets are visible to the job.
     environment: fabric-demo
+    # Pre-bundles Chromium/Firefox/WebKit and their OS deps, skipping
+    # `playwright install --with-deps` (usually the slowest step here).
+    # The tag's Playwright version must match the pip package pyproject.toml
+    # installs below (currently unpinned -> latest, 1.62.0 as of this pin) --
+    # https://playwright.dev/python/docs/docker: mismatched driver/browser
+    # versions fail at fixture setup. Bump this tag whenever that drifts.
+    # --user 1001: runs Chromium unsandboxed-but-non-root per Playwright's
+    # own CI guide (https://playwright.dev/python/docs/ci).
+    container:
+      image: mcr.microsoft.com/playwright/python:v1.62.0-noble
+      options: --user 1001
     env:
       FABRIC_TENANT_ID: ${{ secrets.FABRIC_TENANT_ID }}
       FABRIC_CLIENT_ID: ${{ secrets.FABRIC_CLIENT_ID }}
@@ -71,11 +82,10 @@ jobs:
       # pytest, pytest-playwright, pytest-html, and pytest-xdist are all
       # declared in pyproject.toml's [project.optional-dependencies].dev,
       # so one install covers fab-test and everything Playwright needs.
+      # The browsers themselves come from the container image above, not
+      # from this install.
       - name: Install fab-test from the checkout
         run: pip install -e ".[dev]"
-
-      - name: Install the browser
-        run: playwright install --with-deps chromium
 
       # `doctor` has no `--workspace-id` flag and no visibility into --env /
       # environments.yml, so it reports every cloud analyzer as "no
