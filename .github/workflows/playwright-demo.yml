@@ -122,17 +122,21 @@ jobs:
           fi
           fab-test doctor
 
+      # Bash arrays (`args=(...)`), not POSIX -- the container image above
+      # runs steps under `sh`, not `bash`, and `sh -e {0}` chokes on that
+      # syntax with "Syntax error: ( unexpected". `set --` builds the same
+      # variable-length arg list with plain POSIX positional parameters.
       - name: Run fab-test playwright
         id: playwright
         run: |
-          args=(--env "${{ inputs.environment }}")
-          [ -n "${{ inputs.artifact }}" ] && args+=(--artifact "${{ inputs.artifact }}")
-          [ -n "${{ inputs.dataset_id }}" ] && args+=(--dataset-id "${{ inputs.dataset_id }}")
-          [ -n "${{ inputs.dataset_workspace_id }}" ] && args+=(--dataset-workspace-id "${{ inputs.dataset_workspace_id }}")
-          [ -n "${{ inputs.workspace_id }}" ] && args+=(--workspace-id "${{ inputs.workspace_id }}")
-          [ "${{ inputs.pages }}" = "none" ] && args+=(--pages none)
-          [ "${{ inputs.roles }}" = "none" ] && args+=(--roles none)
-          fab-test playwright "${args[@]}" --report
+          set -- --env "${{ inputs.environment }}"
+          [ -n "${{ inputs.artifact }}" ] && set -- "$@" --artifact "${{ inputs.artifact }}"
+          [ -n "${{ inputs.dataset_id }}" ] && set -- "$@" --dataset-id "${{ inputs.dataset_id }}"
+          [ -n "${{ inputs.dataset_workspace_id }}" ] && set -- "$@" --dataset-workspace-id "${{ inputs.dataset_workspace_id }}"
+          [ -n "${{ inputs.workspace_id }}" ] && set -- "$@" --workspace-id "${{ inputs.workspace_id }}"
+          [ "${{ inputs.pages }}" = "none" ] && set -- "$@" --pages none
+          [ "${{ inputs.roles }}" = "none" ] && set -- "$@" --roles none
+          fab-test playwright "$@" --report
 
       # Always -- the failed run is the one you most want to read. Every
       # case's own evidence lives under playwright/<report>/test-cases/**;
