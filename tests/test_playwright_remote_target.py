@@ -26,6 +26,15 @@ from fab_test.scripts.fab_test_execution import (
 )
 
 
+@pytest.fixture(autouse=True)
+def _no_ambient_scope(monkeypatch):
+    # A known workspace now stands in for --env, so an exported
+    # FABRIC_WORKSPACE_ID on the developer's machine would flip the
+    # "no environment" cases below.
+    monkeypatch.delenv("FABRIC_ENVIRONMENT", raising=False)
+    monkeypatch.delenv("FABRIC_WORKSPACE_ID", raising=False)
+
+
 def _args(**overrides) -> argparse.Namespace:
     defaults = {
         "artifact": None,

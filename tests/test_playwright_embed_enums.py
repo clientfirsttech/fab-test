@@ -10,7 +10,7 @@ to a literal is a mirror, not a guard, and that is exactly how
 every real run.
 
 This module closes that gap by parsing the enums out of the same CDN
-bundle `tests/test_playwright_visual.py` injects and asserting our
+bundle `render_spec.py` injects and asserting our
 constants match. It is marked `integration` because it needs network:
 per pytest.ini's convention it skips when the bundle is unreachable
 rather than failing a laptop or an offline CI leg.
@@ -30,7 +30,7 @@ from fab_test.scripts.playwright_validation.embed_config import (
 
 pytestmark = [pytest.mark.integration, pytest.mark.playwright]
 
-# Pinned to the exact build tests/test_playwright_visual.py injects, so this
+# Pinned to the exact build render_spec.py injects, so this
 # guard cannot pass against a different version than the one we embed with.
 _BUNDLE_URL = "https://cdn.jsdelivr.net/npm/powerbi-client@2.23.1/dist/powerbi.js"
 

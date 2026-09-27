@@ -474,7 +474,11 @@ def _add_playwright_subparser(subs: argparse._SubParsersAction) -> None:
         default="",
         dest="dataset_id",
         metavar="ID",
-        help="Semantic model / dataset ID override",
+        help=(
+            "Semantic model / dataset ID. With --artifact, overrides that "
+            "report's binding; with no report named, tests every report "
+            "built on this dataset"
+        ),
     )
     playwright_p.add_argument(
         "--dataset-workspace-id",

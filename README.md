@@ -214,6 +214,10 @@ fab-test pql-test --env DEV
 # see "Playwright: the minimal working config" below)
 fab-test playwright --artifact "Not Working Visuals" --env dev --env-file .env
 
+# Test only the reports built on one dataset (looked up live in the
+# dataset's workspace and, if set, the --workspace-id workspace)
+fab-test playwright --dataset-id <DATASET_GUID> --dataset-workspace-id <WORKSPACE_GUID>
+
 # Discover reports that depend on a deployed semantic model
 fab-test dependencies --semantic-model SalesModel --env dev --env-file .env
 ```
@@ -227,8 +231,18 @@ rather than authenticating partway and failing on the embed-token call.
 `fab-test doctor` reports it as not ready for the same reason, so it never
 shows a false green for a developer who is only signed in with `az login`.
 
-With a service principal set, the minimal config is `workspace:` and
-`environment:` in `fab-test.yml` -- `environments.yml` is not required at all:
+With a service principal set, a workspace resolves without `environments.yml`
+from any of -- in this order -- `--workspace-id`, `FABRIC_WORKSPACE_ID`, or
+`workspace:` in `fab-test.yml`. No `fab-test.yml` is required at all:
+
+```bash
+fab-test playwright --artifact "Not Working Visuals" --workspace-id "Sales Dev"
+# or
+FABRIC_WORKSPACE_ID="Sales Dev" fab-test playwright --artifact "Not Working Visuals"
+```
+
+A repository that already pins its workspace in committed config can rely on
+`fab-test.yml` instead and drop the flag/env var entirely:
 
 ```yaml
 # fab-test.yml
@@ -248,7 +262,7 @@ A run with 5 report x page x bookmark cases and 1 real failure now says so:
 `envelope.json`'s `test_results` carries one row per case with that case's own
 real outcome, so `findings` names only the case that actually failed instead of
 tagging all 5 identically. Each row also points at that case's own evidence
-(`fab-test-results/playwright/test-cases/<case>/screenshot.png`, plus
+(`fab-test-results/playwright/<report>/test-cases/<case>/screenshot.png`, plus
 `console.json`/`network.json` when there's something to capture) and links
 straight back to the report page/bookmark it validated on `app.powerbi.com`;
 `--report` renders both as links right in the table, and the same paths are in

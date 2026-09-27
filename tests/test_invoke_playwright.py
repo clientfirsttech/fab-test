@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import subprocess
 import tomllib
 from pathlib import Path
@@ -52,6 +53,12 @@ def config() -> PlaywrightValidationConfig:
         timeout_seconds=60,
         headless=True,
     )
+
+
+@pytest.fixture
+def unscoped_config(config) -> PlaywrightValidationConfig:
+    """`config` with no workspace, so nothing names what to resolve against."""
+    return dataclasses.replace(config, workspace_id="")
 
 
 def test_parse_args_requires_no_arguments() -> None:
@@ -783,7 +790,7 @@ def test_complete_service_principal_behaves_as_before(config) -> None:
 
 
 @pytest.mark.playwright
-def test_build_config_refuses_an_artifact_with_no_environment(config) -> None:
+def test_build_config_refuses_an_artifact_with_no_environment(unscoped_config) -> None:
     """`fab-test playwright` from a bare CWD used to crash with a traceback.
 
     The environment came from ``args.environment or config.environment or
@@ -793,7 +800,7 @@ def test_build_config_refuses_an_artifact_with_no_environment(config) -> None:
     short-circuited past it, which is why passing --env hid this.
     """
     with patch(
-        "fab_test.scripts.invoke_playwright.load_config", return_value=config
+        "fab_test.scripts.invoke_playwright.load_config", return_value=unscoped_config
     ):
         args = parse_args(["--artifact", "ThinReport"])
 
@@ -806,7 +813,7 @@ def test_build_config_refuses_an_artifact_with_no_environment(config) -> None:
 
 
 @pytest.mark.playwright
-def test_no_environment_is_reported_before_a_credential_is_built(config) -> None:
+def test_no_environment_is_reported_before_a_credential_is_built(unscoped_config) -> None:
     """Fail on the missing flag, not on the authentication it would need.
 
     Building the service client first reports a credential problem when
@@ -815,7 +822,7 @@ def test_no_environment_is_reported_before_a_credential_is_built(config) -> None
     """
     with (
         patch(
-            "fab_test.scripts.invoke_playwright.load_config", return_value=config
+            "fab_test.scripts.invoke_playwright.load_config", return_value=unscoped_config
         ),
         patch(
             "fab_test.scripts.invoke_playwright.build_fabric_service_client"
@@ -830,14 +837,14 @@ def test_no_environment_is_reported_before_a_credential_is_built(config) -> None
 
 
 @pytest.mark.playwright
-def test_a_missing_environment_exits_one_without_a_traceback(config, capsys) -> None:
+def test_a_missing_environment_exits_one_without_a_traceback(unscoped_config, capsys) -> None:
     """The wrapper already catches ServiceResolutionError; keep it that way.
 
     A traceback across two artifacts is what the user saw. One
     ``::error::`` line and exit 1 is what a CI log and an agent can read.
     """
     with patch(
-        "fab_test.scripts.invoke_playwright.load_config", return_value=config
+        "fab_test.scripts.invoke_playwright.load_config", return_value=unscoped_config
     ):
         args = parse_args(["--artifact", "ThinReport"])
 
@@ -847,7 +854,7 @@ def test_a_missing_environment_exits_one_without_a_traceback(config, capsys) -> 
 
 
 @pytest.mark.playwright
-def test_missing_environment_abort_writes_its_message_to_stderr(config, capsys):
+def test_missing_environment_abort_writes_its_message_to_stderr(unscoped_config, capsys):
     """Given no --env, the abort message goes to stderr, not stdout.
 
     The abort happens before any envelope is written, so this message is the
@@ -864,12 +871,12 @@ def test_missing_environment_abort_writes_its_message_to_stderr(config, capsys):
     args = parse_args(["--artifact", "ThinReport", "--output-path", "unused.json"])
 
     with patch(
-        "fab_test.scripts.invoke_playwright.load_config", return_value=config
+        "fab_test.scripts.invoke_playwright.load_config", return_value=unscoped_config
     ):
         exit_code = run_playwright_validation(args)
 
     captured = capsys.readouterr()
     assert exit_code == 1
     assert "::error::" in captured.err
-    assert "Pass --env" in captured.err
+    assert "--env" in captured.err
     assert "::error::" not in captured.out

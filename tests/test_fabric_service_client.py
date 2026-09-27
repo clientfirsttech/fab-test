@@ -59,13 +59,14 @@ def test_authenticate_service_principal_uses_azure_identity() -> None:
     mock_credential.get_token.assert_called_once()
 
 
-def test_build_client_fails_without_credentials(monkeypatch) -> None:
+def test_build_client_fails_without_credentials(monkeypatch, tmp_path) -> None:
     """Given no credentials and no usable ambient credential, should fail."""
     for var in (
         "FABRIC_TENANT_ID", "FABRIC_CLIENT_ID", "FABRIC_CLIENT_SECRET",
         "FABRIC_SERVICE_PRINCIPAL_ID", "FABRIC_SERVICE_PRINCIPAL_SECRET",
     ):
         monkeypatch.delenv(var, raising=False)
+    monkeypatch.setenv("PLAYWRIGHT_ENV_FILE", str(tmp_path / "absent.env"))
     with patch(
         "fab_test.scripts.playwright_validation.fabric_service_client._authenticate_ambient",
         side_effect=FabricServiceClientError("no ambient credential"),
@@ -99,6 +100,33 @@ def test_build_client_reads_env_file(tmp_path: Path) -> None:
     assert client._credentials.tenant_id == "env-tenant"
     assert client._credentials.client_id == "env-client"
     assert client._credentials.client_secret == "env-secret"
+
+
+def test_build_client_without_an_env_file_searches_like_the_credential_probe(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """Given no env_file, should read the same default .env that probe_credentials
+    reports from, not skip it and authenticate as the ambient identity -- which
+    made `auth status` verify one identity and test reachability as another."""
+    for var in ("FABRIC_TENANT_ID", "FABRIC_CLIENT_ID", "FABRIC_CLIENT_SECRET"):
+        monkeypatch.delenv(var, raising=False)
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        "FABRIC_TENANT_ID=env-tenant\nFABRIC_CLIENT_ID=env-client\nFABRIC_CLIENT_SECRET=env-secret\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("PLAYWRIGHT_ENV_FILE", str(env_file))
+
+    with patch(
+        "fab_test.scripts.playwright_validation.fabric_service_client._authenticate_service_principal",
+        return_value="token",
+    ), patch(
+        "fab_test.scripts.playwright_validation.fabric_service_client._authenticate_ambient",
+        side_effect=AssertionError("must not fall back to ambient when the default .env has a service principal"),
+    ):
+        client = build_fabric_service_client()
+
+    assert client._credentials.client_id == "env-client"
 
 
 def test_list_items_uses_fabric_api(
@@ -303,6 +331,9 @@ def _clear_service_principal_env(monkeypatch):
         "FABRIC_SERVICE_PRINCIPAL_ID", "FABRIC_SERVICE_PRINCIPAL_SECRET",
     ):
         monkeypatch.delenv(var, raising=False)
+    # The default .env search would otherwise find a developer's real
+    # .fab-test/.env and supply the very variables this helper clears.
+    monkeypatch.setenv("PLAYWRIGHT_ENV_FILE", str(Path(__file__).parent / "no-such.env"))
 
 
 def test_authenticate_ambient_uses_default_azure_credential() -> None:
