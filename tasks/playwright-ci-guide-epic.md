@@ -1,6 +1,6 @@
 # Playwright CI Guide Epic
 
-**Status**: 🔄 IN-PROGRESS (2/7 tasks: setup guide drafted; all 6 CLI gaps closed, render spec now ships in the package 2026-09-26)
+**Status**: 🔄 IN-PROGRESS (3/7 tasks: setup guide, all 6 CLI gaps, and the copy-ready example workflow done)
 **Goal**: Give a team a documented, copy-ready GitHub Actions path from "no service principal" to a green `fab-test playwright` run against their own Fabric workspace.
 
 ## Overview
@@ -51,6 +51,8 @@ Add `docs/examples/github-actions/playwright-live.yml`, a complete workflow a co
 - Given the triggers, should use `workflow_dispatch` with `artifact`, `pages`, and `roles` inputs plus a commented-out `schedule`, and should not use `pull_request`, where fork PRs get no secrets.
 - Given a failing run, should still upload `fab-test-results/**`, including `playwright/test-cases/**`, under `if: always()`, and should write a per-case pass/fail table from the envelope's `test_results` to `$GITHUB_STEP_SUMMARY`.
 - Given the GitHub-side setup, should be covered in the guide: creating the Environment, adding required reviewers, and entering each secret and variable by the exact name the workflow reads.
+
+**Done 2026-09-27.** `docs/examples/github-actions/playwright-live.yml`, with `artifact`/`dataset_id`/`dataset_workspace_id`/`pages`/`roles` dispatch inputs covering all three targeting shapes (per the "show off `--dataset-id`/`--dataset-workspace-id`, not just a bare `--artifact` run" note in `plan.md`). `docs/PLAYWRIGHT-CI.md` gained the GitHub Environment setup steps and a table describing the three input shapes. Live-verified against the real workspace: ran the workflow's exact commands and its step-summary script by hand against `--dataset-workspace-id` alone (2 reports, "every dataset" mode) -- caught a real bug doing it, not a hypothetical one: the upload step's `test-cases/**` glob was flat (`playwright/test-cases/**`), but the real layout nests it per report (`playwright/<report>/test-cases/**`); a dataset-targeted or batch run producing more than one report would have uploaded nothing there and left every `report.html` linking to files that were never included. The same flat pattern was already wrong in `docs/QUICK-VALIDATION.md`, README.md, and `references/flags.md` (both copies) -- fixed all four, and added `tests/test_playwright_test_cases_path_docs.py` so it can't drift back silently.
 
 ---
 

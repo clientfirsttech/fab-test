@@ -227,7 +227,7 @@ discoverable: `fab-test init` scaffolds a commented line for it, and
 `env:FABRIC_WORKSPACE_ID`, etc.) alongside every other setting.
 
 **Every generated case gets its own accurate result, not the run's outcome copy-pasted.**
-`fab-test-results/playwright/test-cases/<case>/result.json` (written by the pytest
+`fab-test-results/playwright/<report>/test-cases/<case>/result.json` (written by the pytest
 spec itself, per case) records that case's real `status` (`pass`/`error`) and, on
 failure, the actual detail -- the embed error, a render timeout, or an RDL error
 modal -- rather than the fixed string every case used to share. The envelope's

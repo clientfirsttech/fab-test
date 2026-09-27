@@ -2,7 +2,7 @@
 
 `fab-test playwright` opens each published report in a real browser, page by page, and fails the run when a visual doesn't render. It is the one analyzer that needs a **service principal**: it has to generate an embed token, and an `az login` session can't do that.
 
-This guide takes you from nothing to a passing local run. Do these steps in order. Each step is a prerequisite for the next, and the local run at the end is how you know the setup is right before you involve CI.
+This guide takes you from nothing to a passing local run, then to the same run in GitHub Actions. Do these steps in order. Each step is a prerequisite for the next, and the local run is how you know the setup is right before you involve CI.
 
 | Step | Where | Who usually does it |
 |------|-------|---------------------|
@@ -11,6 +11,7 @@ This guide takes you from nothing to a passing local run. Do these steps in orde
 | [3. Give it a workspace role](#3-give-it-a-workspace-role) and enable XMLA | Fabric workspace and capacity | Workspace and capacity admins |
 | [4. Deploy the reports you want to test](#4-deploy-the-reports-you-want-to-test) | Fabric workspace | You |
 | [5. Run it locally](#5-run-it-locally) | Your machine | You |
+| [Run it in GitHub Actions](#next-run-it-in-github-actions) | GitHub repository settings | You |
 
 ## 1. Register the service principal
 
@@ -196,4 +197,44 @@ Every case writes its evidence to `fab-test-results/playwright/<report>/test-cas
 
 ## Next: run it in GitHub Actions
 
-Once the local run passes, the same variables go into a GitHub Environment's secrets, and a workflow installs the browser and runs the same command. That workflow and its setup are documented in the next section of this guide.
+Once the local run passes, the same values go into a GitHub Environment's secrets and variables, and a workflow installs the browser and its pytest plugins before running the same command.
+
+### Create the GitHub Environment
+
+1. In your repository, go to **Settings → Environments → New environment**, name it `fabric-demo` (or pick your own name and update the workflow's `environment:` key to match).
+2. Optionally, under **Deployment protection rules**, add required reviewers -- a run against a real workspace then waits for approval before it starts.
+3. Under **Environment secrets**, add:
+
+   | Secret | Value |
+   |--------|-------|
+   | `FABRIC_TENANT_ID` | Directory (tenant) ID |
+   | `FABRIC_CLIENT_ID` | Application (client) ID |
+   | `FABRIC_CLIENT_SECRET` | Client secret value |
+
+4. Under **Environment variables** (not secrets -- a workspace ID is metadata, not a credential), add:
+
+   | Variable | Value |
+   |----------|-------|
+   | `FABRIC_WORKSPACE_ID` | The workspace GUID from [step 3](#3-give-it-a-workspace-role) |
+
+### Copy the example workflow
+
+[`docs/examples/github-actions/playwright-live.yml`](examples/github-actions/playwright-live.yml) is a complete workflow -- copy it into your own repository's `.github/workflows/`. It:
+
+- Triggers only on `workflow_dispatch`, never `pull_request` -- a fork PR has no access to this Environment's secrets at all.
+- Takes `artifact`, `dataset_id`, `dataset_workspace_id`, `pages`, and `roles` as dispatch inputs, so the one workflow covers all three ways of naming what to test (see [Targeting a report or a dataset](#targeting-a-report-or-a-dataset) below).
+- Installs the published package, then the browser and its pytest plugins separately (see [Run it locally](#5-run-it-locally) for why those are separate).
+- Runs `fab-test doctor` before the real command, so a misconfigured Environment fails fast with exit `127` naming what's missing.
+- Uploads `fab-test-results/playwright/**` under `if: always()`, and writes a per-case pass/fail table to the job's step summary.
+
+### Targeting a report or a dataset
+
+The same three shapes from [`references/flags.md`](../.github/skills/fab-test/references/flags.md) work as dispatch inputs -- fill in exactly one when you run the workflow:
+
+| Fill in | Runs |
+|---------|------|
+| `artifact` only | That one report |
+| `dataset_id` (+ `dataset_workspace_id`) | Every report built on that dataset |
+| `dataset_workspace_id` only | Every dataset in that workspace, each one's own dependent reports |
+
+The last two need nothing local checked in -- they resolve entirely against Fabric, which is why a team with reports deployed straight from Power BI Desktop (no `.pbip` in the repository at all) can still run this workflow.
