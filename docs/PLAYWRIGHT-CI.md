@@ -238,3 +238,13 @@ The same three shapes from [`references/flags.md`](../.github/skills/fab-test/re
 | `dataset_workspace_id` only | Every dataset in that workspace, each one's own dependent reports |
 
 The last two need nothing local checked in -- they resolve entirely against Fabric, which is why a team with reports deployed straight from Power BI Desktop (no `.pbip` in the repository at all) can still run this workflow.
+
+### Picking dev, test, or prod at dispatch time
+
+The example workflow above reads one fixed `FABRIC_WORKSPACE_ID` per Environment -- simplest when you only ever run against one workspace from that Environment. A team that promotes through several workspaces (dev/test/prod) and wants to pick which one *at dispatch time*, without duplicating the Environment or the workflow, can do this instead:
+
+1. Commit an `environments.yml` mapping each label to its workspace ID -- see [Configuration](.github/skills/fab-test/references/configuration.md#configuration) for the file's location and shape. Workspace IDs are metadata, not secrets, so this file is safe to check in.
+2. Add an `environment` dispatch input (a `choice` of your labels), and pass it straight through as `--env ${{ inputs.environment }}` -- `fab-test` resolves the workspace from `environments.yml` itself, no `FABRIC_WORKSPACE_ID` Environment variable needed at all.
+3. Add an optional `workspace_id` dispatch input too, passed as `--workspace-id` when non-empty. It wins over `--env`, so a workspace not yet in `environments.yml` -- or a one-off run against somewhere else entirely -- never needs a workflow edit.
+
+`.github/workflows/playwright-demo.yml` in this repository is exactly this pattern, reading this repository's own `.fab-test/metadata/environments.yml`: `--env dev` already resolves to a real workspace with nothing else supplied, and `test`/`prod` fall back to the `workspace_id` override until their entries in that file carry a real workspace ID.

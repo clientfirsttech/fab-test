@@ -1,6 +1,6 @@
 # Playwright CI Guide Epic
 
-**Status**: 🔄 IN-PROGRESS (3/7 tasks: setup guide, all 6 CLI gaps, and the copy-ready example workflow done)
+**Status**: 🔄 IN-PROGRESS (5/7 tasks: setup guide, all 6 CLI gaps, the example workflow, the demo workflow, and the drift test done)
 **Goal**: Give a team a documented, copy-ready GitHub Actions path from "no service principal" to a green `fab-test playwright` run against their own Fabric workspace.
 
 ## Overview
@@ -67,6 +67,15 @@ Add `.github/workflows/playwright-demo.yml`, which runs the same steps as the ex
 - Given that the demo tests this repository's current code, should install from the checkout (`pip install -e .`), unlike the consumer example. A comment should point readers to the example for the published-package path.
 - Given the artifact input, should default to `SampleModel-PQLAssert` (4 cases, verified green) and offer `Not Working Visuals` (Page 1 fails with `Missing_References`, verified red) as a choice, so the same workflow shows both a green and a red run.
 
+**Done 2026-09-27**, with two deliberate deviations from the letter of the above, both explained here rather than silently:
+- `pip install -e ".[dev]"`, not `pip install -e .` -- `pyproject.toml`'s `dev` extra already declares `pytest`/`pytest-playwright`/`pytest-html`/`pytest-xdist`, so one install covers fab-test and everything Playwright needs, closing the same dev-only-dependency gap the "Close the CLI gaps" task found for the published-package path.
+- `artifact` is free text with a default, not a `choice` of two reports -- by the time this task was built, `--dataset-id`/`--dataset-workspace-id` targeting existed too (Playwright Dataset Target epic), so the workflow gained `dataset_id`/`dataset_workspace_id` inputs alongside `artifact`; a fixed two-report choice list would have fought "leave `artifact` blank to target a dataset instead."
+- Workspace targeting is `--env <environment>` (a `choice` input resolved through this repository's own committed `.fab-test/metadata/environments.yml`) plus an optional `workspace_id` override that wins over it -- raised directly by the user while setting up the `fabric-demo` Environment ("how do I make that dynamic... depending on the test I may want to call it against the test workspace or the dev workspace"), instead of one fixed `FABRIC_WORKSPACE_ID` Environment variable like the consumer-facing example workflow. `dev` already resolves to a real workspace with nothing else supplied; `test`/`prod` have no `workspace_id` in that file yet, so they need the override until they do. `docs/PLAYWRIGHT-CI.md` gained a "Picking dev, test, or prod at dispatch time" section documenting the pattern for a consumer who wants the same flexibility.
+
+Live-verified by replicating the workflow's exact steps by hand against the real workspace: from a directory with no checkout, `--env dev` fails correctly (`environments.yml not found`, naming the fallbacks) -- confirming the checkout step is load-bearing, not decorative; from the repository root (what `actions/checkout@v4` gives the real job), the same command resolves `dev` to the workspace and passes, exit 0.
+
+A drift test (`tests/test_playwright_workflows_drift.py`) now guards both this workflow and the example one together, satisfying all three requirements of "Guard the guide and both workflows against drift" below in the same pass: browser install before any `fab-test` step, `if: always()` on every upload, and no inlined secret (both workflows); the guide and both workflows naming the same three credential variables; and the demo's triggers being exactly `workflow_dispatch` with its job naming a protected `environment`.
+
 ---
 
 ## Guard the guide and both workflows against drift
@@ -77,6 +86,8 @@ Add a documentation test in the style of `tests/test_a11y_documentation.py` that
 - Given the example and demo workflows, should parse each as YAML and assert the browser install step comes before any `fab-test` step, that the upload runs with `if: always()`, and that no secret value is inlined.
 - Given the environment variable names the CLI reads for Playwright, should assert that the guide and both workflows name the same set, so a renamed variable breaks the build instead of the reader's first run.
 - Given the demo workflow, should assert its triggers are exactly `workflow_dispatch` and its job names an `environment`, so a later edit can't quietly expose it to PRs.
+
+**Done 2026-09-27** as part of building the demo workflow above -- see that task's note for what `tests/test_playwright_workflows_drift.py` covers.
 
 ---
 
