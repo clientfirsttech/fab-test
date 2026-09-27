@@ -167,11 +167,11 @@ Playwright validation can run in three modes: static `.env` mode, service-resolv
 **By default, `playwright` tests every page, every page's own bookmarks, and every
 RLS role — not just the default tab.** `--pages none`/`--roles none` (or `PLAYWRIGHT_PAGE_IDS`/
 `--page-ids`, which skip discovery entirely as an explicit override) fall back to the
-one-case shape every prior release had. Discovery needs the full permission set in
-[docs/PLAYWRIGHT-CI.md](../../../../docs/PLAYWRIGHT-CI.md#1-register-the-service-principal)
-on the service principal beyond what embedding already required; a missing grant
-logs a warning and falls back to the single-case shape rather than failing the
-run. Each role gets its own embed token —
+one-case shape every prior release had. Discovery needs the full permission set
+in `docs/PLAYWRIGHT-CI.md` ("Register the service principal") on the service
+principal beyond what embedding already required; a missing grant logs a
+warning and falls back to the single-case shape rather than failing the run.
+Each role gets its own embed token —
 a token carries its RLS identity, so one token cannot cover two roles — and
 discovered roles with no `PLAYWRIGHT_USER_NAME` abort before any token is minted
 rather than silently testing no role at all (`GenerateToken` drops the identity
@@ -199,6 +199,21 @@ environment, in a .env file, or pass --env-file.
 a false green when only an ambient credential is available — `playwright-impact` and
 `dependencies`, which never call the embed-token API, are unaffected and accept
 ambient auth like every other cloud-backed analyzer.
+
+**Exit `127` is a setup problem, exit `1` is a report failure.** A run that never
+reached a case (missing credential, unresolved workspace, unknown report name)
+exits `127` and names what's missing; a run that opened the report and found a
+real problem (a broken visual, a render timeout, an RLS token that couldn't be
+minted) exits `1`. Don't retry a `127` — fix the named prerequisite first.
+
+**Setting this up in CI** (service principal registration, tenant settings,
+workspace role, XMLA endpoint, GitHub Environment/secrets) is a one-time,
+outside-the-CLI prerequisite covered in `docs/PLAYWRIGHT-CI.md`, not here. A
+copy-ready workflow lives at
+`docs/examples/github-actions/playwright-live.yml`; this repository's own
+`.github/workflows/playwright-demo.yml` (manually dispatched, gated behind
+the `fabric-demo` Environment) is the working reference for what a real
+dispatch looks like.
 
 **Generated cases run concurrently, up to a bounded worker cap.** A report's
 page/bookmark/role matrix can generate many cases; they run across `pytest-xdist`

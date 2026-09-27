@@ -1,6 +1,6 @@
 # Playwright CI Guide Epic
 
-**Status**: 🔄 IN-PROGRESS (6/8 tasks: setup guide, all 6 CLI gaps, the example workflow, the demo workflow, the drift test, and proving it end to end in CI done; syncing the three doc callers and non-PBIP RLS role discovery remain)
+**Status**: 🔄 IN-PROGRESS (7/8 tasks: setup guide, all 6 CLI gaps, the example workflow, the demo workflow, the drift test, proving it end to end in CI, and syncing the three doc callers done; non-PBIP RLS role discovery remains, tracked separately since it needs a new runtime dependency decision)
 **Goal**: Give a team a documented, copy-ready GitHub Actions path from "no service principal" to a green `fab-test playwright` run against their own Fabric workspace.
 
 ## Overview
@@ -142,5 +142,12 @@ Use the `document` skill so README, QUICK-VALIDATION, and the fab-test skill all
 - Given README, QUICK-VALIDATION, and `references/flags.md` each list only `Report.Read.All` and `SemanticModel.Read.All`, should point to the guide's full permission list (`App.Read.All`, `Dataset.Read.All`, `SemanticModel.Read.All`, `Report.Read.All`, `Workspace.Read.All` with admin consent), the Member role, and XMLA endpoint access.
 - Given QUICK-VALIDATION's partial Playwright snippet, should point to the full example workflow so the two cannot disagree, and should link to the demo workflow's run history as the working reference.
 - Given the fab-test skill, should tell an agent where the example workflow and prerequisites live and which exit codes mean setup problems (`127`) versus report failures (`1`), with the packaged copy under `src/fab_test/skill/` kept identical.
+
+**Done 2026-09-27.** The `document` skill's own trigger (`.github/skills/document/SKILL.md`) covers CLI-flag/subcommand sync, not this task's guide-linking scope, so this was done directly against the four requirements above instead:
+- README's "minimal working config" section gained a "Running this in CI" pointer to `docs/PLAYWRIGHT-CI.md` and the example workflow; its and QUICK-VALIDATION's partial `Report.Read.All`/`SemanticModel.Read.All` mentions now point to the guide's full five-permission list instead of restating two of them.
+- QUICK-VALIDATION's Playwright pipeline snippet gained a pointer to the full example workflow and to this repository's own demo workflow run history (`https://github.com/kerski/fab-test/actions/workflows/playwright-demo.yml`) as the working reference.
+- `.github/skills/fab-test/references/flags.md` gained an exit-code summary (`127` = setup problem, `1` = report failure) and pointers to the guide, the example workflow, and the demo workflow -- as plain-text paths, not markdown links, since this file also ships inside the installed package (`src/fab_test/skill/`) where a relative link into a sibling `docs/` folder wouldn't resolve.
+- `tests/test_package_metadata.py::test_every_readme_link_resolves_off_the_project_page` caught the two new README links using relative paths (would 404 on the PyPI project page) -- fixed to the repository's established `https://github.com/kerski/fab-test/blob/main/...` convention.
+- Re-synced `src/fab_test/skill/references/flags.md` from its authored counterpart; `tests/test_skill_resource.py` confirms parity.
 
 ---
