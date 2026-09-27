@@ -440,6 +440,95 @@ def _check_qry07_move_complex_sql(root: ET.Element, _namespace: str, rule: dict[
     return findings
 
 
+# --------------------------------------------------------------------------- #
+# Parameter rules (PRM-01, PRM-03, PRM-04, PRM-05)
+# --------------------------------------------------------------------------- #
+
+
+def _check_prm01_default_value(root: ET.Element, _namespace: str, _rule: dict[str, Any]) -> list[Finding]:
+    return [
+        {
+            "object": parameter.get("Name") or "?",
+            "message": "no DefaultValue -- the report won't run on open without a manual selection",
+        }
+        for parameter in root.findall(".//ReportParameters/ReportParameter")
+        if parameter.find("DefaultValue") is None
+    ]
+
+
+_DEFAULT_PRM03_MAX_PARAMETERS = 5
+# Matches a parameter named after a single date part -- "Year"/"Month"/"Day"
+# as a whole word, so "Yearly" or "PayDay" don't count.
+_DATE_PART_NAME = re.compile(r"(?i)\b(year|month|day)\b")
+
+
+def _check_prm03_parameter_count(root: ET.Element, _namespace: str, rule: dict[str, Any]) -> list[Finding]:
+    max_parameters = rule.get("max_parameters", _DEFAULT_PRM03_MAX_PARAMETERS)
+    parameters = root.findall(".//ReportParameters/ReportParameter")
+    names = [parameter.get("Name") or "" for parameter in parameters]
+    findings: list[Finding] = []
+
+    # Fires regardless of the total count -- three narrow date-part
+    # parameters are the anti-pattern this rule names explicitly, not a
+    # symptom of the report simply having "too many" parameters.
+    date_part_names = [name for name in names if _DATE_PART_NAME.search(name)]
+    date_parts_seen = {match.lower() for name in date_part_names for match in _DATE_PART_NAME.findall(name)}
+    if len(date_parts_seen) >= 2:
+        findings.append({
+            "object": ", ".join(date_part_names),
+            "message": "separate Year/Month/Day parameters should usually be one DateTime picker",
+        })
+
+    if len(parameters) > max_parameters:
+        findings.append({
+            "object": f"{len(parameters)} parameters",
+            "message": (
+                f"{len(parameters)} parameters is over the {max_parameters}-parameter "
+                "threshold -- keep the parameter count low"
+            ),
+        })
+    return findings
+
+
+def _check_prm04_multivalue_nullable(root: ET.Element, _namespace: str, _rule: dict[str, Any]) -> list[Finding]:
+    findings: list[Finding] = []
+    for parameter in root.findall(".//ReportParameters/ReportParameter"):
+        multi_value = (parameter.findtext("MultiValue") or "").strip().lower() == "true"
+        nullable = (parameter.findtext("Nullable") or "").strip().lower() == "true"
+        if multi_value and nullable:
+            findings.append({
+                "object": parameter.get("Name") or "?",
+                "message": "MultiValue=true with Nullable=true isn't supported -- MultiValue + AllowBlank is fine",
+            })
+    return findings
+
+
+_PARAMETER_REFERENCE = re.compile(r"Parameters!(\w+)\.(?:Value|Label)")
+
+
+def _check_prm05_show_parameter_values(root: ET.Element, _namespace: str, _rule: dict[str, Any]) -> list[Finding]:
+    parameters = root.findall(".//ReportParameters/ReportParameter")
+    if not parameters:
+        return []
+    displayed: set[str] = set()
+    for element in root.iter():
+        text = (element.text or "").strip()
+        if not text.startswith("="):
+            continue
+        displayed.update(_PARAMETER_REFERENCE.findall(text))
+    return [
+        {
+            "object": name,
+            "message": (
+                f"parameter '{name}' isn't shown anywhere on the report "
+                f"(Parameters!{name}.Value or .Label) -- exported copies won't be self-explanatory"
+            ),
+        }
+        for name in (parameter.get("Name") or "" for parameter in parameters)
+        if name and name not in displayed
+    ]
+
+
 CHECKS.update({
     "STR-01": _check_str01_current_schema,
     "DS-01": _check_ds01_shared_data_source,
@@ -453,6 +542,10 @@ CHECKS.update({
     "QRY-05": _check_qry05_convert_types_in_query,
     "QRY-06": _check_qry06_join_in_query,
     "QRY-07": _check_qry07_move_complex_sql,
+    "PRM-01": _check_prm01_default_value,
+    "PRM-03": _check_prm03_parameter_count,
+    "PRM-04": _check_prm04_multivalue_nullable,
+    "PRM-05": _check_prm05_show_parameter_values,
 })
 
 

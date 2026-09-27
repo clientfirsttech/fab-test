@@ -21,6 +21,10 @@ from fab_test.scripts._rdl_lint import (
     _check_ds02_unused_datasets,
     _check_ds05_no_select_star,
     _check_ds07_prefer_stored_procedures,
+    _check_prm01_default_value,
+    _check_prm03_parameter_count,
+    _check_prm04_multivalue_nullable,
+    _check_prm05_show_parameter_values,
     _check_qry01_filter_in_query,
     _check_qry02_no_calculated_fields,
     _check_qry03_aggregate_in_query,
@@ -650,3 +654,141 @@ class TestQry07MoveComplexSql:
         root, namespace = _parse(tmp_path, xml)
 
         assert _check_qry07_move_complex_sql(root, namespace, {"max_lines": 50}) == []
+
+
+# --------------------------------------------------------------------------- #
+# Parameter rules (PRM-01, PRM-03, PRM-04, PRM-05)
+# --------------------------------------------------------------------------- #
+
+
+def _report_parameter(
+    name: str, *, default: bool = True, multi_value: bool = False, nullable: bool = False, allow_blank: bool = False
+) -> str:
+    parts = ["<DataType>Integer</DataType>"]
+    if default:
+        parts.append("<DefaultValue><Values><Value>1</Value></Values></DefaultValue>")
+    if allow_blank:
+        parts.append("<AllowBlank>true</AllowBlank>")
+    if nullable:
+        parts.append("<Nullable>true</Nullable>")
+    if multi_value:
+        parts.append("<MultiValue>true</MultiValue>")
+    return f'<ReportParameter Name="{name}">{"".join(parts)}</ReportParameter>'
+
+
+class TestPrm01DefaultValue:
+    def test_flags_a_parameter_with_no_default(self, tmp_path):
+        param = _report_parameter("Region", default=False)
+        xml = _report(f"<ReportParameters>{param}</ReportParameters>")
+        root, namespace = _parse(tmp_path, xml)
+
+        findings = _check_prm01_default_value(root, namespace, {})
+
+        assert len(findings) == 1
+        assert findings[0]["object"] == "Region"
+
+    def test_a_parameter_with_a_default_passes(self, tmp_path):
+        param = _report_parameter("Region", default=True)
+        xml = _report(f"<ReportParameters>{param}</ReportParameters>")
+        root, namespace = _parse(tmp_path, xml)
+
+        assert _check_prm01_default_value(root, namespace, {}) == []
+
+
+class TestPrm03ParameterCount:
+    def test_flags_separate_year_month_day_parameters_under_the_threshold(self, tmp_path):
+        """Fires even when the total count is under max_parameters -- the
+        anti-pattern is the date decomposition, not the raw count."""
+        params = "".join(_report_parameter(n) for n in ("Year", "Month", "Day"))
+        xml = _report(f"<ReportParameters>{params}</ReportParameters>")
+        root, namespace = _parse(tmp_path, xml)
+
+        findings = _check_prm03_parameter_count(root, namespace, {"max_parameters": 5})
+
+        assert len(findings) == 1
+        assert "DateTime" in findings[0]["message"]
+
+    def test_unrelated_parameters_under_the_threshold_pass(self, tmp_path):
+        params = "".join(_report_parameter(n) for n in ("Region", "Product"))
+        xml = _report(f"<ReportParameters>{params}</ReportParameters>")
+        root, namespace = _parse(tmp_path, xml)
+
+        assert _check_prm03_parameter_count(root, namespace, {"max_parameters": 5}) == []
+
+    def test_flags_a_count_over_the_catalog_threshold(self, tmp_path):
+        params = "".join(_report_parameter(f"P{i}") for i in range(6))
+        xml = _report(f"<ReportParameters>{params}</ReportParameters>")
+        root, namespace = _parse(tmp_path, xml)
+
+        findings = _check_prm03_parameter_count(root, namespace, {"max_parameters": 5})
+
+        assert any("threshold" in f["message"] for f in findings)
+
+    def test_uses_the_default_threshold_when_the_catalog_omits_it(self, tmp_path):
+        params = "".join(_report_parameter(f"P{i}") for i in range(3))
+        xml = _report(f"<ReportParameters>{params}</ReportParameters>")
+        root, namespace = _parse(tmp_path, xml)
+
+        assert _check_prm03_parameter_count(root, namespace, {}) == []
+
+
+class TestPrm04MultivalueNullable:
+    def test_flags_multivalue_with_nullable(self, tmp_path):
+        param = _report_parameter("Region", multi_value=True, nullable=True)
+        xml = _report(f"<ReportParameters>{param}</ReportParameters>")
+        root, namespace = _parse(tmp_path, xml)
+
+        findings = _check_prm04_multivalue_nullable(root, namespace, {})
+
+        assert len(findings) == 1
+        assert findings[0]["object"] == "Region"
+
+    def test_multivalue_with_allow_blank_is_not_flagged(self, tmp_path):
+        param = _report_parameter("Region", multi_value=True, allow_blank=True)
+        xml = _report(f"<ReportParameters>{param}</ReportParameters>")
+        root, namespace = _parse(tmp_path, xml)
+
+        assert _check_prm04_multivalue_nullable(root, namespace, {}) == []
+
+    def test_multivalue_alone_is_not_flagged(self, tmp_path):
+        param = _report_parameter("Region", multi_value=True)
+        xml = _report(f"<ReportParameters>{param}</ReportParameters>")
+        root, namespace = _parse(tmp_path, xml)
+
+        assert _check_prm04_multivalue_nullable(root, namespace, {}) == []
+
+
+class TestPrm05ShowParameterValues:
+    def test_flags_a_parameter_never_displayed(self, tmp_path):
+        param = _report_parameter("Region")
+        xml = _report(f"<ReportParameters>{param}</ReportParameters><Body />")
+        root, namespace = _parse(tmp_path, xml)
+
+        findings = _check_prm05_show_parameter_values(root, namespace, {})
+
+        assert len(findings) == 1
+        assert findings[0]["object"] == "Region"
+
+    def test_a_value_reference_counts_as_displayed(self, tmp_path):
+        param = _report_parameter("Region")
+        xml = _report(
+            f"<ReportParameters>{param}</ReportParameters>"
+            '<Body><ReportItems><Textbox Name="Tb1">'
+            "<Value>=Parameters!Region.Value</Value></Textbox></ReportItems></Body>"
+        )
+        root, namespace = _parse(tmp_path, xml)
+
+        assert _check_prm05_show_parameter_values(root, namespace, {}) == []
+
+    def test_a_label_reference_also_counts_as_displayed(self, tmp_path):
+        """Given a parameter referenced as Parameters!X.Label rather than
+        .Value in a textbox, PRM-05 should count it as displayed."""
+        param = _report_parameter("Region")
+        xml = _report(
+            f"<ReportParameters>{param}</ReportParameters>"
+            '<Body><ReportItems><Textbox Name="Tb1">'
+            "<Value>=Parameters!Region.Label</Value></Textbox></ReportItems></Body>"
+        )
+        root, namespace = _parse(tmp_path, xml)
+
+        assert _check_prm05_show_parameter_values(root, namespace, {}) == []
