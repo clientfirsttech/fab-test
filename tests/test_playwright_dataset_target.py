@@ -228,3 +228,40 @@ def test_two_dependents_sharing_a_display_name_both_survive(local_reports) -> No
     assert workspaces == {DATASET_WS, other_ws}
     for cmd in commands.values():
         assert cmd[cmd.index("--artifact") + 1] == "Sales"
+
+
+def test_dataset_workspace_alone_refuses_before_any_local_report_runs(local_reports, capsys) -> None:
+    """The reported bug: --dataset-workspace-id with no --dataset-id used to
+    force every locally discovered report onto that (commonly inaccessible)
+    workspace instead of refusing."""
+    args = _args(local_reports, dataset_id="")
+
+    with patch(_CLIENT) as build_client:
+        assert _run_analyzer("playwright", args, Path(args.output_dir)) == 2
+
+    build_client.assert_not_called()
+    err = capsys.readouterr().err
+    assert "--dataset-workspace-id" in err
+    assert "--dataset-id" in err
+
+
+def test_dataset_workspace_alone_with_an_artifact_keeps_the_binding_override(local_reports) -> None:
+    """A single --artifact run may legitimately point only the workspace half
+    of an auto-detected dataset elsewhere; unaffected by the batch refusal."""
+    args = _args(local_reports, dataset_id="", artifact="Sales")
+
+    with patch(_CLIENT) as build_client:
+        artifacts = _discover_for("playwright", args, "*.Report")
+
+    assert [a.name for a in artifacts] == ["Sales.Report"]
+    build_client.assert_not_called()
+
+
+def test_dataset_workspace_alone_with_an_impact_manifest_keeps_todays_behavior(local_reports) -> None:
+    args = _args(local_reports, dataset_id="", impact_manifest="m.json")
+
+    with patch(_CLIENT) as build_client:
+        artifacts = _discover_for("playwright", args, "*.Report")
+
+    assert artifacts == [Path(".")]
+    build_client.assert_not_called()
