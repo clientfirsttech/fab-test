@@ -279,8 +279,9 @@ instead of restating "did not render within 180000ms".
 **Running this in CI** is a separate setup from the local config above --
 service principal registration, tenant settings, workspace role, and the
 GitHub Environment/secrets a workflow reads. See
-[docs/PLAYWRIGHT-CI.md](docs/PLAYWRIGHT-CI.md) for the full walkthrough and
-[docs/examples/github-actions/playwright-live.yml](docs/examples/github-actions/playwright-live.yml)
+[docs/PLAYWRIGHT-CI.md](https://github.com/kerski/fab-test/blob/main/docs/PLAYWRIGHT-CI.md)
+for the full walkthrough and
+[docs/examples/github-actions/playwright-live.yml](https://github.com/kerski/fab-test/blob/main/docs/examples/github-actions/playwright-live.yml)
 for a copy-ready workflow.
 
 ### Playwright tests every page, bookmark, and role by default
@@ -288,7 +289,8 @@ for a copy-ready workflow.
 `fab-test playwright` discovers a report's pages, each page's own bookmarks,
 and (when RLS is enabled) the semantic model's roles, and tests the full
 matrix, not just whichever tab opens first. Discovery needs the full
-permission set in [docs/PLAYWRIGHT-CI.md](docs/PLAYWRIGHT-CI.md#1-register-the-service-principal)
+permission set in
+[docs/PLAYWRIGHT-CI.md](https://github.com/kerski/fab-test/blob/main/docs/PLAYWRIGHT-CI.md#1-register-the-service-principal)
 on the service principal in addition to what embedding already required; a
 missing grant logs a warning and falls back to testing the one default page
 rather than failing the run. Turn a dimension off with `--pages none` /
