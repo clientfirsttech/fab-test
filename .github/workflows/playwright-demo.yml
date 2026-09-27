@@ -48,6 +48,11 @@ on:
         default: "auto"
         type: choice
         options: ["auto", "none"]
+      test_rls:
+        description: "Enable RLS role testing (sets PLAYWRIGHT_USE_RLS and PLAYWRIGHT_USER_NAME from the fabric-demo Environment's secret) -- without it, an RLS-secured dataset's GenerateToken call always fails with 'requires effective identity to be provided'"
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   playwright-demo:
@@ -71,6 +76,13 @@ jobs:
       FABRIC_TENANT_ID: ${{ secrets.FABRIC_TENANT_ID }}
       FABRIC_CLIENT_ID: ${{ secrets.FABRIC_CLIENT_ID }}
       FABRIC_CLIENT_SECRET: ${{ secrets.FABRIC_CLIENT_SECRET }}
+      # Off by default: `generate_test_cases` only discovers RLS roles when
+      # PLAYWRIGHT_USE_RLS is set, and without a PLAYWRIGHT_USER_NAME
+      # GenerateToken rejects any RLS-secured dataset outright ("requires
+      # effective identity to be provided") -- both stay unset unless
+      # test_rls opts in.
+      PLAYWRIGHT_USE_RLS: ${{ inputs.test_rls }}
+      PLAYWRIGHT_USER_NAME: ${{ inputs.test_rls && secrets.PLAYWRIGHT_USER_NAME || '' }}
     steps:
       - uses: actions/checkout@v4
 
