@@ -271,6 +271,35 @@ def test_generate_embed_token_includes_rls_identity() -> None:
     ]
 
 
+def test_generate_embed_token_includes_identity_with_no_discovered_role() -> None:
+    """RLS-mandatory datasets with no named role (role discovery found none,
+    e.g. a non-PBIP-enabled semantic model) still need an identity attached
+    -- Power BI's own GenerateToken accepts "roles": [] for exactly this
+    case, and rejects the request with "requires effective identity to be
+    provided" when identities is omitted entirely, confirmed live against
+    a workspace's RLS-secured datasets."""
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {"token": "embed-token-1"}
+
+    with patch(
+        "fab_test.scripts.playwright_validation.power_bi_api.requests.post",
+        return_value=mock_response,
+    ) as mock_post:
+        generate_embed_token(
+            "token",
+            ReportIdentity("ws-1", "rpt-1", "ds-1"),
+            use_rls=True,
+            user_name="u1",
+            role="",
+        )
+
+    payload = mock_post.call_args.kwargs["json"]
+    assert payload["identities"] == [
+        {"username": "u1", "roles": [], "datasets": ["ds-1"]}
+    ]
+
+
 def test_generate_embed_token_omits_identity_when_rls_disabled() -> None:
     """When RLS is disabled, identities are omitted even if user_name/role are set."""
     mock_response = MagicMock()

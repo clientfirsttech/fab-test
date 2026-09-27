@@ -1,6 +1,6 @@
 # Playwright CI Guide Epic
 
-**Status**: 🔄 IN-PROGRESS (5/7 tasks: setup guide, all 6 CLI gaps, the example workflow, the demo workflow, and the drift test done)
+**Status**: 🔄 IN-PROGRESS (6/8 tasks: setup guide, all 6 CLI gaps, the example workflow, the demo workflow, the drift test, and proving it end to end in CI done; syncing the three doc callers and non-PBIP RLS role discovery remain)
 **Goal**: Give a team a documented, copy-ready GitHub Actions path from "no service principal" to a green `fab-test playwright` run against their own Fabric workspace.
 
 ## Overview
@@ -100,6 +100,33 @@ Run the demo locally from `.fab-test/.env`, then dispatch the demo workflow and 
 - Given the passing report, should finish with exit `0`, a green step summary, and an uploaded artifact whose `report.html` links resolve to the bundled screenshots.
 - Given the broken report, should fail with exit `1`, with the step summary and `findings` naming only the failing cases.
 - Given anything the guide got wrong or left out during these runs, should be corrected in the guide before this task closes, since the runs test the documentation as much as the workflows.
+
+**Done 2026-09-27** via real `gh workflow run` dispatches against the demo workflow (not a local replay) -- caught four real bugs in CI that a local run alone wouldn't have hit, each fixed and re-verified live:
+- `doctor` has no visibility into `--env`/`environments.yml` and no `--workspace-id` flag, so it reported every cloud analyzer "no workspace ... resolved" and exited 1 even with a fully configured service principal -- fixed by resolving the same workspace the run step uses and exporting it as `FABRIC_WORKSPACE_ID` before calling `doctor`.
+- The job's container runs steps under `sh`, not `bash`; the run step's `args=(...)` bash-array syntax failed with `Syntax error: ( unexpected` -- fixed with POSIX `set --` positional parameters instead.
+- `playwright` is unpinned in `pyproject.toml`; a new release (1.63.0) shipped between two dispatches of this same workflow while the container image stayed pinned to the older tag, so the installed driver's browser revision didn't match what the image baked in (`BrowserType.launch: Executable doesn't exist at .../chromium_headless_shell-<rev>/...`) -- fixed by pinning the pip install to the same version as the container tag (`PLAYWRIGHT_PIN`), so the two can only drift on a deliberate edit.
+- Sweeping `--dataset-workspace-id` alone across a real workspace hit RLS-secured datasets (`RLSTest*`) that `generate_embed_token` couldn't mint a token for: `use_rls and user_name and role` required a discovered role name even to attach an identity at all, so a dataset needing an effective identity but with no discoverable role (e.g. not PBIP-enabled, so `get_semantic_model_roles`'s TMDL-based discovery finds nothing) could never get one -- fixed in `power_bi_api.py` to attach an identity whenever `use_rls and user_name`, sending `"roles": []` when no role was discovered (Power BI's `GenerateToken` accepts this). Added `test_rls`/`PLAYWRIGHT_USE_RLS`/`PLAYWRIGHT_USER_NAME` wiring to the demo workflow so RLS testing is opt-in rather than silently off.
+
+Left open, tracked as its own task below rather than folded in here: role discovery itself (`get_semantic_model_roles`) still only reads the semantic model's Fabric *definition* (TMDL role files), which 404s for a non-PBIP-enabled model -- the identity fix above makes such a dataset's *default* case work (mandatory identity, no specific role), but a role-by-role matrix still can't be discovered for it.
+
+---
+
+## Discover RLS roles for non-PBIP-enabled semantic models
+
+**Status**: 📋 PLANNED
+
+`get_semantic_model_roles` (`service_client.py`) discovers roles by downloading the semantic model's Fabric definition and reading `definition/roles/<Name>.tmdl` part paths. That's blind to any model not enabled for PBIP/Git-integration-style definition download -- `getDefinition` 404s, and discovery silently returns `[]` with no warning (indistinguishable from "this model genuinely has no roles").
+
+The obvious portable fix -- the Power BI REST `executeQueries` API running `EVALUATE INFO.ROLES()` -- is a dead end: Microsoft's own docs state plainly that `executeQueries` supports DAX queries only, and **"INFO functions ... are not supported."** Confirmed by a prior working implementation ([kerski/pbi-dataops-visual-error-testing](https://github.com/kerski/pbi-dataops-visual-error-testing)) that runs `INFO.ROLES()` a different way entirely: `Invoke-ASCmd` (PowerShell's `SqlServer` module, backed by AMO/ADOMD.NET) against the model's true XMLA endpoint, parsing the raw XMLA/SOAP response. That path is Windows/PowerShell-shaped and pulls in a .NET client library `fab-test` has never depended on.
+
+Options for a Python-side, Linux-CI-compatible equivalent, roughly cheapest to most involved:
+- **ADOMD.NET via pythonnet**: `Microsoft.AnalysisServices.AdomdClient.NetCore` (NuGet) targets .NET Core/Linux, so it isn't inherently Windows-only -- but it needs the .NET runtime present in the container image and a Python/.NET bridge (`pythonnet`), a real new dependency chain for one discovery call.
+- **Hand-rolled XMLA-over-SOAP**: XMLA is plain SOAP-over-HTTPS, so a raw `Execute` envelope posted with the existing AAD bearer token is possible in pure Python (`requests`) with no new runtime dependency -- but means implementing SOAP envelope construction and parsing the XMLA rowset response from scratch, with no existing client library to lean on.
+- **Leave the gap documented**: keep today's TMDL-only discovery, and treat "no role discovered, mandatory identity" (the case the fix above now handles) as the supported floor for a non-PBIP model, rather than chasing full role-matrix coverage for it.
+
+**Requirements**:
+- Given a non-PBIP-enabled semantic model with RLS roles, should discover them, or should log a distinguishable warning (not silent `[]`) when discovery is genuinely not possible, so "no roles" and "couldn't check" never look the same in a doctor/CI run.
+- Given whichever approach is chosen, should not require a Windows-only runtime on the demo workflow's Linux container, since that's where this gap was actually found.
 
 ---
 
