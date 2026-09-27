@@ -98,6 +98,12 @@ def run_checks(root: ET.Element, namespace: str, catalog: list[dict[str, Any]]) 
     A catalog entry that is disabled, or has no function in CHECKS yet, is
     silently skipped here -- build_test_results is what records *why* a
     rule produced nothing, for the report and for telemetry.
+
+    A finding's own "rule" wins over the catalog entry being iterated, if
+    it set one -- LAY-03/SUB-01's shared check is the one case that does:
+    a Subreport nested in a Tablix is one finding, not two, so it's
+    dispatched only from LAY-03's catalog entry but tags itself with both
+    IDs rather than letting this loop stamp "LAY-03" over that.
     """
     findings: list[Finding] = []
     for rule in catalog:
@@ -107,7 +113,11 @@ def run_checks(root: ET.Element, namespace: str, catalog: list[dict[str, Any]]) 
         if check is None:
             continue
         findings.extend(
-            {**finding, "rule": rule["id"], "severity": finding.get("severity", rule.get("severity", "warning"))}
+            {
+                **finding,
+                "rule": finding.get("rule", rule["id"]),
+                "severity": finding.get("severity", rule.get("severity", "warning")),
+            }
             for finding in check(root, namespace, rule)
         )
     return findings
@@ -130,6 +140,23 @@ def _dataset_provider(root: ET.Element, query: ET.Element) -> str:
         if source.get("Name") == ds_name:
             return (source.findtext("ConnectionProperties/DataProvider") or "").strip()
     return ""
+
+
+_SIZE_PATTERN = re.compile(r"(?i)^\s*([\d.]+)\s*(in|cm|mm|pt)\s*$")
+_UNIT_TO_INCHES = {"in": 1.0, "cm": 1 / 2.54, "mm": 1 / 25.4, "pt": 1 / 72.0}
+
+
+def _size_in_inches(value: str | None) -> float | None:
+    """Parse an RDL size string ("6in", "21cm", "210mm", "72pt") into
+    inches, or None if it's absent or not one of those four units.
+    """
+    if not value:
+        return None
+    match = _SIZE_PATTERN.match(value)
+    if match is None:
+        return None
+    number, unit = match.groups()
+    return float(number) * _UNIT_TO_INCHES[unit.lower()]
 
 
 # --------------------------------------------------------------------------- #
@@ -529,6 +556,133 @@ def _check_prm05_show_parameter_values(root: ET.Element, _namespace: str, _rule:
     ]
 
 
+# --------------------------------------------------------------------------- #
+# Layout and subreport rules (LAY-01 .. LAY-06, SUB-01, SUB-02)
+# --------------------------------------------------------------------------- #
+
+# RDL's own schema default when Page/PageWidth is omitted (Letter width).
+_DEFAULT_PAGE_WIDTH_INCHES = 8.5
+
+
+def _check_lay01_body_fits_page(root: ET.Element, _namespace: str, _rule: dict[str, Any]) -> list[Finding]:
+    report_section = root.find(".//ReportSection")
+    if report_section is None:
+        return []
+    body_width = _size_in_inches(report_section.findtext("Width"))
+    if body_width is None:
+        return []
+    page = report_section.find("Page")
+    left_margin = _size_in_inches(page.findtext("LeftMargin")) if page is not None else None
+    right_margin = _size_in_inches(page.findtext("RightMargin")) if page is not None else None
+    page_width = _size_in_inches(page.findtext("PageWidth")) if page is not None else None
+    total = body_width + (left_margin or 0.0) + (right_margin or 0.0)
+    effective_page_width = page_width if page_width is not None else _DEFAULT_PAGE_WIDTH_INCHES
+    if total > effective_page_width:
+        return [{
+            "object": "ReportSection",
+            "message": (
+                f"body width + margins ({total:.2f}in) exceeds the page width "
+                f"({effective_page_width:.2f}in) -- PDF/print will add blank overflow pages"
+            ),
+        }]
+    return []
+
+
+def _check_lay02_avoid_total_pages(root: ET.Element, _namespace: str, _rule: dict[str, Any]) -> list[Finding]:
+    findings: list[Finding] = []
+    for element in root.iter():
+        text = (element.text or "").strip()
+        if text.startswith("=") and "Globals!TotalPages" in text:
+            findings.append({
+                "object": "Globals!TotalPages",
+                "message": "Globals!TotalPages slows PDF and image rendering",
+            })
+    return findings
+
+
+def _check_lay03_sub01_subreport_in_tablix(
+    root: ET.Element, _namespace: str, _rule: dict[str, Any]
+) -> list[Finding]:
+    """Registered only under LAY-03's catalog entry -- SUB-01 detects the
+    exact same thing, so this produces one finding per offending
+    Subreport, tagged with both IDs, rather than being dispatched twice.
+    """
+    return [
+        {
+            "rule": "LAY-03/SUB-01",
+            "object": subreport.get("Name") or tablix.get("Name") or "?",
+            "message": (
+                "Subreport nested inside a Tablix runs once per row -- use a "
+                "nested data region, or a drillthrough link when rows are many"
+            ),
+        }
+        for tablix in root.iter("Tablix")
+        for subreport in tablix.iter("Subreport")
+    ]
+
+
+def _check_lay04_interactive_sort(root: ET.Element, _namespace: str, _rule: dict[str, Any]) -> list[Finding]:
+    return [
+        {
+            "object": textbox.get("Name") or "?",
+            "message": "UserSort on a textbox enables interactive sort -- use only when actually wanted",
+        }
+        for textbox in root.iter("Textbox")
+        if textbox.find("UserSort") is not None
+    ]
+
+
+def _check_lay05_large_reports_page_breaks(
+    root: ET.Element, _namespace: str, _rule: dict[str, Any]
+) -> list[Finding]:
+    findings: list[Finding] = []
+    for tablix in root.iter("Tablix"):
+        groups = list(tablix.iter("Group"))
+        if not groups:
+            continue
+        has_page_break = any(group.find("PageBreak/BreakLocation") is not None for group in groups)
+        if not has_page_break:
+            findings.append({
+                "object": tablix.get("Name") or "?",
+                "message": (
+                    "no Group/PageBreak/BreakLocation configured -- nothing shows "
+                    "until the whole report renders on a large dataset"
+                ),
+            })
+    return findings
+
+
+def _check_lay06_avoid_embedded_images(root: ET.Element, _namespace: str, _rule: dict[str, Any]) -> list[Finding]:
+    embedded_message = (
+        "EmbeddedImages/EmbeddedImage bloats the file and is hard to update -- prefer External or Database"
+    )
+    inline_message = "Image/Source=Embedded bloats the file and is hard to update -- prefer External or Database"
+    findings: list[Finding] = [
+        {"object": embedded.get("Name") or "?", "message": embedded_message}
+        for embedded in root.findall(".//EmbeddedImages/EmbeddedImage")
+    ]
+    findings.extend(
+        {"object": image.get("Name") or "?", "message": inline_message}
+        for image in root.iter("Image")
+        if (image.findtext("Source") or "").strip().lower() == "embedded"
+    )
+    return findings
+
+
+_DEFAULT_SUB02_MAX_SUBREPORTS = 49  # "50 or more" fails; 49 is the highest passing count
+
+
+def _check_sub02_subreport_count(root: ET.Element, _namespace: str, rule: dict[str, Any]) -> list[Finding]:
+    max_subreports = rule.get("max_subreports", _DEFAULT_SUB02_MAX_SUBREPORTS)
+    count = len(root.findall(".//Subreport"))
+    if count > max_subreports:
+        return [{
+            "object": f"{count} subreports",
+            "message": f"{count} Subreport elements -- 50 or more fail to render in the service",
+        }]
+    return []
+
+
 CHECKS.update({
     "STR-01": _check_str01_current_schema,
     "DS-01": _check_ds01_shared_data_source,
@@ -546,6 +700,13 @@ CHECKS.update({
     "PRM-03": _check_prm03_parameter_count,
     "PRM-04": _check_prm04_multivalue_nullable,
     "PRM-05": _check_prm05_show_parameter_values,
+    "LAY-01": _check_lay01_body_fits_page,
+    "LAY-02": _check_lay02_avoid_total_pages,
+    "LAY-03": _check_lay03_sub01_subreport_in_tablix,
+    "LAY-04": _check_lay04_interactive_sort,
+    "LAY-05": _check_lay05_large_reports_page_breaks,
+    "LAY-06": _check_lay06_avoid_embedded_images,
+    "SUB-02": _check_sub02_subreport_count,
 })
 
 
@@ -565,10 +726,16 @@ def build_test_results(
     shown here; `findings` itself carries all of them. A row's message is
     the finding's own text when it fired, or the catalog's rule
     description otherwise -- readable either way, never a bare status word.
+
+    A finding's own "rule" can name more than one ID, "/"-separated
+    (LAY-03/SUB-01's shared check) -- indexed under each of them here, so
+    both catalog rows show the one real finding rather than one showing
+    it and the other showing an unrelated "skip".
     """
     hits_by_rule: dict[str, list[Finding]] = {}
     for finding in findings:
-        hits_by_rule.setdefault(finding["rule"], []).append(finding)
+        for rule_id in finding["rule"].split("/"):
+            hits_by_rule.setdefault(rule_id, []).append(finding)
 
     rows = []
     for rule in catalog:
