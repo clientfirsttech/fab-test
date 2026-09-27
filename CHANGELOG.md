@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-09-27
+
+- ✨ - RDL Static Analysis - `fab-test rdl` is a new analyzer for paginated (`.rdl`) reports: 28 Tier A rules covering structure/schema, data sources, query pushdown, parameters, layout/subreports, and accessibility (`plan/rdl-rule-set.md`), implemented in pure Python with no external tool or runtime dependency — `doctor` always reports it ready. Discovery of flat-file artifacts (`*.rdl`, not a `*.Type/` folder) is now generic in `discover_artifacts`, not specific to `playwright`. Tuned via a `rules.rdl` overlay in `fab-test.yml`, same shape as `bpa`/`pbir`. Included in `fab-test all`/`fab-test local` by default. Two real defects found live against the repository's own sample artifacts and fixed before landing: `PaginatedExample-LocalSemanticModel.rdl` had a genuinely unused dataset (DS-02), and `fab-test all` was handing `rdl` PBIR Inspector's own rules file instead of its own, because `all`'s subparser already dedicates `--rules-path` to `pbir` — fixed with a dedicated `--rdl-rules-path`, the same shape `bpa` already has for the same reason. Version bumped to `1.7.0.dev1`.
+
 ## 2026-09-18
 
 - ✨ - PBIR Visual Filter Hidden And Locked - The core PBIR rules now require visual-level filters to be hidden and locked in view mode whenever the filter pane is enabled. The rules remain independent error findings, treat an omitted pane visibility value as Power BI's default enabled state, and traverse only visual filters so page- and report-level consumer controls remain outside the policy. ThinReport fixtures and focused contracts guard the hidden-only, locked-only, neither-state, default-pane, and visual-scope behavior.

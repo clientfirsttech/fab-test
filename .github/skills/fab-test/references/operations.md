@@ -43,6 +43,11 @@ fab-test-results/
       envelope.json
       native.json     ← full pql-test JSON (model_path, passed, failed, results[])
       report.html     ← generated, only with --report
+  rdl/
+    <artifact-stem>/
+      envelope.json
+      native.json     ← the raw findings list, before test_results is built
+      report.html     ← generated, only with --report
   playwright/
     <artifact-stem-or-report-name>/
       envelope.json
@@ -66,7 +71,7 @@ Optional keys — **absent, never null**, so a consumer tests presence:
 | `started_at` | UTC ISO-8601 wall-clock time the run started. `duration_ms` says how long; this says when. |
 
 
-For `pql_test`, the envelope also contains `test_results` (full result array from pql-test, native shape). For `bpa`, it contains one entry per rule TE2 evaluated (`RuleName`/`RuleID`/`Severity`/`Category`/`ObjectName` plus a computed `status` of `pass`/`error`/`warning`), passed and failed alike — unlike `findings`, which stays failure-only. `pbir` matches the same idea in the shared `rule`/`severity`/`object`/`message` shape (each with a `status`), so telemetry can see every rule PBIR Inspector evaluated, not only the ones that failed — `pbir`'s own `TestRun.html` still has its own filter UI, so this field feeds telemetry, not the shared report's full-list filter, for that analyzer specifically. `playwright` uses the pql-test-shaped `test_results` too (one row per generated report x page x bookmark case), plus an `evidence` map per row (`screenshot`/`console`/`network` paths, whichever exist) that the shared renderer turns into links when `--report` is on (see the `playwright` section in [Flags](flags.md)). All four are `[]` when the analyzer produced no per-test breakdown.
+For `pql_test`, the envelope also contains `test_results` (full result array from pql-test, native shape). For `bpa`, it contains one entry per rule TE2 evaluated (`RuleName`/`RuleID`/`Severity`/`Category`/`ObjectName` plus a computed `status` of `pass`/`error`/`warning`), passed and failed alike — unlike `findings`, which stays failure-only. `pbir` matches the same idea in the shared `rule`/`severity`/`object`/`message` shape (each with a `status`), so telemetry can see every rule PBIR Inspector evaluated, not only the ones that failed — `pbir`'s own `TestRun.html` still has its own filter UI, so this field feeds telemetry, not the shared report's full-list filter, for that analyzer specifically. `rdl` matches `pbir`'s shape exactly: one row per catalog rule (all 28), `status` one of `pass`/`skip`/`warning`/`error` — `skip` covers both a disabled rule and one with no check implemented yet, distinguished only by the row's own `message` (the catalog's rule description either way). `playwright` uses the pql-test-shaped `test_results` too (one row per generated report x page x bookmark case), plus an `evidence` map per row (`screenshot`/`console`/`network` paths, whichever exist) that the shared renderer turns into links when `--report` is on (see the `playwright` section in [Flags](flags.md)). All five are `[]` when the analyzer produced no per-test breakdown.
 
 `status` values: `passed` | `failed` | `warning` | `skipped` | `error` | `timeout` | `dry-run`.
 

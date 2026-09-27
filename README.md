@@ -207,6 +207,10 @@ fab-test pbir --inspector-path "/path/to/PBIRInspectorCLI"
 # by default -- add "a11y" to fab_test_all in analyzers.json to opt in.
 fab-test a11y
 
+# Run the 28 Tier A rules against paginated (.rdl) reports -- pure Python,
+# no external tool, always ready. Included in `fab-test all` by default.
+fab-test rdl
+
 # Run pql-test DAX tests
 fab-test pql-test --env DEV
 
