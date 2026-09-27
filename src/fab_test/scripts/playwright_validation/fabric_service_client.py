@@ -317,24 +317,15 @@ def build_fabric_service_client(
        a partially-set service principal (e.g. tenant_id but no secret) is
        treated as a mistake, not silently overridden by ambient auth.
     """
-    from .config import _parse_env_file
+    from .config import _parse_env_file, resolve_env_file
 
-    env_path = None
-    if env_file is not None:
-        env_path = Path(env_file).resolve()
-        env_values = _parse_env_file(env_path)
-    else:
-        env_values = {}
+    # The same search probe_credentials reports from, so `auth status` never
+    # verifies one identity and then tests reachability as another.
+    env_path = resolve_env_file(env_file)
+    env_values = _parse_env_file(env_path)
 
     def _get(name: str, explicit: str) -> str:
-        if explicit:
-            return explicit
-        env_value = os.getenv(name, "")
-        if env_value:
-            return env_value
-        if env_path is not None:
-            return env_values.get(name, "")
-        return ""
+        return explicit or os.getenv(name, "") or env_values.get(name, "")
 
     tenant_id = _get("FABRIC_TENANT_ID", tenant_id)
     client_id = _get("FABRIC_CLIENT_ID", client_id) or _get(

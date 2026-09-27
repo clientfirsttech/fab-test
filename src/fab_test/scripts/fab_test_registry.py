@@ -20,7 +20,7 @@ from ._analyzer_tool_bootstrap import (
     probe_executable,
     resolve_executable,
 )
-from ._credentials import probe_credentials
+from ._credentials import configured_workspace, probe_credentials
 from ._desktop import (
     DesktopMatchError,
     desktop_ports,
@@ -174,9 +174,7 @@ def unsupported_type_error(name: str, target: ResolvedTarget | None) -> str | No
         return None
 
     others = tuple(
-        analyzer
-        for analyzer in _suffix_to_analyzers().get(f".{target.type}", ())
-        if analyzer not in HIDDEN_ANALYZERS
+        analyzer for analyzer in _suffix_to_analyzers().get(f".{target.type}", ()) if analyzer not in HIDDEN_ANALYZERS
     )
     opening = f"{name} reads {handled} artifacts; '{target.raw}' is a {target.type}"
     if not others:
@@ -201,9 +199,7 @@ _DESKTOP_CAPABLE_ANALYZERS = {"pql_test"}
 # Which variables actually resolve a credential lives in _credentials.py,
 # the single chain both `doctor` and `auth status` read. This is only the
 # phrasing used when no workspace is set and there is nothing to probe yet.
-_SERVICE_PRINCIPAL_HINT = (
-    "FABRIC_TENANT_ID, FABRIC_SERVICE_PRINCIPAL_ID, and FABRIC_SERVICE_PRINCIPAL_SECRET"
-)
+_SERVICE_PRINCIPAL_HINT = "FABRIC_TENANT_ID, FABRIC_SERVICE_PRINCIPAL_ID, and FABRIC_SERVICE_PRINCIPAL_SECRET"
 
 # Maps fab-test subcommand name to the matching analyzer registry key in
 # .github/metadata/analyzers.json.
@@ -353,8 +349,7 @@ def build_bpa_command(
 ) -> list[str]:
     """Build the Tabular Editor BPA command for ``artifact``."""
     te_path = getattr(args, "_resolved_tool_path", None) or (
-        getattr(args, "tabular_editor_path", None)
-        or _env("TABULAR_EDITOR_PATH", _DEFAULT_TE_PATH)
+        getattr(args, "tabular_editor_path", None) or _env("TABULAR_EDITOR_PATH", _DEFAULT_TE_PATH)
     )
     rules_path = _resolve_bpa_rules_path(args, output_dir)
     output = output_dir / "bpa" / artifact.stem / "envelope.json"
@@ -380,8 +375,7 @@ def build_pbir_command(
 ) -> list[str]:
     """Build the PBIR Inspector command for ``artifact``."""
     inspector = getattr(args, "_resolved_tool_path", None) or (
-        getattr(args, "inspector_path", None)
-        or _env("PBIR_INSPECTOR_PATH", _DEFAULT_INSPECTOR_PATH)
+        getattr(args, "inspector_path", None) or _env("PBIR_INSPECTOR_PATH", _DEFAULT_INSPECTOR_PATH)
     )
     rules_path = _resolve_pbir_rules_path(args, output_dir)
     output = output_dir / "pbir" / artifact.stem / "envelope.json"
@@ -570,9 +564,7 @@ def _report_type_for_command(artifact: Path, args: argparse.Namespace) -> str:
     return _LOCAL_SUFFIX_TO_REPORT_TYPE.get(artifact.suffix, "")
 
 
-def _dataset_override_for_command(
-    artifact: Path, args: argparse.Namespace
-) -> tuple[str, str]:
+def _dataset_override_for_command(artifact: Path, args: argparse.Namespace) -> tuple[str, str]:
     """Return ``(dataset_id, dataset_workspace_id)`` to force on the
     subprocess, or ``("", "")`` for either half to let it resolve normally.
 
@@ -609,12 +601,7 @@ def _report_parameters_for_command(artifact: Path, args: argparse.Namespace) -> 
     parameters = parse_rdl_report_parameters(artifact)
     if not parameters:
         return ""
-    return json.dumps(
-        [
-            {"name": parameter.name, "multi_value": parameter.multi_value}
-            for parameter in parameters
-        ]
-    )
+    return json.dumps([{"name": parameter.name, "multi_value": parameter.multi_value} for parameter in parameters])
 
 
 def build_playwright_command(
@@ -624,6 +611,11 @@ def build_playwright_command(
 ) -> list[str]:
     """Build the Playwright validation command for ``artifact``."""
     output = output_dir / "playwright" / artifact.stem / "envelope.json"
+    # A dataset-targeted run disambiguates two dependent reports that share a
+    # display name (different IDs, different workspaces) by giving the
+    # synthetic Path its own unique stem; the real name Fabric knows the
+    # report by still has to reach --artifact for it to resolve at all.
+    report_name = (getattr(args, "playwright_report_names", None) or {}).get(artifact.stem, artifact.stem)
     cmd = [
         sys.executable,
         "-m",
@@ -631,20 +623,21 @@ def build_playwright_command(
         "--output-path",
         str(output),
         "--artifact",
-        artifact.stem,
+        report_name,
         "--test-cases-dir",
         str(playwright_test_cases_dir(output_dir, artifact)),
     ]
     env_file = getattr(args, "playwright_env_file", None)
     if env_file:
         cmd += ["--env-file", str(env_file)]
-    env = getattr(args, "environment", "") or __import__("os").getenv(
-        "FABRIC_ENVIRONMENT", ""
-    )
+    env = getattr(args, "environment", "") or __import__("os").getenv("FABRIC_ENVIRONMENT", "")
     if env:
         cmd += ["--env", env]
-    workspace_id = getattr(args, "workspace_id", "") or __import__("os").getenv(
-        "FABRIC_WORKSPACE_ID", ""
+    # A dataset-targeted run's dependents each live in their own workspace.
+    workspace_id = (
+        (getattr(args, "playwright_report_workspaces", None) or {}).get(artifact.stem)
+        or getattr(args, "workspace_id", "")
+        or __import__("os").getenv("FABRIC_WORKSPACE_ID", "")
     )
     if workspace_id:
         cmd += ["--workspace-id", workspace_id]
@@ -691,14 +684,10 @@ def build_playwright_impact_command(
     env_file = getattr(args, "playwright_env_file", None)
     if env_file:
         cmd += ["--env-file", str(env_file)]
-    env = getattr(args, "environment", "") or __import__("os").getenv(
-        "FABRIC_ENVIRONMENT", ""
-    )
+    env = getattr(args, "environment", "") or __import__("os").getenv("FABRIC_ENVIRONMENT", "")
     if env:
         cmd += ["--env", env]
-    workspace_id = getattr(args, "workspace_id", "") or __import__("os").getenv(
-        "FABRIC_WORKSPACE_ID", ""
-    )
+    workspace_id = getattr(args, "workspace_id", "") or __import__("os").getenv("FABRIC_WORKSPACE_ID", "")
     if workspace_id:
         cmd += ["--workspace-id", workspace_id]
     output_path = getattr(args, "output_path", None)
@@ -723,14 +712,10 @@ def build_dependencies_command(
     env_file = getattr(args, "playwright_env_file", None)
     if env_file:
         cmd += ["--env-file", str(env_file)]
-    env = getattr(args, "environment", "") or __import__("os").getenv(
-        "FABRIC_ENVIRONMENT", ""
-    )
+    env = getattr(args, "environment", "") or __import__("os").getenv("FABRIC_ENVIRONMENT", "")
     if env:
         cmd += ["--env", env]
-    workspace_id = getattr(args, "workspace_id", "") or __import__("os").getenv(
-        "FABRIC_WORKSPACE_ID", ""
-    )
+    workspace_id = getattr(args, "workspace_id", "") or __import__("os").getenv("FABRIC_WORKSPACE_ID", "")
     if workspace_id:
         cmd += ["--workspace-id", workspace_id]
     output_path = getattr(args, "output_path", None)
@@ -829,8 +814,7 @@ def _cloud_readiness(name: str, args: argparse.Namespace | None) -> dict[str, An
     whether the workspace is genuinely *reachable* is `auth status`'s
     question, not this one's.
     """
-    workspace_id = (getattr(args, "workspace_id", "") or "") if args is not None else ""
-    workspace_id = workspace_id or _env("FABRIC_WORKSPACE_ID")
+    workspace_id = configured_workspace(args, playwright=name != "pql_test")
 
     if workspace_id:
         status = probe_credentials()
@@ -845,7 +829,8 @@ def _cloud_readiness(name: str, args: argparse.Namespace | None) -> dict[str, An
                 "ready": False,
                 "resolved_path": None,
                 "reason": f"workspace configured; playwright needs a full service principal ({status.detail})",
-                "remediation": status.remediation or (
+                "remediation": status.remediation
+                or (
                     "set FABRIC_TENANT_ID, FABRIC_CLIENT_ID (or "
                     "FABRIC_SERVICE_PRINCIPAL_ID), and FABRIC_CLIENT_SECRET "
                     "(or FABRIC_SERVICE_PRINCIPAL_SECRET) in the environment "
@@ -880,17 +865,13 @@ def _cloud_readiness(name: str, args: argparse.Namespace | None) -> dict[str, An
             "remediation": None,
         }
 
-    remediation = (
-        f"Set FABRIC_WORKSPACE_ID (or pass --workspace-id) plus {_SERVICE_PRINCIPAL_HINT}"
-    )
+    remediation = f"Set FABRIC_WORKSPACE_ID (or pass --workspace-id) plus {_SERVICE_PRINCIPAL_HINT}"
     if desktop_capable:
         return {
             "ready": False,
             "resolved_path": None,
             "reason": "no workspace, credentials, or running Desktop instance",
-            "remediation": (
-                f"{remediation}; or open the .pbip in Power BI Desktop to run locally"
-            ),
+            "remediation": (f"{remediation}; or open the .pbip in Power BI Desktop to run locally"),
         }
     return {
         "ready": False,

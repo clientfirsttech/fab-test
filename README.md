@@ -214,6 +214,10 @@ fab-test pql-test --env DEV
 # see "Playwright: the minimal working config" below)
 fab-test playwright --artifact "Not Working Visuals" --env dev --env-file .env
 
+# Test only the reports built on one dataset (looked up live in the
+# dataset's workspace and, if set, the --workspace-id workspace)
+fab-test playwright --dataset-id <DATASET_GUID> --dataset-workspace-id <WORKSPACE_GUID>
+
 # Discover reports that depend on a deployed semantic model
 fab-test dependencies --semantic-model SalesModel --env dev --env-file .env
 ```

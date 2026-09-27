@@ -178,7 +178,7 @@ def _run_local(args: argparse.Namespace) -> int:
         code = _run_analyzer(name, args, output_dir, manifest, telemetry)
         results.append({"analyzer": name, "status": "ran", "exit_code": code})
 
-    exit_code = 1 if any(r.get("exit_code", 0) != 0 for r in results) else 0
+    exit_code = max((r.get("exit_code", 0) for r in results), default=0)
     # Flushed before the manifest is written so run.json can record whether
     # this run's telemetry landed.
     manifest.telemetry_error = _close_telemetry(telemetry, args)
