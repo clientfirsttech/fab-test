@@ -35,6 +35,28 @@ TEST_HARD = 900
 # test_the_ceiling_is_not_left_slack_after_a_cleanup in
 # test_complexity_budget.py.
 EXEMPTIONS: dict[str, tuple[int, str]] = {
+    "src/fab_test/scripts/_rdl_lint.py": (
+        832,
+        (
+            "2026-09-27: born over the hard budget adding ACC-01/02/03/08, "
+            "the eighth and final Tier A rule-implementation task in the RDL "
+            "Static Analysis epic -- 28 check functions across six rule "
+            "families (structure/data-source, query, parameters, layout/"
+            "subreport, accessibility), one function per rule ID, the same "
+            "shape fab_test_parser.py's own exemption already argues for "
+            "('one function per subcommand keeps each piece small; "
+            "splitting the module further would cut across that seam rather "
+            "than with it'). Growth here is bounded within this epic: Tier B "
+            "and Tier C rules (plan/rdl-rule-set.md) are explicitly out of "
+            "scope, and the remaining epic task (documentation) adds no "
+            "code. If a future epic implements Tier B/C rules and this file "
+            "keeps growing, split then along the same family lines "
+            "tests/_rdl_lint_fixtures.py and tests/test_rdl_lint_*.py "
+            "already use -- one _rdl_checks_<family>.py per family, "
+            "_rdl_lint.py keeping only the core engine (RDL Static Analysis "
+            "epic)."
+        ),
+    ),
     "src/fab_test/scripts/fab_test_parser.py": (
         1079,
         (

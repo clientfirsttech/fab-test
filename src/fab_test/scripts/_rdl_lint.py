@@ -683,6 +683,75 @@ def _check_sub02_subreport_count(root: ET.Element, _namespace: str, rule: dict[s
     return []
 
 
+# --------------------------------------------------------------------------- #
+# Accessibility rules (ACC-01, ACC-02, ACC-03, ACC-08)
+# --------------------------------------------------------------------------- #
+
+# Tablix is excluded here even though it's a report item like the rest --
+# ACC-03 already covers a missing Tablix/ToolTip specifically, and a
+# Tablix with none should be one finding (ACC-03), not two.
+_ALT_TEXT_ELEMENTS = ("Image", "Chart", "GaugePanel", "Map")
+
+
+def _check_acc01_alt_text(root: ET.Element, _namespace: str, _rule: dict[str, Any]) -> list[Finding]:
+    return [
+        {
+            "object": element.get("Name") or "?",
+            "message": f"{tag} has no ToolTip -- screen readers get nothing in the service or Accessible PDF",
+        }
+        for tag in _ALT_TEXT_ELEMENTS
+        for element in root.iter(tag)
+        if not (element.findtext("ToolTip") or "").strip()
+    ]
+
+
+_PLACEHOLDER_CHART_NAME = re.compile(r"(?i)^chart\d*$")
+
+
+def _check_acc02_chart_alt_text_quality(root: ET.Element, _namespace: str, _rule: dict[str, Any]) -> list[Finding]:
+    findings: list[Finding] = []
+    for chart in root.iter("Chart"):
+        tooltip = (chart.findtext("ToolTip") or "").strip()
+        if not tooltip:
+            continue  # missing entirely is ACC-01's concern, not ACC-02's
+        if tooltip.startswith("="):
+            continue  # an expression's wording can't be judged statically
+        name = chart.get("Name") or ""
+        if tooltip == name or _PLACEHOLDER_CHART_NAME.match(tooltip):
+            findings.append({
+                "object": name or "?",
+                "message": f"ToolTip '{tooltip}' looks like a placeholder, not a description of what the chart shows",
+            })
+    return findings
+
+
+def _check_acc03_table_caption(root: ET.Element, _namespace: str, _rule: dict[str, Any]) -> list[Finding]:
+    return [
+        {
+            "object": tablix.get("Name") or "?",
+            "message": "Tablix has no ToolTip -- add a caption summarising what the table conveys",
+        }
+        for tablix in root.iter("Tablix")
+        if not (tablix.findtext("ToolTip") or "").strip()
+    ]
+
+
+def _check_acc08_html_link_alt_text(root: ET.Element, _namespace: str, _rule: dict[str, Any]) -> list[Finding]:
+    findings: list[Finding] = []
+    for textbox in root.iter("Textbox"):
+        has_html_run = any(
+            (run.findtext("MarkupType") or "").strip().lower() == "html" for run in textbox.iter("TextRun")
+        )
+        if not has_html_run:
+            continue
+        if not (textbox.findtext("ToolTip") or "").strip():
+            findings.append({
+                "object": textbox.get("Name") or "?",
+                "message": "renders an HTML TextRun (a hyperlink) but has no ToolTip",
+            })
+    return findings
+
+
 CHECKS.update({
     "STR-01": _check_str01_current_schema,
     "DS-01": _check_ds01_shared_data_source,
@@ -707,6 +776,10 @@ CHECKS.update({
     "LAY-05": _check_lay05_large_reports_page_breaks,
     "LAY-06": _check_lay06_avoid_embedded_images,
     "SUB-02": _check_sub02_subreport_count,
+    "ACC-01": _check_acc01_alt_text,
+    "ACC-02": _check_acc02_chart_alt_text_quality,
+    "ACC-03": _check_acc03_table_caption,
+    "ACC-08": _check_acc08_html_link_alt_text,
 })
 
 
