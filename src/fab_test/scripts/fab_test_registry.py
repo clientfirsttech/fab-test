@@ -568,16 +568,22 @@ def _dataset_override_for_command(artifact: Path, args: argparse.Namespace) -> t
     """Return ``(dataset_id, dataset_workspace_id)`` to force on the
     subprocess, or ``("", "")`` for either half to let it resolve normally.
 
-    Explicit ``--dataset-id``/``--dataset-workspace-id`` always win. Otherwise,
-    a discovered ``.rdl`` file's own ``PBIDATASET`` data source already names
-    the dataset it queries and the workspace that dataset lives in -- the
-    caller should never have to already know and supply a GUID fab-test can
-    read directly out of a file already checked into the repository. The
-    workspace half is passed through as whatever the ``.rdl`` file recorded
-    (a display name, not necessarily a GUID); ``--dataset-workspace-id``
-    already resolves either transparently on the subprocess side.
+    A per-report dataset ID wins first: "every dataset in a workspace" mode
+    (`--dataset-workspace-id` alone) can span more than one dataset in a
+    single run, so `args.dataset_id` alone cannot describe which dataset
+    *this* report is bound to -- see `playwright_report_datasets` in
+    `_playwright_dataset_target.py`. Otherwise explicit
+    ``--dataset-id``/``--dataset-workspace-id`` win. Otherwise, a discovered
+    ``.rdl`` file's own ``PBIDATASET`` data source already names the dataset
+    it queries and the workspace that dataset lives in -- the caller should
+    never have to already know and supply a GUID fab-test can read directly
+    out of a file already checked into the repository. The workspace half is
+    passed through as whatever the ``.rdl`` file recorded (a display name,
+    not necessarily a GUID); ``--dataset-workspace-id`` already resolves
+    either transparently on the subprocess side.
     """
-    dataset_id = getattr(args, "dataset_id", "") or ""
+    per_report_dataset = (getattr(args, "playwright_report_datasets", None) or {}).get(artifact.stem)
+    dataset_id = per_report_dataset or getattr(args, "dataset_id", "") or ""
     dataset_workspace_id = getattr(args, "dataset_workspace_id", "") or ""
     if dataset_id or dataset_workspace_id or artifact.suffix != ".rdl":
         return dataset_id, dataset_workspace_id
