@@ -48,6 +48,11 @@ on:
         default: "auto"
         type: choice
         options: ["auto", "none"]
+      test_rls:
+        description: "Enable RLS role testing (sets PLAYWRIGHT_USE_RLS and PLAYWRIGHT_USER_NAME from the fabric-demo Environment's secret) -- without it, an RLS-secured dataset's GenerateToken call always fails with 'requires effective identity to be provided'"
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   playwright-demo:
@@ -58,19 +63,31 @@ jobs:
     environment: fabric-demo
     # Pre-bundles Chromium/Firefox/WebKit and their OS deps, skipping
     # `playwright install --with-deps` (usually the slowest step here).
-    # The tag's Playwright version must match the pip package pyproject.toml
-    # installs below (currently unpinned -> latest, 1.62.0 as of this pin) --
-    # https://playwright.dev/python/docs/docker: mismatched driver/browser
-    # versions fail at fixture setup. Bump this tag whenever that drifts.
+    # `playwright` is unpinned in pyproject.toml, so it floats to whatever's
+    # latest on pip -- this tag drifting out of lockstep with that (a new
+    # release shipped between two runs of this same workflow) broke a real
+    # dispatch with "BrowserType.launch: Executable doesn't exist at
+    # /ms-playwright/chromium_headless_shell-<rev>/...": the image's own
+    # baked browser revision didn't match the newly-installed driver's.
+    # PLAYWRIGHT_PIN below forces the install to this exact version instead
+    # of trusting pyproject.toml's unpinned constraint -- bump both together.
     # --user 1001: runs Chromium unsandboxed-but-non-root per Playwright's
     # own CI guide (https://playwright.dev/python/docs/ci).
     container:
-      image: mcr.microsoft.com/playwright/python:v1.62.0-noble
+      image: mcr.microsoft.com/playwright/python:v1.63.0-noble
       options: --user 1001
     env:
+      PLAYWRIGHT_PIN: "1.63.0"
       FABRIC_TENANT_ID: ${{ secrets.FABRIC_TENANT_ID }}
       FABRIC_CLIENT_ID: ${{ secrets.FABRIC_CLIENT_ID }}
       FABRIC_CLIENT_SECRET: ${{ secrets.FABRIC_CLIENT_SECRET }}
+      # Off by default: `generate_test_cases` only discovers RLS roles when
+      # PLAYWRIGHT_USE_RLS is set, and without a PLAYWRIGHT_USER_NAME
+      # GenerateToken rejects any RLS-secured dataset outright ("requires
+      # effective identity to be provided") -- both stay unset unless
+      # test_rls opts in.
+      PLAYWRIGHT_USE_RLS: ${{ inputs.test_rls }}
+      PLAYWRIGHT_USER_NAME: ${{ inputs.test_rls && secrets.PLAYWRIGHT_USER_NAME || '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -83,7 +100,10 @@ jobs:
       # declared in pyproject.toml's [project.optional-dependencies].dev,
       # so one install covers fab-test and everything Playwright needs.
       # The browsers themselves come from the container image above, not
-      # from this install.
+      # from this install -- "playwright==$PLAYWRIGHT_PIN" overrides
+      # pyproject.toml's unpinned constraint so the installed driver always
+      # matches the browser revision the image baked in, in case a newer
+      # release ships on pip between this file's own edits.
       #
       # --user: uid 1001 (set by the container's --user 1001 above) can't
       # write to the site-packages actions/setup-python installed as
@@ -92,7 +112,7 @@ jobs:
       # doesn't include, hence appending its bin dir to GITHUB_PATH here.
       - name: Install fab-test from the checkout
         run: |
-          pip install --user -e ".[dev]"
+          pip install --user -e ".[dev]" "playwright==$PLAYWRIGHT_PIN"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       # `doctor` has no `--workspace-id` flag and no visibility into --env /
