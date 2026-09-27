@@ -105,7 +105,7 @@ def merged_file_config(
     return {**pyproject_config, **yaml_config}, warnings
 
 
-_RULE_OVERLAY_ANALYZERS = ("bpa", "pbir")
+_RULE_OVERLAY_ANALYZERS = ("bpa", "pbir", "rdl")
 _RULE_OVERLAY_KEYS: dict[str, type] = {"disable": list, "severity": dict, "extend": str}
 
 

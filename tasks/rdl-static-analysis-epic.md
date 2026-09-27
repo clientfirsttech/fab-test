@@ -1,6 +1,6 @@
 # RDL Static Analysis Epic
 
-**Status**: 📋 PLANNED
+**Status**: 🔄 IN-PROGRESS (1/8 tasks: rule catalog and analyzer skeleton)
 **Goal**: `fab-test rdl` runs the 28 Tier A rules from [plan/rdl-rule-set.md](../plan/rdl-rule-set.md) against local `.rdl` files, with no workspace and no new dependency.
 
 ## Overview
@@ -8,6 +8,10 @@
 Paginated reports are the only report type fab-test finds but never checks: `.rdl` files are read only to feed Playwright's rendering, so unused datasets, report-side filters and joins, page overflow, invalid parameter combinations, and missing alt text all surface after publish, if at all. No upstream analyzer reads RDL (Fab Inspector is PBIR/JSON only), so like `prompt_lint` this is an in-house analyzer. The checks are written in Python on stdlib `xml.etree`, and a JSON rule catalog holds each rule's ID, severity, source, and disabled flag, tuned through the same `rules.<analyzer>` overlay in `fab-test.yml` that BPA and PBIR use. Envelope, exit code, HTML report, CI annotations, and telemetry all follow the existing analyzer contract. Tier B (heuristic) and Tier C (cross-file, service, or manual) rules are left for follow-up epics.
 
 ---
+
+## Fixture policy
+
+Each remaining task adds one or a small set of real `.rdl` fixtures to `.fabric/artifacts/` — named for what they exercise (e.g. `PaginatedExample-SubreportInTablix.rdl`) — alongside the checks that read them, mirroring `PaginatedExample-BrokenRDL.rdl` and the existing broken-visuals samples. Real Report Builder output over hand-typed XML wherever the user can supply it; synthesized (an edited copy of an existing sample) otherwise. Fixtures land with their task, not ahead of it — a fixture with no check yet reading it goes stale silently. These feed both the `rdl` marker's contract tests and `fab-test rdl` used as a demo.
 
 ## Rule catalog and analyzer skeleton
 

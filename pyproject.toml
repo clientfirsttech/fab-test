@@ -210,6 +210,9 @@ max-args = 8
 # orchestrator, not a scanner, and the exemption meant each new blind except
 # landed unexamined. Its three are now justified individually.
 "src/fab_test/scripts/invoke_tabular_editor_bpa.py" = ["S314"]
+# .rdl is the local artifact fab-test was asked to analyze -- same trust
+# boundary as a .pbip/.tmdl file, not untrusted network input.
+"src/fab_test/scripts/_rdl_lint.py" = ["S314"]
 # Tests: asserts are the point, stub callables ignore their arguments, fake
 # credentials are not secrets, and sys.path setup runs before imports.
 "tests/**" = [

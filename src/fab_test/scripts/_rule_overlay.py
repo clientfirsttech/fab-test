@@ -5,9 +5,10 @@ An overlay never forks an upstream rules file -- it applies deltas
 one rule out of dozens never means committing a forked copy that then
 drifts from upstream forever.
 
-BPA (`apply_overlay`) and PBIR Inspector (`apply_pbir_overlay`) use
-genuinely different rule-file shapes, so each gets its own function
-rather than forcing one shape-detecting function to do both:
+BPA (`apply_overlay`), PBIR Inspector (`apply_pbir_overlay`), and RDL
+(`apply_rdl_overlay`) use genuinely different rule-file shapes, so each
+gets its own function rather than forcing one shape-detecting function to
+do all three:
 
 - BPA: a bare JSON array of rule objects keyed by `"ID"`, numeric
   `"Severity"` (Tabular Editor's own scale: 1 = info, 2 = warning,
@@ -19,6 +20,12 @@ rather than forcing one shape-detecting function to do both:
   rather than passed through unverified). Disabling sets `"disabled": true`
   in place -- the format's own documented convention -- rather than
   removing the rule.
+- RDL (fab-test's own in-house catalog): `{"rules": [...]}`, each rule
+  keyed by `"id"`, with its own `"disabled"` boolean and a `"severity"`
+  string already using the envelope's own vocabulary
+  (`"error"`/`"warning"`/`"info"`) -- unlike PBIR's `logType`, all three
+  labels are accepted since nothing about the catalog rules them out.
+  Disabling sets `"disabled": true` in place, same as PBIR.
 """
 
 from __future__ import annotations
@@ -122,6 +129,53 @@ def apply_pbir_overlay(upstream_path: Path, overlay: dict[str, Any]) -> dict[str
                     f"(expected one of: {', '.join(sorted(_PBIR_LOG_TYPES))})"
                 )
             rule["logType"] = label
+        resolved_rules.append(rule)
+
+    extend_path = overlay.get("extend")
+    if extend_path:
+        extra = json.loads(Path(extend_path).read_text(encoding="utf-8"))
+        resolved_rules.extend(extra.get("rules", []) if isinstance(extra, dict) else extra)
+
+    return {**data, "rules": resolved_rules}
+
+
+def apply_rdl_overlay(upstream_path: Path, overlay: dict[str, Any]) -> dict[str, Any]:
+    """Apply ``overlay`` to the RDL rules document at ``upstream_path``
+    (``{"rules": [...]}``), returning the resolved document. Never mutates
+    or rewrites ``upstream_path``.
+
+    Same ``overlay`` keys and disable convention as ``apply_pbir_overlay``,
+    but ``severity`` sets the catalog's own ``"severity"`` field directly,
+    and accepts any of the envelope's three labels
+    (``"error"``/``"warning"``/``"info"``) -- the RDL catalog has no
+    PBIR-style restriction to rule out ``"info"``.
+    """
+    data = json.loads(upstream_path.read_text(encoding="utf-8"))
+    rules = data.get("rules", [])
+    known_ids = {rule["id"] for rule in rules}
+
+    disable_ids = set(overlay.get("disable", []))
+    severity_map = overlay.get("severity", {})
+    unmatched = sorted((disable_ids | severity_map.keys()) - known_ids)
+    if unmatched:
+        raise RuleOverlayError(
+            f"overlay names rule ID(s) not found in {upstream_path.name}: "
+            f"{', '.join(unmatched)}"
+        )
+
+    resolved_rules = []
+    for original_rule in rules:
+        rule = dict(original_rule)
+        if rule["id"] in disable_ids:
+            rule["disabled"] = True
+        label = severity_map.get(rule["id"])
+        if label is not None:
+            if label not in _SEVERITY_LABELS:
+                raise RuleOverlayError(
+                    f"unknown severity label '{label}' for rule '{rule['id']}' "
+                    f"(expected one of: {', '.join(_SEVERITY_LABELS)})"
+                )
+            rule["severity"] = label
         resolved_rules.append(rule)
 
     extend_path = overlay.get("extend")

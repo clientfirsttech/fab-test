@@ -489,8 +489,20 @@ def test_validate_config_accepts_a_full_valid_rules_overlay():
         "rules": {
             "bpa": {"disable": ["RULE_A"], "severity": {"RULE_B": "warning"}, "extend": "extra.json"},
             "pbir": {"disable": ["RULE_C"]},
+            "rdl": {"disable": ["DS-02"], "severity": {"QRY-07": "info"}},
         }
     })  # must not raise
+
+
+@pytest.mark.fab_test
+def test_schema_rules_analyzers_match_the_overlay_allowlist():
+    """The schema's rules.<analyzer> keys and _RULE_OVERLAY_ANALYZERS can't drift --
+    an analyzer added to one without the other either rejects a valid config
+    (schema) or accepts one the loader then rejects anyway (validator)."""
+    schema = json.loads(_SCHEMA_PATH.read_text(encoding="utf-8"))
+    from fab_test.scripts._config import _RULE_OVERLAY_ANALYZERS
+
+    assert set(schema["properties"]["rules"]["properties"].keys()) == set(_RULE_OVERLAY_ANALYZERS)
 
 
 @pytest.mark.fab_test
