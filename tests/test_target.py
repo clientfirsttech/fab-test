@@ -249,3 +249,15 @@ def test_the_type_list_comes_from_the_map_not_the_code():
     root = Path(__file__).resolve().parent.parent
 
     assert len(artifact_types(root)) >= 9
+
+
+@pytest.mark.fab_test
+def test_rdl_type_suffix_parses_even_though_it_is_not_in_the_artifact_map():
+    """Sales.rdl -- a paginated report is a flat file, not a
+    NAME.PaginatedReport/ folder, so "rdl" is not a value in
+    artifact-map.json the way "SemanticModel"/"Report" are. It still needs
+    to parse as a typed target rather than raise "unknown artifact type"."""
+    target = parse_target("Sales.rdl")
+
+    assert target.name == "Sales"
+    assert target.type == "rdl"

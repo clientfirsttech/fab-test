@@ -118,6 +118,96 @@ def test_desktop_target_filters_by_name_like_a_stem(artifact_tree):
 
 
 # --------------------------------------------------------------------------- #
+# discover_artifacts -- flat-file globs (a paginated report is NAME.rdl, not
+# a folder with a Fabric type suffix)
+# --------------------------------------------------------------------------- #
+
+
+@pytest.fixture
+def rdl_tree(tmp_path):
+    """A repository root holding one .rdl file and one unrelated .Report folder."""
+    (tmp_path / "Sales.rdl").write_text("<Report />", encoding="utf-8")
+    (tmp_path / "Sales.Report").mkdir()
+    return tmp_path
+
+
+@pytest.mark.fab_test
+def test_no_target_discovers_every_rdl_file(rdl_tree):
+    """The flat-file path mirrors the folder path: no target, no filtering."""
+    found = discover_artifacts(rdl_tree, "*.rdl", None)
+
+    assert [p.name for p in found] == ["Sales.rdl"]
+
+
+@pytest.mark.fab_test
+def test_bare_name_target_selects_the_matching_rdl_file(rdl_tree):
+    """A bare name filters a flat file by stem the same way it filters a folder."""
+    found = discover_artifacts(rdl_tree, "*.rdl", parse_target("Sales"))
+
+    assert [p.name for p in found] == ["Sales.rdl"]
+
+
+@pytest.mark.fab_test
+def test_rdl_typed_target_selects_the_file(rdl_tree):
+    """Sales.rdl -- the explicit NAME.Type form -- selects that one file."""
+    found = discover_artifacts(rdl_tree, "*.rdl", parse_target("Sales.rdl"))
+
+    assert [p.name for p in found] == ["Sales.rdl"]
+
+
+@pytest.mark.fab_test
+def test_a_folder_typed_target_selects_nothing_for_the_rdl_glob(rdl_tree):
+    """Sales.Report names a different shape of artifact entirely; rdl reads
+    flat files only."""
+    found = discover_artifacts(rdl_tree, "*.rdl", parse_target("Sales.Report"))
+
+    assert found == []
+
+
+@pytest.mark.fab_test
+def test_path_target_selects_exactly_that_rdl_file(rdl_tree):
+    """An explicit path to a flat file is used directly, mirroring the folder case."""
+    target = parse_target(str(rdl_tree / "Sales.rdl"))
+
+    found = discover_artifacts(rdl_tree, "*.rdl", target)
+
+    assert [p.name for p in found] == ["Sales.rdl"]
+
+
+@pytest.mark.fab_test
+def test_path_target_naming_a_folder_does_not_match_the_rdl_glob(rdl_tree):
+    """A path target's own shape must still agree with the glob's shape --
+    pointing at a folder for a flat-file analyzer matches nothing."""
+    target = parse_target(str(rdl_tree / "Sales.Report"))
+
+    assert discover_artifacts(rdl_tree, "*.rdl", target) == []
+
+
+@pytest.mark.fab_test
+def test_the_rdl_run_output_directory_is_not_rediscovered(tmp_path):
+    """Mirrors the folder-analyzer case: results land in a folder named
+    after the artifact, which must not itself be rediscovered as one."""
+    real = tmp_path / "Sales.rdl"
+    real.write_text("<Report />", encoding="utf-8")
+    results = tmp_path / "fab-test-results" / "rdl"
+    results.mkdir(parents=True)
+    (results / "Sales.rdl").write_text("stale", encoding="utf-8")
+
+    found = discover_artifacts(tmp_path, "*.rdl", None, output_dir=tmp_path / "fab-test-results")
+
+    assert found == [real.resolve()]
+
+
+@pytest.mark.fab_test
+def test_folder_based_discovery_is_unchanged_by_flat_file_support(artifact_tree):
+    """The existing *.SemanticModel/*.Report path must behave exactly as
+    before -- flat-file support is an addition, not a rewrite."""
+    found = discover_artifacts(artifact_tree, "*.SemanticModel", None)
+
+    assert {p.name for p in found} == {"Sales.SemanticModel", "Other.SemanticModel"}
+
+
+# --------------------------------------------------------------------------- #
 # select_target
 # --------------------------------------------------------------------------- #
 

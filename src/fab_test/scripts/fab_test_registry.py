@@ -20,6 +20,7 @@ from ._analyzer_tool_bootstrap import (
     probe_executable,
     resolve_executable,
 )
+from ._artifact_types import load_artifact_map
 from ._credentials import configured_workspace, probe_credentials
 from ._desktop import (
     DesktopMatchError,
@@ -31,7 +32,7 @@ from ._metadata import ANALYZERS, BPA_RULES, PBIR_RULES, default_repo_root, meta
 from ._pbip_discovery import discover_pbip_projects
 from ._report_html import resolve_report
 from ._rule_overlay import apply_overlay, apply_pbir_overlay
-from ._scan import find_artifact_dirs
+from ._scan import find_artifact_dirs, find_files_by_suffix
 from ._target import ResolvedTarget
 from .playwright_validation.rdl_datasource import (
     parse_rdl_power_bi_datasource,
@@ -280,18 +281,30 @@ def discover_artifacts(
     wrong. Every other scope narrows the scan by name, and by type when
     the target carries one — which is how ``Sales.SemanticModel`` stops
     selecting ``Sales.Report``.
+
+    A glob can name either a Fabric folder type (``*.SemanticModel``) or a
+    flat-file suffix (``*.rdl`` — a paginated report is a single file, not
+    a folder with a Fabric type suffix). Which shape it is comes from
+    ``artifact-map.json``: a suffix declared there is a folder; anything
+    else is a file. Both paths share the rest of this function's
+    filtering, so a flat-file analyzer gets the same target/path/type
+    narrowing a folder one already has.
     """
+    suffix = glob.lstrip("*")
+    is_folder_suffix = suffix in load_artifact_map(REPO_ROOT)
+
     if target is not None and target.path is not None:
         resolved = target.path.resolve()
-        return [resolved] if resolved.is_dir() and resolved.name.endswith(glob.lstrip("*")) else []
+        matches_shape = resolved.is_dir() if is_folder_suffix else resolved.is_file()
+        return [resolved] if matches_shape and resolved.name.endswith(suffix) else []
 
     if not artifact_dir.exists():
         return []
-    suffix = glob.lstrip("*")
-    artifacts = find_artifact_dirs(
-        artifact_dir,
-        (suffix,),
-        excluded_paths=[output_dir] if output_dir is not None else (),
+    excluded_paths = [output_dir] if output_dir is not None else ()
+    artifacts = (
+        find_artifact_dirs(artifact_dir, (suffix,), excluded_paths=excluded_paths)
+        if is_folder_suffix
+        else find_files_by_suffix(artifact_dir, suffix, excluded_paths=excluded_paths)
     )
     if target is None:
         return artifacts
