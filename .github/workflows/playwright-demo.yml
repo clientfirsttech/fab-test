@@ -15,9 +15,9 @@ on:
   workflow_dispatch:
     inputs:
       artifact:
-        description: "Report name (default: a known-good report). Leave blank with dataset_workspace_id alone to run every dataset in the workspace."
+        description: "Report name to test. Leave blank with dataset_workspace_id alone to run every dataset in the workspace."
         required: false
-        default: "SampleModel-PQLAssert"
+        default: ""
       dataset_id:
         description: "Semantic model ID -- tests every report built on it instead of one named report"
         required: false
@@ -56,6 +56,17 @@ jobs:
     # Protected Environment: required reviewers gate every dispatch, and
     # only this Environment's secrets are visible to the job.
     environment: fabric-demo
+    # Pre-bundles Chromium/Firefox/WebKit and their OS deps, skipping
+    # `playwright install --with-deps` (usually the slowest step here).
+    # The tag's Playwright version must match the pip package pyproject.toml
+    # installs below (currently unpinned -> latest, 1.62.0 as of this pin) --
+    # https://playwright.dev/python/docs/docker: mismatched driver/browser
+    # versions fail at fixture setup. Bump this tag whenever that drifts.
+    # --user 1001: runs Chromium unsandboxed-but-non-root per Playwright's
+    # own CI guide (https://playwright.dev/python/docs/ci).
+    container:
+      image: mcr.microsoft.com/playwright/python:v1.62.0-noble
+      options: --user 1001
     env:
       FABRIC_TENANT_ID: ${{ secrets.FABRIC_TENANT_ID }}
       FABRIC_CLIENT_ID: ${{ secrets.FABRIC_CLIENT_ID }}
@@ -71,30 +82,61 @@ jobs:
       # pytest, pytest-playwright, pytest-html, and pytest-xdist are all
       # declared in pyproject.toml's [project.optional-dependencies].dev,
       # so one install covers fab-test and everything Playwright needs.
+      # The browsers themselves come from the container image above, not
+      # from this install.
+      #
+      # --user: uid 1001 (set by the container's --user 1001 above) can't
+      # write to the site-packages actions/setup-python installed as
+      # whatever uid provisioned it, so `fab-test`'s console-script lands
+      # under $HOME/.local instead -- which the container's default PATH
+      # doesn't include, hence appending its bin dir to GITHUB_PATH here.
       - name: Install fab-test from the checkout
-        run: pip install -e ".[dev]"
+        run: |
+          pip install --user -e ".[dev]"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
-      - name: Install the browser
-        run: playwright install --with-deps chromium
-
-      # Credential-only here: workspace readiness for --env is resolved
-      # from environments.yml by the real run below, which `doctor` has no
-      # visibility into. A `workspace_id` override makes this row fully
-      # accurate too.
+      # `doctor` has no `--workspace-id` flag and no visibility into --env /
+      # environments.yml, so it reports every cloud analyzer as "no
+      # workspace ... resolved" and exits 1 even when the service principal
+      # is fully configured -- resolve the same workspace the run step below
+      # will use and export it as FABRIC_WORKSPACE_ID (the one source
+      # `doctor` does read) so this row reflects the real run.
       - name: Confirm the service principal is ready
-        run: fab-test doctor
+        env:
+          FABRIC_WORKSPACE_ID: ${{ inputs.workspace_id }}
+        run: |
+          if [ -z "$FABRIC_WORKSPACE_ID" ]; then
+            export FABRIC_WORKSPACE_ID=$(python - <<'PY'
+          from fab_test.scripts.playwright_validation.resolver import (
+              ServiceResolutionError,
+              resolve_environment,
+          )
 
+          override = "${{ inputs.dataset_workspace_id }}"
+          try:
+              print(resolve_environment("${{ inputs.environment }}", workspace_id_override=override).workspace_id)
+          except ServiceResolutionError:
+              pass
+          PY
+          )
+          fi
+          fab-test doctor
+
+      # Bash arrays (`args=(...)`), not POSIX -- the container image above
+      # runs steps under `sh`, not `bash`, and `sh -e {0}` chokes on that
+      # syntax with "Syntax error: ( unexpected". `set --` builds the same
+      # variable-length arg list with plain POSIX positional parameters.
       - name: Run fab-test playwright
         id: playwright
         run: |
-          args=(--env "${{ inputs.environment }}")
-          [ -n "${{ inputs.artifact }}" ] && args+=(--artifact "${{ inputs.artifact }}")
-          [ -n "${{ inputs.dataset_id }}" ] && args+=(--dataset-id "${{ inputs.dataset_id }}")
-          [ -n "${{ inputs.dataset_workspace_id }}" ] && args+=(--dataset-workspace-id "${{ inputs.dataset_workspace_id }}")
-          [ -n "${{ inputs.workspace_id }}" ] && args+=(--workspace-id "${{ inputs.workspace_id }}")
-          [ "${{ inputs.pages }}" = "none" ] && args+=(--pages none)
-          [ "${{ inputs.roles }}" = "none" ] && args+=(--roles none)
-          fab-test playwright "${args[@]}" --report
+          set -- --env "${{ inputs.environment }}"
+          [ -n "${{ inputs.artifact }}" ] && set -- "$@" --artifact "${{ inputs.artifact }}"
+          [ -n "${{ inputs.dataset_id }}" ] && set -- "$@" --dataset-id "${{ inputs.dataset_id }}"
+          [ -n "${{ inputs.dataset_workspace_id }}" ] && set -- "$@" --dataset-workspace-id "${{ inputs.dataset_workspace_id }}"
+          [ -n "${{ inputs.workspace_id }}" ] && set -- "$@" --workspace-id "${{ inputs.workspace_id }}"
+          [ "${{ inputs.pages }}" = "none" ] && set -- "$@" --pages none
+          [ "${{ inputs.roles }}" = "none" ] && set -- "$@" --roles none
+          fab-test playwright "$@" --report
 
       # Always -- the failed run is the one you most want to read. Every
       # case's own evidence lives under playwright/<report>/test-cases/**;
