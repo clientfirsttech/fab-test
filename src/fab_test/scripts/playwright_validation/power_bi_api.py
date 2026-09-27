@@ -201,20 +201,24 @@ def generate_embed_token(
         payload["targetWorkspaces"] = [{"id": wid} for wid in target_workspace_ids]
         payload["accessLevel"] = "View"
 
-    if use_rls and user_name:
-        # An empty `role` still needs an identity attached: a dataset can
-        # require an effective identity without naming any role at all (a
-        # tenant-wide "mandatory identity" policy, or a model whose roles
-        # couldn't be discovered -- e.g. a non-PBIP-enabled semantic model,
-        # where TMDL-based discovery finds nothing). GenerateToken accepts
-        # "roles": [] for exactly this case; omitting identities outright
-        # gets "requires effective identity to be provided" instead,
-        # confirmed live. Requiring `role` too (as this used to) meant no
-        # such dataset could ever mint a token when no role was discovered.
+    if use_rls and user_name and role:
+        # Tried dropping the `role` requirement here (attach an identity
+        # with "roles": [] whenever a dataset's role couldn't be discovered)
+        # to handle a mandatory-identity, no-named-role dataset -- reverted
+        # after a live run proved it a net regression: Power BI rejected
+        # every *non*-RLS dataset with "shouldn't have effective identity"
+        # (6 reports that previously passed), while the RLS-secured
+        # datasets this was meant to fix still failed, now with "requires
+        # roles to be included in provided effective identity" instead --
+        # they have real named roles that discovery isn't finding, so an
+        # empty roles list was never going to satisfy them either. Fixing
+        # this needs the role discovery itself, not a looser guard here --
+        # see "Discover RLS roles for non-PBIP-enabled semantic models" in
+        # tasks/playwright-ci-guide-epic.md.
         payload["identities"] = [
             {
                 "username": user_name,
-                "roles": [role] if role else [],
+                "roles": [role],
                 "datasets": [identity.dataset_id],
             }
         ]
