@@ -68,3 +68,20 @@ requirement above: `--dataset-workspace-id` alone stops being an error and becom
   matching the existing empty-dependents behavior for a single named dataset
 - Given the reports discovered this way, should cover RDL/paginated reports exactly as `--dataset-id` mode
   already does -- a semantic model's dependents are not only interactive `Report` items
+
+**Done 2026-09-26.** `dataset_workspace_only_requested`/`resolve_dataset_workspace_targets` and
+`dataset_workspace_artifact_requested`/`resolve_dataset_workspace_artifact` in
+`_playwright_dataset_target.py`, wired into `_discover_for`'s `_playwright_service_resolved_target`
+and its local-discovery-miss fallback. `--env` fills in via `_resolve_target_workspace`, scoped to these
+two modes only -- the literal `--dataset-workspace-id` flag still gates the trigger, so a plain batch
+run with nothing local is never reinterpreted as "every dataset in this workspace." Each report's own
+dataset ID is carried per-stem (`REPORT_DATASETS_ATTR`), since one "every dataset" run can span several
+datasets where the single-dataset mode only ever needed one shared ID. 23 tests in
+`tests/test_playwright_dataset_target.py`. Live-verified against a real workspace: `--dataset-workspace-id`
+alone found 2 semantic models and ran both dependents; `--artifact "Not Working Visuals"` (not a dataset)
+refined to that one report -- the exact scenario originally reported; `--artifact "SampleModel-PQLAssert"`
+(also a dataset name) ran that one dataset's dependent instead. One observation, not a regression: the
+live workspace's "Not Working Visuals" report was not returned as any dataset's dependent by
+`get_dependent_reports`, so "every dataset" mode didn't include it even though `--artifact` resolves it
+fine directly -- pre-existing behavior of the already-shipped dependents lookup, not something this task
+changed.

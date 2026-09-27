@@ -230,24 +230,133 @@ def test_two_dependents_sharing_a_display_name_both_survive(local_reports) -> No
         assert cmd[cmd.index("--artifact") + 1] == "Sales"
 
 
-def test_dataset_workspace_alone_refuses_before_any_local_report_runs(local_reports, capsys) -> None:
-    """The reported bug: --dataset-workspace-id with no --dataset-id used to
-    force every locally discovered report onto that (commonly inaccessible)
-    workspace instead of refusing."""
+def _client_with_models(models_by_workspace: dict[str, list[dict]], dependents: dict[str, list[dict]]) -> MagicMock:
+    """A client that also lists semantic models, keyed by (workspace_id, dataset_id)
+    for dependents so two models in the same workspace return different reports."""
+    client = MagicMock()
+    client.list_items.side_effect = lambda workspace_id, item_type: (
+        models_by_workspace.get(workspace_id, []) if item_type == "SemanticModel" else []
+    )
+    client.get_dependent_reports.side_effect = lambda workspace_id, dataset_id: dependents.get(
+        (workspace_id, dataset_id), []
+    )
+    return client
+
+
+def _model(model_id: str, name: str) -> dict:
+    return {"id": model_id, "displayName": name, "type": "SemanticModel"}
+
+
+def test_dataset_workspace_alone_runs_every_semantic_models_dependents(local_reports) -> None:
+    """--dataset-workspace-id alone, superseding the old refusal: every
+    semantic model in the workspace, each one's own dependents."""
     args = _args(local_reports, dataset_id="")
+    client = _client_with_models(
+        {DATASET_WS: [_model("m1", "Sales Model"), _model("m2", "Marketing Model")]},
+        {
+            (DATASET_WS, "m1"): [_dep("r1", "Sales", DATASET_WS)],
+            (DATASET_WS, "m2"): [_dep("r2", "Marketing", DATASET_WS)],
+        },
+    )
+
+    with patch(_CLIENT, return_value=client):
+        artifacts = _discover_for("playwright", args, "*.Report")
+
+    assert {a.name for a in artifacts} == {"Sales.Report", "Marketing.Report"}
+
+
+def test_dataset_workspace_alone_each_report_carries_its_own_datasets_id(local_reports) -> None:
+    """Unlike single-dataset mode, dependents of different models in the same
+    workspace need different --dataset-id overrides per report."""
+    args = _args(local_reports, dataset_id="")
+    client = _client_with_models(
+        {DATASET_WS: [_model("m1", "Sales Model"), _model("m2", "Marketing Model")]},
+        {
+            (DATASET_WS, "m1"): [_dep("r1", "Sales", DATASET_WS)],
+            (DATASET_WS, "m2"): [_dep("r2", "Marketing", DATASET_WS)],
+        },
+    )
+
+    with patch(_CLIENT, return_value=client):
+        artifacts = _discover_for("playwright", args, "*.Report")
+
+    commands = {a.stem: build_playwright_command(a, args, Path(args.output_dir)) for a in artifacts}
+    assert commands["Sales"][commands["Sales"].index("--dataset-id") + 1] == "m1"
+    assert commands["Marketing"][commands["Marketing"].index("--dataset-id") + 1] == "m2"
+
+
+def test_dataset_workspace_alone_no_semantic_models_exits_zero_with_notice(local_reports, capsys) -> None:
+    args = _args(local_reports, dataset_id="")
+    client = _client_with_models({}, {})
+
+    with patch(_CLIENT, return_value=client):
+        assert _run_analyzer("playwright", args, Path(args.output_dir)) == 0
+
+    assert DATASET_WS in capsys.readouterr().out
+
+
+def test_dataset_workspace_alone_no_dependents_exits_zero_with_notice(local_reports, capsys) -> None:
+    """Semantic models exist, but none has a dependent report -- still exit 0."""
+    args = _args(local_reports, dataset_id="")
+    client = _client_with_models({DATASET_WS: [_model("m1", "Sales Model")]}, {})
+
+    with patch(_CLIENT, return_value=client):
+        assert _run_analyzer("playwright", args, Path(args.output_dir)) == 0
+
+    assert DATASET_WS in capsys.readouterr().out
+
+
+def test_dataset_workspace_alone_still_needs_a_workspace_from_somewhere(local_reports, monkeypatch, capsys) -> None:
+    """No --dataset-workspace-id, no --workspace-id/env var/fab-test.yml, no
+    --env: this mode never triggers at all (falls into ordinary batch
+    discovery), so a plain `fab-test playwright` run is never hijacked into
+    workspace-wide dataset discovery just because nothing local matched."""
+    monkeypatch.delenv("FABRIC_WORKSPACE_ID", raising=False)
+    args = _args(local_reports, dataset_id="", dataset_workspace_id="")
 
     with patch(_CLIENT) as build_client:
-        assert _run_analyzer("playwright", args, Path(args.output_dir)) == 2
+        artifacts = _discover_for("playwright", args, "*.Report")
 
     build_client.assert_not_called()
-    err = capsys.readouterr().err
-    assert "--dataset-workspace-id" in err
-    assert "--dataset-id" in err
+    assert {a.name for a in artifacts} == {"Sales.Report", "Unrelated.Report"}
 
 
-def test_dataset_workspace_alone_with_an_artifact_keeps_the_binding_override(local_reports) -> None:
-    """A single --artifact run may legitimately point only the workspace half
-    of an auto-detected dataset elsewhere; unaffected by the batch refusal."""
+def test_dataset_workspace_and_artifact_refines_to_the_report_when_name_is_not_a_dataset(tmp_path) -> None:
+    """--dataset-workspace-id X --artifact NAME, no local match, and NAME is
+    not a dataset in X: resolves as a normal single-report target, with the
+    workspace stashed as a fallback -- closes the reported "no *.Report
+    artifacts found" gap for a caller who only knows the dataset's workspace."""
+    args = _args(tmp_path, dataset_id="", artifact="EscapeRoom-Results")
+    client = _client_with_models({DATASET_WS: []}, {})
+
+    with patch(_CLIENT, return_value=client):
+        artifacts = _discover_for("playwright", args, "*.Report")
+
+    assert artifacts == [Path("EscapeRoom-Results")]
+    assert args.workspace_id == DATASET_WS
+
+
+def test_dataset_workspace_and_artifact_runs_the_named_datasets_dependents_when_name_is_a_dataset(tmp_path) -> None:
+    """--dataset-workspace-id X --artifact NAME where NAME resolves to a
+    SemanticModel in X: runs that one dataset's dependents, named by display
+    name instead of --dataset-id."""
+    args = _args(tmp_path, dataset_id="", artifact="EscapeRoom-Results")
+    client = _client_with_models(
+        {DATASET_WS: [_model("ds-9", "EscapeRoom-Results")]},
+        {(DATASET_WS, "ds-9"): [_dep("r1", "EscapeRoom-Results Summary", DATASET_WS)]},
+    )
+
+    with patch(_CLIENT, return_value=client):
+        artifacts = _discover_for("playwright", args, "*.Report")
+
+    assert artifacts == [Path("EscapeRoom-Results Summary.Report")]
+    assert args.dataset_id == "ds-9"
+
+
+def test_dataset_workspace_alone_with_an_artifact_and_a_real_local_match_is_left_alone(local_reports) -> None:
+    """A report that already exists locally is used as-is -- the new
+    Fabric-side report-vs-dataset disambiguation is a last resort, only
+    reached once local discovery under --artifact-dir finds nothing."""
     args = _args(local_reports, dataset_id="", artifact="Sales")
 
     with patch(_CLIENT) as build_client:
@@ -265,3 +374,52 @@ def test_dataset_workspace_alone_with_an_impact_manifest_keeps_todays_behavior(l
 
     assert artifacts == [Path(".")]
     build_client.assert_not_called()
+
+
+def test_resolve_target_workspace_falls_back_to_env_via_environments_yml(local_reports, monkeypatch) -> None:
+    """--env alone (no --dataset-workspace-id, no --workspace-id) is enough to
+    drive both new workspace-only modes, resolved the same way every other
+    workspace-consuming flag already resolves an environment label."""
+    from fab_test.scripts._playwright_dataset_target import _resolve_target_workspace
+    from fab_test.scripts.playwright_validation.resolver import ResolvedEnvironment
+
+    args = _args(local_reports, dataset_workspace_id="", environment="dev")
+    monkeypatch.setattr(
+        "fab_test.scripts.playwright_validation.resolver.resolve_environment",
+        lambda env, **_kw: ResolvedEnvironment(environment=env, workspace_id=DATASET_WS),
+    )
+
+    assert _resolve_target_workspace(args) == DATASET_WS
+
+
+def test_resolve_target_workspace_prefers_dataset_workspace_id_over_env(local_reports, monkeypatch) -> None:
+    from fab_test.scripts._playwright_dataset_target import _resolve_target_workspace
+
+    args = _args(local_reports, environment="dev")
+
+    def _fail_if_called(*_a, **_kw):
+        raise AssertionError("must not resolve environments.yml when --dataset-workspace-id is set")
+
+    monkeypatch.setattr(
+        "fab_test.scripts.playwright_validation.resolver.resolve_environment", _fail_if_called
+    )
+
+    assert _resolve_target_workspace(args) == DATASET_WS
+
+
+def test_resolve_target_workspace_empty_when_env_resolution_fails(local_reports, monkeypatch) -> None:
+    """A bad --env label (unknown environment, missing environments.yml) is a
+    graceful "no workspace known" here, not a crash -- the caller reports it."""
+    from fab_test.scripts._playwright_dataset_target import _resolve_target_workspace
+    from fab_test.scripts.playwright_validation.resolver import ServiceResolutionError
+
+    args = _args(local_reports, dataset_workspace_id="", environment="staging")
+
+    def _raise(*_a, **_kw):
+        raise ServiceResolutionError("Unknown environment 'staging'.")
+
+    monkeypatch.setattr(
+        "fab_test.scripts.playwright_validation.resolver.resolve_environment", _raise
+    )
+
+    assert _resolve_target_workspace(args) == ""

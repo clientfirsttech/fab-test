@@ -1,4 +1,5 @@
-"""Dataset-targeted Playwright runs: the reports built on one dataset.
+"""Dataset-targeted Playwright runs: the reports built on one dataset, or on
+every dataset in a workspace.
 
 `fab-test playwright --dataset-id X` with no report named used to fall into
 batch discovery -- every local report under `--artifact-dir`, each one
@@ -6,11 +7,22 @@ force-rebound to dataset X. Naming a dataset without naming a report now
 means "the reports that depend on it", resolved live, one synthetic
 `NAME.Report` target per dependent so each still gets its own subprocess,
 envelope, and summary row (Playwright Dataset Target epic).
+
+`--dataset-workspace-id` alone -- no `--dataset-id`, no report named -- used
+to refuse outright, and `--dataset-workspace-id` with a bare `--artifact`
+that had no local match fell into ordinary discovery with no way to resolve
+the workspace, reporting "no *.Report artifacts found" even though the
+service principal could see the report fine. Both are real behavior now:
+a lone `--dataset-workspace-id` means "every dataset in this workspace",
+and pairing it with `--artifact NAME` refines to that one report or that
+one dataset's reports, whichever `NAME` turns out to be (Playwright Dataset
+Target epic, live use against a real workspace).
 """
 
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -18,15 +30,17 @@ from ._cli_utils import narrate
 from ._credentials import configured_workspace
 from ._target import target_from_args
 
-# `args` attributes build_playwright_command reads back, both keyed by each
-# synthetic target's stem: the workspace the report lives in (dependents of
-# one dataset can live in more than one workspace), and the report's real
-# display name when that differs from the stem -- two distinct reports (
-# different IDs, different workspaces) can share a display name, and the
-# stem is disambiguated for the synthetic Path while --artifact still needs
-# the real name to resolve.
+# `args` attributes build_playwright_command reads back, all keyed by each
+# synthetic target's stem: the workspace the report lives in and its real
+# display name (dependents of one dataset can live in more than one
+# workspace, and two distinct reports -- different IDs, different
+# workspaces -- can share a display name, so the stem is disambiguated for
+# the synthetic Path while --artifact still needs the real name to
+# resolve), and -- only when a single run can span more than one dataset,
+# i.e. "every dataset in a workspace" -- the dataset each report is bound to.
 REPORT_WORKSPACES_ATTR = "playwright_report_workspaces"
 REPORT_NAMES_ATTR = "playwright_report_names"
+REPORT_DATASETS_ATTR = "playwright_report_datasets"
 
 
 class DatasetTargetExit(Exception):
@@ -50,37 +64,213 @@ def dataset_target_requested(args: argparse.Namespace) -> bool:
     )
 
 
-def refuse_dataset_workspace_without_dataset_id(args: argparse.Namespace) -> None:
-    """Refuse a batch run left ambiguous by `--dataset-workspace-id` alone.
+def _resolve_target_workspace(args: argparse.Namespace) -> str:
+    """Best-known workspace for the two workspace-only modes below.
 
-    `_dataset_override_for_command` applies an explicit
-    `--dataset-workspace-id` unconditionally, to every artifact discovery
-    finds -- with no `--dataset-id` to say *which* dataset it names the
-    workspace of, and no `--artifact`/target/`--impact-manifest` naming one
-    report either, that would force every locally discovered report onto
-    that workspace instead, commonly one the caller's service principal has
-    no access to at all. Raises before any artifact runs; a single-report
-    override (`--artifact`, a target, or `--impact-manifest`) is unaffected.
+    In order: `--dataset-workspace-id`, then `--workspace-id` /
+    `FABRIC_WORKSPACE_ID` / `workspace:` in fab-test.yml (`configured_workspace`),
+    then `--env` resolved through `environments.yml` -- the same fallback
+    chain every other workspace-consuming flag already honors, so `--env`
+    alone is enough to drive either mode. Does not raise: a resolution
+    failure here just means "no workspace known", for the caller to report.
+    """
+    workspace = getattr(args, "dataset_workspace_id", "") or configured_workspace(args, playwright=True)
+    if workspace:
+        return workspace
+    environment = getattr(args, "environment", "") or os.getenv("FABRIC_ENVIRONMENT", "")
+    if not environment:
+        return ""
+
+    from .playwright_validation.resolver import ServiceResolutionError, resolve_environment
+
+    try:
+        return resolve_environment(environment).workspace_id
+    except ServiceResolutionError:
+        return ""
+
+
+def dataset_workspace_only_requested(args: argparse.Namespace) -> bool:
+    """True when `--dataset-workspace-id` is given and nothing else narrows
+    the run to one dataset or one report -- every semantic model in that
+    workspace gets its own dependents run.
+
+    Keyed off the literal `--dataset-workspace-id` flag, not `--env`: a
+    plain `fab-test playwright --env dev` batch run with nothing local to
+    discover must not be silently reinterpreted as "every dataset in this
+    workspace" -- that would hijack an ordinary, long-working invocation.
+    """
+    return bool(
+        getattr(args, "dataset_workspace_id", "")
+        and not getattr(args, "dataset_id", "")
+        and not getattr(args, "impact_manifest", None)
+        and target_from_args(args) is None
+    )
+
+
+def resolve_dataset_workspace_targets(args: argparse.Namespace) -> list[Path]:
+    """Return one synthetic ``NAME.Report`` target per report dependent on
+    *any* semantic model in the named workspace.
+
+    Mirrors `resolve_dataset_targets` below, but for every dataset in the
+    workspace at once rather than one named by `--dataset-id` -- each
+    dependent report is tagged with its own dataset's ID (`REPORT_DATASETS_ATTR`),
+    since two reports in this list can be bound to two different datasets.
 
     Raises:
-        DatasetTargetExit: 2, always, when called for an ambiguous batch.
+        DatasetTargetExit: 2 when no workspace names where to look, 1 when
+            a lookup fails.
     """
-    if (
-        not getattr(args, "dataset_workspace_id", "")
-        or getattr(args, "dataset_id", "")
-        or getattr(args, "impact_manifest", None)
-        or target_from_args(args) is not None
-    ):
-        return
-    workspace_id = args.dataset_workspace_id
-    print(
-        f"  ✗ fab-test playwright: --dataset-workspace-id {workspace_id} with no --dataset-id "
-        "would force every locally discovered report onto that workspace's dataset instead of "
-        "targeting one. Pass --dataset-id too (to test that dataset's own reports), or --artifact "
-        "NAME / a target (to override one report's dataset workspace).",
-        file=sys.stderr,
+    output_format = getattr(args, "output_format", "text")
+    workspace_id = _resolve_target_workspace(args)
+    if not workspace_id:
+        print(
+            "  ✗ fab-test playwright: --dataset-workspace-id names no workspace to find its "
+            "semantic models in. Pass --dataset-workspace-id, --workspace-id / "
+            "FABRIC_WORKSPACE_ID, or --env (resolved via environments.yml).",
+            file=sys.stderr,
+        )
+        raise DatasetTargetExit(2)
+
+    from .playwright_validation.fabric_service_client import (
+        FabricServiceClientError,
+        build_fabric_service_client,
     )
-    raise DatasetTargetExit(2)
+    from .playwright_validation.resolver import ServiceResolutionError, resolve_workspace_id
+
+    try:
+        client = build_fabric_service_client(env_file=getattr(args, "playwright_env_file", None))
+        workspace_id = resolve_workspace_id(client, workspace_id)
+        models = client.list_items(workspace_id, "SemanticModel")
+    except (FabricServiceClientError, ServiceResolutionError) as exc:
+        print(
+            f"  ✗ fab-test playwright: could not list semantic models in workspace {workspace_id}: {exc}",
+            file=sys.stderr,
+        )
+        raise DatasetTargetExit(1) from exc
+
+    if not models:
+        narrate(
+            f"  ⚠ fab-test playwright: no semantic models found in workspace {workspace_id}",
+            output_format=output_format,
+        )
+        return []
+
+    reports: dict[str, tuple[str, str, str]] = {}  # report id -> (name, workspace id, dataset id)
+    try:
+        for model in models:
+            model_id = model.get("id", "")
+            for dep in client.get_dependent_reports(workspace_id, model_id):
+                reports.setdefault(
+                    dep["id"],
+                    (dep.get("displayName") or dep["id"], dep.get("workspaceId") or workspace_id, model_id),
+                )
+    except FabricServiceClientError as exc:
+        print(
+            f"  ✗ fab-test playwright: could not list dependent reports in workspace {workspace_id}: {exc}",
+            file=sys.stderr,
+        )
+        raise DatasetTargetExit(1) from exc
+
+    if not reports:
+        narrate(
+            f"  ⚠ fab-test playwright: {len(models)} semantic model(s) in workspace {workspace_id}, "
+            "none with dependent reports",
+            output_format=output_format,
+        )
+        return []
+
+    report_workspaces, report_names, report_datasets = _disambiguate_stems_with_dataset(reports)
+    setattr(args, REPORT_WORKSPACES_ATTR, report_workspaces)
+    setattr(args, REPORT_NAMES_ATTR, report_names)
+    setattr(args, REPORT_DATASETS_ATTR, report_datasets)
+    stems = list(report_workspaces)
+    narrate(
+        f"  fab-test playwright: {len(models)} semantic model(s), {len(stems)} report(s) in "
+        f"workspace {workspace_id}: " + ", ".join(stems),
+        output_format=output_format,
+    )
+    return [Path(f"{stem}.Report") for stem in stems]
+
+
+def dataset_workspace_artifact_requested(args: argparse.Namespace) -> bool:
+    """True when `--dataset-workspace-id` is given with a bare artifact/target
+    and no `--dataset-id` -- eligible for `resolve_dataset_workspace_artifact`'s
+    Fabric-side report-vs-dataset disambiguation.
+
+    Mirrors `_playwright_remote_target`'s own guard: a real filesystem path
+    (`./src/Sales.Report`) is left alone, since naming a specific location
+    and finding nothing there is a real miss, not a signal to look remotely.
+    """
+    target = target_from_args(args)
+    if target is None or target.scope not in ("path", "workspace"):
+        return False
+    if target.scope == "path" and target.path is not None:
+        return False
+    return bool(
+        getattr(args, "dataset_workspace_id", "")
+        and not getattr(args, "dataset_id", "")
+        and not getattr(args, "impact_manifest", None)
+    )
+
+
+def resolve_dataset_workspace_artifact(args: argparse.Namespace) -> list[Path] | None:
+    """Last-resort fallback for `--dataset-workspace-id` with a bare artifact/target,
+    once local discovery under `--artifact-dir` has already found nothing and
+    `_playwright_remote_target` has no other workspace to resolve it with.
+
+    Resolves the named artifact against Fabric to tell a report from a
+    dataset: a dataset's dependent reports run (mirroring `--dataset-id`
+    mode, the dataset named by display name instead); a name that is not a
+    dataset resolves as a normal single-report target, with the workspace
+    stashed on ``args`` as a fallback so the subprocess needs nothing else.
+
+    Returns:
+        The resolved target list, or ``None`` when this mode does not apply
+        at all -- the caller's ordinary empty-discovery narration still fires.
+
+    Raises:
+        DatasetTargetExit: 1 when resolving the name against Fabric fails.
+    """
+    if not dataset_workspace_artifact_requested(args):
+        return None
+    target = target_from_args(args)
+    name = target.name
+    workspace_id = _resolve_target_workspace(args)
+    if not workspace_id:
+        return None
+
+    from .playwright_validation.fabric_service_client import (
+        FabricServiceClientError,
+        build_fabric_service_client,
+    )
+    from .playwright_validation.resolver import (
+        ItemNotFoundError,
+        ResolvedEnvironment,
+        ServiceResolutionError,
+        resolve_item,
+        resolve_workspace_id,
+    )
+
+    try:
+        client = build_fabric_service_client(env_file=getattr(args, "playwright_env_file", None))
+        workspace_id = resolve_workspace_id(client, workspace_id)
+        resolved_env = ResolvedEnvironment(environment="", workspace_id=workspace_id)
+        dataset = resolve_item(name, "SemanticModel", resolved_env, client)
+    except ItemNotFoundError:
+        if not getattr(args, "workspace_id", ""):
+            args.workspace_id = workspace_id
+        return [Path(name)]
+    except (FabricServiceClientError, ServiceResolutionError) as exc:
+        print(
+            f"  ✗ fab-test playwright: could not resolve '{name}' in workspace {workspace_id}: {exc}",
+            file=sys.stderr,
+        )
+        raise DatasetTargetExit(1) from exc
+
+    args.dataset_id = dataset.item_id
+    if not getattr(args, "dataset_workspace_id", ""):
+        args.dataset_workspace_id = workspace_id
+    return resolve_dataset_targets(args)
 
 
 def _lookup_workspaces(args: argparse.Namespace) -> list[str]:
@@ -190,3 +380,32 @@ def _disambiguate_stems(
         report_workspaces[stem] = workspace_id
         report_names[stem] = name
     return report_workspaces, report_names
+
+
+def _disambiguate_stems_with_dataset(
+    reports: dict[str, tuple[str, str, str]],
+) -> tuple[dict[str, str], dict[str, str], dict[str, str]]:
+    """Same disambiguation as `_disambiguate_stems`, carrying each stem's own
+    dataset ID too.
+
+    Kept as a sibling rather than folded into `_disambiguate_stems`: only
+    "every dataset in a workspace" mode needs a per-report dataset override
+    -- single-dataset mode already has one shared `args.dataset_id` for the
+    whole run, and giving every report its own entry there would be a
+    distinction without a difference.
+    """
+    by_name: dict[str, list[str]] = {}
+    for report_id, (name, _workspace_id, _dataset_id) in reports.items():
+        by_name.setdefault(name, []).append(report_id)
+
+    report_workspaces: dict[str, str] = {}
+    report_names: dict[str, str] = {}
+    report_datasets: dict[str, str] = {}
+    for report_id, (name, workspace_id, dataset_id) in reports.items():
+        stem = name if len(by_name[name]) == 1 else f"{name} ({workspace_id})"
+        if stem in report_workspaces:
+            stem = f"{stem} [{report_id}]"
+        report_workspaces[stem] = workspace_id
+        report_names[stem] = name
+        report_datasets[stem] = dataset_id
+    return report_workspaces, report_names, report_datasets

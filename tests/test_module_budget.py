@@ -206,6 +206,25 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
             "Report (Paginated Report Testing epic)."
         ),
     ),
+    "src/fab_test/scripts/fab_test_execution.py": (
+        814,
+        (
+            "2026-09-26: born over the hard budget adding "
+            "_playwright_service_resolved_target (collapses _discover_for's "
+            "impact-manifest/dataset-id/dataset-workspace-only early returns "
+            "into one call, both for readability and to keep _discover_for's "
+            "own return count under the pylint ceiling) and a last-resort "
+            "resolve_dataset_workspace_artifact fallback alongside the "
+            "existing _playwright_remote_target one, for --dataset-workspace-id "
+            "with a bare artifact and no local match (Playwright Dataset "
+            "Target epic, Every Dataset In A Workspace task). The file's own "
+            "discovery logic (_discover_for, _discover_rdl_files, "
+            "_playwright_remote_target, _target_of) is a defensible seam to "
+            "split into its own module -- not done here, since this task's "
+            "job was the behavior, not a refactor of a file three separate "
+            "epics have now added to. Revisit if it keeps growing."
+        ),
+    ),
 }
 
 # How much headroom an exemption may carry before it should be tightened.

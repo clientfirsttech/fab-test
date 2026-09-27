@@ -31,8 +31,10 @@ from ._fab_test_context import (
 from ._playwright_dataset_target import (
     DatasetTargetExit,
     dataset_target_requested,
-    refuse_dataset_workspace_without_dataset_id,
+    dataset_workspace_only_requested,
     resolve_dataset_targets,
+    resolve_dataset_workspace_artifact,
+    resolve_dataset_workspace_targets,
 )
 from ._playwright_timeout_scaling import (
     Narration as PlaywrightNarration,
@@ -520,6 +522,25 @@ def _discover_rdl_files(args: argparse.Namespace, output_dir: Path) -> list[Path
     return [f for f in files if f.stem == target.name]
 
 
+def _playwright_service_resolved_target(args: argparse.Namespace) -> list[Path] | None:
+    """Return a service-resolved target list for one of playwright's
+    non-local modes, or ``None`` when none apply and ordinary discovery
+    should decide instead.
+
+    Covers an impact manifest (repository-scoped), `--dataset-id` (that
+    dataset's dependents), and `--dataset-workspace-id` alone (every dataset
+    in that workspace) -- split out of `_discover_for` so its own early
+    returns don't count against that function's return-count budget.
+    """
+    if getattr(args, "impact_manifest", None):
+        return [Path(".")]
+    if dataset_target_requested(args):
+        return resolve_dataset_targets(args)
+    if dataset_workspace_only_requested(args):
+        return resolve_dataset_workspace_targets(args)
+    return None
+
+
 def _discover_for(name: str, args: argparse.Namespace, glob: str) -> list[Path]:
     """Return the artifacts ``name`` will run against.
 
@@ -530,11 +551,9 @@ def _discover_for(name: str, args: argparse.Namespace, glob: str) -> list[Path]:
     if _is_repository_scoped(name):
         return [Path(".")]
     if name == "playwright":
-        refuse_dataset_workspace_without_dataset_id(args)
-    if name == "playwright" and getattr(args, "impact_manifest", None):
-        return [Path(".")]
-    if name == "playwright" and dataset_target_requested(args):
-        return resolve_dataset_targets(args)
+        resolved = _playwright_service_resolved_target(args)
+        if resolved is not None:
+            return resolved
     output_dir = Path(getattr(args, "output_dir", RESULTS_ROOT))
     discovered = _discover(Path(args.artifact_dir), glob, _target_of(args), output_dir=output_dir)
     if name == "playwright":
@@ -547,6 +566,12 @@ def _discover_for(name: str, args: argparse.Namespace, glob: str) -> list[Path]:
             remote = _playwright_remote_target(args)
             if remote is not None:
                 return [remote]
+            # Last resort: --dataset-workspace-id with a bare name and no
+            # local match -- resolve it against Fabric to tell a report
+            # from a dataset (Playwright Dataset Target epic).
+            dataset_remote = resolve_dataset_workspace_artifact(args)
+            if dataset_remote is not None:
+                return dataset_remote
     return discovered
 
 

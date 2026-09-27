@@ -336,14 +336,45 @@ fab-test playwright --dataset-id 5bf5a7e1-65e5-4d74-944b-1ada5941a664 \
 ```
 
 **`--dataset-workspace-id` alone -- no `--dataset-id`, `--artifact`, target, or
-`--impact-manifest` -- refuses (exit `2`) before any artifact runs.** Nothing
-else would say *which* dataset it names the workspace of, and
-`_dataset_override_for_command` applies an explicit `--dataset-workspace-id`
-unconditionally to every artifact discovery finds; without this refusal that
-forced every locally discovered report onto that workspace instead, commonly
-one the caller's service principal has no access to at all. Pair it with
-`--dataset-id` (dataset-targeted mode, above), or scope it to one report with
-`--artifact`/a target/`--impact-manifest`, both unaffected by this refusal.
+`--impact-manifest` -- means every dataset in that workspace.** Every
+semantic model in the workspace is listed live, and each one's own dependent
+reports (including paginated/RDL reports) are run, embedded against that
+model -- the same per-report resolution `--dataset-id` mode uses, just for
+every dataset the workspace has rather than one named explicitly. `--env`
+works in place of (or alongside) `--dataset-workspace-id`: with neither
+`--dataset-workspace-id` nor `--workspace-id`/`FABRIC_WORKSPACE_ID` set, the
+workspace resolves from `--env` via `environments.yml` instead. With no
+workspace from any of those sources it refuses (exit `2`) before any network
+call; a workspace with no semantic models, or none with dependent reports,
+exits `0` with a notice.
+
+```bash
+fab-test playwright --dataset-workspace-id 798dfd00-0081-45d3-a7a7-f74f62e57277
+```
+
+**`--dataset-workspace-id` with a bare `--artifact NAME` (or a target) and no
+`--dataset-id` refines by what `NAME` turns out to be.** With no local match
+under `--artifact-dir`, `NAME` is resolved against Fabric in that workspace:
+a `SemanticModel` runs that one dataset's dependents (dataset-targeted mode,
+above, named by display name instead of `--dataset-id`); anything else
+resolves as a normal single-report target, with the workspace stashed as a
+fallback so nothing else needs to name it. A report that *does* exist
+locally is left alone -- this Fabric-side lookup is a last resort, never run
+ahead of ordinary discovery.
+
+```bash
+# "Sales Model" is a dataset in this workspace: runs its dependent reports
+fab-test playwright --dataset-workspace-id 798dfd00-0081-45d3-a7a7-f74f62e57277 \
+  --artifact "Sales Model"
+
+# "Invoice RDL" is not a dataset: refines to that one report
+fab-test playwright --dataset-workspace-id 798dfd00-0081-45d3-a7a7-f74f62e57277 \
+  --artifact "Invoice RDL"
+```
+
+Pairing `--dataset-workspace-id` with `--dataset-id`, `--impact-manifest`, or
+a report that already has a local folder is unaffected by either of the two
+behaviors above:
 
 ```bash
 # A checked-in .rdl file resolves both the dataset and its workspace on its own
