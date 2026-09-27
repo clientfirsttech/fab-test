@@ -70,11 +70,14 @@ Deploying is out of scope for `fab-test`. Use Git integration, deployment pipeli
 
 ## 5. Run it locally
 
-Install `fab-test` (see [Install](../README.md#install)) and the browser Playwright drives. The browser is a separate download from the pip package:
+Install `fab-test` (see [Install](../README.md#install)), then the browser Playwright drives and the pytest plugins that run it. All are separate from the `fab-test` package itself -- `pytest`, `pytest-playwright`, and `pytest-html` are dev-only dependencies of the `fab-test` project, not something installing `fab-test` pulls in for you, and `pytest-xdist` is needed the moment more than one case runs, which is the default for any report with more than one page:
 
 ```bash
 playwright install chromium
+pip install pytest pytest-playwright pytest-html pytest-xdist
 ```
+
+Skipping this step fails with a raw `pytest` usage error (`unrecognized arguments: --html=...`) rather than a `fab-test`-style remediation message -- if you see that, this is almost always why.
 
 ### Put the credentials in `.fab-test/.env`
 
@@ -183,6 +186,7 @@ Every case writes its evidence to `fab-test-results/playwright/<report>/test-cas
 | Symptom | Likely cause | Fix |
 |---------|--------------|-----|
 | `doctor` shows ❌ *no workspace or credentials resolved* | `FABRIC_WORKSPACE_ID` isn't exported in this shell | [Name the workspace](#name-the-workspace-and-environment) |
+| *ERROR: usage: python -m pytest …* / *unrecognized arguments: --html=…* | `pytest`, `pytest-playwright`, `pytest-html`, or `pytest-xdist` isn't installed | [Run it locally](#5-run-it-locally) -- `pip install` all four |
 | *No environment given, so there is nothing to resolve…* | `FABRIC_ENVIRONMENT` isn't set and `--env` wasn't passed | Export `FABRIC_ENVIRONMENT` or add `--env dev` |
 | *No Report matching '…'* | The report isn't deployed, or has a different name | [Step 4](#4-deploy-the-reports-you-want-to-test) |
 | `401` / `403` in `console.json`, or a permissions message in `embed_error_details.txt` | Tenant setting not applied, or no workspace role | [Step 2](#2-allow-service-principals-in-the-tenant), [step 3](#3-give-it-a-workspace-role) |

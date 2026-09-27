@@ -1,6 +1,6 @@
 # Playwright CI Guide Epic
 
-**Status**: 🔄 IN-PROGRESS (1/7 tasks: setup guide drafted; CLI gaps 4/6 fixed 2026-09-26, spec packaging open)
+**Status**: 🔄 IN-PROGRESS (2/7 tasks: setup guide drafted; CLI gaps 5/6 fixed, spec packaging fixed 2026-09-26)
 **Goal**: Give a team a documented, copy-ready GitHub Actions path from "no service principal" to a green `fab-test playwright` run against their own Fabric workspace.
 
 ## Overview
@@ -33,6 +33,8 @@ Fix the mismatches between documented and actual behavior that the first local r
 - Given no `--env-file`, `auth status` and workspace-name resolution should use the same `.fab-test/.env` search as credential probing, not fall back to the ambient Azure identity and report a reachable workspace as unreachable.
 - Given missing service-principal variables, should exit `127` as README and the skill's Agent Contract promise, not `1`, so a pipeline can tell setup failures from render failures.
 - Given `fab-test playwright` installed from the wheel and run outside this repository, should find its pytest spec. Today `_SPEC_PATH` is `<cwd>/tests/test_playwright_visual.py`, which ships in no wheel, so every consumer run fails with `ERROR: usage: python -m pytest` (verified 2026-09-26 from `.venv-test` in a scratch folder).
+  **Fixed 2026-09-26**: the render checks moved into the package (`playwright_validation/render_spec.py` + `render_helpers.py`); `tests/test_playwright_visual.py` now holds only their unit tests. `invoke_playwright.py._spec_path()` resolves the spec from the installed module, and `check_wheel_contents.py`'s `REQUIRED` guards it shipping. Verified end to end from `.venv-test` (a wheel-equivalent editable install) run from a scratch directory with no checkout: exit 0 against `SampleModel-PQLAssert`. Splitting `test_report_visual_renders` into `_resolve_case_config`/`_embed_interactive_report`/`_finish_interactive_case` kept `tests/test_complexity_budget.py`'s ceiling at 0 -- the function's pre-existing complexity had been invisible in `tests/`, which this repo's own complexity scan does not cover, and became visible only once it moved into `src/`.
+  **New finding, same task**: with the spec now reachable, the *next* failure for a genuine `pip install fab-test` consumer is `pytest`, `pytest-playwright`, `pytest-html`, and `pytest-xdist` all being dev-only dependencies of this project -- a consumer must `pip install` all four separately, or the run fails with a raw `unrecognized arguments: --html=...` usage error. This was already true before today and is already asserted by `tests/test_invoke_playwright.py::test_pytest_html_and_pytest_playwright_are_dev_dependencies`, but the one doc that named the extra install step (`references/flags.md`'s "Browser setup") only named `pytest-html`, silently missing the other three -- corrected 2026-09-26 in `flags.md` and `docs/PLAYWRIGHT-CI.md`. Left open: `fab-test doctor`/`playwright` still surface a raw pytest usage error here instead of a `fab-test`-style remediation message (exit 127 naming the missing package) -- a deliberate design decision on which of these four become hard runtime dependencies vs. stay an extra install step, not folded into this task without asking.
 - Given a real Playwright run, should collect only the report render cases, not the 11 unit tests that share `test_playwright_visual.py` today.
 
 ---

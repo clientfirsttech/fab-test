@@ -60,8 +60,17 @@ _EVIDENCE_FILENAMES = {
     "event_log": "event_log.json",
 }
 
-# Relative path from repo root to the pytest spec.
-_SPEC_PATH = Path("tests") / "test_playwright_visual.py"
+def _spec_path() -> Path:
+    """Return the packaged Playwright render spec pytest collects.
+
+    Resolved from the installed module's own file, never ``repo_root /
+    "tests"`` -- see render_spec.py's own docstring for why (Playwright CI
+    Guide epic, Render Spec Packaging task).
+    """
+    from .playwright_validation import render_spec
+
+    return Path(render_spec.__file__).resolve()
+
 
 # Default output location for test-case CSV/JSON artifacts.
 _DEFAULT_TEST_CASES_DIR = Path("fab-test-results") / "playwright" / "test-cases"
@@ -370,7 +379,7 @@ def _run_pytest(
     default) when not given explicitly.
     """
     repo_root = _repo_root()
-    spec_path = repo_root / _SPEC_PATH
+    spec_path = _spec_path()
 
     command = [
         sys.executable,

@@ -40,7 +40,7 @@ class EmbedConfig:
 
 
 # Numeric values align with the powerbi-client enum constants used by the CDN build
-# that tests/test_playwright_visual.py injects (powerbi-client@2.23.1). Read straight
+# that render_spec.py injects (powerbi-client@2.23.1). Read straight
 # out of that bundle rather than transcribed from memory -- `tokenType` shipped as 0
 # under an "Embed" label for long enough to make every real run 403, because 0 is Aad:
 # declaring an embed token as an AAD token sends the embed host looking for the

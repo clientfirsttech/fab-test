@@ -6,7 +6,7 @@ Before this, a failing run tagged *every* generated case with the same
 generic message, and a passing run recorded zero `test_results` -- a
 report with 5 pages and 1 real failure said "5 finding(s)", all
 identical. The pytest spec now writes a `result.json` per case
-(`tests/test_playwright_visual.py::_write_result`); this module covers
+(`render_helpers.py::_write_result`); this module covers
 the wrapper side that reads it back into an accurate, per-case
 `test_results` list (mirroring BPA/PBIR's own `test_results`) and derives
 `findings` from only the cases that actually failed.
