@@ -1,0 +1,144 @@
+# Manually triggered demo of `fab-test playwright` against a real Fabric
+# workspace, testing this repository's own current code (installed from the
+# checkout, not the published package -- see
+# docs/examples/github-actions/playwright-live.yml for the consumer-facing
+# version of this workflow).
+#
+# workflow_dispatch only, deliberately: this is the one workflow in this
+# repository that carries service-principal credentials, and pull_request
+# would run it against every fork PR with no access to those secrets at all
+# (tests/test_workflow_triggers.py enforces the trigger and Environment).
+
+name: Playwright demo
+
+on:
+  workflow_dispatch:
+    inputs:
+      artifact:
+        description: "Report name (default: a known-good report). Leave blank with dataset_workspace_id alone to run every dataset in the workspace."
+        required: false
+        default: "SampleModel-PQLAssert"
+      dataset_id:
+        description: "Semantic model ID -- tests every report built on it instead of one named report"
+        required: false
+        default: ""
+      dataset_workspace_id:
+        description: "Workspace ID the dataset above lives in, or -- alone -- every dataset in this workspace"
+        required: false
+        default: ""
+      environment:
+        description: "Environment label, resolved via .fab-test/metadata/environments.yml (test/prod have no workspace_id there yet -- use workspace_id below until they do)"
+        required: false
+        default: "dev"
+        type: choice
+        options: ["testbed", "dev", "test", "prod"]
+      workspace_id:
+        description: "Workspace ID override -- wins over 'environment' above; needed for test/prod until environments.yml carries their workspace_id"
+        required: false
+        default: ""
+      pages:
+        description: "Page dimension"
+        required: false
+        default: "auto"
+        type: choice
+        options: ["auto", "none"]
+      roles:
+        description: "RLS role dimension"
+        required: false
+        default: "auto"
+        type: choice
+        options: ["auto", "none"]
+
+jobs:
+  playwright-demo:
+    name: fab-test playwright (demo)
+    runs-on: ubuntu-latest
+    # Protected Environment: required reviewers gate every dispatch, and
+    # only this Environment's secrets are visible to the job.
+    environment: fabric-demo
+    env:
+      FABRIC_TENANT_ID: ${{ secrets.FABRIC_TENANT_ID }}
+      FABRIC_CLIENT_ID: ${{ secrets.FABRIC_CLIENT_ID }}
+      FABRIC_CLIENT_SECRET: ${{ secrets.FABRIC_CLIENT_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # This repository's own current code, plus the dev extras --
+      # pytest, pytest-playwright, pytest-html, and pytest-xdist are all
+      # declared in pyproject.toml's [project.optional-dependencies].dev,
+      # so one install covers fab-test and everything Playwright needs.
+      - name: Install fab-test from the checkout
+        run: pip install -e ".[dev]"
+
+      - name: Install the browser
+        run: playwright install --with-deps chromium
+
+      # Credential-only here: workspace readiness for --env is resolved
+      # from environments.yml by the real run below, which `doctor` has no
+      # visibility into. A `workspace_id` override makes this row fully
+      # accurate too.
+      - name: Confirm the service principal is ready
+        run: fab-test doctor
+
+      - name: Run fab-test playwright
+        id: playwright
+        run: |
+          args=(--env "${{ inputs.environment }}")
+          [ -n "${{ inputs.artifact }}" ] && args+=(--artifact "${{ inputs.artifact }}")
+          [ -n "${{ inputs.dataset_id }}" ] && args+=(--dataset-id "${{ inputs.dataset_id }}")
+          [ -n "${{ inputs.dataset_workspace_id }}" ] && args+=(--dataset-workspace-id "${{ inputs.dataset_workspace_id }}")
+          [ -n "${{ inputs.workspace_id }}" ] && args+=(--workspace-id "${{ inputs.workspace_id }}")
+          [ "${{ inputs.pages }}" = "none" ] && args+=(--pages none)
+          [ "${{ inputs.roles }}" = "none" ] && args+=(--roles none)
+          fab-test playwright "${args[@]}" --report
+
+      # Always -- the failed run is the one you most want to read. Every
+      # case's own evidence lives under playwright/<report>/test-cases/**;
+      # report.html links straight to it.
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fab-test-playwright-demo-results
+          path: |
+            fab-test-results/playwright/**/report.html
+            fab-test-results/playwright/**/envelope.json
+            fab-test-results/playwright/**/test-cases/**
+
+      - name: Write the per-case summary
+        if: always()
+        run: |
+          python <<'PY'
+          import glob
+          import json
+          import os
+
+          rows = []
+          for path in sorted(glob.glob("fab-test-results/playwright/*/envelope.json")):
+              with open(path, encoding="utf-8") as fh:
+                  envelope = json.load(fh)
+              for case in envelope.get("test_results", []):
+                  icon = "PASS" if case.get("status") == "pass" else "FAIL"
+                  link = case.get("report_link") or {}
+                  label = link.get("label", "")
+                  href = link.get("href", "")
+                  cell = f"[{label}]({href})" if href else label
+                  rows.append(
+                      f"| {envelope.get('artifact_path', '')} | {case.get('page_name', '')} | "
+                      f"{case.get('bookmark_name', '')} | {case.get('role', '')} | {icon} | {cell} |"
+                  )
+
+          summary_path = os.environ["GITHUB_STEP_SUMMARY"]
+          with open(summary_path, "a", encoding="utf-8") as fh:
+              fh.write("## Playwright demo results\n\n")
+              if rows:
+                  fh.write("| Report | Page | Bookmark | Role | Status | Link |\n")
+                  fh.write("|---|---|---|---|---|---|\n")
+                  fh.write("\n".join(rows) + "\n")
+              else:
+                  fh.write("No cases ran -- check the step above for why.\n")
+          PY

@@ -164,8 +164,15 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
         ),
     ),
     "src/fab_test/scripts/invoke_playwright.py": (
-        920,
+        929,
         (
+            "2026-09-26: +9 lines replacing the `_SPEC_PATH = Path(\"tests\") / "
+            "\"test_playwright_visual.py\"` constant with `_spec_path()`, resolved "
+            "from the installed `render_spec` module's own file -- a `pip install "
+            "fab-test` consumer has no checkout of this repository's tests/ "
+            "directory, so every real run failed outright until the spec itself "
+            "moved into the package (Playwright CI Guide epic, Render Spec "
+            "Packaging task). "
             "2026-08-31: +11 lines adding --report-parameters and threading "
             "it into the resolved PlaywrightValidationConfig, so a "
             "paginated report's declared parameters reach the pytest spec "
@@ -197,6 +204,25 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
             "resolve_report call and the resulting PlaywrightValidationConfig "
             "so a paginated target resolves against PaginatedReport instead of "
             "Report (Paginated Report Testing epic)."
+        ),
+    ),
+    "src/fab_test/scripts/fab_test_execution.py": (
+        814,
+        (
+            "2026-09-26: born over the hard budget adding "
+            "_playwright_service_resolved_target (collapses _discover_for's "
+            "impact-manifest/dataset-id/dataset-workspace-only early returns "
+            "into one call, both for readability and to keep _discover_for's "
+            "own return count under the pylint ceiling) and a last-resort "
+            "resolve_dataset_workspace_artifact fallback alongside the "
+            "existing _playwright_remote_target one, for --dataset-workspace-id "
+            "with a bare artifact and no local match (Playwright Dataset "
+            "Target epic, Every Dataset In A Workspace task). The file's own "
+            "discovery logic (_discover_for, _discover_rdl_files, "
+            "_playwright_remote_target, _target_of) is a defensible seam to "
+            "split into its own module -- not done here, since this task's "
+            "job was the behavior, not a refactor of a file three separate "
+            "epics have now added to. Revisit if it keeps growing."
         ),
     ),
 }

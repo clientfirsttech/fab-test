@@ -1,0 +1,5 @@
+storyMap:
+  userJourneys:
+    - file: rdl-static-analysis.yaml
+      id: c9uzij8msuiecirjwg7hkh1c
+      name: RDL Static Analysis

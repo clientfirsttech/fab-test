@@ -1,0 +1,156 @@
+# Copy this file into your own repository's .github/workflows/.
+#
+# Runs `fab-test playwright` against a deployed Fabric workspace from a
+# GitHub Environment's secrets. See docs/PLAYWRIGHT-CI.md in the fab-test
+# repository for everything this workflow assumes is already set up:
+# the service principal, its permissions, the workspace role, and the
+# GitHub Environment itself (name, secrets, variable, required reviewers).
+#
+# Targeting the run: fill in exactly one of the three shapes below when you
+# dispatch it (leave the rest blank) --
+#   artifact only                          -> that one report
+#   dataset_id (+ dataset_workspace_id)     -> every report built on that dataset
+#   dataset_workspace_id only               -> every dataset in that workspace,
+#                                              each one's own dependent reports
+# See "Naming what to test" in references/flags.md for the full grammar.
+
+name: Playwright report validation
+
+on:
+  workflow_dispatch:
+    inputs:
+      artifact:
+        description: "Report name to test (leave blank to use --dataset-id/--dataset-workspace-id instead)"
+        required: false
+        default: ""
+      dataset_id:
+        description: "Semantic model ID -- tests every report built on it (leave blank for a single --artifact run)"
+        required: false
+        default: ""
+      dataset_workspace_id:
+        description: "Workspace ID the dataset above lives in, or -- alone, with dataset_id and artifact both blank -- every dataset in this workspace"
+        required: false
+        default: ""
+      pages:
+        description: "Page dimension"
+        required: false
+        default: "auto"
+        type: choice
+        options: ["auto", "none"]
+      roles:
+        description: "RLS role dimension"
+        required: false
+        default: "auto"
+        type: choice
+        options: ["auto", "none"]
+  # Uncomment to also run on a schedule -- still never on pull_request,
+  # where a fork PR has no access to this Environment's secrets at all.
+  # schedule:
+  #   - cron: "0 6 * * 1"  # Mondays 06:00 UTC
+
+jobs:
+  playwright:
+    name: fab-test playwright
+    runs-on: ubuntu-latest
+    # Ties the job to the Environment holding the four values below, and
+    # (if you configured required reviewers) gates the run on approval.
+    environment: fabric-demo
+    env:
+      FABRIC_TENANT_ID: ${{ secrets.FABRIC_TENANT_ID }}
+      FABRIC_CLIENT_ID: ${{ secrets.FABRIC_CLIENT_ID }}
+      FABRIC_CLIENT_SECRET: ${{ secrets.FABRIC_CLIENT_SECRET }}
+      FABRIC_WORKSPACE_ID: ${{ vars.FABRIC_WORKSPACE_ID }}
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # The published package. Swap this one line for a checkout + `pip
+      # install -e .` if you're validating fab-test itself, not a report.
+      - name: Install fab-test
+        run: |
+          pip install \
+            --index-url https://test.pypi.org/simple/ \
+            --extra-index-url https://pypi.org/simple \
+            "fab-test==1.4.0.dev1"
+          # Once fab-test has a final release on PyPI, replace the three
+          # lines above with: pip install fab-test
+
+      # Separate from the pip install above -- pytest, pytest-playwright,
+      # and pytest-html are dev-only dependencies of fab-test itself, and
+      # pytest-xdist is needed the moment more than one case runs (the
+      # default for any report with more than one page). Skipping this step
+      # fails with a raw `unrecognized arguments: --html=...` pytest error,
+      # not a fab-test remediation message -- see docs/PLAYWRIGHT-CI.md.
+      - name: Install the browser and its pytest plugins
+        run: |
+          pip install pytest pytest-playwright pytest-html pytest-xdist
+          playwright install --with-deps chromium
+
+      # Fails fast (exit 127) naming every missing value, before any
+      # browser or network call -- the whole reason this step exists ahead
+      # of the real run.
+      - name: Confirm the service principal and workspace are ready
+        run: fab-test doctor
+
+      - name: Run fab-test playwright
+        id: playwright
+        run: |
+          args=()
+          [ -n "${{ inputs.artifact }}" ] && args+=(--artifact "${{ inputs.artifact }}")
+          [ -n "${{ inputs.dataset_id }}" ] && args+=(--dataset-id "${{ inputs.dataset_id }}")
+          [ -n "${{ inputs.dataset_workspace_id }}" ] && args+=(--dataset-workspace-id "${{ inputs.dataset_workspace_id }}")
+          [ "${{ inputs.pages }}" = "none" ] && args+=(--pages none)
+          [ "${{ inputs.roles }}" = "none" ] && args+=(--roles none)
+          fab-test playwright "${args[@]}" --env dev --report
+
+      # Always -- the failed run is the one you most want to read. Every
+      # case's own screenshot/console.json/network.json/event_log.json (and,
+      # on a render timeout with a visible error panel, embed_error_details.txt)
+      # lives under playwright/<report>/test-cases/**; report.html links straight to them.
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fab-test-playwright-results
+          path: |
+            fab-test-results/playwright/**/report.html
+            fab-test-results/playwright/**/envelope.json
+            fab-test-results/playwright/**/test-cases/**
+
+      # One row per case, from each resolved report's own envelope.json --
+      # a dataset-targeted run (--dataset-id / --dataset-workspace-id) can
+      # produce more than one, a bare --artifact run exactly one.
+      - name: Write the per-case summary
+        if: always()
+        run: |
+          python <<'PY'
+          import glob
+          import json
+          import os
+
+          rows = []
+          for path in sorted(glob.glob("fab-test-results/playwright/*/envelope.json")):
+              with open(path, encoding="utf-8") as fh:
+                  envelope = json.load(fh)
+              for case in envelope.get("test_results", []):
+                  icon = "PASS" if case.get("status") == "pass" else "FAIL"
+                  link = case.get("report_link") or {}
+                  label = link.get("label", "")
+                  href = link.get("href", "")
+                  cell = f"[{label}]({href})" if href else label
+                  rows.append(
+                      f"| {envelope.get('artifact_path', '')} | {case.get('page_name', '')} | "
+                      f"{case.get('bookmark_name', '')} | {case.get('role', '')} | {icon} | {cell} |"
+                  )
+
+          summary_path = os.environ["GITHUB_STEP_SUMMARY"]
+          with open(summary_path, "a", encoding="utf-8") as fh:
+              fh.write("## Playwright results\n\n")
+              if rows:
+                  fh.write("| Report | Page | Bookmark | Role | Status | Link |\n")
+                  fh.write("|---|---|---|---|---|---|\n")
+                  fh.write("\n".join(rows) + "\n")
+              else:
+                  fh.write("No cases ran -- check the step above for why.\n")
+          PY

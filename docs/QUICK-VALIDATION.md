@@ -286,7 +286,7 @@ See the [Configuration section of the fab-test skill](../.github/skills/fab-test
       fab-test-results/index.html
       fab-test-results/**/report.html
       fab-test-results/**/TestRun.html
-      fab-test-results/playwright/test-cases/**
+      fab-test-results/playwright/**/test-cases/**
       fab-test-results/run.json
 ```
 

@@ -261,3 +261,18 @@ def test_a_wheel_with_everything_required_and_nothing_forbidden_passes():
     names = [*checker.REQUIRED, "fab_test/scripts/fab_test.py"]
 
     assert checker.wheel_problems(names) == []
+
+
+@pytest.mark.fab_test
+def test_the_wheel_carries_the_playwright_render_spec() -> None:
+    """The exact failure this closes: a wheel missing the spec `invoke_playwright.py`
+    points pytest at fails every real Playwright run outside a checkout
+    (Playwright CI Guide epic, Render Spec Packaging task)."""
+    checker = _load_script("check_wheel_contents.py")
+
+    assert any("render_spec.py" in r for r in checker.REQUIRED), checker.REQUIRED
+
+    names = [n for n in checker.REQUIRED if "render_spec.py" not in n]
+    problems = checker.wheel_problems(names)
+
+    assert any("render_spec.py" in p for p in problems), problems

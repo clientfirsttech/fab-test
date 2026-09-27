@@ -299,3 +299,72 @@ def test_format_invalid_choice_lists_allowed_formats():
     assert "json" in result.stderr
 
 
+
+
+# --------------------------------------------------------------------------- #
+# Setup failures inside a wrapper keep their own exit code
+# --------------------------------------------------------------------------- #
+# A wrapper that refuses to start (invoke_playwright's missing service
+# principal returns 127) used to be flattened to 1 on the way out, so a
+# pipeline could not tell "fix your secrets" from "a visual is broken" --
+# the distinction the exit-code contract exists to make (Playwright CI
+# Guide epic, first live run 2026-09-26).
+
+
+@pytest.mark.fab_test
+@pytest.mark.parametrize("code", [126, 127])
+def test_artifact_exit_code_keeps_a_setup_failure_code(code):
+    assert _artifact_exit_code(code, None) == code
+    assert _artifact_exit_code(code, {"findings": []}) == code
+
+
+@pytest.mark.fab_test
+def test_artifact_exit_code_findings_still_mean_one_even_on_a_nonzero_exit():
+    envelope = {"findings": [{"rule": "R1", "severity": "Error"}]}
+    assert _artifact_exit_code(127, envelope) == 1
+
+
+@pytest.mark.fab_test
+@pytest.mark.parametrize("output_format", ["text", "json"])
+def test_single_analyzer_run_exits_with_the_setup_failure_code(output_format, capsys):
+    from fab_test.scripts.fab_test_summary import _print_summary
+
+    code = _print_summary(
+        "playwright", [("Sales", 1), ("Finance", 127)], output_format=output_format
+    )
+    assert code == 127
+
+
+@pytest.mark.fab_test
+def test_all_run_exits_with_the_setup_failure_code(tmp_path, capsys):
+    from fab_test.scripts.fab_test_summary import _print_all_summary
+
+    artifact_dir = tmp_path / "artifacts"
+    (artifact_dir / "Sales.SemanticModel").mkdir(parents=True)
+    (artifact_dir / "Sales.Report").mkdir(parents=True)
+    args = argparse.Namespace(artifact_dir=str(artifact_dir), artifact=None, dry_run=False)
+    code = _print_all_summary(tmp_path / "results", ("bpa", "pbir"), [1, 127], args)
+    assert code == 127
+
+
+@pytest.mark.fab_test
+def test_local_run_exits_with_the_setup_failure_code(tmp_path, monkeypatch):
+    from fab_test.scripts import fab_test_local
+    from fab_test.scripts.fab_test import _run_local
+
+    monkeypatch.setattr(
+        fab_test_local,
+        "_local_readiness",
+        lambda name, args: {"ready": True, "reason": "", "remediation": None},
+    )
+    monkeypatch.setattr(
+        fab_test_local,
+        "_run_analyzer",
+        lambda name, args, output_dir, manifest, telemetry=None: 127 if name == "pql_test" else 0,
+    )
+    args = argparse.Namespace(
+        analyzer="local", artifact_dir=str(tmp_path), output_dir=str(tmp_path / "results"),
+        dry_run=False, artifact=None, timeout=None, jobs=1, output_format="text",
+        telemetry=False, no_telemetry=True, verbose=0,
+    )
+    assert _run_local(args) == 127

@@ -1,0 +1,85 @@
+# User journey: static analysis of a paginated (RDL) report
+# Source rule set: plan/rdl-rule-set.md (44 rules; Tier A is the first epic)
+id: c9uzij8msuiecirjwg7hkh1c
+name: RDL Static Analysis
+description: >
+  A paginated report gets the same local, pre-publish quality gate that PBIR
+  reports and semantic models already get, drawn from a 44-rule set covering
+  performance, correctness, and accessibility.
+createdAt: 1790460895759
+updatedAt: 1790460895759
+personas: [gtvxf8r6wn2jnzdtemvjr8n5, hxl1drwi9gxpwvszy63j5hla, vzm8qmbzgyzjoh0d42xuf7ch]
+
+painPoints:
+  - id: gwgjsjvn6snl03idpznun6u9
+    name: No static gate for paginated reports
+    description: >
+      .rdl files are discovered only for Playwright rendering; nothing checks
+      the definition itself, so issues surface only after publish.
+    impact: 7
+    frequency: 8
+  - id: okcb3wy8aj3l61wj0kilob7m
+    name: Slow reports from report-side work
+    description: >
+      Unused datasets, SELECT *, report filters, Lookup joins, and subreports
+      in tablixes make reports slow, and they're invisible until run at scale.
+    impact: 8
+    frequency: 6
+  - id: w16zkzlu8dfhsij1t08t9365
+    name: Inaccessible exports
+    description: >
+      Missing alt text (ToolTip) on charts, images, and tables fails screen
+      readers in the service and in Accessible PDF.
+    impact: 7
+    frequency: 7
+  - id: li452nn9sl2kiwk4x3cl5l4v
+    name: Blank pages and broken parameters in print/PDF
+    description: >
+      Body wider than the page, or MultiValue+Nullable parameters, only fail
+      at render or export time.
+    impact: 6
+    frequency: 5
+
+steps:
+  - id: qrt8x78phk74c9yl382tl5bd
+    name: Run the check locally
+    description: Author saves the .rdl and runs `fab-test rdl` (or `local`/`all`) with no workspace.
+    userStories:
+      - id: dclybpgl24aawkncntctow7a
+        name: Lint an RDL file locally
+        story: As a Report Author, I want to run `fab-test rdl` against my .rdl files, so that I find problems before publishing.
+        painPoint: gwgjsjvn6snl03idpznun6u9
+        priority: 56
+        status: { state: backlog, comment: RDL Static Analysis epic }
+  - id: rojhhud3vzoaatrygxgno83o
+    name: Read findings
+    description: Each finding names the rule ID, severity, the report item (by Name), and the fix.
+    userStories:
+      - id: gmuw2elxo67vbyzqw16btrnn
+        name: Performance findings
+        story: As a Report Author, I want query-pushdown and dataset findings, so that my report doesn't do in the render engine what the source does faster.
+        painPoint: okcb3wy8aj3l61wj0kilob7m
+        priority: 48
+        status: { state: backlog, comment: RDL Static Analysis epic }
+      - id: kqm5ltz5dwdgfrnsydskpaa6
+        name: Accessibility findings
+        story: As a Report Author, I want missing or default alt text flagged, so that exported reports work with screen readers.
+        painPoint: w16zkzlu8dfhsij1t08t9365
+        priority: 49
+        status: { state: backlog, comment: RDL Static Analysis epic }
+      - id: fmsorznwr4w0h0pm1kqqkfhp
+        name: Layout and parameter findings
+        story: As a Report Author, I want page-overflow and invalid parameter combinations flagged, so that PDF and print exports render correctly.
+        painPoint: li452nn9sl2kiwk4x3cl5l4v
+        priority: 30
+        status: { state: backlog, comment: RDL Static Analysis epic }
+  - id: ji2ap2rh3duj3jmdtc3gq9yq
+    name: Gate and remediate
+    description: CI fails on High findings only; an agent applies fixes from the envelope.
+    userStories:
+      - id: j1xo5e6zxeolas373o81ti90
+        name: Block only on High severity
+        story: As a CI Pipeline, I want High findings to fail the run and Medium/Low to warn, so that convention rules don't block merges.
+        painPoint: gwgjsjvn6snl03idpznun6u9
+        priority: 56
+        status: { state: backlog, comment: RDL Static Analysis epic }

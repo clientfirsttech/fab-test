@@ -15,6 +15,7 @@ Constraints {
   (project language is Python) => skip JS/TS skills: aidd-javascript, aidd-lit, aidd-react, aidd-autodux, aidd-ecs
   (task writes or reviews Python) => load aidd-python — it is the language skill the JS/TS skills would otherwise have supplied
   (task adds to, or reviews a diff touching, a file over 400 lines) => load aidd-module-budgets
+  (task plans, adds, reviews, or changes an analyzer subcommand, invoke_*.py wrapper, or its registration) => load aidd-analyzer-contract; its Constraints are the minimum bar for parity with the other analyzers
   (task involves code changes) => use aidd-tdd — write tests before implementation
   All skills resolve to: .github/skills/<skill-name>/SKILL.md
   Epic files: tasks/<epic-name>-epic.md
@@ -51,6 +52,7 @@ Constraints {
 | `aidd-workflow` | This file — project command resolver |
 | `aidd-python` | Python best practices, simplicity budgets, over-engineering review lens |
 | `aidd-module-budgets` | File-level size budgets, split seams for oversized modules |
+| `aidd-analyzer-contract` | Minimum requirements for a new or changed analyzer: envelope, exit codes, report, telemetry, registration touch points |
 | `document` | Sync docs: README, QUICK-VALIDATION, fab-test skill |
 | `fab-test` | fab-test CLI reference — subcommands, flags, result locations |
 

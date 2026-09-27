@@ -156,7 +156,7 @@ Playwright validation can run in three modes: static `.env` mode, service-resolv
 | `--artifact NAME` | Resolve the deployed report from this artifact name and the target environment |
 | `--env ENV` | Target environment label (e.g. `dev`, `test`, `prod`) [env: `FABRIC_ENVIRONMENT`] |
 | `--workspace-id ID` | Explicit workspace ID override [env: `FABRIC_WORKSPACE_ID`] |
-| `--dataset-id ID` | Explicit dataset / semantic-model ID override |
+| `--dataset-id ID` | Dataset / semantic-model ID. With `--artifact`, overrides that report's binding; with no report named, tests every report built on this dataset (see below) |
 | `--dataset-workspace-id ID` | Workspace ID the dataset lives in, when different from the report's own workspace [env: `PLAYWRIGHT_DATASET_WORKSPACE_ID`] |
 | `--report-type {report,paginated}` | Force the report type instead of auto-detecting it [env: `PLAYWRIGHT_REPORT_TYPE`] |
 | `--impact-manifest PATH` | Validate every report listed in the impacted-report manifest once, regardless of local `.Report` artifacts |
@@ -227,7 +227,7 @@ discoverable: `fab-test init` scaffolds a commented line for it, and
 `env:FABRIC_WORKSPACE_ID`, etc.) alongside every other setting.
 
 **Every generated case gets its own accurate result, not the run's outcome copy-pasted.**
-`fab-test-results/playwright/test-cases/<case>/result.json` (written by the pytest
+`fab-test-results/playwright/<report>/test-cases/<case>/result.json` (written by the pytest
 spec itself, per case) records that case's real `status` (`pass`/`error`) and, on
 failure, the actual detail -- the embed error, a render timeout, or an RDL error
 modal -- rather than the fixed string every case used to share. The envelope's
@@ -320,6 +320,62 @@ tested live, no effect); only this one field, confirmed live and matching
 documentation](https://learn.microsoft.com/en-us/power-bi/developer/embedded/embed-paginated-reports),
 clears it. An interactive report's dataset entry is unaffected.
 
+**`--dataset-id` with no report named tests the reports built on that
+dataset -- not every local report.** `fab-test playwright --dataset-id ID`
+with no `--artifact`, target, or `--impact-manifest` looks the dataset's
+dependent reports up live -- in `--dataset-workspace-id`'s workspace and, when
+set and different, the `--workspace-id`/`FABRIC_WORKSPACE_ID`/`PLAYWRIGHT_WORKSPACE_ID` workspace --
+and runs one per-report validation for each, embedded against that dataset.
+With neither workspace given it refuses (exit `2`) before any network call;
+a dataset nothing depends on exits `0` with a notice. `PLAYWRIGHT_DATASET_ID`
+in a `.env` never switches this on -- only the flag does.
+
+```bash
+fab-test playwright --dataset-id 5bf5a7e1-65e5-4d74-944b-1ada5941a664 \
+  --dataset-workspace-id c4698d28-b05c-40bc-926c-707563ac85e7
+```
+
+**`--dataset-workspace-id` alone -- no `--dataset-id`, `--artifact`, target, or
+`--impact-manifest` -- means every dataset in that workspace.** Every
+semantic model in the workspace is listed live, and each one's own dependent
+reports (including paginated/RDL reports) are run, embedded against that
+model -- the same per-report resolution `--dataset-id` mode uses, just for
+every dataset the workspace has rather than one named explicitly. `--env`
+works in place of (or alongside) `--dataset-workspace-id`: with neither
+`--dataset-workspace-id` nor `--workspace-id`/`FABRIC_WORKSPACE_ID` set, the
+workspace resolves from `--env` via `environments.yml` instead. With no
+workspace from any of those sources it refuses (exit `2`) before any network
+call; a workspace with no semantic models, or none with dependent reports,
+exits `0` with a notice.
+
+```bash
+fab-test playwright --dataset-workspace-id 798dfd00-0081-45d3-a7a7-f74f62e57277
+```
+
+**`--dataset-workspace-id` with a bare `--artifact NAME` (or a target) and no
+`--dataset-id` refines by what `NAME` turns out to be.** With no local match
+under `--artifact-dir`, `NAME` is resolved against Fabric in that workspace:
+a `SemanticModel` runs that one dataset's dependents (dataset-targeted mode,
+above, named by display name instead of `--dataset-id`); anything else
+resolves as a normal single-report target, with the workspace stashed as a
+fallback so nothing else needs to name it. A report that *does* exist
+locally is left alone -- this Fabric-side lookup is a last resort, never run
+ahead of ordinary discovery.
+
+```bash
+# "Sales Model" is a dataset in this workspace: runs its dependent reports
+fab-test playwright --dataset-workspace-id 798dfd00-0081-45d3-a7a7-f74f62e57277 \
+  --artifact "Sales Model"
+
+# "Invoice RDL" is not a dataset: refines to that one report
+fab-test playwright --dataset-workspace-id 798dfd00-0081-45d3-a7a7-f74f62e57277 \
+  --artifact "Invoice RDL"
+```
+
+Pairing `--dataset-workspace-id` with `--dataset-id`, `--impact-manifest`, or
+a report that already has a local folder is unaffected by either of the two
+behaviors above:
+
 ```bash
 # A checked-in .rdl file resolves both the dataset and its workspace on its own
 fab-test playwright --artifact "Invoice RDL" --env dev
@@ -400,11 +456,11 @@ fab-test playwright-impact --changed-artifacts changed-artifacts.json --env dev 
 fab-test playwright --impact-manifest fab-test-results/playwright/impact-manifest.json --env dev --env-file .env
 ```
 
-Browser setup:
+Browser setup -- `pytest`, `pytest-playwright`, and `pytest-html` are dev-only dependencies of this project, so a `pip install fab-test` consumer needs all three installed separately (plus `pytest-xdist`, needed the moment more than one case runs, which is the default for any report with more than one page):
 
 ```bash
 playwright install chromium
-pip install pytest-html
+pip install pytest pytest-playwright pytest-html pytest-xdist
 ```
 
 ### playwright-impact

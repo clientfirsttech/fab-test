@@ -18,7 +18,7 @@
             "altText": {
               "expr": {
                 "Literal": {
-                  "Value": "''"
+                  "Value": "'KPI group summary'"
                 }
               }
             }

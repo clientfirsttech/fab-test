@@ -22,11 +22,19 @@ from ._analyzer_annotations import (
 from ._analyzer_envelope import severity_counts
 from ._cli_utils import CHECKOUT_REMEDIATION, narrate, skipped_checkout_lines
 from ._config import resolve_setting
-from ._credentials import redact_secrets
+from ._credentials import configured_workspace, redact_secrets
 from ._fab_test_context import (
     _DEFAULT_SUBPROCESS_TIMEOUT,
     _PYPROJECT_CONFIG,
     RESULTS_ROOT,
+)
+from ._playwright_dataset_target import (
+    DatasetTargetExit,
+    dataset_target_requested,
+    dataset_workspace_only_requested,
+    resolve_dataset_targets,
+    resolve_dataset_workspace_artifact,
+    resolve_dataset_workspace_targets,
 )
 from ._playwright_timeout_scaling import (
     Narration as PlaywrightNarration,
@@ -85,7 +93,7 @@ def _is_ci() -> bool:
 def _clean_annotation(line: str) -> str:
     for prefix in _CI_PREFIXES:
         if line.startswith(prefix):
-            return line[len(prefix):]
+            return line[len(prefix) :]
     return line
 
 
@@ -132,9 +140,7 @@ def _verbosity_env(args: argparse.Namespace) -> str:
 _resolve_report = resolve_report
 
 
-def _resolve_timeout(
-    args: argparse.Namespace, config: dict[str, Any] | None = None
-) -> tuple[int, bool]:
+def _resolve_timeout(args: argparse.Namespace, config: dict[str, Any] | None = None) -> tuple[int, bool]:
     """Resolve the per-artifact subprocess timeout via the centralized resolver.
 
     Precedence: --timeout > ANALYZER_TIMEOUT > config file > default.
@@ -157,9 +163,7 @@ def _resolve_timeout(
     return value, origin == "default"
 
 
-def _apply_environment_default(
-    args: argparse.Namespace, config: dict[str, Any]
-) -> None:
+def _apply_environment_default(args: argparse.Namespace, config: dict[str, Any]) -> None:
     """Fill --env via the centralized resolver when not passed.
 
     No-op for subcommands without an --env flag. Precedence:
@@ -183,16 +187,17 @@ def _artifact_exit_code(
 ) -> int:
     """Return the fab-test exit code for a single artifact run.
 
-    Warnings do not fail the build. Errors and tool crashes do.
+    Warnings do not fail the build. Errors and tool crashes do. A wrapper that
+    refused to start (126/127) keeps that code, so setup is not mistaken for a finding.
     """
+    failure = proc_returncode if proc_returncode in (126, 127) else 1
     if envelope is None:
-        return 1 if proc_returncode != 0 else 0
+        return failure if proc_returncode != 0 else 0
     errors, warnings = severity_counts(envelope.get("findings", []))
     if errors > 0:
         return 1
     if proc_returncode != 0 and warnings == 0:
-        # Tool crashed or could not run; propagate the failure.
-        return 1
+        return failure
     return 0
 
 
@@ -286,7 +291,12 @@ def _run_artifact_process(
             _reemit_lines(exc.stdout, output_format)
         if ctx.manifest is not None:
             ctx.manifest.record_artifact(
-                name, display_name, "timeout", None, 0, 0,
+                name,
+                display_name,
+                "timeout",
+                None,
+                0,
+                0,
                 detail=f"exceeded {ctx.timeout}s timeout",
             )
         return (display_name, 1)
@@ -398,9 +408,7 @@ def _run_one_artifact(
         # the flat outer timeout unchanged.
         test_cases_path = _playwright_test_cases_dir(output_dir, artifact) / "test-cases.json"
 
-    result = _run_artifact_process(
-        cmd, ctx, capture_stdout, output_format, name, display_name, test_cases_path
-    )
+    result = _run_artifact_process(cmd, ctx, capture_stdout, output_format, name, display_name, test_cases_path)
     if isinstance(result, tuple):
         return result
     proc = result
@@ -490,7 +498,8 @@ def _playwright_remote_target(args: argparse.Namespace) -> Path | None:
     if target.scope == "path" and target.path is not None:
         return None
     environment = getattr(args, "environment", "") or os.getenv("FABRIC_ENVIRONMENT", "")
-    if not environment:
+    workspace = configured_workspace(args, playwright=False)
+    if not environment and not workspace:
         return None
     return Path(target.name)
 
@@ -507,29 +516,46 @@ def _discover_rdl_files(args: argparse.Namespace, output_dir: Path) -> list[Path
     target = _target_of(args)
     if target is not None and target.type is not None and target.type != "PaginatedReport":
         return []
-    files = _find_rdl_files(
-        Path(args.artifact_dir), excluded_paths=[output_dir]
-    )
+    files = _find_rdl_files(Path(args.artifact_dir), excluded_paths=[output_dir])
     if target is None or target.name is None:
         return files
     return [f for f in files if f.stem == target.name]
+
+
+def _playwright_service_resolved_target(args: argparse.Namespace) -> list[Path] | None:
+    """Return a service-resolved target list for one of playwright's
+    non-local modes, or ``None`` when none apply and ordinary discovery
+    should decide instead.
+
+    Covers an impact manifest (repository-scoped), `--dataset-id` (that
+    dataset's dependents), and `--dataset-workspace-id` alone (every dataset
+    in that workspace) -- split out of `_discover_for` so its own early
+    returns don't count against that function's return-count budget.
+    """
+    if getattr(args, "impact_manifest", None):
+        return [Path(".")]
+    if dataset_target_requested(args):
+        return resolve_dataset_targets(args)
+    if dataset_workspace_only_requested(args):
+        return resolve_dataset_workspace_targets(args)
+    return None
 
 
 def _discover_for(name: str, args: argparse.Namespace, glob: str) -> list[Path]:
     """Return the artifacts ``name`` will run against.
 
     Two analyzers do not discover at all: a repository-scoped one runs once
-    against the repo metadata, and impact-manifest-driven Playwright
-    validates a service-resolved set regardless of what exists locally.
+    against the repo metadata, and impact-manifest- or dataset-driven
+    Playwright validates a service-resolved set whatever exists locally.
     """
     if _is_repository_scoped(name):
         return [Path(".")]
-    if name == "playwright" and getattr(args, "impact_manifest", None):
-        return [Path(".")]
+    if name == "playwright":
+        resolved = _playwright_service_resolved_target(args)
+        if resolved is not None:
+            return resolved
     output_dir = Path(getattr(args, "output_dir", RESULTS_ROOT))
-    discovered = _discover(
-        Path(args.artifact_dir), glob, _target_of(args), output_dir=output_dir
-    )
+    discovered = _discover(Path(args.artifact_dir), glob, _target_of(args), output_dir=output_dir)
     if name == "playwright":
         # playwright's own registered glob only ever covers *.Report, so a
         # paginated report -- a flat .rdl file, never discovered by the
@@ -540,12 +566,16 @@ def _discover_for(name: str, args: argparse.Namespace, glob: str) -> list[Path]:
             remote = _playwright_remote_target(args)
             if remote is not None:
                 return [remote]
+            # Last resort: --dataset-workspace-id with a bare name and no
+            # local match -- resolve it against Fabric to tell a report
+            # from a dataset (Playwright Dataset Target epic).
+            dataset_remote = resolve_dataset_workspace_artifact(args)
+            if dataset_remote is not None:
+                return dataset_remote
     return discovered
 
 
-def _report_no_artifacts(
-    name: str, glob: str, args: argparse.Namespace, *, emit_own_json: bool
-) -> int:
+def _report_no_artifacts(name: str, glob: str, args: argparse.Namespace, *, emit_own_json: bool) -> int:
     """Narrate an empty discovery. Always exits 0 -- nothing matched is not a failure.
 
     An empty result has two very different causes that used to read
@@ -600,8 +630,7 @@ def _report_dry_run(
     output_format = getattr(args, "output_format", "text")
     artifact_dir = Path(args.artifact_dir)
     narrate(
-        f"\nfab-test {name} ({description}) — dry run, "
-        f"{len(artifacts)} artifact(s):",
+        f"\nfab-test {name} ({description}) — dry run, {len(artifacts)} artifact(s):",
         output_format=output_format,
     )
     resolved = _manifest_target(args)
@@ -631,9 +660,7 @@ def _report_dry_run(
         )
         environment = getattr(args, "environment", "") or os.getenv("FABRIC_ENVIRONMENT", "")
         for a in artifacts:
-            preview = _build_telemetry_payload(
-                name, a, {"status": "dry-run", "findings": []}, environment
-            )
+            preview = _build_telemetry_payload(name, a, {"status": "dry-run", "findings": []}, environment)
             narrate("\n  Telemetry preview (not sent):", output_format=output_format)
             narrate(json.dumps(preview, indent=2), output_format=output_format)
     if emit_own_json:
@@ -736,7 +763,10 @@ def _run_analyzer(
         "local",
     )
 
-    artifacts = _discover_for(name, args, glob)
+    try:
+        artifacts = _discover_for(name, args, glob)
+    except DatasetTargetExit as exc:
+        return exc.code
     if not artifacts:
         return _report_no_artifacts(name, glob, args, emit_own_json=emit_own_json)
     if args.dry_run:

@@ -60,8 +60,17 @@ _EVIDENCE_FILENAMES = {
     "event_log": "event_log.json",
 }
 
-# Relative path from repo root to the pytest spec.
-_SPEC_PATH = Path("tests") / "test_playwright_visual.py"
+def _spec_path() -> Path:
+    """Return the packaged Playwright render spec pytest collects.
+
+    Resolved from the installed module's own file, never ``repo_root /
+    "tests"`` -- see render_spec.py's own docstring for why (Playwright CI
+    Guide epic, Render Spec Packaging task).
+    """
+    from .playwright_validation import render_spec
+
+    return Path(render_spec.__file__).resolve()
+
 
 # Default output location for test-case CSV/JSON artifacts.
 _DEFAULT_TEST_CASES_DIR = Path("fab-test-results") / "playwright" / "test-cases"
@@ -370,7 +379,7 @@ def _run_pytest(
     default) when not given explicitly.
     """
     repo_root = _repo_root()
-    spec_path = repo_root / _SPEC_PATH
+    spec_path = _spec_path()
 
     command = [
         sys.executable,
@@ -442,14 +451,14 @@ def _build_config_from_args(
     if args.impact_manifest:
         return config
 
-    # Checked before the client is built: authenticating only to discover
-    # there is no environment to resolve against wastes a round trip, and
-    # reports a credential problem when the real problem is a missing flag.
-    if not args.environment:
+    # Checked before the client is built, so a missing flag isn't reported as a credential
+    # problem. A known workspace is enough: resolve_environment never reads the label then.
+    workspace_id = args.workspace_id or config.workspace_id
+    if not args.environment and not workspace_id:
         raise ServiceResolutionError(
-            "No environment given, so there is nothing to resolve "
-            f"'{args.artifact}' against. Pass --env, set FABRIC_ENVIRONMENT, "
-            "or set `environment:` in fab-test.yml."
+            f"No workspace or environment given, so there is nothing to resolve '{args.artifact}' against. "
+            "Pass --workspace-id or set FABRIC_WORKSPACE_ID (or `workspace:` in fab-test.yml); or pass --env, "
+            "set FABRIC_ENVIRONMENT, or set `environment:` in fab-test.yml to look it up in environments.yml."
         )
 
     client = build_fabric_service_client(
@@ -462,7 +471,7 @@ def _build_config_from_args(
 
     resolved_env = resolve_environment(
         args.environment,
-        workspace_id_override=args.workspace_id or config.workspace_id,
+        workspace_id_override=workspace_id,
     )
     report = resolve_report(
         args.artifact,

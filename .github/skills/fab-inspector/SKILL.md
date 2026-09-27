@@ -148,6 +148,10 @@ RuleLogTypes {
   "error" => test failure
 }
 
+`ENSURE_ALTTEXT` reads an ordinary visual's alt-text from
+`visual.visualContainerObjects.general` and a `visualGroup` container's alt-text from
+`visualGroup.objects.general`. A non-empty value at either applicable path satisfies the rule.
+
 ### Disabling a rule
 
 Set `"disabled": true` in the rules JSON to skip evaluation.

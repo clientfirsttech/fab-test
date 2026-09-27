@@ -150,6 +150,26 @@ def _lookup(
     return "", None
 
 
+def configured_workspace(args: Any, *, playwright: bool) -> str:
+    """Return the workspace a cloud analyzer's run would target, without a network call.
+
+    Mirrors the run's own sources so `doctor` never reports ❌ for a run that
+    succeeds: ``--workspace-id``, ``FABRIC_WORKSPACE_ID``, ``workspace:`` in
+    fab-test.yml, and -- for the Playwright family only, whose config loader
+    reads it -- ``PLAYWRIGHT_WORKSPACE_ID`` from the environment or `.env` file.
+    """
+    workspace = (
+        getattr(args, "workspace_id", "")
+        or os.getenv("FABRIC_WORKSPACE_ID", "")
+        or (getattr(args, "file_config", None) or {}).get("workspace", "")
+    )
+    if workspace or not playwright:
+        return workspace
+    env_path = _resolve_env_path(getattr(args, "playwright_env_file", None))
+    file_values = _parse_env_file(env_path) if env_path.exists() else {}
+    return _lookup("PLAYWRIGHT_WORKSPACE_ID", file_values)[0]
+
+
 def _missing_variable_remediation(
     tenant: str, client_id: str, client_secret: str
 ) -> str:
