@@ -17,5 +17,5 @@
 | `scripts/playwright_validation/power_bi_api.py` | Power BI REST API token helpers |
 | `scripts/playwright_validation/fabric_service_client.py` | Azure Identity service client for Fabric/Power BI REST APIs |
 | `scripts/playwright_validation/resolver.py` | Environment/workspace/report resolution |
-| `tests/test_playwright_visual.py` | pytest-playwright spec that embeds reports |
+| `scripts/playwright_validation/render_spec.py` | pytest-playwright spec that embeds reports (ships in the package; `tests/test_playwright_visual.py` holds its unit tests) |
 | `scripts/_analyzer_envelope.py` | Shared envelope schema builder |

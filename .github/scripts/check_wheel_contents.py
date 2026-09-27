@@ -33,6 +33,7 @@ REQUIRED = [
     "fab_test/metadata/rules/BPARules.json",
     "fab_test/metadata/rules/pbi-inspector-custom-rules.json",
     "fab_test/schemas/fab-test.schema.json",
+    "fab_test/scripts/playwright_validation/render_spec.py",
     "fab_test/skill/SKILL.md",
     "fab_test/skill/references/configuration.md",
     "fab_test/skill/references/credentials.md",

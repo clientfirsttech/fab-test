@@ -164,8 +164,15 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
         ),
     ),
     "src/fab_test/scripts/invoke_playwright.py": (
-        920,
+        929,
         (
+            "2026-09-26: +9 lines replacing the `_SPEC_PATH = Path(\"tests\") / "
+            "\"test_playwright_visual.py\"` constant with `_spec_path()`, resolved "
+            "from the installed `render_spec` module's own file -- a `pip install "
+            "fab-test` consumer has no checkout of this repository's tests/ "
+            "directory, so every real run failed outright until the spec itself "
+            "moved into the package (Playwright CI Guide epic, Render Spec "
+            "Packaging task). "
             "2026-08-31: +11 lines adding --report-parameters and threading "
             "it into the resolved PlaywrightValidationConfig, so a "
             "paginated report's declared parameters reach the pytest spec "
