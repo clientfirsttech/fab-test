@@ -109,11 +109,11 @@ def run_rdl_lint(args: argparse.Namespace) -> int:
     findings: list[dict] = []
     with Timer() as timer:
         try:
-            root = parse_rdl(artifact_path)
+            root, namespace = parse_rdl(artifact_path)
         except RdlParseError as exc:
             parse_error = str(exc)
         else:
-            findings = run_checks(root, catalog)
+            findings = run_checks(root, namespace, catalog)
 
     if parse_error is not None:
         findings = [{"rule": "PARSE", "severity": "error", "object": artifact_path.name, "message": parse_error}]

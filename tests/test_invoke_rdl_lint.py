@@ -17,12 +17,15 @@ _RDL = """<?xml version="1.0" encoding="utf-8"?>
 </Report>
 """
 
+# A rule ID no real check will ever be registered under -- keeps the
+# "unimplemented" tests below decoupled from which real rules Task 4+
+# happens to have implemented so far.
 _CATALOG = {
     "rules": [
         {
-            "id": "DS-02",
-            "name": "No unused datasets",
-            "description": "No unused datasets",
+            "id": "FAKE-UNIMPLEMENTED",
+            "name": "Placeholder for an unimplemented rule",
+            "description": "Placeholder for an unimplemented rule",
             "severity": "error",
             "disabled": False,
         }
@@ -84,40 +87,75 @@ class TestRunRdlLint:
 
         data = json.loads(output.read_text(encoding="utf-8"))
         assert data["test_results"] == [{
-            "rule": "DS-02", "severity": "error", "object": "",
-            "message": "No unused datasets", "status": "skip",
+            "rule": "FAKE-UNIMPLEMENTED", "severity": "error", "object": "",
+            "message": "Placeholder for an unimplemented rule", "status": "skip",
         }]
 
     def test_a_registered_check_that_fires_fails_the_run(self, tmp_path: Path):
         artifact, rules_path, output = _write_fixture(tmp_path)
-        CHECKS["DS-02"] = lambda _root: [{"object": "Sales", "message": "unused dataset"}]
+        rules_path.write_text(
+            json.dumps({"rules": [{"id": "FAKE-01", "name": "n", "severity": "error", "disabled": False}]}),
+            encoding="utf-8",
+        )
+        CHECKS["FAKE-01"] = lambda _root, _namespace: [{"object": "Sales", "message": "unused dataset"}]
         try:
             exit_code = run_rdl_lint(_Args(artifact, rules_path, output))
         finally:
-            del CHECKS["DS-02"]
+            del CHECKS["FAKE-01"]
 
         assert exit_code == 1
         data = json.loads(output.read_text(encoding="utf-8"))
         assert data["status"] == "failed"
         assert data["findings"] == [
-            {"object": "Sales", "message": "unused dataset", "rule": "DS-02", "severity": "error"}
+            {"object": "Sales", "message": "unused dataset", "rule": "FAKE-01", "severity": "error"}
         ]
 
     def test_a_warning_only_run_passes_the_exit_code_but_not_silently(self, tmp_path: Path):
         artifact, rules_path, output = _write_fixture(tmp_path)
         rules_path.write_text(
-            json.dumps({"rules": [{"id": "QRY-07", "name": "n", "severity": "warning", "disabled": False}]}),
+            json.dumps({"rules": [{"id": "FAKE-02", "name": "n", "severity": "warning", "disabled": False}]}),
             encoding="utf-8",
         )
-        CHECKS["QRY-07"] = lambda _root: [{"object": "Sales", "message": "long query"}]
+        CHECKS["FAKE-02"] = lambda _root, _namespace: [{"object": "Sales", "message": "long query"}]
         try:
             exit_code = run_rdl_lint(_Args(artifact, rules_path, output))
         finally:
-            del CHECKS["QRY-07"]
+            del CHECKS["FAKE-02"]
 
         assert exit_code == 0
         data = json.loads(output.read_text(encoding="utf-8"))
         assert data["status"] == "warning"
+
+    def test_ds02_fires_through_the_real_wrapper_for_a_genuinely_unused_dataset(self, tmp_path: Path):
+        """End-to-end confirmation that a real, permanently-registered rule
+        (not a monkeypatched stand-in) reaches the wrapper's envelope --
+        the unit-level behavior is covered in test_rdl_lint.py."""
+        artifact = tmp_path / "Sales.rdl"
+        artifact.write_text(
+            '<Report xmlns="http://schemas.microsoft.com/sqlserver/reporting/2016/01/reportdefinition">'
+            '<DataSets><DataSet Name="Orphan"><Query><DataSourceName>DS1</DataSourceName>'
+            "<CommandText>EVALUATE 'T'</CommandText></Query></DataSet></DataSets>"
+            "<Body />"
+            "</Report>",
+            encoding="utf-8",
+        )
+        rules_path = tmp_path / "rdl-rules.json"
+        rules_path.write_text(
+            json.dumps({
+                "rules": [
+                    {"id": "DS-02", "description": "No unused datasets", "severity": "error", "disabled": False}
+                ]
+            }),
+            encoding="utf-8",
+        )
+        output = tmp_path / "out.json"
+
+        exit_code = run_rdl_lint(_Args(artifact, rules_path, output))
+
+        assert exit_code == 1
+        data = json.loads(output.read_text(encoding="utf-8"))
+        assert data["findings"][0]["rule"] == "DS-02"
+        assert data["findings"][0]["object"] == "Orphan"
 
     def test_a_malformed_rdl_reports_one_error_finding_rather_than_raising(self, tmp_path: Path):
         artifact = tmp_path / "Broken.rdl"

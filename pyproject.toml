@@ -220,6 +220,7 @@ max-args = 8
     "S105",   # hardcoded password string
     "S106",   # hardcoded password argument
     "S314",   # xml parsing of fixture data
+    "S608",   # literal SQL text in .rdl CommandText fixtures, never executed
     "ARG001", # stub function arguments
     "ARG002", # stub method arguments
     "ARG005", # stub lambda arguments
