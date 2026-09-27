@@ -97,7 +97,7 @@ class TestRunRdlLint:
             json.dumps({"rules": [{"id": "FAKE-01", "name": "n", "severity": "error", "disabled": False}]}),
             encoding="utf-8",
         )
-        CHECKS["FAKE-01"] = lambda _root, _namespace: [{"object": "Sales", "message": "unused dataset"}]
+        CHECKS["FAKE-01"] = lambda _root, _namespace, _rule: [{"object": "Sales", "message": "unused dataset"}]
         try:
             exit_code = run_rdl_lint(_Args(artifact, rules_path, output))
         finally:
@@ -116,7 +116,7 @@ class TestRunRdlLint:
             json.dumps({"rules": [{"id": "FAKE-02", "name": "n", "severity": "warning", "disabled": False}]}),
             encoding="utf-8",
         )
-        CHECKS["FAKE-02"] = lambda _root, _namespace: [{"object": "Sales", "message": "long query"}]
+        CHECKS["FAKE-02"] = lambda _root, _namespace, _rule: [{"object": "Sales", "message": "long query"}]
         try:
             exit_code = run_rdl_lint(_Args(artifact, rules_path, output))
         finally:

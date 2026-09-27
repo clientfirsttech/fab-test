@@ -19,11 +19,14 @@ from pathlib import Path
 from typing import Any
 
 Finding = dict[str, Any]
-# Every check gets the same two arguments -- the parsed (namespace-stripped)
-# report root, and the report's own original schema namespace URI -- even
-# though only STR-01 reads the second one. One dataset name shape is
-# simpler than a dataclass wrapper for the one rule that needs it.
-RdlCheck = Callable[[ET.Element, str], list[Finding]]
+# Every check gets the same three arguments -- the parsed (namespace-
+# stripped) report root, the report's own original schema namespace URI,
+# and its own catalog entry (so a rule with a configurable threshold, e.g.
+# QRY-07's line count or SUB-02's subreport count, reads it from the
+# catalog rather than a hardcoded constant) -- even though most checks
+# ignore the second and third. One uniform shape is simpler than a
+# dataclass wrapper for the few rules that need the extra context.
+RdlCheck = Callable[[ET.Element, str, dict[str, Any]], list[Finding]]
 
 CURRENT_RDL_NAMESPACE = "http://schemas.microsoft.com/sqlserver/reporting/2016/01/reportdefinition"
 
@@ -105,7 +108,7 @@ def run_checks(root: ET.Element, namespace: str, catalog: list[dict[str, Any]]) 
             continue
         findings.extend(
             {**finding, "rule": rule["id"], "severity": finding.get("severity", rule.get("severity", "warning"))}
-            for finding in check(root, namespace)
+            for finding in check(root, namespace, rule)
         )
     return findings
 
@@ -134,7 +137,7 @@ def _dataset_provider(root: ET.Element, query: ET.Element) -> str:
 # --------------------------------------------------------------------------- #
 
 
-def _check_str01_current_schema(_root: ET.Element, namespace: str) -> list[Finding]:
+def _check_str01_current_schema(_root: ET.Element, namespace: str, _rule: dict[str, Any]) -> list[Finding]:
     if namespace and namespace != CURRENT_RDL_NAMESPACE:
         return [{
             "object": "Report",
@@ -149,7 +152,7 @@ def _check_str01_current_schema(_root: ET.Element, namespace: str) -> list[Findi
 _CREDENTIAL_PATTERN = re.compile(r"(?i)\b(password|pwd)\s*=")
 
 
-def _check_ds01_shared_data_source(root: ET.Element, _namespace: str) -> list[Finding]:
+def _check_ds01_shared_data_source(root: ET.Element, _namespace: str, _rule: dict[str, Any]) -> list[Finding]:
     findings: list[Finding] = []
     for source in root.findall(".//DataSources/DataSource"):
         name = source.get("Name") or "?"
@@ -181,7 +184,7 @@ def _check_ds01_shared_data_source(root: ET.Element, _namespace: str) -> list[Fi
     return findings
 
 
-def _check_ds02_unused_datasets(root: ET.Element, _namespace: str) -> list[Finding]:
+def _check_ds02_unused_datasets(root: ET.Element, _namespace: str, _rule: dict[str, Any]) -> list[Finding]:
     dataset_names = {ds.get("Name") for ds in root.findall(".//DataSets/DataSet") if ds.get("Name")}
     if not dataset_names:
         return []
@@ -217,7 +220,7 @@ _SQL_SELECT_STAR = re.compile(r"(?i)select\s+\*")
 _DAX_BARE_EVALUATE_TABLE = re.compile(r"(?is)^\s*evaluate\s+'[^']+'\s*$")
 
 
-def _check_ds05_no_select_star(root: ET.Element, _namespace: str) -> list[Finding]:
+def _check_ds05_no_select_star(root: ET.Element, _namespace: str, _rule: dict[str, Any]) -> list[Finding]:
     findings: list[Finding] = []
     for dataset in root.findall(".//DataSets/DataSet"):
         name = dataset.get("Name") or "?"
@@ -243,7 +246,7 @@ def _check_ds05_no_select_star(root: ET.Element, _namespace: str) -> list[Findin
     return findings
 
 
-def _check_ds07_prefer_stored_procedures(root: ET.Element, _namespace: str) -> list[Finding]:
+def _check_ds07_prefer_stored_procedures(root: ET.Element, _namespace: str, _rule: dict[str, Any]) -> list[Finding]:
     findings: list[Finding] = []
     for dataset in root.findall(".//DataSets/DataSet"):
         name = dataset.get("Name") or "?"
@@ -266,12 +269,190 @@ def _check_ds07_prefer_stored_procedures(root: ET.Element, _namespace: str) -> l
     return findings
 
 
+# --------------------------------------------------------------------------- #
+# Query pushdown rules (QRY-01 .. QRY-07)
+# --------------------------------------------------------------------------- #
+
+
+def _check_qry01_filter_in_query(root: ET.Element, _namespace: str, _rule: dict[str, Any]) -> list[Finding]:
+    findings: list[Finding] = []
+    for dataset in root.findall(".//DataSets/DataSet"):
+        filters = dataset.find("Filters")
+        if filters is not None and filters.findall("Filter"):
+            findings.append({
+                "object": dataset.get("Name") or "?",
+                "message": (
+                    "DataSet/Filters present -- prefer a WHERE clause or query "
+                    "parameter; a report filter fetches everything first"
+                ),
+            })
+    for tablix in root.iter("Tablix"):
+        filters = tablix.find("Filters")
+        if filters is not None and filters.findall("Filter"):
+            findings.append({
+                "object": tablix.get("Name") or "?",
+                "message": (
+                    "Tablix/Filters present -- prefer a WHERE clause or query "
+                    "parameter; a report filter fetches everything first"
+                ),
+            })
+    return findings
+
+
+def _check_qry02_no_calculated_fields(root: ET.Element, _namespace: str, _rule: dict[str, Any]) -> list[Finding]:
+    findings: list[Finding] = []
+    for dataset in root.findall(".//DataSets/DataSet"):
+        fields = dataset.find("Fields")
+        if fields is None:
+            continue
+        findings.extend(
+            {
+                "object": field.get("Name") or "?",
+                "message": (
+                    "Field has a Value expression instead of DataField -- "
+                    "move the expression into the query"
+                ),
+            }
+            for field in fields.findall("Field")
+            if field.find("Value") is not None
+        )
+    return findings
+
+
+# QRY-03 is deliberately scoped to an aggregate called with an explicit
+# dataset-scope argument (e.g. =Sum(Fields!X.Value, "Sales")) -- the shape
+# that aggregates an entire named dataset from inside a report expression,
+# not a plain =Sum(Fields!X.Value) in a tablix group/total footer,  which
+# is the normal, correct way RDL shows a total and would otherwise flood
+# every ordinary report with false positives.
+_AGGREGATE_WITH_DATASET_SCOPE = re.compile(r'(?i)\b(sum|count|countdistinct|avg|max|min)\s*\([^()]*,\s*"([^"]+)"\s*\)')
+
+
+def _check_qry03_aggregate_in_query(root: ET.Element, _namespace: str, _rule: dict[str, Any]) -> list[Finding]:
+    findings: list[Finding] = []
+    seen: set[tuple[str, str]] = set()
+    for element in root.iter():
+        text = (element.text or "").strip()
+        if not text.startswith("="):
+            continue
+        for match in _AGGREGATE_WITH_DATASET_SCOPE.finditer(text):
+            func, dataset_name = match.group(1), match.group(2)
+            key = (func.lower(), dataset_name)
+            if key in seen:
+                continue
+            seen.add(key)
+            findings.append({
+                "object": dataset_name,
+                "message": (
+                    f"{func}(...) aggregates dataset '{dataset_name}' entirely in a "
+                    "report expression -- use GROUP BY in the query for a large detail dataset"
+                ),
+            })
+    return findings
+
+
+def _check_qry04_sort_in_query(root: ET.Element, _namespace: str, _rule: dict[str, Any]) -> list[Finding]:
+    findings: list[Finding] = []
+    for group in root.iter("Group"):
+        sort_expressions = group.find("SortExpressions")
+        if sort_expressions is not None and sort_expressions.findall("SortExpression"):
+            findings.append({
+                "object": group.get("Name") or "?",
+                "message": (
+                    "Group has explicit SortExpressions -- an order the query "
+                    "could already provide via ORDER BY"
+                ),
+            })
+    return findings
+
+
+_TYPE_CONVERSION = re.compile(r"(?i)\b(CDate|CInt|CDec|CStr)\s*\(\s*([^()]+?)\s*\)")
+
+
+def _check_qry05_convert_types_in_query(root: ET.Element, _namespace: str, _rule: dict[str, Any]) -> list[Finding]:
+    # Given a type-conversion function applied to the same field in more
+    # than one expression, reports once per (function, field) pair, not
+    # once per occurrence -- counted first, findings built after.
+    counts: dict[tuple[str, str], int] = {}
+    for element in root.iter():
+        text = (element.text or "").strip()
+        if not text.startswith("="):
+            continue
+        for match in _TYPE_CONVERSION.finditer(text):
+            key = (match.group(1), match.group(2).strip())
+            counts[key] = counts.get(key, 0) + 1
+    return [
+        {
+            "object": field,
+            "message": f"{func}({field}) is repeated across expressions -- cast once in the query",
+        }
+        for (func, field), count in sorted(counts.items())
+        if count >= 2
+    ]
+
+
+_LOOKUP_CALL = re.compile(r"(?i)\b(Lookup|LookupSet|MultiLookup)\s*\(")
+
+
+def _check_qry06_join_in_query(root: ET.Element, _namespace: str, _rule: dict[str, Any]) -> list[Finding]:
+    findings: list[Finding] = []
+    for element in root.iter():
+        text = (element.text or "").strip()
+        if not text.startswith("="):
+            continue
+        match = _LOOKUP_CALL.search(text)
+        if match is None:
+            continue
+        snippet = text if len(text) <= 60 else text[:60] + "..."
+        findings.append({
+            "object": snippet,
+            "message": (
+                f"{match.group(1)}(...) in an expression -- replace with a SQL join, "
+                "or a Power BI semantic model when sources differ"
+            ),
+        })
+    return findings
+
+
+_DEFAULT_QRY07_MAX_LINES = 50
+
+
+def _check_qry07_move_complex_sql(root: ET.Element, _namespace: str, rule: dict[str, Any]) -> list[Finding]:
+    max_lines = rule.get("max_lines", _DEFAULT_QRY07_MAX_LINES)
+    findings: list[Finding] = []
+    for dataset in root.findall(".//DataSets/DataSet"):
+        query = dataset.find("Query")
+        if query is None:
+            continue
+        provider = _dataset_provider(root, query)
+        if provider in _NON_RELATIONAL_PROVIDERS:
+            continue
+        command_text = query.findtext("CommandText") or ""
+        line_count = len(command_text.splitlines())
+        if line_count > max_lines:
+            findings.append({
+                "object": dataset.get("Name") or "?",
+                "message": (
+                    f"CommandText is {line_count} line(s), over the {max_lines}-line "
+                    "threshold -- move complex SQL into a view or stored procedure"
+                ),
+            })
+    return findings
+
+
 CHECKS.update({
     "STR-01": _check_str01_current_schema,
     "DS-01": _check_ds01_shared_data_source,
     "DS-02": _check_ds02_unused_datasets,
     "DS-05": _check_ds05_no_select_star,
     "DS-07": _check_ds07_prefer_stored_procedures,
+    "QRY-01": _check_qry01_filter_in_query,
+    "QRY-02": _check_qry02_no_calculated_fields,
+    "QRY-03": _check_qry03_aggregate_in_query,
+    "QRY-04": _check_qry04_sort_in_query,
+    "QRY-05": _check_qry05_convert_types_in_query,
+    "QRY-06": _check_qry06_join_in_query,
+    "QRY-07": _check_qry07_move_complex_sql,
 })
 
 
