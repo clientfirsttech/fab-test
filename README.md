@@ -262,7 +262,7 @@ A run with 5 report x page x bookmark cases and 1 real failure now says so:
 `envelope.json`'s `test_results` carries one row per case with that case's own
 real outcome, so `findings` names only the case that actually failed instead of
 tagging all 5 identically. Each row also points at that case's own evidence
-(`fab-test-results/playwright/test-cases/<case>/screenshot.png`, plus
+(`fab-test-results/playwright/<report>/test-cases/<case>/screenshot.png`, plus
 `console.json`/`network.json` when there's something to capture) and links
 straight back to the report page/bookmark it validated on `app.powerbi.com`;
 `--report` renders both as links right in the table, and the same paths are in
