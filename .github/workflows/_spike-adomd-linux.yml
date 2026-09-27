@@ -10,6 +10,8 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install pythonnet
+      - name: Show what .NET is already on this runner
+        run: dotnet --list-runtimes || echo "no dotnet on PATH"
       - name: Try loading net8.0 ADOMD.NET assembly under pythonnet on Linux
         run: |
           python - <<'PY'
@@ -39,6 +41,12 @@ jobs:
           print("Extracted to", extract_dir, "-", os.listdir(extract_dir))
 
           sys.path.append(extract_dir)
+          # pythonnet defaults to Mono on Linux unless told otherwise; the
+          # bare runner has neither Mono nor an explicit CoreCLR pointer, so
+          # the first attempt here failed with "Could not find libmono"
+          # before ever touching the net8.0 assembly. ubuntu-latest ships a
+          # .NET SDK already -- point pythonnet at it explicitly.
+          os.environ["PYTHONNET_RUNTIME"] = "coreclr"
           import clr  # noqa: E402
 
           clr.AddReference("Microsoft.AnalysisServices.AdomdClient")
