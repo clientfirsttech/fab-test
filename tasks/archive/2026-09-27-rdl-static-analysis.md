@@ -1,7 +1,7 @@
 # RDL Static Analysis Epic
 
-**Status**: 🔄 IN-PROGRESS (8/8 rule-implementation tasks done; all 28 Tier A rules real. Documentation is the last remaining task.)
-**Goal**: `fab-test rdl` runs the 28 Tier A rules from [plan/rdl-rule-set.md](../plan/rdl-rule-set.md) against local `.rdl` files, with no workspace and no new dependency.
+**Status**: ✅ COMPLETED (2026-09-27)
+**Goal**: `fab-test rdl` runs the 28 Tier A rules from [plan/rdl-rule-set.md](../../plan/rdl-rule-set.md) against local `.rdl` files, with no workspace and no new dependency.
 
 ## Overview
 
@@ -118,3 +118,20 @@ Update all three callers with the `document` skill, then bump the MINOR version.
 - Given the README, should show `fab-test rdl` running on a sample `.rdl` and list each rule ID with its severity and source
 - Given the fab-test skill, should document `rdl`'s targets, exit codes, and finding shape in SudoLang, with the packaged copy kept identical (`tests/test_skill_resource.py`)
 - Given the pipeline docs, should give a copy-paste YAML step that fails only on High findings
+
+---
+
+## Closing notes (added at archive time)
+
+All 9 tasks (discovery + 8 implementation/documentation tasks) completed and
+committed independently on `feat/rdl-static-analysis`, each verified through
+the real installed CLI against the repository's own sample `.rdl` files
+before committing, not just through unit tests. See
+[plan.md](../../plan.md)'s Completed Epics entry for the full summary,
+including the real defects and judgment calls found along the way.
+
+The README's "list each rule ID with its severity and source" line in the
+Documentation task above was interpreted narrowly: the worked example and
+the skill's `references/flags.md` describe the rule *families* and point to
+`plan/rdl-rule-set.md` for the full 28-row table, rather than duplicating
+that table a third time in README.md itself.
