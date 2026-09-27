@@ -15,9 +15,9 @@ on:
   workflow_dispatch:
     inputs:
       artifact:
-        description: "Report name (default: a known-good report). Leave blank with dataset_workspace_id alone to run every dataset in the workspace."
+        description: "Report name to test. Leave blank with dataset_workspace_id alone to run every dataset in the workspace."
         required: false
-        default: "SampleModel-PQLAssert"
+        default: ""
       dataset_id:
         description: "Semantic model ID -- tests every report built on it instead of one named report"
         required: false
@@ -84,8 +84,16 @@ jobs:
       # so one install covers fab-test and everything Playwright needs.
       # The browsers themselves come from the container image above, not
       # from this install.
+      #
+      # --user: uid 1001 (set by the container's --user 1001 above) can't
+      # write to the site-packages actions/setup-python installed as
+      # whatever uid provisioned it, so `fab-test`'s console-script lands
+      # under $HOME/.local instead -- which the container's default PATH
+      # doesn't include, hence appending its bin dir to GITHUB_PATH here.
       - name: Install fab-test from the checkout
-        run: pip install -e ".[dev]"
+        run: |
+          pip install --user -e ".[dev]"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       # `doctor` has no `--workspace-id` flag and no visibility into --env /
       # environments.yml, so it reports every cloud analyzer as "no
