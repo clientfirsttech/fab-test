@@ -276,15 +276,23 @@ any text it finds to `embed_error_details.txt` and folding it into the
 failure message -- so `envelope.json` names a permissions/token-scope problem
 instead of restating "did not render within 180000ms".
 
+**Running this in CI** is a separate setup from the local config above --
+service principal registration, tenant settings, workspace role, and the
+GitHub Environment/secrets a workflow reads. See
+[docs/PLAYWRIGHT-CI.md](docs/PLAYWRIGHT-CI.md) for the full walkthrough and
+[docs/examples/github-actions/playwright-live.yml](docs/examples/github-actions/playwright-live.yml)
+for a copy-ready workflow.
+
 ### Playwright tests every page, bookmark, and role by default
 
 `fab-test playwright` discovers a report's pages, each page's own bookmarks,
 and (when RLS is enabled) the semantic model's roles, and tests the full
-matrix, not just whichever tab opens first. Discovery needs `Report.Read.All`
-and `SemanticModel.Read.All` on the service principal in addition to what
-embedding already required; a missing grant logs a warning and falls back to
-testing the one default page rather than failing the run. Turn a dimension off
-with `--pages none` / `--roles none`:
+matrix, not just whichever tab opens first. Discovery needs the full
+permission set in [docs/PLAYWRIGHT-CI.md](docs/PLAYWRIGHT-CI.md#1-register-the-service-principal)
+on the service principal in addition to what embedding already required; a
+missing grant logs a warning and falls back to testing the one default page
+rather than failing the run. Turn a dimension off with `--pages none` /
+`--roles none`:
 
 ```bash
 # Every page, every page's bookmarks, every role

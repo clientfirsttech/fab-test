@@ -167,10 +167,11 @@ Playwright validation can run in three modes: static `.env` mode, service-resolv
 **By default, `playwright` tests every page, every page's own bookmarks, and every
 RLS role — not just the default tab.** `--pages none`/`--roles none` (or `PLAYWRIGHT_PAGE_IDS`/
 `--page-ids`, which skip discovery entirely as an explicit override) fall back to the
-one-case shape every prior release had. Discovery needs `Report.Read.All` (pages,
-bookmarks) and `SemanticModel.Read.All` (roles) on the service principal beyond what
-embedding already required; a missing grant logs a warning and falls back to the
-single-case shape rather than failing the run. Each role gets its own embed token —
+one-case shape every prior release had. Discovery needs the full permission set in
+[docs/PLAYWRIGHT-CI.md](../../../../docs/PLAYWRIGHT-CI.md#1-register-the-service-principal)
+on the service principal beyond what embedding already required; a missing grant
+logs a warning and falls back to the single-case shape rather than failing the
+run. Each role gets its own embed token —
 a token carries its RLS identity, so one token cannot cover two roles — and
 discovered roles with no `PLAYWRIGHT_USER_NAME` abort before any token is minted
 rather than silently testing no role at all (`GenerateToken` drops the identity
