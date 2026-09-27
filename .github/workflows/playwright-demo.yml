@@ -77,12 +77,32 @@ jobs:
       - name: Install the browser
         run: playwright install --with-deps chromium
 
-      # Credential-only here: workspace readiness for --env is resolved
-      # from environments.yml by the real run below, which `doctor` has no
-      # visibility into. A `workspace_id` override makes this row fully
-      # accurate too.
+      # `doctor` has no `--workspace-id` flag and no visibility into --env /
+      # environments.yml, so it reports every cloud analyzer as "no
+      # workspace ... resolved" and exits 1 even when the service principal
+      # is fully configured -- resolve the same workspace the run step below
+      # will use and export it as FABRIC_WORKSPACE_ID (the one source
+      # `doctor` does read) so this row reflects the real run.
       - name: Confirm the service principal is ready
-        run: fab-test doctor
+        env:
+          FABRIC_WORKSPACE_ID: ${{ inputs.workspace_id }}
+        run: |
+          if [ -z "$FABRIC_WORKSPACE_ID" ]; then
+            export FABRIC_WORKSPACE_ID=$(python - <<'PY'
+          from fab_test.scripts.playwright_validation.resolver import (
+              ServiceResolutionError,
+              resolve_environment,
+          )
+
+          override = "${{ inputs.dataset_workspace_id }}"
+          try:
+              print(resolve_environment("${{ inputs.environment }}", workspace_id_override=override).workspace_id)
+          except ServiceResolutionError:
+              pass
+          PY
+          )
+          fi
+          fab-test doctor
 
       - name: Run fab-test playwright
         id: playwright
