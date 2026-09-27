@@ -335,6 +335,16 @@ fab-test playwright --dataset-id 5bf5a7e1-65e5-4d74-944b-1ada5941a664 \
   --dataset-workspace-id c4698d28-b05c-40bc-926c-707563ac85e7
 ```
 
+**`--dataset-workspace-id` alone -- no `--dataset-id`, `--artifact`, target, or
+`--impact-manifest` -- refuses (exit `2`) before any artifact runs.** Nothing
+else would say *which* dataset it names the workspace of, and
+`_dataset_override_for_command` applies an explicit `--dataset-workspace-id`
+unconditionally to every artifact discovery finds; without this refusal that
+forced every locally discovered report onto that workspace instead, commonly
+one the caller's service principal has no access to at all. Pair it with
+`--dataset-id` (dataset-targeted mode, above), or scope it to one report with
+`--artifact`/a target/`--impact-manifest`, both unaffected by this refusal.
+
 ```bash
 # A checked-in .rdl file resolves both the dataset and its workspace on its own
 fab-test playwright --artifact "Invoice RDL" --env dev
@@ -415,11 +425,11 @@ fab-test playwright-impact --changed-artifacts changed-artifacts.json --env dev 
 fab-test playwright --impact-manifest fab-test-results/playwright/impact-manifest.json --env dev --env-file .env
 ```
 
-Browser setup:
+Browser setup -- `pytest`, `pytest-playwright`, and `pytest-html` are dev-only dependencies of this project, so a `pip install fab-test` consumer needs all three installed separately (plus `pytest-xdist`, needed the moment more than one case runs, which is the default for any report with more than one page):
 
 ```bash
 playwright install chromium
-pip install pytest-html
+pip install pytest pytest-playwright pytest-html pytest-xdist
 ```
 
 ### playwright-impact

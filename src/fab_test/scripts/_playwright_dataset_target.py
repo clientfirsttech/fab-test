@@ -50,6 +50,39 @@ def dataset_target_requested(args: argparse.Namespace) -> bool:
     )
 
 
+def refuse_dataset_workspace_without_dataset_id(args: argparse.Namespace) -> None:
+    """Refuse a batch run left ambiguous by `--dataset-workspace-id` alone.
+
+    `_dataset_override_for_command` applies an explicit
+    `--dataset-workspace-id` unconditionally, to every artifact discovery
+    finds -- with no `--dataset-id` to say *which* dataset it names the
+    workspace of, and no `--artifact`/target/`--impact-manifest` naming one
+    report either, that would force every locally discovered report onto
+    that workspace instead, commonly one the caller's service principal has
+    no access to at all. Raises before any artifact runs; a single-report
+    override (`--artifact`, a target, or `--impact-manifest`) is unaffected.
+
+    Raises:
+        DatasetTargetExit: 2, always, when called for an ambiguous batch.
+    """
+    if (
+        not getattr(args, "dataset_workspace_id", "")
+        or getattr(args, "dataset_id", "")
+        or getattr(args, "impact_manifest", None)
+        or target_from_args(args) is not None
+    ):
+        return
+    workspace_id = args.dataset_workspace_id
+    print(
+        f"  ✗ fab-test playwright: --dataset-workspace-id {workspace_id} with no --dataset-id "
+        "would force every locally discovered report onto that workspace's dataset instead of "
+        "targeting one. Pass --dataset-id too (to test that dataset's own reports), or --artifact "
+        "NAME / a target (to override one report's dataset workspace).",
+        file=sys.stderr,
+    )
+    raise DatasetTargetExit(2)
+
+
 def _lookup_workspaces(args: argparse.Namespace) -> list[str]:
     """The dataset's workspace, then the report workspace the run itself would
     target, deduplicated."""

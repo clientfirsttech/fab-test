@@ -28,7 +28,12 @@ from ._fab_test_context import (
     _PYPROJECT_CONFIG,
     RESULTS_ROOT,
 )
-from ._playwright_dataset_target import DatasetTargetExit, dataset_target_requested, resolve_dataset_targets
+from ._playwright_dataset_target import (
+    DatasetTargetExit,
+    dataset_target_requested,
+    refuse_dataset_workspace_without_dataset_id,
+    resolve_dataset_targets,
+)
 from ._playwright_timeout_scaling import (
     Narration as PlaywrightNarration,
 )
@@ -524,6 +529,8 @@ def _discover_for(name: str, args: argparse.Namespace, glob: str) -> list[Path]:
     """
     if _is_repository_scoped(name):
         return [Path(".")]
+    if name == "playwright":
+        refuse_dataset_workspace_without_dataset_id(args)
     if name == "playwright" and getattr(args, "impact_manifest", None):
         return [Path(".")]
     if name == "playwright" and dataset_target_requested(args):

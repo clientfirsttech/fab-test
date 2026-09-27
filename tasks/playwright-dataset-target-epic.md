@@ -21,3 +21,20 @@ Resolve the dependent reports of the named dataset live and run Playwright on on
 - Given a dataset with no dependent reports in scope, should exit 0 with a notice that nothing was found
 - Given a dependent report rendered in dataset mode, should embed it against the named dataset and dataset workspace
 - Given `--dataset-id` together with `--artifact`, should keep today's behavior: override that one report's dataset binding
+
+## Dataset workspace given without a dataset to scope it
+
+Live-verifying the dataset-targeted run above (`--dataset-workspace-id c4698d28... --dataset-id 5bf5a7e1...`,
+which correctly resolved and ran only the dependent report) surfaced a sibling bug: `--dataset-workspace-id`
+*alone*, with no `--dataset-id` and no `--artifact`, forces every locally discovered report onto that
+workspace's dataset instead of refusing -- `_dataset_override_for_command` applies an explicit
+`--dataset-workspace-id` unconditionally, to every artifact discovery finds, whether or not that artifact
+has anything to do with the named workspace. A caller who names a dataset's workspace but not the dataset
+itself, and names no report either, gets a full batch run silently mistargeted at a workspace their service
+principal commonly has no access to, instead of a fast, clear refusal.
+
+**Requirements**:
+- Given `--dataset-workspace-id` alone -- no `--dataset-id`, `--artifact`, target, or `--impact-manifest` --
+  should refuse before any artifact runs, naming both flags
+- Given `--dataset-workspace-id` with `--dataset-id` (dataset-targeted mode) or `--artifact` (single-report
+  override) or `--impact-manifest`, should keep today's behavior unchanged
