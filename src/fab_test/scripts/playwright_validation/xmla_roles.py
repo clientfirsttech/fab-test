@@ -73,7 +73,9 @@ def _download_adomd(lib_folder: str) -> Path:
                 if not member.startswith(prefix) or member.endswith("/"):
                     continue
                 rel = member[len(prefix) :]
-                dest = cache / rel
+                dest = (cache / rel).resolve()
+                if not dest.is_relative_to(cache.resolve()):
+                    raise OSError(f"unsafe path in ADOMD.NET package: {member}")
                 dest.parent.mkdir(parents=True, exist_ok=True)
                 with archive.open(member) as src, open(dest, "wb") as out:
                     out.write(src.read())

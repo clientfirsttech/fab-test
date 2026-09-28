@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import builtins
+import zipfile
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -154,6 +155,29 @@ def test_download_adomd_reuses_existing_cache(tmp_path) -> None:
 
     assert result == cache
     mock_urlretrieve.assert_not_called()
+
+
+def test_download_adomd_rejects_a_path_traversal_member(tmp_path) -> None:
+    """A malicious or corrupted nupkg member (e.g. `lib/net8.0/../../../evil.dll`)
+    must never be written outside the cache directory (zip slip, CWE-22) --
+    the package comes from a fixed, pinned nuget.org URL, but the extraction
+    itself should not trust member names regardless."""
+    cache = tmp_path / "cache"
+    nupkg = tmp_path / "adomd.nupkg"
+    with zipfile.ZipFile(nupkg, "w") as archive:
+        archive.writestr("lib/net8.0/../../../evil.dll", b"payload")
+
+    with (
+        patch.object(xmla_roles, "_cache_dir", return_value=cache),
+        patch(
+            "fab_test.scripts.playwright_validation.xmla_roles.urllib.request.urlretrieve",
+            side_effect=lambda _url, dest: __import__("shutil").copy(nupkg, dest),
+        ),
+        pytest.raises(OSError, match="unsafe path"),
+    ):
+        _download_adomd("net8.0")
+
+    assert not (tmp_path / "evil.dll").exists()
 
 
 def test_ensure_adomd_loaded_wraps_clr_runtime_failure(monkeypatch) -> None:
