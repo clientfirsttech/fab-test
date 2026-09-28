@@ -73,6 +73,7 @@ telemetry-lakehouse = [
     "azure-storage-file-datalake==12.25.0",
 ]
 dev = [
+    "pre-commit",
     "ruff>=0.15",
     "pytest",
     "pytest-cov",
