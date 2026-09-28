@@ -1,0 +1,34 @@
+[
+    {
+        "test_case": "2a981b2c-0dc1-43df-8797-d078c5a8cb82",
+        "workspace_id": "c4698d28-b05c-40bc-926c-707563ac85e7",
+        "report_id": "916325b9-944c-4f8c-b79b-668e6c830a05",
+        "report_name": "PaginatedExample-WithFilter",
+        "dataset_ids": [
+            {
+                "id": "4c353b5c-d311-4e90-b9d1-5766b87f59dc",
+                "xmlaPermissions": "ReadOnly"
+            }
+        ],
+        "wait_seconds": 20
+    },
+    {
+        "test_case": "71d94400-2aa3-404e-ae84-3085ff288f04",
+        "workspace_id": "c4698d28-b05c-40bc-926c-707563ac85e7",
+        "report_id": "916325b9-944c-4f8c-b79b-668e6c830a05",
+        "report_name": "PaginatedExample-WithFilter",
+        "dataset_ids": [
+            {
+                "id": "4c353b5c-d311-4e90-b9d1-5766b87f59dc",
+                "xmlaPermissions": "ReadOnly"
+            }
+        ],
+        "report_parameters": [
+            {
+                "name": "ReportParameter1",
+                "value": "2"
+            }
+        ],
+        "wait_seconds": 20
+    }
+]

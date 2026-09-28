@@ -1,0 +1,5 @@
+"test_case","workspace_id","report_id","report_name","page_id","page_name","dataset_id","role","user_name","expected_status"
+"1e22e669-7c57-4e1d-998f-9e70459e0d41","c4698d28-b05c-40bc-926c-707563ac85e7","5ec7214c-51d8-41fd-a5d7-f1f572c48c76","RLSTest-ThinReport","8189e52cdb8f5fb2b2cf","Page 1","ea073e0c-4655-4ad5-b483-9d9b382c418d","Team A","john@kerski.net","pass"
+"d7088bee-0e66-48e8-9102-385265303a6e","c4698d28-b05c-40bc-926c-707563ac85e7","5ec7214c-51d8-41fd-a5d7-f1f572c48c76","RLSTest-ThinReport","8189e52cdb8f5fb2b2cf","Page 1","ea073e0c-4655-4ad5-b483-9d9b382c418d","Team B","john@kerski.net","pass"
+"10a0d1ec-5fc8-41c9-9759-f64326ab8b71","c4698d28-b05c-40bc-926c-707563ac85e7","5ec7214c-51d8-41fd-a5d7-f1f572c48c76","RLSTest-ThinReport","76b3b7e1b330753127fa","Page 2","ea073e0c-4655-4ad5-b483-9d9b382c418d","Team A","john@kerski.net","pass"
+"fbf58efa-997c-4acc-af18-1ed9a36c02d4","c4698d28-b05c-40bc-926c-707563ac85e7","5ec7214c-51d8-41fd-a5d7-f1f572c48c76","RLSTest-ThinReport","76b3b7e1b330753127fa","Page 2","ea073e0c-4655-4ad5-b483-9d9b382c418d","Team B","john@kerski.net","pass"

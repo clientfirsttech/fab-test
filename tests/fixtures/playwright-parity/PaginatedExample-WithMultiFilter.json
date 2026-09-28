@@ -1,0 +1,38 @@
+[
+    {
+        "test_case": "8a9471a7-9949-4714-beb7-a4ad782f438f",
+        "workspace_id": "c4698d28-b05c-40bc-926c-707563ac85e7",
+        "report_id": "675df22f-32a0-49f5-960a-6603247a0ed5",
+        "report_name": "PaginatedExample-WithMultiFilter",
+        "dataset_ids": [
+            {
+                "id": "4c353b5c-d311-4e90-b9d1-5766b87f59dc",
+                "xmlaPermissions": "ReadOnly"
+            }
+        ],
+        "wait_seconds": 20
+    },
+    {
+        "test_case": "86343fc4-a77a-46a3-946e-041ab6b66d79",
+        "workspace_id": "c4698d28-b05c-40bc-926c-707563ac85e7",
+        "report_id": "675df22f-32a0-49f5-960a-6603247a0ed5",
+        "report_name": "PaginatedExample-WithMultiFilter",
+        "dataset_ids": [
+            {
+                "id": "4c353b5c-d311-4e90-b9d1-5766b87f59dc",
+                "xmlaPermissions": "ReadOnly"
+            }
+        ],
+        "report_parameters": [
+            {
+                "name": "ReportParameter1",
+                "value": "2"
+            },
+                        {
+                "name": "ReportParameter1",
+                "value": "4"
+            }
+        ],
+        "wait_seconds": 20
+    }
+]

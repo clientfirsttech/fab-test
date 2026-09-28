@@ -184,8 +184,9 @@ def test_report_parameters_are_derived_from_a_local_rdl_files_own_declarations(
     tmp_path: Path,
 ) -> None:
     """A discovered .rdl file's own <ReportParameters> block is passed
-    through as JSON -- the caller never has to already know what a report
-    prompts for."""
+    through as JSON, including where each parameter's valid values come
+    from -- the caller never has to already know what a report prompts for,
+    or what to pick for it."""
     rdl = tmp_path / "Invoice RDL.rdl"
     rdl.write_text(_PARAMETERIZED_RDL, encoding="utf-8")
 
@@ -193,7 +194,15 @@ def test_report_parameters_are_derived_from_a_local_rdl_files_own_declarations(
 
     assert "--report-parameters" in cmd
     payload = json.loads(cmd[cmd.index("--report-parameters") + 1])
-    assert payload == [{"name": "ReportParameter1", "multi_value": True}]
+    assert payload == [
+        {
+            "name": "ReportParameter1",
+            "multi_value": True,
+            "values_query": "",
+            "value_column": "",
+            "static_values": [],
+        }
+    ]
 
 
 def test_report_parameters_are_absent_for_a_non_rdl_artifact(tmp_path: Path) -> None:

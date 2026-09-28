@@ -212,3 +212,98 @@ def test_write_test_cases_creates_csv_and_json(
     data = json.loads(json_path.read_text(encoding="utf-8"))
     assert data["total"] == 1
     assert data["test_cases"][0]["report_name"] == "SalesReport"
+
+
+def test_user_name_is_blank_on_a_case_with_no_role(
+    base_config: PlaywrightValidationConfig,
+) -> None:
+    """Given an effective-identity user is configured but the case carries no
+    role, should emit no user -- an embed token for a model with no RLS is
+    rejected outright when it carries an identity."""
+    config = dataclasses.replace(base_config, user_name="analyst@example.com")
+
+    cases = generate_test_cases(
+        config,
+        pages=[DiscoveredPage(page_id="p1", page_name="Page 1")],
+        roles=[""],
+    )
+
+    assert [case.user_name for case in cases] == [""]
+
+
+def test_user_name_is_emitted_on_a_case_that_carries_a_role(
+    base_config: PlaywrightValidationConfig,
+) -> None:
+    """Given a role, should emit the configured user unchanged -- the role is
+    only enforced when an identity is minted alongside it."""
+    config = dataclasses.replace(base_config, user_name="analyst@example.com")
+
+    cases = generate_test_cases(
+        config,
+        pages=[DiscoveredPage(page_id="p1", page_name="Page 1")],
+        roles=["Team A"],
+    )
+
+    assert [(case.role, case.user_name) for case in cases] == [
+        ("Team A", "analyst@example.com")
+    ]
+
+
+def test_paginated_case_follows_the_same_user_name_rule(
+    base_config: PlaywrightValidationConfig,
+) -> None:
+    """A paginated report has no page/bookmark matrix, but the identity rule
+    is the model's, not the matrix's: no role, no user."""
+    config = dataclasses.replace(
+        base_config, report_type="paginated", user_name="analyst@example.com"
+    )
+
+    assert generate_test_cases(config)[0].user_name == ""
+    assert (
+        generate_test_cases(dataclasses.replace(config, role="Team A"))[0].user_name
+        == "analyst@example.com"
+    )
+
+
+def test_paginated_report_gets_a_baseline_and_a_parameterized_case(
+    base_config: PlaywrightValidationConfig,
+) -> None:
+    """Given a parameter set, should emit the no-parameter baseline plus one
+    case holding that set, so a failure names the render that caused it."""
+    config = dataclasses.replace(base_config, report_type="paginated")
+    parameter_set = [
+        {"name": "ReportParameter1", "value": "2"},
+        {"name": "ReportParameter1", "value": "4"},
+    ]
+
+    cases = generate_test_cases(config, parameter_sets=[parameter_set])
+
+    assert [json.loads(case.report_parameters) for case in cases] == [[], parameter_set]
+    assert len({case.test_case for case in cases}) == 2
+
+
+def test_paginated_report_with_no_parameter_set_stays_one_case(
+    base_config: PlaywrightValidationConfig,
+) -> None:
+    """Given no parameter set, should emit exactly the one baseline case."""
+    config = dataclasses.replace(base_config, report_type="paginated")
+
+    cases = generate_test_cases(config, parameter_sets=[])
+
+    assert len(cases) == 1
+    assert json.loads(cases[0].report_parameters) == []
+
+
+def test_parameterized_case_id_names_the_values_it_tests(
+    base_config: PlaywrightValidationConfig,
+) -> None:
+    """The parameterized case's id carries its values, so its evidence
+    directory and its test_results row are told apart at a glance."""
+    config = dataclasses.replace(base_config, report_type="paginated")
+
+    cases = generate_test_cases(
+        config, parameter_sets=[[{"name": "Region", "value": "East"}]]
+    )
+
+    assert cases[0].test_case == "SalesReport"
+    assert cases[1].test_case == "SalesReport_params-Region-East"

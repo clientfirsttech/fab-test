@@ -515,6 +515,17 @@ def _add_playwright_subparser(subs: argparse._SubParsersAction) -> None:
         ),
     )
     playwright_p.add_argument(
+        "--plan-only",
+        action="store_true",
+        dest="plan_only",
+        help=(
+            "Show what would be tested: discover the page/bookmark/role "
+            "matrix, write test-cases.csv/json, and stop without minting an "
+            "embed token or launching a browser. Unlike --dry-run, which "
+            "only lists matching artifacts, this resolves each one"
+        ),
+    )
+    playwright_p.add_argument(
         "--pages",
         choices=["auto", "none"],
         default="auto",

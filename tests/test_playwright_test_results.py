@@ -236,3 +236,53 @@ def test_report_html_links_to_a_failed_cases_evidence(tmp_path: Path, monkeypatc
     html = report_path.read_text(encoding="utf-8")
     assert "screenshot.png" in html
     assert '<a href="' in html
+
+
+def _paginated_case(parameters: str = "[]"):
+    from fab_test.scripts.playwright_validation.test_cases import TestCase
+
+    return TestCase(
+        test_case="Invoice_params-Region-East" if parameters != "[]" else "Invoice",
+        report_name="Invoice",
+        report_id="rpt-1",
+        workspace_id="ws-1",
+        page_id="",
+        page_name="",
+        bookmark_id="",
+        bookmark_name="",
+        dataset_id="ds-1",
+        user_name="",
+        role="",
+        report_type="paginated",
+        report_parameters=parameters,
+    )
+
+
+def test_a_row_names_the_parameter_values_its_case_tested(tmp_path: Path) -> None:
+    """Given a parameterized paginated case, should carry its values in a
+    `parameters` field -- the only thing telling it apart from its baseline."""
+    from fab_test.scripts.invoke_playwright import _test_results_rows
+
+    parameterized = _paginated_case(json.dumps([{"name": "Region", "value": "East"}]))
+    rows = _test_results_rows(
+        [_paginated_case(), parameterized], tmp_path, overall_success=True
+    )
+
+    assert [row["parameters"] for row in rows] == [[], [{"name": "Region", "value": "East"}]]
+
+
+def test_a_case_that_never_ran_records_why_not_rendered(tmp_path: Path) -> None:
+    """Given a case with no result of its own because the run failed before it
+    (an embed-token error), should record that failure as `actual` -- never
+    `rendered` beside an `error` status."""
+    from fab_test.scripts.invoke_playwright import _test_results_rows
+
+    rows = _test_results_rows(
+        [_paginated_case()],
+        tmp_path,
+        overall_success=False,
+        fallback_error="Power BI API error: At least one dataset is required",
+    )
+
+    assert rows[0]["status"] == "error"
+    assert rows[0]["actual"] == "Power BI API error: At least one dataset is required"
