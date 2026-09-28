@@ -48,6 +48,7 @@ A Fabric administrator enables these in the **Fabric admin portal → Tenant set
 
 - **Service principals can use Fabric APIs** (older tenants label it *Allow service principals to use Power BI APIs*). Without it, every API call gets `401`/`403`, however the rest is configured. This is the most common silent blocker.
 - **Embed content in apps**. Playwright renders each report through the embedding SDK.
+- **Dataset Execute Queries REST API** (under *Integration settings*). Only needed for paginated reports with parameters: fab-test runs each parameter's own valid-values query to pick the values it tests. Without it, those reports are tested with no parameters and a warning names this setting.
 
 Tenant setting changes can take up to about 15 minutes to take effect.
 
@@ -133,7 +134,11 @@ A passing run ends like this and exits `0`:
   ✅  SampleModel-PQLAssert  — no findings
 ```
 
-By default every page, each page's bookmarks, and (when RLS is on) every role is tested. Add `--pages none --roles none` for a quick single-case smoke test.
+By default every page, each page's bookmarks, and (when RLS is in play) every role is tested -- one case per page, plus one per that page's own bookmark, repeated per role. Add `--pages none --roles none` for a quick single-case smoke test, or `--plan-only` to write the matrix to `test-cases.csv` and stop without minting a token or launching a browser.
+
+A paginated report is tested with no parameters and, when it declares any, once more with a parameter set -- the first valid value of each single-value parameter, the first two of each multi-value one, applied at embed time. Reading those values runs the parameter's own dataset query through `executeQueries`, which needs the **Dataset Execute Queries REST API** tenant setting to allow the service principal; without it, the report is still tested with no parameters and the run logs a warning naming the setting.
+
+Role discovery needs an effective-identity user. Set `PLAYWRIGHT_USER_NAME` (as the workflow below does, from a secret) or declare `playwright_user_name` in `fab-test.yml`; with neither, a model's roles are discovered and the run stops before any token is minted rather than silently testing the default identity.
 
 ### What a failure looks like
 
@@ -193,6 +198,7 @@ Every case writes its evidence to `fab-test-results/playwright/<report>/test-cas
 | `401` / `403` in `console.json`, or a permissions message in `embed_error_details.txt` | Tenant setting not applied, or no workspace role | [Step 2](#2-allow-service-principals-in-the-tenant), [step 3](#3-give-it-a-workspace-role) |
 | *did not render within 180000ms* | A slow page or a large model | Raise `PLAYWRIGHT_TIMEOUT_SECONDS` (default `180`) |
 | Only one case ran when you expected several | Page or role discovery couldn't list them (a warning was logged) | Check `Report.Read.All` and `SemanticModel.Read.All` have admin consent ([step 1](#1-register-the-service-principal)) and the workspace role ([step 3](#3-give-it-a-workspace-role)) |
+| A paginated report with parameters ran only its no-parameter case | Its valid-values query couldn't run (a warning names the parameter) | Enable **Dataset Execute Queries REST API** for the service principal's group ([step 2](#2-allow-service-principals-in-the-tenant)) |
 | `fab-test auth status` says the workspace isn't reachable, but runs succeed | Without `--env-file`, `auth status` checks reachability with your Azure sign-in, not the service principal | Pass `--env-file .fab-test/.env` |
 
 ## Next: run it in GitHub Actions

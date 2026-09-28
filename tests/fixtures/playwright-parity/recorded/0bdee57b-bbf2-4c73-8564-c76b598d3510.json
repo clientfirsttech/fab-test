@@ -1,0 +1,39 @@
+{
+  "bookmarks": [
+    {
+      "bookmark_id": "9963678390c48cbbd225",
+      "bookmark_name": "Hide Broken",
+      "page_id": "0e66f25d564bd6d4c710"
+    },
+    {
+      "bookmark_id": "ed2fc906cea483dce759",
+      "bookmark_name": "Page 1 Bookmark",
+      "page_id": "fe83bc0c21cae0d63c03"
+    },
+    {
+      "bookmark_id": "59447976551c403c4656",
+      "bookmark_name": "Show Broken",
+      "page_id": "0e66f25d564bd6d4c710"
+    }
+  ],
+  "dataset_id": "23f20f93-2985-448a-9b35-61abdcc3f5e8",
+  "golden_csv": "RLSTest-WithBookmarks.csv",
+  "pages": [
+    {
+      "page_id": "fe83bc0c21cae0d63c03",
+      "page_name": "Page 1"
+    },
+    {
+      "page_id": "0e66f25d564bd6d4c710",
+      "page_name": "Page 2"
+    }
+  ],
+  "report_id": "0bdee57b-bbf2-4c73-8564-c76b598d3510",
+  "report_name": "RLSTest-WithBookmarks",
+  "roles": [
+    "Team A",
+    "Team B"
+  ],
+  "use_rls": true,
+  "workspace_id": "c4698d28-b05c-40bc-926c-707563ac85e7"
+}

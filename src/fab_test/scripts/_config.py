@@ -40,6 +40,11 @@ _VALID_KEYS: dict[str, type] = {
     # (Open Report Flag epic §1). Opt-in, implies `report`, suppressed
     # under CI.
     "open_report": bool,
+    # Effective-identity user for RLS embed tokens (Playwright Generation
+    # Parity §3). Falls back from PLAYWRIGHT_USER_NAME, which still wins:
+    # a caller that no longer supplies the variable per run declares the
+    # UPN once here instead.
+    "playwright_user_name": str,
     # Rule overlays (Config Consolidation §6-7): {"bpa": {...}, "pbir": {...}}.
     # Nested disable/severity/extend keys are validated by _rule_overlay.py
     # itself at use time, not here.

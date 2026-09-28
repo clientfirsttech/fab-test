@@ -260,13 +260,23 @@ ambient sign-in cannot do.
 By default this discovers every page, each page's own bookmarks, and (when RLS
 is enabled) every semantic-model role, and tests the full matrix. Beyond the
 `Report.Read` / `Dataset.ReadWrite.All`-equivalent grant embedding already
-needed, the service principal also needs **`Report.Read.All`** (pages,
-bookmarks) and **`SemanticModel.Read.All`** (roles) to discover the matrix — a
-missing grant logs a warning and falls back to testing the single default
-page/role rather than failing the run. Add `--pages none --roles none` to the
-command above to keep the one-case-per-report shape every prior release had.
+needed, the service principal needs the full permission set in
+[docs/PLAYWRIGHT-CI.md](PLAYWRIGHT-CI.md#1-register-the-service-principal) to
+discover the matrix — a missing grant logs a warning and falls back to testing
+the single default page/role rather than failing the run. Add
+`--pages none --roles none` to the command above to keep the
+one-case-per-report shape every prior release had.
 
 See the [Configuration section of the fab-test skill](../.github/skills/fab-test/references/configuration.md#configuration) for the full settings list and rule-overlay keys.
+
+The snippet above is deliberately minimal -- for a complete, copy-ready
+workflow (dispatch inputs, `fab-test doctor` as a fail-fast step, uploading
+results, and a per-case step-summary table), see
+[docs/PLAYWRIGHT-CI.md](PLAYWRIGHT-CI.md) and
+[docs/examples/github-actions/playwright-live.yml](examples/github-actions/playwright-live.yml).
+[This repository's own demo workflow's run history](https://github.com/kerski/fab-test/actions/workflows/playwright-demo.yml)
+is the working reference for what a real dispatch looks like, both green and
+red.
 
 ### Pipeline snippet: a reviewable report as the build artifact
 

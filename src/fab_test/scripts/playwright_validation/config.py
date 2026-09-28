@@ -109,6 +109,27 @@ def _fabric_api_root_for(cloud: str) -> str:
     return mapping.get(cloud.lower(), mapping["public"])
 
 
+def _user_name_from_config_file() -> str:
+    """Return the effective-identity user declared in fab-test.yml, if any.
+
+    Read lazily and defensively: this module is imported by the standalone
+    ``invoke_playwright`` subprocess as well as the CLI, and a missing or
+    malformed config file is not a reason an otherwise-complete environment
+    cannot run. Same lazy-import shape as ``eventhouse_logger`` uses to reach
+    the config file from a script module.
+    """
+    try:
+        from .._config import merged_file_config
+        from .._metadata import default_repo_root
+
+        repo_root = default_repo_root()
+        file_config, _ = merged_file_config(repo_root, repo_root / "pyproject.toml")
+    except Exception:  # noqa: BLE001 - an unreadable config file is not fatal
+        return ""
+    value = file_config.get("playwright_user_name", "")
+    return str(value) if value else ""
+
+
 @dataclass(frozen=True)
 class PlaywrightValidationConfig:
     """Static configuration for one report validation target.
@@ -252,7 +273,10 @@ def load_config(
         dataset_id=get("PLAYWRIGHT_DATASET_ID"),
         page_ids=page_ids,
         bookmark_ids=bookmark_ids,
-        user_name=get("PLAYWRIGHT_USER_NAME"),
+        # PLAYWRIGHT_USER_NAME stays the winning source (released surface,
+        # and what playwright-demo.yml sets); fab-test.yml is the fallback
+        # for callers that no longer supply it per run.
+        user_name=get("PLAYWRIGHT_USER_NAME") or _user_name_from_config_file(),
         role=get("PLAYWRIGHT_ROLE"),
         use_rls=use_rls,
         cloud=get("PLAYWRIGHT_CLOUD") or "public",

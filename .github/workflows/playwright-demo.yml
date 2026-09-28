@@ -81,11 +81,11 @@ jobs:
       FABRIC_TENANT_ID: ${{ secrets.FABRIC_TENANT_ID }}
       FABRIC_CLIENT_ID: ${{ secrets.FABRIC_CLIENT_ID }}
       FABRIC_CLIENT_SECRET: ${{ secrets.FABRIC_CLIENT_SECRET }}
-      # Off by default: `generate_test_cases` only discovers RLS roles when
-      # PLAYWRIGHT_USE_RLS is set, and without a PLAYWRIGHT_USER_NAME
-      # GenerateToken rejects any RLS-secured dataset outright ("requires
-      # effective identity to be provided") -- both stay unset unless
-      # test_rls opts in.
+      # Off by default: role discovery runs when PLAYWRIGHT_USE_RLS is set or
+      # an effective-identity user is configured, and without a
+      # PLAYWRIGHT_USER_NAME GenerateToken rejects any RLS-secured dataset
+      # outright ("requires effective identity to be provided") -- both stay
+      # unset unless test_rls opts in.
       PLAYWRIGHT_USE_RLS: ${{ inputs.test_rls }}
       PLAYWRIGHT_USER_NAME: ${{ inputs.test_rls && secrets.PLAYWRIGHT_USER_NAME || '' }}
     steps:
@@ -94,6 +94,25 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
+      # Needed for two things this container image doesn't otherwise carry:
+      # the pbir analyzer (doctor already reports it as not-ready without
+      # this: ".NET 8+ runtime not found") and, since this run, RLS role
+      # discovery's XMLA fallback -- pythonnet's PYTHONNET_RUNTIME=coreclr
+      # still needs a real .NET runtime to find, and this container has
+      # none, confirmed live ("Can not determine dotnet root" / "Failed to
+      # create a .NET runtime (coreclr)"), unlike a bare ubuntu-latest
+      # runner, which ships one by default.
+      #
+      # DOTNET_INSTALL_DIR: the default install location
+      # (/usr/share/dotnet) isn't writable by uid 1001 (the container's
+      # --user 1001 above) -- confirmed live ("mkdir: cannot create
+      # directory '/usr/share/dotnet': Permission denied").
+      - name: Set a user-writable .NET install directory
+        run: echo "DOTNET_INSTALL_DIR=$HOME/.dotnet" >> "$GITHUB_ENV"
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
 
       # This repository's own current code, plus the dev extras --
       # pytest, pytest-playwright, pytest-html, and pytest-xdist are all

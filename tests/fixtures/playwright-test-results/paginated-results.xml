@@ -1,0 +1,206 @@
+<testsuites id="" name="" tests="14" failures="2" skipped="0" errors="0" time="155.127645">
+<testsuite name="tests\paginated.spec.ts" timestamp="2026-09-28T11:54:00.754Z" hostname="" tests="13" failures="2" skipped="0" time="139.443" errors="0">
+<testcase name="test if access token can be generated from the environment variables provided (Paginated Report)." classname="tests\paginated.spec.ts" time="0.043">
+<system-out>
+<![CDATA[##[debug]Test if access token can be generated from the environment variables provided (Paginated Report).
+
+[[ATTACHMENT|tests-paginated-test-if-ac-dbb7a--provided-Paginated-Report-\trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="test 2381c637-7a08-4ddf-bb9e-68dd01a245e7 - &apos;PaginatedExample-BrokenRDL&apos; embed token is accessible " classname="tests\paginated.spec.ts" time="0.267">
+<system-out>
+<![CDATA[##[debug]test 2381c637-7a08-4ddf-bb9e-68dd01a245e7 - 'PaginatedExample-BrokenRDL' embed token is accessible 
+
+[[ATTACHMENT|tests-paginated-test-2381c-62be3--embed-token-is-accessible-\trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="test 2a981b2c-0dc1-43df-8797-d078c5a8cb82 - &apos;PaginatedExample-WithFilter&apos; embed token is accessible " classname="tests\paginated.spec.ts" time="0.151">
+<system-out>
+<![CDATA[##[debug]test 2a981b2c-0dc1-43df-8797-d078c5a8cb82 - 'PaginatedExample-WithFilter' embed token is accessible 
+
+[[ATTACHMENT|tests-paginated-test-2a981-40671--embed-token-is-accessible-\trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="test 71d94400-2aa3-404e-ae84-3085ff288f04 - &apos;PaginatedExample-WithFilter&apos; embed token is accessible " classname="tests\paginated.spec.ts" time="0.117">
+<system-out>
+<![CDATA[##[debug]test 71d94400-2aa3-404e-ae84-3085ff288f04 - 'PaginatedExample-WithFilter' embed token is accessible 
+
+[[ATTACHMENT|tests-paginated-test-71d94-5dfcb--embed-token-is-accessible-\trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="test 8a9471a7-9949-4714-beb7-a4ad782f438f - &apos;PaginatedExample-WithMultiFilter&apos; embed token is accessible " classname="tests\paginated.spec.ts" time="0.081">
+<system-out>
+<![CDATA[##[debug]test 8a9471a7-9949-4714-beb7-a4ad782f438f - 'PaginatedExample-WithMultiFilter' embed token is accessible 
+
+[[ATTACHMENT|tests-paginated-test-8a947-d81b5--embed-token-is-accessible-\trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="test 86343fc4-a77a-46a3-946e-041ab6b66d79 - &apos;PaginatedExample-WithMultiFilter&apos; embed token is accessible " classname="tests\paginated.spec.ts" time="0.128">
+<system-out>
+<![CDATA[##[debug]test 86343fc4-a77a-46a3-946e-041ab6b66d79 - 'PaginatedExample-WithMultiFilter' embed token is accessible 
+
+[[ATTACHMENT|tests-paginated-test-86343-31c28--embed-token-is-accessible-\trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="test 039afa29-e0a1-4863-aefd-e2aa8adb1012 - &apos;PaginatedExample&apos; embed token is accessible " classname="tests\paginated.spec.ts" time="0.104">
+<system-out>
+<![CDATA[##[debug]test 039afa29-e0a1-4863-aefd-e2aa8adb1012 - 'PaginatedExample' embed token is accessible 
+
+[[ATTACHMENT|tests-paginated-test-039af-c6ba7--embed-token-is-accessible-\trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="test 2381c637-7a08-4ddf-bb9e-68dd01a245e7 - &apos;PaginatedExample-BrokenRDL&apos; for visual errors , Link: https://app.powerbi.com/groups/c4698d28-b05c-40bc-926c-707563ac85e7/rdlreports/65339f9f-7488-4d72-af60-5669775e6428  " classname="tests\paginated.spec.ts" time="22.742">
+<system-out>
+<![CDATA[##[debug]test 2381c637-7a08-4ddf-bb9e-68dd01a245e7 - 'PaginatedExample-BrokenRDL' for visual errors , Link: https://app.powerbi.com/groups/c4698d28-b05c-40bc-926c-707563ac85e7/rdlreports/65339f9f-7488-4d72-af60-5669775e6428
+
+[[ATTACHMENT|tests-paginated-test-2381c-1934c-488-4d72-af60-5669775e6428-\test-failed-1.png]]
+
+[[ATTACHMENT|tests-paginated-test-2381c-1934c-488-4d72-af60-5669775e6428-\error-context.md]]
+
+[[ATTACHMENT|tests-paginated-test-2381c-1934c-488-4d72-af60-5669775e6428-\trace.zip]]
+]]>
+</system-out>
+<failure message="expect(received).toBe(expected) // Object.is equality" type="expect.toBe">
+<![CDATA[  tests\paginated.spec.ts:68:7 › test 2381c637-7a08-4ddf-bb9e-68dd01a245e7 - 'PaginatedExample-BrokenRDL' for visual errors , Link: https://app.powerbi.com/groups/c4698d28-b05c-40bc-926c-707563ac85e7/rdlreports/65339f9f-7488-4d72-af60-5669775e6428   
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: -1
+    Received: 36677
+
+      148 |
+      149 |     const searchForModal = fullPageHTML.search('"ms-Dialog-content');
+    > 150 |     expect(searchForModal).toBe(-1);
+          |                            ^
+      151 |   });
+      152 | });
+        at C:\Users\jkers\OneDrive - Kerski Family\Documents\Git\pbi-dataops-visual-error-testing\tests\paginated.spec.ts:150:28
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\tests-paginated-test-2381c-1934c-488-4d72-af60-5669775e6428-\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results\tests-paginated-test-2381c-1934c-488-4d72-af60-5669775e6428-\error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\tests-paginated-test-2381c-1934c-488-4d72-af60-5669775e6428-\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\tests-paginated-test-2381c-1934c-488-4d72-af60-5669775e6428-\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+</testcase>
+<testcase name="test 2a981b2c-0dc1-43df-8797-d078c5a8cb82 - &apos;PaginatedExample-WithFilter&apos; for visual errors , Link: https://app.powerbi.com/groups/c4698d28-b05c-40bc-926c-707563ac85e7/rdlreports/916325b9-944c-4f8c-b79b-668e6c830a05  " classname="tests\paginated.spec.ts" time="22.365">
+<system-out>
+<![CDATA[##[debug]test 2a981b2c-0dc1-43df-8797-d078c5a8cb82 - 'PaginatedExample-WithFilter' for visual errors , Link: https://app.powerbi.com/groups/c4698d28-b05c-40bc-926c-707563ac85e7/rdlreports/916325b9-944c-4f8c-b79b-668e6c830a05
+
+[[ATTACHMENT|tests-paginated-test-2a981-73278-44c-4f8c-b79b-668e6c830a05-\trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="test 71d94400-2aa3-404e-ae84-3085ff288f04 - &apos;PaginatedExample-WithFilter&apos; for visual errors , Link: https://app.powerbi.com/groups/c4698d28-b05c-40bc-926c-707563ac85e7/rdlreports/916325b9-944c-4f8c-b79b-668e6c830a05?rp:ReportParameter1=2  " classname="tests\paginated.spec.ts" time="22.203">
+<system-out>
+<![CDATA[##[debug]test 71d94400-2aa3-404e-ae84-3085ff288f04 - 'PaginatedExample-WithFilter' for visual errors , Link: https://app.powerbi.com/groups/c4698d28-b05c-40bc-926c-707563ac85e7/rdlreports/916325b9-944c-4f8c-b79b-668e6c830a05?rp:ReportParameter1=2
+
+[[ATTACHMENT|tests-paginated-test-71d94-29fc6-0a05-rp-ReportParameter1-2-\trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="test 8a9471a7-9949-4714-beb7-a4ad782f438f - &apos;PaginatedExample-WithMultiFilter&apos; for visual errors , Link: https://app.powerbi.com/groups/c4698d28-b05c-40bc-926c-707563ac85e7/rdlreports/675df22f-32a0-49f5-960a-6603247a0ed5  " classname="tests\paginated.spec.ts" time="24.237">
+<system-out>
+<![CDATA[##[debug]test 8a9471a7-9949-4714-beb7-a4ad782f438f - 'PaginatedExample-WithMultiFilter' for visual errors , Link: https://app.powerbi.com/groups/c4698d28-b05c-40bc-926c-707563ac85e7/rdlreports/675df22f-32a0-49f5-960a-6603247a0ed5
+
+[[ATTACHMENT|tests-paginated-test-8a947-c25c4-2a0-49f5-960a-6603247a0ed5-\trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="test 86343fc4-a77a-46a3-946e-041ab6b66d79 - &apos;PaginatedExample-WithMultiFilter&apos; for visual errors , Link: https://app.powerbi.com/groups/c4698d28-b05c-40bc-926c-707563ac85e7/rdlreports/675df22f-32a0-49f5-960a-6603247a0ed5?rp:ReportParameter1=2&amp;rp:ReportParameter1=4  " classname="tests\paginated.spec.ts" time="24.54">
+<system-out>
+<![CDATA[##[debug]test 86343fc4-a77a-46a3-946e-041ab6b66d79 - 'PaginatedExample-WithMultiFilter' for visual errors , Link: https://app.powerbi.com/groups/c4698d28-b05c-40bc-926c-707563ac85e7/rdlreports/675df22f-32a0-49f5-960a-6603247a0ed5?rp:ReportParameter1=2&rp:ReportParameter1=4
+
+[[ATTACHMENT|tests-paginated-test-86343-ab9f5-r1-2-rp-ReportParameter1-4-\test-failed-2.png]]
+
+[[ATTACHMENT|tests-paginated-test-86343-ab9f5-r1-2-rp-ReportParameter1-4-\test-failed-4.png]]
+
+[[ATTACHMENT|tests-paginated-test-86343-ab9f5-r1-2-rp-ReportParameter1-4-\test-failed-1.png]]
+
+[[ATTACHMENT|tests-paginated-test-86343-ab9f5-r1-2-rp-ReportParameter1-4-\test-failed-3.png]]
+
+[[ATTACHMENT|tests-paginated-test-86343-ab9f5-r1-2-rp-ReportParameter1-4-\error-context.md]]
+
+[[ATTACHMENT|tests-paginated-test-86343-ab9f5-r1-2-rp-ReportParameter1-4-\trace.zip]]
+]]>
+</system-out>
+<failure message="expect(received).toBe(expected) // Object.is equality" type="expect.toBe">
+<![CDATA[  tests\paginated.spec.ts:68:7 › test 86343fc4-a77a-46a3-946e-041ab6b66d79 - 'PaginatedExample-WithMultiFilter' for visual errors , Link: https://app.powerbi.com/groups/c4698d28-b05c-40bc-926c-707563ac85e7/rdlreports/675df22f-32a0-49f5-960a-6603247a0ed5?rp:ReportParameter1=2&rp:ReportParameter1=4   
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: -1
+    Received: 41019
+
+      148 |
+      149 |     const searchForModal = fullPageHTML.search('"ms-Dialog-content');
+    > 150 |     expect(searchForModal).toBe(-1);
+          |                            ^
+      151 |   });
+      152 | });
+        at C:\Users\jkers\OneDrive - Kerski Family\Documents\Git\pbi-dataops-visual-error-testing\tests\paginated.spec.ts:150:28
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\tests-paginated-test-86343-ab9f5-r1-2-rp-ReportParameter1-4-\test-failed-2.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\tests-paginated-test-86343-ab9f5-r1-2-rp-ReportParameter1-4-\test-failed-4.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #3: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\tests-paginated-test-86343-ab9f5-r1-2-rp-ReportParameter1-4-\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #4: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\tests-paginated-test-86343-ab9f5-r1-2-rp-ReportParameter1-4-\test-failed-3.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results\tests-paginated-test-86343-ab9f5-r1-2-rp-ReportParameter1-4-\error-context.md
+
+    attachment #6: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results\tests-paginated-test-86343-ab9f5-r1-2-rp-ReportParameter1-4-\trace.zip
+    Usage:
+
+        npx playwright show-trace test-results\tests-paginated-test-86343-ab9f5-r1-2-rp-ReportParameter1-4-\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+</testcase>
+<testcase name="test 039afa29-e0a1-4863-aefd-e2aa8adb1012 - &apos;PaginatedExample&apos; for visual errors , Link: https://app.powerbi.com/groups/c4698d28-b05c-40bc-926c-707563ac85e7/rdlreports/b0662655-6e66-436e-9671-a09b3fe9ed41  " classname="tests\paginated.spec.ts" time="22.465">
+<system-out>
+<![CDATA[##[debug]test 039afa29-e0a1-4863-aefd-e2aa8adb1012 - 'PaginatedExample' for visual errors , Link: https://app.powerbi.com/groups/c4698d28-b05c-40bc-926c-707563ac85e7/rdlreports/b0662655-6e66-436e-9671-a09b3fe9ed41
+
+[[ATTACHMENT|tests-paginated-test-039af-d1823-e66-436e-9671-a09b3fe9ed41-\trace.zip]]
+]]>
+</system-out>
+</testcase>
+</testsuite>
+<testsuite name="tests\pbi.spec.ts" timestamp="2026-09-28T11:54:00.754Z" hostname="" tests="1" failures="0" skipped="0" time="0.004" errors="0">
+<testcase name="test if access token can be generated from the environment variables provided." classname="tests\pbi.spec.ts" time="0.004">
+<system-out>
+<![CDATA[##[debug]Test if access token can be generated from the environment variables provided.
+
+[[ATTACHMENT|tests-pbi-test-if-access-t-12457-ronment-variables-provided-\trace.zip]]
+]]>
+</system-out>
+</testcase>
+</testsuite>
+</testsuites>

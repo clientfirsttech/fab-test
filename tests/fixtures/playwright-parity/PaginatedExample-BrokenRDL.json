@@ -1,0 +1,15 @@
+[
+    {
+        "test_case": "2381c637-7a08-4ddf-bb9e-68dd01a245e7",
+        "workspace_id": "c4698d28-b05c-40bc-926c-707563ac85e7",
+        "report_id": "65339f9f-7488-4d72-af60-5669775e6428",
+        "report_name": "PaginatedExample-BrokenRDL",
+        "dataset_ids": [
+            {
+                "id": "5bf5a7e1-65e5-4d74-944b-1ada5941a664",
+                "xmlaPermissions": "ReadOnly"
+            }
+        ],
+        "wait_seconds": 20
+    }
+]

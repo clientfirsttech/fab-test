@@ -14,6 +14,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import json
 import os
 import subprocess
@@ -34,7 +35,11 @@ from .playwright_validation.config import (
     _app_root_for,
     load_config,
 )
-from .playwright_validation.discovery import acquire_embed_configs, resolve_discovery
+from .playwright_validation.discovery import (
+    acquire_embed_configs,
+    resolve_discovery,
+    resolve_paginated_plan,
+)
 from .playwright_validation.fabric_service_client import build_fabric_service_client
 from .playwright_validation.power_bi_api import PowerBiApiError
 from .playwright_validation.resolver import (
@@ -183,26 +188,34 @@ def _test_results_rows(
     *,
     overall_success: bool,
     cloud: str = "public",
+    fallback_error: str = "",
 ) -> list[dict[str, Any]]:
     """One row per generated case, using its own result.json when the spec wrote one.
 
     A case with no result.json (the pytest process never reached it, e.g.
     a crash on an earlier case) falls back to the run's overall outcome
     rather than reporting nothing -- the same "never silently drop a row"
-    contract `test_results` already has for BPA and PBIR.
+    contract `test_results` already has for BPA and PBIR. ``fallback_error``
+    is why such a case never ran (an embed-token failure), recorded as its
+    ``actual`` so an ``error`` row never claims the report rendered.
     """
     rows = []
     for case in cases:
         result_dir = _case_result_dir(case, test_cases_dir)
         result = _read_case_result(result_dir)
         status = result.get("status") or ("pass" if overall_success else "error")
-        error = result.get("error", "")
+        error = result.get("error", "") or (fallback_error if status != "pass" else "")
+        try:
+            parameters = json.loads(case.report_parameters or "[]")
+        except json.JSONDecodeError:
+            parameters = []
         rows.append(
             {
                 "suite_name": case.report_name,
                 "test_name": case.test_case,
                 "expected": "rendered",
                 "actual": error or "rendered",
+                "parameters": parameters,
                 "status": status,
                 "evidence": _case_evidence(result_dir),
                 "page_name": case.page_name,
@@ -603,6 +616,15 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Comma-separated bookmark IDs (advanced override).",
     )
     parser.add_argument(
+        "--plan-only",
+        action="store_true",
+        dest="plan_only",
+        help=(
+            "Discover the page/bookmark/role matrix, write test-cases.csv/json, "
+            "and stop -- no embed token is minted and no browser is launched"
+        ),
+    )
+    parser.add_argument(
         "--pages",
         choices=["auto", "none"],
         default="auto",
@@ -673,7 +695,13 @@ def _write_embed_error_envelope(
     """
     findings = _write_findings(cases, success=False, message=message)
     test_results = (
-        _test_results_rows(cases, test_cases_dir, overall_success=False, cloud=cloud)
+        _test_results_rows(
+            cases,
+            test_cases_dir,
+            overall_success=False,
+            cloud=cloud,
+            fallback_error=message,
+        )
         if test_cases_dir is not None
         else []
     )
@@ -688,6 +716,38 @@ def _write_embed_error_envelope(
     _write_playwright_envelope(output_path, env)
     log_error(message)
     return 1
+
+
+def _write_plan_envelope(
+    output_path: Path,
+    report_name: str,
+    cases: list[TestCase],
+    *,
+    test_cases_dir: Path,
+) -> int:
+    """Write the envelope a ``--plan-only`` run produces and return 0.
+
+    ``skipped`` rather than ``pass``: the matrix was generated, nothing was
+    rendered, and a caller that reads this envelope must not mistake a plan
+    for a green run. It is a status the summary, the exit-code mapping, and
+    the report reader already understand, so the plan needs no envelope
+    shape of its own.
+    """
+    message = (
+        f"Playwright plan only: {len(cases)} case(s) generated, none executed "
+        f"({test_cases_dir})"
+    )
+    env = build_envelope(
+        EnvelopeIdentity("playwright", str(report_name)),
+        status="skipped",
+        message=message,
+        findings=[],
+        duration_ms=0,
+    )
+    env["test_results"] = []
+    _write_playwright_envelope(output_path, env)
+    log(f"::notice::{message}")
+    return 0
 
 
 def _log_run_header(
@@ -720,7 +780,14 @@ def _run_single_report(
 ) -> int:
     """Run Playwright validation for a single resolved report."""
     pages, roles = resolve_discovery(config, args)
-    cases = generate_test_cases(config, pages=pages, roles=roles)
+    parameter_sets = None
+    if config.report_type == "paginated":
+        plan = resolve_paginated_plan(config)
+        config = dataclasses.replace(config, dataset_id=plan.dataset_id)
+        parameter_sets = plan.parameter_sets
+    cases = generate_test_cases(
+        config, pages=pages, roles=roles, parameter_sets=parameter_sets
+    )
     if not cases:
         log("::notice::No Playwright test cases generated; skipping validation.")
         return 0
@@ -732,13 +799,20 @@ def _run_single_report(
     output_path = Path(args.output_path).resolve() if args.output_path else envelope_path("playwright", report_name)
 
     distinct_roles = sorted({case.role for case in cases})
+    if getattr(args, "plan_only", False):
+        _log_run_header(report_name, output_path, cases, pages, distinct_roles)
+        return _write_plan_envelope(
+            output_path, report_name, cases, test_cases_dir=test_cases_dir
+        )
+
     if roles and not config.user_name:
         # `generate_embed_token` silently drops the `identities` entry when
         # `user_name` is empty, so a run would otherwise pass while every
         # "role" case actually embedded with no RLS identity at all.
         message = (
             "Discovered RLS roles "
-            f"({', '.join(roles)}) but PLAYWRIGHT_USER_NAME is unset; set it "
+            f"({', '.join(roles)}) but no effective-identity user is set; "
+            "set PLAYWRIGHT_USER_NAME or playwright_user_name in fab-test.yml "
             "before any embed token is minted, or pass --roles none."
         )
         return _write_embed_error_envelope(

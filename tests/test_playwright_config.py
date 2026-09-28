@@ -84,6 +84,11 @@ def test_load_config_defaults_when_optional_omitted(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Given no fab-test.yml in scope, should default every optional field --
+    isolated from this repository's own fab-test.yml (which pins a real
+    playwright_user_name for its dev-workspace fixtures), or this test would
+    pass or fail depending on what that unrelated file happens to hold."""
+    monkeypatch.chdir(tmp_path)
     env_path = tmp_path / ".env"
     env_path.write_text(
         "\n".join(
@@ -354,3 +359,47 @@ def test_discovered_env_secrets_never_appear_in_test_case_dict(tmp_path, monkeyp
     assert "client_secret" not in test_case_dict
     assert "client_id" not in test_case_dict
     assert "tenant_id" not in test_case_dict
+
+
+def test_user_name_falls_back_to_the_config_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Given no PLAYWRIGHT_USER_NAME, should take the effective-identity user
+    from fab-test.yml, so an RLS run needs no per-caller environment variable."""
+    monkeypatch.delenv("PLAYWRIGHT_USER_NAME", raising=False)
+    (tmp_path / "fab-test.yml").write_text(
+        "playwright_user_name: analyst@example.com\n", encoding="utf-8"
+    )
+    monkeypatch.chdir(tmp_path)
+
+    config = load_config(env_file=str(tmp_path / "missing.env"), required=False)
+
+    assert config.user_name == "analyst@example.com"
+
+
+def test_environment_user_name_wins_over_the_config_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Given both, should keep the released environment variable winning --
+    a workflow that sets it today must not start reading someone else's file."""
+    monkeypatch.setenv("PLAYWRIGHT_USER_NAME", "ci@example.com")
+    (tmp_path / "fab-test.yml").write_text(
+        "playwright_user_name: analyst@example.com\n", encoding="utf-8"
+    )
+    monkeypatch.chdir(tmp_path)
+
+    config = load_config(env_file=str(tmp_path / "missing.env"), required=False)
+
+    assert config.user_name == "ci@example.com"
+
+
+def test_user_name_is_empty_when_no_source_supplies_one(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Given neither source, should stay empty rather than invent an identity."""
+    monkeypatch.delenv("PLAYWRIGHT_USER_NAME", raising=False)
+    monkeypatch.chdir(tmp_path)
+
+    config = load_config(env_file=str(tmp_path / "missing.env"), required=False)
+
+    assert config.user_name == ""
