@@ -95,6 +95,17 @@ def _case_id(report_name: str, page_id: str, bookmark_id: str, role: str) -> str
     )
 
 
+def _effective_user(config: PlaywrightValidationConfig, role: str) -> str:
+    """Return the effective-identity user this case should embed with.
+
+    Only a case that carries a role does. An embed token minted for a model
+    with no RLS and a non-empty identity is rejected outright by the Power BI
+    API ("shouldn't have effective identity"), so carrying the configured
+    user onto every case would break the reports that need it least.
+    """
+    return config.user_name if role else ""
+
+
 def _build_case(
     config: PlaywrightValidationConfig,
     *,
@@ -115,23 +126,38 @@ def _build_case(
         bookmark_id=bookmark_id,
         bookmark_name=bookmark_name,
         dataset_id=config.dataset_id,
-        user_name=config.user_name,
+        user_name=_effective_user(config, role),
         role=role,
         report_type=getattr(config, "report_type", "report"),
         render_wait_seconds=getattr(config, "render_wait_seconds", 20),
     )
 
 
-def _build_paginated_case(config: PlaywrightValidationConfig) -> TestCase:
-    """Build the single case a paginated report generates.
+def _build_paginated_case(
+    config: PlaywrightValidationConfig,
+    parameter_set: list[dict[str, str]] | None = None,
+) -> TestCase:
+    """Build one paginated case: the baseline, or one holding ``parameter_set``.
 
     A paginated (RDL) report has no page/bookmark dimension, so unlike
     ``_build_case`` this never encodes ``"default-page"``/``"no-bookmark"``
-    placeholders that only make sense for that matrix.
+    placeholders that only make sense for that matrix. A parameterized
+    case's id carries its values so it can never collide with the
+    baseline's, and ``report_parameters`` holds the set in the embed SDK's
+    own ``parameterValues`` shape.
     """
     role = config.role
+    params = "-".join(
+        f"{entry['name']}-{entry['value']}" for entry in parameter_set or []
+    )
     test_case = "_".join(
-        part for part in [config.report_name, f"role-{role}" if role else ""] if part
+        part
+        for part in [
+            config.report_name,
+            f"role-{role}" if role else "",
+            f"params-{params}" if params else "",
+        ]
+        if part
     )
     return TestCase(
         test_case=test_case,
@@ -143,11 +169,11 @@ def _build_paginated_case(config: PlaywrightValidationConfig) -> TestCase:
         bookmark_id="",
         bookmark_name="",
         dataset_id=config.dataset_id,
-        user_name=config.user_name,
+        user_name=_effective_user(config, role),
         role=role,
         report_type="paginated",
         render_wait_seconds=getattr(config, "render_wait_seconds", 20),
-        report_parameters=getattr(config, "report_parameters", "[]"),
+        report_parameters=json.dumps(parameter_set or []),
     )
 
 
@@ -223,6 +249,7 @@ def generate_test_cases(
     *,
     pages: list[DiscoveredPage] | None = None,
     roles: list[str] | None = None,
+    parameter_sets: list[list[dict[str, str]]] | None = None,
 ) -> list[TestCase]:
     """Expand a config into a list of ``TestCase`` records.
 
@@ -232,11 +259,15 @@ def generate_test_cases(
     ``--page-ids``/``--bookmark-ids`` override. With ``pages`` (a discovered
     matrix), each page's own bookmarks are used instead of every bookmark in
     the report, and the whole matrix repeats once per entry in ``roles``. A
-    paginated report always emits exactly one case regardless of
-    ``pages``/``roles`` -- RDL reports have no page/bookmark matrix to expand.
+    paginated report ignores ``pages``/``roles`` -- RDL reports have no
+    page/bookmark matrix to expand -- and emits one baseline case plus one
+    case per entry in ``parameter_sets``.
     """
     if getattr(config, "report_type", "report") == "paginated":
-        return [_build_paginated_case(config)]
+        return [_build_paginated_case(config)] + [
+            _build_paginated_case(config, parameter_set)
+            for parameter_set in parameter_sets or []
+        ]
     if pages is not None:
         return _generate_discovered_cases(config, pages, roles or [config.role])
     return _generate_cartesian_cases(config)

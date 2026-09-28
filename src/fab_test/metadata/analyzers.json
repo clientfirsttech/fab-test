@@ -75,12 +75,12 @@
         "env_var": "PBIR_A11Y_PATH",
         "default_path": "./pbir-a11y/dist/cli.js",
         "install_url_env_var": "PBIR_A11Y_INSTALL_URL",
-        "install_url": "https://github.com/Juls-BI/pbir-a11y/archive/refs/tags/v0.3.2.zip",
+        "install_url": "https://github.com/Juls-BI/pbir-a11y/archive/refs/tags/v0.5.0.zip",
         "archive_type": "npm_build",
         "build_entrypoint": "dist/cli.js",
         "build_extra_dependencies": ["docx@^9.6.1"],
-        "version": "0.3.2",
-        "install_sha256": "403a2ab0ae1648d0b385201a3b5b57ae10a16d71eda7584cafd8391fe81d5e77",
+        "version": "0.5.0",
+        "install_sha256": "3b55721659c1f1bad5bd82e4f733d8c3a1b9f7fc9871e01c7817bb76c869b7ba",
         "requires_runtime": {
           "name": "node",
           "min_major": 18

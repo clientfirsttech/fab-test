@@ -161,22 +161,49 @@ Playwright validation can run in three modes: static `.env` mode, service-resolv
 | `--report-type {report,paginated}` | Force the report type instead of auto-detecting it [env: `PLAYWRIGHT_REPORT_TYPE`] |
 | `--impact-manifest PATH` | Validate every report listed in the impacted-report manifest once, regardless of local `.Report` artifacts |
 | `--pages {auto,none}` | Discover every report page and its own bookmarks (default: `auto`); `none` tests only the default page |
-| `--roles {auto,none}` | Discover RLS/OLS roles from the semantic model and test the page matrix under each one when RLS is enabled (default: `auto`); `none` tests only `PLAYWRIGHT_ROLE` |
+| `--roles {auto,none}` | Discover RLS/OLS roles from the semantic model and test the page matrix under each one whenever RLS is in play — `PLAYWRIGHT_USE_RLS`, **or** an effective-identity user being configured at all (default: `auto`); `none` tests only `PLAYWRIGHT_ROLE` |
+| `--plan-only` | Discover the matrix, write `test-cases.csv`/`.json`, and stop — no embed token, no browser. Unlike `--dry-run`, which only lists matching artifacts, this resolves each one |
 | `--workers N` | Max `pytest-xdist` workers for running generated cases concurrently (default: `4`) [env: `PLAYWRIGHT_XDIST_WORKERS`] |
 
 **By default, `playwright` tests every page, every page's own bookmarks, and every
 RLS role — not just the default tab.** `--pages none`/`--roles none` (or `PLAYWRIGHT_PAGE_IDS`/
 `--page-ids`, which skip discovery entirely as an explicit override) fall back to the
-one-case shape every prior release had. Discovery needs `Report.Read.All` (pages,
-bookmarks) and `SemanticModel.Read.All` (roles) on the service principal beyond what
-embedding already required; a missing grant logs a warning and falls back to the
-single-case shape rather than failing the run. Each role gets its own embed token —
+one-case shape every prior release had. Discovery needs the full permission set
+in `docs/PLAYWRIGHT-CI.md` ("Register the service principal") on the service
+principal beyond what embedding already required; a missing grant logs a
+warning and falls back to the single-case shape rather than failing the run.
+Each role gets its own embed token —
 a token carries its RLS identity, so one token cannot cover two roles — and
-discovered roles with no `PLAYWRIGHT_USER_NAME` abort before any token is minted
+discovered roles with no effective-identity user (`PLAYWRIGHT_USER_NAME`, or
+`playwright_user_name` in `fab-test.yml`) abort before any token is minted
 rather than silently testing no role at all (`GenerateToken` drops the identity
 entry with an empty username). Case ids and `test_results` rows now carry page,
 bookmark, and role, so two roles of the same page write to different evidence
 directories instead of overwriting each other's `screenshot.png`.
+
+**The matrix a report expands into**: one case per page, plus one case per that
+page's *own* bookmark (never a page paired with another page's bookmark), and
+the whole set repeated once per discovered role. A report with 2 pages, 1
+bookmark on the first and 2 on the second, under 2 roles, is 10 cases.
+Bookmarks are found in the PBIR `definition/bookmarks/` parts, a flat
+`definition/bookmarks.json`, **or** a legacy `report.json`'s embedded config —
+the shape every report in a classic (non-PBIR) workspace still has. A bookmark
+*group* is expanded into its children, which carry the state; the group itself
+is not a case. `user_name` is emitted only on a case that carries a role: an
+embed token for a model with no RLS is rejected outright when it carries an
+identity.
+
+See what a report would test, without rendering it:
+
+```bash
+fab-test playwright --artifact "Sales Report" --plan-only
+```
+
+This writes the same `test-cases.csv`/`test-cases.json` a real run writes and an
+envelope with status `skipped`, then exits `0` — no embed token is minted and no
+browser is launched, so it works on a machine where `playwright install` has
+never run. Passing `--dry-run` as well takes the cheaper path: `--dry-run` wins
+and no discovery call is made.
 
 **`playwright` always needs a full service principal — unlike every other analyzer.**
 `get_embed_context` calls MSAL with a client secret to generate the embed token; an
@@ -198,6 +225,21 @@ environment, in a .env file, or pass --env-file.
 a false green when only an ambient credential is available — `playwright-impact` and
 `dependencies`, which never call the embed-token API, are unaffected and accept
 ambient auth like every other cloud-backed analyzer.
+
+**Exit `127` is a setup problem, exit `1` is a report failure.** A run that never
+reached a case (missing credential, unresolved workspace, unknown report name)
+exits `127` and names what's missing; a run that opened the report and found a
+real problem (a broken visual, a render timeout, an RLS token that couldn't be
+minted) exits `1`. Don't retry a `127` — fix the named prerequisite first.
+
+**Setting this up in CI** (service principal registration, tenant settings,
+workspace role, XMLA endpoint, GitHub Environment/secrets) is a one-time,
+outside-the-CLI prerequisite covered in `docs/PLAYWRIGHT-CI.md`, not here. A
+copy-ready workflow lives at
+`docs/examples/github-actions/playwright-live.yml`; this repository's own
+`.github/workflows/playwright-demo.yml` (manually dispatched, gated behind
+the `fabric-demo` Environment) is the working reference for what a real
+dispatch looks like.
 
 **Generated cases run concurrently, up to a bounded worker cap.** A report's
 page/bookmark/role matrix can generate many cases; they run across `pytest-xdist`
@@ -268,8 +310,10 @@ need to declare `--report-type`/`PLAYWRIGHT_REPORT_TYPE` up front:
 
 A paginated report is resolved against Fabric item type `PaginatedReport`
 instead of `Report`. Page/bookmark/role discovery is skipped entirely (RDL
-reports have neither dimension), and exactly one test case is generated, with
-no `page_name`/`bookmark_name` and a `report_link` that stays `{}` (RDL
+reports have neither dimension). One baseline case is generated with no
+parameters, plus -- when the report declares parameters -- one case with a
+parameter set applied at embed time as `parameterValues` (see below). Both
+have no `page_name`/`bookmark_name` and a `report_link` that stays `{}` (RDL
 reports use a different URL shape in the Fabric portal, not yet linked). The
 embed configuration itself carries no `pageName`/`bookmark` key at all, rather
 than empty values that would mimic a real page or bookmark. Because a
@@ -291,6 +335,31 @@ fab-test playwright --artifact "Invoice RDL" --env dev --env-file .env
 fab-test playwright --artifact "Invoice RDL" --env dev --report-type paginated
 ```
 
+**A parameterized paginated report gets a second case with real values.** A
+render with no parameters says nothing about a parameter's own
+`FilterExpression`, which only breaks once a value is applied. The parameter
+set holds the first valid value of each single-value parameter and the first
+two of each multi-value one (a multi-value parameter repeats its name once per
+value, the embed SDK's `parameterValues` shape). Declared parameters come from
+the local `.rdl` when there is one, else the report's deployed definition
+(Fabric `getDefinition`). Valid values come from a static `<ParameterValues>`
+list, or from the parameter's own `<DataSetReference>` query run through
+`executeQueries` against the report's dataset -- which needs the tenant's
+**Dataset Execute Queries REST API** setting for the service principal. A
+free-text parameter, or a query that fails, leaves only the baseline case and
+logs a warning naming the parameter and the setting; it never fails the run.
+Each `test_results` row carries `parameters` (`[{name, value}, ...]`, empty on
+the baseline) so the two cases can be told apart:
+
+```json
+{"test_name": "Invoice_params-Region-East", "status": "error",
+ "actual": "RDL error modal detected",
+ "parameters": [{"name": "Region", "value": "East"}]}
+```
+
+A case that never rendered because its embed token failed records that failure
+as `actual`, never `rendered`.
+
 **A paginated report bound to a Power BI dataset resolves that binding
 automatically -- from the report's own local `.rdl` file, when one exists.**
 Power BI's `GET /reports/{id}` metadata lookup that resolves an interactive
@@ -301,11 +370,14 @@ a `PBIDATASET` data source's `ConnectString` embeds the dataset's own GUID
 (`Initial Catalog=sobe_wowvirtualserver-<GUID>`) and `rd:PowerBIWorkspaceName`
 names the workspace it lives in, which commonly differs from the report's own
 workspace -- a shared dataset commonly does. Nothing needs supplying by hand
-for a report checked in this way; `--dataset-id`/`PLAYWRIGHT_DATASET_ID` and
+for a report checked in this way. A report with no local `.rdl` resolves it
+from its own data sources (`GET /reports/{id}/datasources`, whose Power BI
+connection names the dataset as `sobe_wowvirtualserver-<GUID>`) -- without
+this, `GenerateToken` refuses the token with *At least one dataset is
+required*. `--dataset-id`/`PLAYWRIGHT_DATASET_ID` and
 `--dataset-workspace-id`/`PLAYWRIGHT_DATASET_WORKSPACE_ID` remain available as
 explicit overrides (a display name there resolves the same way
-`WORKSPACE.Workspace/NAME.Type` targets resolve a workspace name), for a
-purely-remote report with nothing checked in locally.
+`WORKSPACE.Workspace/NAME.Type` targets resolve a workspace name).
 
 A paginated report's `GenerateToken` payload is otherwise minimal --
 `reports`/`datasets` only, no `targetWorkspaces`/`accessLevel` -- matching a

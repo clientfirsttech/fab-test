@@ -34,8 +34,14 @@ If both `fab-test.yml` and `[tool.fab-test]` are present, `fab-test.yml` wins pe
 | `workspace` | string | `FABRIC_WORKSPACE_ID` | (none) — display name or GUID |
 | `report` | boolean | `ANALYZER_REPORT` | `false` — see [Reports](reports.md) |
 | `open_report` | boolean | `ANALYZER_OPEN_REPORT` | `false` — implies `report`; no-op under CI — see [Open Report](reports.md#open-report) |
+| `playwright_user_name` | string | `PLAYWRIGHT_USER_NAME` | (none) — effective-identity UPN for RLS embed tokens; only reaches cases that carry a discovered role |
 | `rules` | object | — | (none) — see Rule Overlays below |
 | `telemetry` | object | — | (none) — see Telemetry below |
+
+Declaring `playwright_user_name` is what lets an RLS-secured model be tested
+without a per-run environment variable: with a user configured, `playwright`
+discovers the model's roles and tests the page matrix under each one, minting
+one embed token per role. `PLAYWRIGHT_USER_NAME` still wins over the file.
 
 An unknown key exits `2` naming the key and the closest valid key (e.g. `artifac_dir` → "did you mean 'artifact_dir'?"); a key with the wrong type exits `2` naming the expected type.
 

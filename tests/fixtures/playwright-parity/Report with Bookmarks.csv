@@ -1,0 +1,4 @@
+"test_case","workspace_id","report_id","report_name","page_id","page_name","dataset_id","bookmark_id","bookmark_name","expected_status"
+"58eb2f3e-b03f-4383-bcfb-3360fd162604","c4698d28-b05c-40bc-926c-707563ac85e7","ff411a6d-e5bd-4efb-be9a-7e03df219aaf","Report with Bookmarks","5da315eb042003e41290","Page 1","ec98392b-618d-41c5-8140-62919028eff1","","","pass"
+"79f49761-c88e-424b-8ce5-170d3b87a11c","c4698d28-b05c-40bc-926c-707563ac85e7","ff411a6d-e5bd-4efb-be9a-7e03df219aaf","Report with Bookmarks","5da315eb042003e41290","Page 1","ec98392b-618d-41c5-8140-62919028eff1","4069a31f88c3cdcda01c","Bookmark 1","pass"
+"47e3bd91-326e-4aea-b673-d5a194208e9c","c4698d28-b05c-40bc-926c-707563ac85e7","ff411a6d-e5bd-4efb-be9a-7e03df219aaf","Report with Bookmarks","5da315eb042003e41290","Page 1","ec98392b-618d-41c5-8140-62919028eff1","abec14a043093db454bd","Bookmark 2","pass"

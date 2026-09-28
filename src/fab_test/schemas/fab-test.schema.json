@@ -96,6 +96,10 @@
           }
         }
       }
+    },
+    "playwright_user_name": {
+      "type": "string",
+      "description": "Effective-identity user (UPN) embedded in the RLS token `fab-test playwright` mints [env: PLAYWRIGHT_USER_NAME, which wins]. Only used for cases that carry a role."
     }
   },
   "$defs": {

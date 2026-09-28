@@ -16,6 +16,11 @@
 # environment: DEV                 # default environment label [env: FABRIC_ENVIRONMENT]
 # workspace: Sales Dev             # default workspace name or GUID [env: FABRIC_WORKSPACE_ID]
 
+# Effective-identity user (UPN) for the RLS embed token `fab-test playwright`
+# mints. PLAYWRIGHT_USER_NAME wins over this. Only reaches cases that carry a
+# discovered role -- a report on a model with no RLS embeds with no identity.
+playwright_user_name: john@kerski.net
+
 # Rule overlays: deltas applied to a packaged ruleset instead of forking it.
 # rules:
 #   bpa:

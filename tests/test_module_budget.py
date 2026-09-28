@@ -36,7 +36,7 @@ TEST_HARD = 900
 # test_complexity_budget.py.
 EXEMPTIONS: dict[str, tuple[int, str]] = {
     "src/fab_test/scripts/fab_test_parser.py": (
-        1050,
+        1060,
         (
             "2026-08-31: +11 lines adding a `name` positional and --list to "
             "the skill subparser, so `fab-test skill` can list known skills "
@@ -160,11 +160,13 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
             "fab_test_execution.py's case-count-scaled timeout both need to "
             "agree on the same path (Playwright Case Scaling epic). "
             "2026-08-30: +3 lines forwarding --workers to invoke_playwright.py "
-            "when explicitly set on the outer CLI."
+            "when explicitly set on the outer CLI. "
+            "2026-09-27: +10 lines adding --plan-only to the playwright "
+            "subparser (Playwright Generation Parity epic)."
         ),
     ),
     "src/fab_test/scripts/invoke_playwright.py": (
-        929,
+        1003,
         (
             "2026-09-26: +9 lines replacing the `_SPEC_PATH = Path(\"tests\") / "
             "\"test_playwright_visual.py\"` constant with `_spec_path()`, resolved "
@@ -196,6 +198,16 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
             "> packaged default) -- a small, cohesive addition to an already "
             "large file, not worth a forced split for ~20 lines. Revisit if "
             "it keeps growing. "
+            "2026-09-27: +48 lines adding --plan-only -- the flag, and the "
+            "envelope a plan writes instead of a render (Playwright "
+            "Generation Parity epic). This file is now the largest single "
+            "candidate for a split; the plan/envelope helpers are the "
+            "obvious seam. "
+            "2026-09-28: +26 lines wiring the paginated plan (dataset + "
+            "parameter set) into _run_single_report and adding the "
+            "`parameters` row field and embed-error `actual` (Playwright "
+            "Result Parity epic). Past 1,000 lines: the next growth here "
+            "should come with the split, not another exemption. "
             "2026-08-30: +47 lines adding _report_deep_link and threading "
             "cloud through _test_results_rows/_write_embed_error_envelope, so "
             "the HTML report can link back to the report page/bookmark a "

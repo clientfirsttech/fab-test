@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import base64
 import json
+import re
 import time
 from dataclasses import dataclass
 from typing import Any
@@ -64,6 +65,11 @@ def _decode_payload(payload: str) -> dict[str, Any] | None:
         return json.loads(decoded)
     except (ValueError, UnicodeDecodeError, json.JSONDecodeError):
         return None
+
+
+_VIRTUAL_SERVER_DATASET = re.compile(
+    r"sobe_wowvirtualserver-([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
+)
 
 
 def _bookmark_page_id(bookmark: dict[str, Any]) -> str:
@@ -125,6 +131,35 @@ def _decode_bookmark_file(payload: str) -> dict[str, str] | None:
         "bookmark_name": data.get("displayName", data.get("name", "")),
         "page_id": _bookmark_page_id(data),
     }
+
+
+def _decode_report_json_bookmarks(payload: str) -> list[dict[str, str]]:
+    """Parse bookmarks out of a legacy ``report.json`` definition part.
+
+    A report that has never been converted to the PBIR folder format ships
+    as a single ``report.json`` whose ``config`` -- usually an embedded JSON
+    *string*, occasionally an object -- carries the same ``bookmarks`` array
+    ``definition/bookmarks.json`` holds in the flat shape. Every report in a
+    classic workspace looks like this, so without this path bookmark
+    discovery returns nothing and the whole bookmark dimension silently
+    drops out of the test matrix.
+    """
+    data = _decode_payload(payload)
+    if not data:
+        return []
+    config = data.get("config")
+    if isinstance(config, str):
+        try:
+            config = json.loads(config)
+        except json.JSONDecodeError:
+            return []
+    if not isinstance(config, dict):
+        return []
+    return [
+        bookmark
+        for entry in config.get("bookmarks", [])
+        for bookmark in _flatten_bookmark_entry(entry)
+    ]
 
 
 class FabricRestClient:
@@ -307,8 +342,10 @@ class FabricRestClient:
         tagged with the page it targets.
 
         Reads every bookmark part under ``definition/bookmarks/`` (one
-        ``*.bookmark.json`` file per bookmark, the PBIR shape) plus a flat
-        ``definition/bookmarks.json`` for older exports. ``page_id`` comes
+        ``*.bookmark.json`` file per bookmark, the PBIR shape), a flat
+        ``definition/bookmarks.json`` for older exports, and the bookmarks
+        embedded in a legacy ``report.json``'s ``config`` -- the shape every
+        report in a classic (non-PBIR) workspace still has. ``page_id`` comes
         from each bookmark's ``explorationState.activeSection`` so a
         bookmark can be paired with the one page it belongs to instead of
         every page in the report. Falls back to an empty list when the
@@ -341,7 +378,71 @@ class FabricRestClient:
                 bookmark = _decode_bookmark_file(part.get("payload", ""))
                 if bookmark:
                     bookmarks.append(bookmark)
+            elif path == "report.json":
+                bookmarks.extend(
+                    _decode_report_json_bookmarks(part.get("payload", ""))
+                )
         return bookmarks
+
+    def get_report_dataset_ids(self, workspace_id: str, report_id: str) -> list[str]:
+        """Return the Power BI datasets a (paginated) report's data sources query.
+
+        A paginated report deployed with no local ``.rdl`` has nowhere else
+        its dataset is recorded -- the report-metadata lookup returns no
+        ``datasetId`` for one -- and ``GenerateToken`` refuses a paginated
+        token without it ("At least one dataset is required"). Its
+        ``datasources`` name each Power BI dataset as the catalog of a
+        ``sobe_wowvirtualserver-<id>`` connection, the same shape a local
+        ``.rdl``'s ``ConnectString`` carries.
+        """
+        data = self._request(
+            "GET", f"/v1.0/myorg/groups/{workspace_id}/reports/{report_id}/datasources"
+        )
+        dataset_ids: list[str] = []
+        for source in data.get("value", []):
+            database = source.get("connectionDetails", {}).get("database", "")
+            match = _VIRTUAL_SERVER_DATASET.fullmatch(database)
+            if match and match.group(1) not in dataset_ids:
+                dataset_ids.append(match.group(1))
+        return dataset_ids
+
+    def get_paginated_report_definition(self, workspace_id: str, report_id: str) -> str:
+        """Return a deployed paginated report's ``.rdl`` text, or ``""``.
+
+        The definition that actually renders -- and, for a report that
+        exists nowhere locally, the only place its declared parameters and
+        their valid-values queries can be read from.
+        """
+        data = self._request(
+            "POST",
+            f"/v1/workspaces/{workspace_id}/items/{report_id}/getDefinition",
+            api_root=_fabric_api_root_for(self._token.cloud),
+        )
+        for part in data.get("definition", {}).get("parts", []):
+            if part.get("path", "").lower().endswith(".rdl"):
+                try:
+                    return base64.b64decode(part.get("payload", "")).decode("utf-8-sig")
+                except (ValueError, UnicodeDecodeError):
+                    return ""
+        return ""
+
+    def execute_dax_query(
+        self, workspace_id: str, dataset_id: str, query: str
+    ) -> list[dict[str, Any]]:
+        """Run one DAX query against a dataset and return its result rows.
+
+        Needs the tenant's "Dataset Execute Queries REST API" setting on for
+        the service principal; a caller treats a failure as "no values
+        known", not as a reason the run cannot continue.
+        """
+        data = self._request(
+            "POST",
+            f"/v1.0/myorg/groups/{workspace_id}/datasets/{dataset_id}/executeQueries",
+            json_payload={"queries": [{"query": query}]},
+        )
+        results = data.get("results") or [{}]
+        tables = results[0].get("tables") or [{}]
+        return list(tables[0].get("rows") or [])
 
     def get_semantic_model_roles(
         self,
@@ -354,8 +455,11 @@ class FabricRestClient:
         derives each role's name from its ``definition/roles/<RoleName>.tmdl``
         part path -- Power BI Desktop names each role file after the role
         itself, so the path is a reliable source without parsing TMDL role
-        syntax. Falls back to an empty list when the definition is
-        unavailable (e.g. a legacy, non-PBIP-enabled semantic model).
+        syntax. Falls back to a live ``INFO.ROLES()`` DAX query over the
+        model's XMLA endpoint (``_discover_roles_via_xmla``) when that finds
+        nothing -- a 404 (no PBIP/Git-integration-enabled definition to
+        download) or an empty parts list are the same fact: this path never
+        found a role, not that the model has none.
         """
         try:
             data = self._request(
@@ -365,16 +469,86 @@ class FabricRestClient:
                 api_root=_fabric_api_root_for(self._token.cloud),
             )
         except ServiceClientError as exc:
-            if exc.status_code == 404:
-                return []
-            raise
+            if exc.status_code != 404:
+                raise
+            data = None
 
-        roles = []
-        for part in data.get("definition", {}).get("parts", []):
-            path = part.get("path", "")
-            if path.startswith("definition/roles/") and path.endswith(".tmdl"):
-                roles.append(path.rsplit("/", 1)[-1][: -len(".tmdl")])
-        return roles
+        roles: list[str] = []
+        if data is not None:
+            for part in data.get("definition", {}).get("parts", []):
+                path = part.get("path", "")
+                if path.startswith("definition/roles/") and path.endswith(".tmdl"):
+                    roles.append(path.rsplit("/", 1)[-1][: -len(".tmdl")])
+
+        if roles:
+            return roles
+        return self._discover_roles_via_xmla(workspace_id, semantic_model_id)
+
+    def get_workspace_name(self, workspace_id: str) -> str:
+        """Return a workspace's display name from its GUID.
+
+        The XMLA endpoint addresses a workspace by name
+        (``powerbi://.../v1.0/myorg/<WorkspaceName>``), not GUID.
+        """
+        data = self._request("GET", f"/v1.0/myorg/groups/{workspace_id}")
+        return str(data.get("name", ""))
+
+    def get_dataset_name(self, workspace_id: str, dataset_id: str) -> str:
+        """Return a dataset's display name from its GUID.
+
+        The XMLA endpoint's ``Initial Catalog`` is the dataset's display
+        name, not GUID.
+        """
+        data = self._request(
+            "GET", f"/v1.0/myorg/groups/{workspace_id}/datasets/{dataset_id}"
+        )
+        return str(data.get("name", ""))
+
+    def _discover_roles_via_xmla(
+        self, workspace_id: str, semantic_model_id: str
+    ) -> list[str]:
+        """Fall back to a live ``INFO.ROLES()`` DAX query when the TMDL-based
+        lookup above finds nothing -- the case for a semantic model that
+        isn't PBIP/Git-integration-enabled, where ``getDefinition`` 404s and
+        there is no role-file part path to read at all.
+
+        The Power BI REST ``executeQueries`` API cannot run this query --
+        Microsoft's own docs state plainly that ``INFO`` functions aren't
+        supported there -- so this goes over the model's real XMLA endpoint
+        via ADOMD.NET (``xmla_roles``) instead, exactly as a live query
+        against the model would (e.g. from DAX query view).
+
+        Raises ``ServiceClientError`` (matching the TMDL path's own failure
+        shape) when the fallback itself can't run -- name resolution failing
+        or ADOMD.NET/XMLA unavailable -- so "couldn't check" is never
+        silently reported the same as "checked, found none."
+        """
+        from .xmla_roles import XmlaQueryError, execute_dax_query
+
+        try:
+            workspace_name = self.get_workspace_name(workspace_id)
+            dataset_name = self.get_dataset_name(workspace_id, semantic_model_id)
+        except ServiceClientError as exc:
+            raise ServiceClientError(
+                "Could not resolve workspace/dataset names for XMLA role "
+                f"discovery: {exc}",
+                status_code=exc.status_code,
+                body=exc.body,
+            ) from exc
+
+        api_root = _api_root_for(self._token.cloud).replace("https://", "powerbi://")
+        server = f"{api_root}/v1.0/myorg/{workspace_name}"
+        try:
+            rows = execute_dax_query(
+                server,
+                dataset_name,
+                self._token.access_token,
+                'EVALUATE SELECTCOLUMNS(INFO.ROLES(), "RoleName", [Name])',
+            )
+        except XmlaQueryError as exc:
+            raise ServiceClientError(f"XMLA role discovery failed: {exc}") from exc
+
+        return [str(row["RoleName"]) for row in rows if row.get("RoleName")]
 
     def get_dependent_reports(
         self,
