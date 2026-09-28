@@ -103,6 +103,13 @@ jobs:
       # none, confirmed live ("Can not determine dotnet root" / "Failed to
       # create a .NET runtime (coreclr)"), unlike a bare ubuntu-latest
       # runner, which ships one by default.
+      #
+      # DOTNET_INSTALL_DIR: the default install location
+      # (/usr/share/dotnet) isn't writable by uid 1001 (the container's
+      # --user 1001 above) -- confirmed live ("mkdir: cannot create
+      # directory '/usr/share/dotnet': Permission denied").
+      - name: Set a user-writable .NET install directory
+        run: echo "DOTNET_INSTALL_DIR=$HOME/.dotnet" >> "$GITHUB_ENV"
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "8.0.x"
