@@ -84,6 +84,11 @@ def test_load_config_defaults_when_optional_omitted(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Given no fab-test.yml in scope, should default every optional field --
+    isolated from this repository's own fab-test.yml (which pins a real
+    playwright_user_name for its dev-workspace fixtures), or this test would
+    pass or fail depending on what that unrelated file happens to hold."""
+    monkeypatch.chdir(tmp_path)
     env_path = tmp_path / ".env"
     env_path.write_text(
         "\n".join(
