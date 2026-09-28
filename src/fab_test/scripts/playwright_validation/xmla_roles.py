@@ -104,6 +104,15 @@ def _ensure_adomd_loaded() -> Any:
             "pythonnet is not installed. It ships as a transitive dependency "
             "of pql-test, so this indicates a broken fab-test install."
         ) from exc
+    except Exception as exc:
+        # (not ImportError) from inside `import clr` itself when it can't
+        # create a runtime -- confirmed live: PYTHONNET_RUNTIME=coreclr set,
+        # but no .NET runtime installed in the container (a bare
+        # ubuntu-latest runner ships one; this project's own Playwright
+        # container image does not), raising "Can not determine dotnet
+        # root" / "Failed to create a .NET runtime (coreclr)" uncaught,
+        # once per report, before this except existed.
+        raise XmlaQueryError(f"Could not load pythonnet's CLR runtime: {exc}") from exc
 
     try:
         cache_dir = _download_adomd(lib_folder)

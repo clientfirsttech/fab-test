@@ -95,6 +95,18 @@ jobs:
         with:
           python-version: "3.12"
 
+      # Needed for two things this container image doesn't otherwise carry:
+      # the pbir analyzer (doctor already reports it as not-ready without
+      # this: ".NET 8+ runtime not found") and, since this run, RLS role
+      # discovery's XMLA fallback -- pythonnet's PYTHONNET_RUNTIME=coreclr
+      # still needs a real .NET runtime to find, and this container has
+      # none, confirmed live ("Can not determine dotnet root" / "Failed to
+      # create a .NET runtime (coreclr)"), unlike a bare ubuntu-latest
+      # runner, which ships one by default.
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
       # This repository's own current code, plus the dev extras --
       # pytest, pytest-playwright, pytest-html, and pytest-xdist are all
       # declared in pyproject.toml's [project.optional-dependencies].dev,
