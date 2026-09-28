@@ -9,6 +9,7 @@ command list.
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import json
 import os
 import sys
@@ -607,7 +608,7 @@ def _report_parameters_for_command(artifact: Path, args: argparse.Namespace) -> 
     parameters = parse_rdl_report_parameters(artifact)
     if not parameters:
         return ""
-    return json.dumps([{"name": parameter.name, "multi_value": parameter.multi_value} for parameter in parameters])
+    return json.dumps([dataclasses.asdict(parameter) for parameter in parameters])
 
 
 def build_playwright_command(
@@ -661,6 +662,8 @@ def build_playwright_command(
     report_parameters = _report_parameters_for_command(artifact, args)
     if report_parameters:
         cmd += ["--report-parameters", report_parameters]
+    if getattr(args, "plan_only", False):
+        cmd += ["--plan-only"]
     pages = getattr(args, "pages", "auto")
     if pages != "auto":
         cmd += ["--pages", pages]

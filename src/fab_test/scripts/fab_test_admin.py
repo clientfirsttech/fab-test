@@ -159,6 +159,7 @@ _SETTING_SPECS: list[tuple[str, str | None, Any, type | None]] = [
     ("timeout", "ANALYZER_TIMEOUT", _DEFAULT_SUBPROCESS_TIMEOUT, int),
     ("environment", "FABRIC_ENVIRONMENT", "", None),
     ("workspace", "FABRIC_WORKSPACE_ID", "", None),
+    ("playwright_user_name", "PLAYWRIGHT_USER_NAME", "", None),
 ]
 
 _SECRET_KEY_MARKERS = ("secret", "password", "token", "api_key")
@@ -250,6 +251,10 @@ _FAB_TEST_YML_TEMPLATE = """\
 #                                   # setting this overrides that)
 # environment: DEV                 # default environment label [env: FABRIC_ENVIRONMENT]
 # workspace: Sales Dev             # default workspace name or GUID [env: FABRIC_WORKSPACE_ID]
+# playwright_user_name: analyst@contoso.com
+#                                  # effective-identity UPN for RLS embed tokens
+#                                  # [env: PLAYWRIGHT_USER_NAME]; only used for
+#                                  # cases that carry a discovered role
 
 # Rule overlays: deltas applied to a packaged ruleset instead of forking it.
 # rules:

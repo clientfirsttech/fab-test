@@ -67,7 +67,7 @@ def _download_adomd(lib_folder: str) -> Path:
     try:
         with tempfile.NamedTemporaryFile(suffix=".nupkg", delete=False) as fh:
             tmp_path = fh.name
-        urllib.request.urlretrieve(url, tmp_path)  # noqa: S310 -- fixed nuget.org host
+        urllib.request.urlretrieve(url, tmp_path)  # fixed nuget.org host
         with zipfile.ZipFile(tmp_path) as archive:
             for member in archive.namelist():
                 if not member.startswith(prefix) or member.endswith("/"):

@@ -153,7 +153,6 @@ def generate_embed_token(
     access_token: str,
     identity: ReportIdentity,
     *,
-    use_rls: bool = False,
     user_name: str = "",
     role: str = "",
     cloud: str = "public",
@@ -201,7 +200,12 @@ def generate_embed_token(
         payload["targetWorkspaces"] = [{"id": wid} for wid in target_workspace_ids]
         payload["accessLevel"] = "View"
 
-    if use_rls and user_name and role:
+    # An identity follows from the case's own role, not from a separate RLS
+    # flag: a non-empty ``role`` only ever reaches here from role discovery,
+    # which does not run without RLS in play. Gating on the flag as well drops
+    # the identity from a token minted for a real role -- a run that passes
+    # while testing nobody's rows.
+    if user_name and role:
         # Tried dropping the `role` requirement here (attach an identity
         # with "roles": [] whenever a dataset's role couldn't be discovered)
         # to handle a mandatory-identity, no-named-role dataset -- reverted
@@ -266,7 +270,6 @@ def get_embed_context(config: PlaywrightValidationConfig) -> EmbedContext:
             config.dataset_id,
             dataset_workspace_id=config.dataset_workspace_id,
         ),
-        use_rls=config.use_rls,
         user_name=config.user_name,
         role=config.role,
         cloud=config.cloud,

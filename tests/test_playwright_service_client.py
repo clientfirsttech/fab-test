@@ -155,6 +155,108 @@ def test_get_report_bookmarks_expands_a_group_into_its_children(
     ]
 
 
+def test_get_report_bookmarks_parses_a_legacy_report_json_definition(
+    client: FabricRestClient,
+) -> None:
+    """A report that was never PBIR-converted keeps its bookmarks inside
+    ``report.json``'s embedded config, not in ``definition/bookmarks/`` --
+    discovery finds them there too, or every bookmark in the six reports of
+    a classic workspace goes untested."""
+    import base64
+    import json
+
+    report_json = {
+        "config": json.dumps(
+            {
+                "bookmarks": [
+                    {
+                        "name": "bmk1",
+                        "displayName": "Bookmark One",
+                        "explorationState": {"activeSection": "page1"},
+                    },
+                    {
+                        "name": "group1",
+                        "displayName": "Group One",
+                        "children": [
+                            {
+                                "name": "child1",
+                                "displayName": "Child One",
+                                "explorationState": {"activeSection": "page2"},
+                            },
+                        ],
+                    },
+                ]
+            }
+        ),
+        "sections": [],
+    }
+    data = {
+        "definition": {
+            "parts": [
+                {"path": "definition.pbir", "payload": base64.b64encode(b"{}").decode("utf-8")},
+                {
+                    "path": "report.json",
+                    "payload": base64.b64encode(
+                        json.dumps(report_json).encode("utf-8")
+                    ).decode("utf-8"),
+                },
+            ]
+        }
+    }
+    with patch(
+        "fab_test.scripts.playwright_validation.service_client.requests.request",
+        return_value=_mock_response(data),
+    ):
+        bookmarks = client.get_report_bookmarks("ws-1", "rpt-1")
+
+    assert bookmarks == [
+        {"bookmark_id": "bmk1", "bookmark_name": "Bookmark One", "page_id": "page1"},
+        {"bookmark_id": "child1", "bookmark_name": "Child One", "page_id": "page2"},
+    ]
+
+
+def test_get_report_bookmarks_reads_a_legacy_config_given_as_an_object(
+    client: FabricRestClient,
+) -> None:
+    """Some exports carry ``report.json``'s config as an object rather than
+    an embedded JSON string -- both shapes name the same bookmarks."""
+    import base64
+    import json
+
+    report_json = {
+        "config": {
+            "bookmarks": [
+                {
+                    "name": "bmk1",
+                    "displayName": "Bookmark One",
+                    "explorationState": {"activeSection": "page1"},
+                },
+            ]
+        }
+    }
+    data = {
+        "definition": {
+            "parts": [
+                {
+                    "path": "report.json",
+                    "payload": base64.b64encode(
+                        json.dumps(report_json).encode("utf-8")
+                    ).decode("utf-8"),
+                },
+            ]
+        }
+    }
+    with patch(
+        "fab_test.scripts.playwright_validation.service_client.requests.request",
+        return_value=_mock_response(data),
+    ):
+        bookmarks = client.get_report_bookmarks("ws-1", "rpt-1")
+
+    assert bookmarks == [
+        {"bookmark_id": "bmk1", "bookmark_name": "Bookmark One", "page_id": "page1"},
+    ]
+
+
 def test_get_report_bookmarks_parses_pbir_bookmark_files(
     client: FabricRestClient,
 ) -> None:
@@ -545,3 +647,77 @@ def test_request_raises_on_http_error(client: FabricRestClient) -> None:
         client.list_items("ws-1", "Report")
 
     assert exc_info.value.status_code == 401
+
+
+_REQUEST = "fab_test.scripts.playwright_validation.service_client.requests.request"
+
+
+def test_get_report_dataset_ids_reads_the_power_bi_dataset_behind_a_paginated_report(
+    client: FabricRestClient,
+) -> None:
+    """A paginated report with no local .rdl names its dataset only in its
+    datasources -- as the catalog of a sobe_wowvirtualserver connection."""
+    data = {
+        "value": [
+            {
+                "datasourceType": "AnalysisServices",
+                "connectionDetails": {
+                    "server": "pbiazure://api.powerbi.com/",
+                    "database": "sobe_wowvirtualserver-4c353b5c-d311-4e90-b9d1-5766b87f59dc",
+                },
+            },
+            {"datasourceType": "Sql", "connectionDetails": {"database": "sales"}},
+        ]
+    }
+    with patch(_REQUEST, return_value=_mock_response(data)) as request:
+        dataset_ids = client.get_report_dataset_ids("ws-1", "rpt-1")
+
+    assert dataset_ids == ["4c353b5c-d311-4e90-b9d1-5766b87f59dc"]
+    assert request.call_args.args[1].endswith("/groups/ws-1/reports/rpt-1/datasources")
+
+
+def test_get_paginated_report_definition_returns_the_rdl_text(
+    client: FabricRestClient,
+) -> None:
+    """The deployed definition's .rdl part is decoded -- BOM and all -- so it
+    parses the same as a local file would."""
+    import base64
+
+    rdl = "﻿<Report><ReportParameters/></Report>"
+    data = {
+        "definition": {
+            "parts": [
+                {"path": ".platform", "payload": base64.b64encode(b"{}").decode()},
+                {
+                    "path": "Sales.rdl",
+                    "payload": base64.b64encode(rdl.encode("utf-8")).decode(),
+                },
+            ]
+        }
+    }
+    with patch(_REQUEST, return_value=_mock_response(data)) as request:
+        text = client.get_paginated_report_definition("ws-1", "rpt-1")
+
+    assert text == "<Report><ReportParameters/></Report>"
+    assert request.call_args.args[1].endswith("/v1/workspaces/ws-1/items/rpt-1/getDefinition")
+
+
+def test_get_paginated_report_definition_is_empty_when_there_is_no_rdl_part(
+    client: FabricRestClient,
+) -> None:
+    """A definition with no .rdl part yields nothing to parse, not a crash."""
+    with patch(_REQUEST, return_value=_mock_response({"definition": {"parts": []}})):
+        assert client.get_paginated_report_definition("ws-1", "rpt-1") == ""
+
+
+def test_execute_dax_query_returns_the_first_tables_rows(
+    client: FabricRestClient,
+) -> None:
+    """A parameter's valid-values query comes back as rows keyed by column."""
+    data = {"results": [{"tables": [{"rows": [{"Table[Column B]": 2}, {"Table[Column B]": 4}]}]}]}
+    with patch(_REQUEST, return_value=_mock_response(data)) as request:
+        rows = client.execute_dax_query("ws-1", "ds-1", "EVALUATE T")
+
+    assert rows == [{"Table[Column B]": 2}, {"Table[Column B]": 4}]
+    assert request.call_args.args[1].endswith("/groups/ws-1/datasets/ds-1/executeQueries")
+    assert request.call_args.kwargs["json"] == {"queries": [{"query": "EVALUATE T"}]}

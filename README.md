@@ -287,8 +287,11 @@ for a copy-ready workflow.
 ### Playwright tests every page, bookmark, and role by default
 
 `fab-test playwright` discovers a report's pages, each page's own bookmarks,
-and (when RLS is enabled) the semantic model's roles, and tests the full
-matrix, not just whichever tab opens first. Discovery needs the full
+and (when RLS is in play) the semantic model's roles, and tests the full
+matrix, not just whichever tab opens first. It expands to one case per page,
+plus one per that page's *own* bookmark, repeated once per role -- a report
+with 2 pages, 1 bookmark on the first and 2 on the second, under 2 roles, is
+10 cases. Discovery needs the full
 permission set in
 [docs/PLAYWRIGHT-CI.md](https://github.com/kerski/fab-test/blob/main/docs/PLAYWRIGHT-CI.md#1-register-the-service-principal)
 on the service principal in addition to what embedding already required; a
@@ -302,7 +305,22 @@ fab-test playwright --artifact "Not Working Visuals" --env dev
 
 # Only the default page/role, matching every prior release
 fab-test playwright --artifact "Not Working Visuals" --env dev --pages none --roles none
+
+# See the matrix without rendering it: writes test-cases.csv/json and exits 0,
+# minting no embed token and launching no browser
+fab-test playwright --artifact "Not Working Visuals" --env dev --plan-only
 ```
+
+Role discovery needs an effective-identity user to embed with. Declare it once
+in `fab-test.yml` instead of setting `PLAYWRIGHT_USER_NAME` per run:
+
+```yaml
+playwright_user_name: analyst@contoso.com
+```
+
+With a user configured, an RLS-secured model's roles are discovered and tested
+under one embed token each. `PLAYWRIGHT_USER_NAME` still wins over the file, and
+a case with no role embeds with no identity at all.
 
 ### Validating a paginated (RDL) report
 
@@ -315,11 +333,24 @@ alongside `NAME.Report` folders, and `--artifact NAME --env ENV` with no local
 match tries Fabric's `Report` item type first, then `PaginatedReport`, using
 whichever actually matches the name. If the report is bound to a Power BI
 dataset, its dataset ID and workspace are read straight out of the `.rdl`
-file's own `<DataSources>` block, too -- no GUID to look up and supply by hand.
+file's own `<DataSources>` block -- or, for a report that exists only in the
+workspace, from the report's own data sources -- so there is no GUID to look up
+and supply by hand.
 
 ```bash
 fab-test playwright --artifact "Invoice RDL" --env dev --env-file .env
 ```
+
+A report that declares parameters is tested twice: once with no parameters,
+and once with a real parameter set applied at embed time -- the first valid
+value of each single-value parameter and the first two of each multi-value
+one. The valid values are read the way the report itself reads them: a static
+list straight from the `.rdl`, or the parameter's own dataset query run against
+the report's dataset. That query needs the tenant's **Dataset Execute Queries
+REST API** setting to allow the service principal; without it, the report is
+tested with no parameters and a warning names the setting. Each case's row in
+`test_results` carries a `parameters` field, empty on the no-parameter case, so
+a failure names the values that caused it.
 
 `--report-type {report,paginated}` (or `PLAYWRIGHT_REPORT_TYPE`) forces it
 explicitly, for the rare case you need to -- never required for `--artifact`

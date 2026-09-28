@@ -93,6 +93,22 @@ jobs:
       - name: Confirm the service principal and workspace are ready
         run: fab-test doctor
 
+      # A paginated report's parameterized case reads its parameter values with
+      # the report's own dataset query (executeQueries), so the tenant's
+      # "Dataset Execute Queries REST API" setting must allow this service
+      # principal. Without it the report is tested with no parameters only.
+      #
+      # What this run will test, before spending minutes in a browser. Writes
+      # test-cases.csv/json and exits 0 without minting an embed token -- a
+      # cheap sanity check that discovery found the pages, bookmarks, and
+      # roles you expect. Drop this step once you trust the matrix.
+      - name: Preview the test matrix
+        run: |
+          args=()
+          [ -n "${{ inputs.artifact }}" ] && args+=(--artifact "${{ inputs.artifact }}")
+          fab-test playwright "${args[@]}" --env dev --plan-only
+          cat fab-test-results/playwright/*/test-cases/test-cases.csv
+
       - name: Run fab-test playwright
         id: playwright
         run: |
