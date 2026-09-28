@@ -407,17 +407,99 @@ def test_request_raises_when_long_running_operation_fails(
         client.get_semantic_model_roles("ws-1", "sm-1")
 
 
-def test_get_semantic_model_roles_returns_empty_on_404(
+def test_get_semantic_model_roles_falls_back_to_xmla_on_404(
     client: FabricRestClient,
 ) -> None:
-    """A semantic model with no PBIP definition yields no roles, not an error."""
-    with patch(
-        "fab_test.scripts.playwright_validation.service_client.requests.request",
-        return_value=_mock_response({}, status_code=404),
+    """A semantic model with no PBIP definition (getDefinition 404s) falls
+    back to a live `INFO.ROLES()` DAX query over its XMLA endpoint rather
+    than reporting "no roles" on the strength of a 404 alone -- that 404 is
+    exactly the non-PBIP-enabled-model case this fallback exists for."""
+    with (
+        patch(
+            "fab_test.scripts.playwright_validation.service_client.requests.request",
+            return_value=_mock_response({}, status_code=404),
+        ),
+        patch.object(client, "get_workspace_name", return_value="Sales"),
+        patch.object(client, "get_dataset_name", return_value="SalesModel"),
+        patch(
+            "fab_test.scripts.playwright_validation.xmla_roles.execute_dax_query",
+            return_value=[{"RoleName": "Manager"}, {"RoleName": "Analyst"}],
+        ) as mock_execute,
+    ):
+        roles = client.get_semantic_model_roles("ws-1", "sm-1")
+
+    assert roles == ["Manager", "Analyst"]
+    server_arg = mock_execute.call_args.args[0]
+    assert server_arg == "powerbi://api.powerbi.com/v1.0/myorg/Sales"
+    catalog_arg = mock_execute.call_args.args[1]
+    assert catalog_arg == "SalesModel"
+
+
+def test_get_semantic_model_roles_falls_back_to_xmla_when_tmdl_has_no_role_parts(
+    client: FabricRestClient,
+) -> None:
+    """A definition that downloads fine but names no `definition/roles/*.tmdl`
+    parts still tries the XMLA fallback -- an empty TMDL role list and "this
+    model genuinely has no roles" are not the same fact."""
+    data = {"definition": {"parts": [{"path": "definition/tables/Sales.tmdl", "payload": ""}]}}
+    with (
+        patch(
+            "fab_test.scripts.playwright_validation.service_client.requests.request",
+            return_value=_mock_response(data),
+        ),
+        patch.object(client, "get_workspace_name", return_value="Sales"),
+        patch.object(client, "get_dataset_name", return_value="SalesModel"),
+        patch(
+            "fab_test.scripts.playwright_validation.xmla_roles.execute_dax_query",
+            return_value=[],
+        ),
     ):
         roles = client.get_semantic_model_roles("ws-1", "sm-1")
 
     assert roles == []
+
+
+def test_get_semantic_model_roles_xmla_fallback_failure_raises(
+    client: FabricRestClient,
+) -> None:
+    """When the fallback itself can't run (XMLA query failure), the caller
+    must see an error, not a silent `[]` -- otherwise "couldn't check" and
+    "checked, found none" are indistinguishable, exactly the gap this
+    fallback was built to close."""
+    from fab_test.scripts.playwright_validation.xmla_roles import XmlaQueryError
+
+    with (
+        patch(
+            "fab_test.scripts.playwright_validation.service_client.requests.request",
+            return_value=_mock_response({}, status_code=404),
+        ),
+        patch.object(client, "get_workspace_name", return_value="Sales"),
+        patch.object(client, "get_dataset_name", return_value="SalesModel"),
+        patch(
+            "fab_test.scripts.playwright_validation.xmla_roles.execute_dax_query",
+            side_effect=XmlaQueryError("could not load ADOMD.NET"),
+        ),
+        pytest.raises(ServiceClientError, match="XMLA role discovery failed"),
+    ):
+        client.get_semantic_model_roles("ws-1", "sm-1")
+
+
+def test_get_workspace_name_reads_the_display_name(client: FabricRestClient) -> None:
+    """The XMLA endpoint addresses a workspace by display name, not GUID."""
+    with patch(
+        "fab_test.scripts.playwright_validation.service_client.requests.request",
+        return_value=_mock_response({"name": "Sales"}),
+    ):
+        assert client.get_workspace_name("ws-1") == "Sales"
+
+
+def test_get_dataset_name_reads_the_display_name(client: FabricRestClient) -> None:
+    """The XMLA endpoint's Initial Catalog is the dataset's display name, not GUID."""
+    with patch(
+        "fab_test.scripts.playwright_validation.service_client.requests.request",
+        return_value=_mock_response({"name": "SalesModel"}),
+    ):
+        assert client.get_dataset_name("ws-1", "sm-1") == "SalesModel"
 
 
 def test_get_report_bookmarks_returns_empty_on_404(client: FabricRestClient) -> None:

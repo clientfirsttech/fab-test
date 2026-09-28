@@ -354,8 +354,11 @@ class FabricRestClient:
         derives each role's name from its ``definition/roles/<RoleName>.tmdl``
         part path -- Power BI Desktop names each role file after the role
         itself, so the path is a reliable source without parsing TMDL role
-        syntax. Falls back to an empty list when the definition is
-        unavailable (e.g. a legacy, non-PBIP-enabled semantic model).
+        syntax. Falls back to a live ``INFO.ROLES()`` DAX query over the
+        model's XMLA endpoint (``_discover_roles_via_xmla``) when that finds
+        nothing -- a 404 (no PBIP/Git-integration-enabled definition to
+        download) or an empty parts list are the same fact: this path never
+        found a role, not that the model has none.
         """
         try:
             data = self._request(
@@ -365,16 +368,86 @@ class FabricRestClient:
                 api_root=_fabric_api_root_for(self._token.cloud),
             )
         except ServiceClientError as exc:
-            if exc.status_code == 404:
-                return []
-            raise
+            if exc.status_code != 404:
+                raise
+            data = None
 
-        roles = []
-        for part in data.get("definition", {}).get("parts", []):
-            path = part.get("path", "")
-            if path.startswith("definition/roles/") and path.endswith(".tmdl"):
-                roles.append(path.rsplit("/", 1)[-1][: -len(".tmdl")])
-        return roles
+        roles: list[str] = []
+        if data is not None:
+            for part in data.get("definition", {}).get("parts", []):
+                path = part.get("path", "")
+                if path.startswith("definition/roles/") and path.endswith(".tmdl"):
+                    roles.append(path.rsplit("/", 1)[-1][: -len(".tmdl")])
+
+        if roles:
+            return roles
+        return self._discover_roles_via_xmla(workspace_id, semantic_model_id)
+
+    def get_workspace_name(self, workspace_id: str) -> str:
+        """Return a workspace's display name from its GUID.
+
+        The XMLA endpoint addresses a workspace by name
+        (``powerbi://.../v1.0/myorg/<WorkspaceName>``), not GUID.
+        """
+        data = self._request("GET", f"/v1.0/myorg/groups/{workspace_id}")
+        return str(data.get("name", ""))
+
+    def get_dataset_name(self, workspace_id: str, dataset_id: str) -> str:
+        """Return a dataset's display name from its GUID.
+
+        The XMLA endpoint's ``Initial Catalog`` is the dataset's display
+        name, not GUID.
+        """
+        data = self._request(
+            "GET", f"/v1.0/myorg/groups/{workspace_id}/datasets/{dataset_id}"
+        )
+        return str(data.get("name", ""))
+
+    def _discover_roles_via_xmla(
+        self, workspace_id: str, semantic_model_id: str
+    ) -> list[str]:
+        """Fall back to a live ``INFO.ROLES()`` DAX query when the TMDL-based
+        lookup above finds nothing -- the case for a semantic model that
+        isn't PBIP/Git-integration-enabled, where ``getDefinition`` 404s and
+        there is no role-file part path to read at all.
+
+        The Power BI REST ``executeQueries`` API cannot run this query --
+        Microsoft's own docs state plainly that ``INFO`` functions aren't
+        supported there -- so this goes over the model's real XMLA endpoint
+        via ADOMD.NET (``xmla_roles``) instead, exactly as a live query
+        against the model would (e.g. from DAX query view).
+
+        Raises ``ServiceClientError`` (matching the TMDL path's own failure
+        shape) when the fallback itself can't run -- name resolution failing
+        or ADOMD.NET/XMLA unavailable -- so "couldn't check" is never
+        silently reported the same as "checked, found none."
+        """
+        from .xmla_roles import XmlaQueryError, execute_dax_query
+
+        try:
+            workspace_name = self.get_workspace_name(workspace_id)
+            dataset_name = self.get_dataset_name(workspace_id, semantic_model_id)
+        except ServiceClientError as exc:
+            raise ServiceClientError(
+                "Could not resolve workspace/dataset names for XMLA role "
+                f"discovery: {exc}",
+                status_code=exc.status_code,
+                body=exc.body,
+            ) from exc
+
+        api_root = _api_root_for(self._token.cloud).replace("https://", "powerbi://")
+        server = f"{api_root}/v1.0/myorg/{workspace_name}"
+        try:
+            rows = execute_dax_query(
+                server,
+                dataset_name,
+                self._token.access_token,
+                'EVALUATE SELECTCOLUMNS(INFO.ROLES(), "RoleName", [Name])',
+            )
+        except XmlaQueryError as exc:
+            raise ServiceClientError(f"XMLA role discovery failed: {exc}") from exc
+
+        return [str(row["RoleName"]) for row in rows if row.get("RoleName")]
 
     def get_dependent_reports(
         self,

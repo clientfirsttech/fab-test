@@ -1,6 +1,6 @@
 # Playwright CI Guide Epic
 
-**Status**: 🔄 IN-PROGRESS (7/8 tasks: setup guide, all 6 CLI gaps, the example workflow, the demo workflow, the drift test, proving it end to end in CI, and syncing the three doc callers done; non-PBIP RLS role discovery remains, tracked separately since it needs a new runtime dependency decision)
+**Status**: 🔄 IN-PROGRESS (all 8 planned tasks done; live-verifying the RLS role-discovery fix end-to-end against real RLSTest* datasets before closing the epic)
 **Goal**: Give a team a documented, copy-ready GitHub Actions path from "no service principal" to a green `fab-test playwright` run against their own Fabric workspace.
 
 ## Overview
@@ -113,23 +113,25 @@ Left open, tracked as its own task below: role discovery itself (`get_semantic_m
 
 ## Discover RLS roles for non-PBIP-enabled semantic models
 
-**Status**: 📋 PLANNED
+**Status**: ✅ DONE 2026-09-27
 
-`get_semantic_model_roles` (`service_client.py`) discovers roles by downloading the semantic model's Fabric definition and reading `definition/roles/<Name>.tmdl` part paths. That's blind to any model not enabled for PBIP/Git-integration-style definition download -- `getDefinition` 404s, and discovery silently returns `[]` with no warning (indistinguishable from "this model genuinely has no roles").
+`get_semantic_model_roles` (`service_client.py`) discovered roles only by downloading the semantic model's Fabric definition and reading `definition/roles/<Name>.tmdl` part paths -- blind to any model not enabled for PBIP/Git-integration-style definition download (`getDefinition` 404s, and discovery silently returned `[]`, indistinguishable from "this model genuinely has no roles").
 
-The obvious portable fix -- the Power BI REST `executeQueries` API running `EVALUATE INFO.ROLES()` -- is a dead end: Microsoft's own docs state plainly that `executeQueries` supports DAX queries only, and **"INFO functions ... are not supported."** Confirmed by a prior working implementation ([kerski/pbi-dataops-visual-error-testing](https://github.com/kerski/pbi-dataops-visual-error-testing)) that runs `INFO.ROLES()` a different way entirely: `Invoke-ASCmd` (PowerShell's `SqlServer` module, backed by AMO/ADOMD.NET) against the model's true XMLA endpoint, parsing the raw XMLA/SOAP response. That path is Windows/PowerShell-shaped and pulls in a .NET client library `fab-test` has never depended on.
+The obvious portable fix -- the Power BI REST `executeQueries` API running `EVALUATE INFO.ROLES()` -- was a dead end: Microsoft's own docs state plainly that `executeQueries` supports DAX queries only, and **"INFO functions ... are not supported."** A prior working implementation ([kerski/pbi-dataops-visual-error-testing](https://github.com/kerski/pbi-dataops-visual-error-testing)) runs `INFO.ROLES()` a different way entirely: `Invoke-ASCmd` (PowerShell's `SqlServer` module, backed by AMO/ADOMD.NET) against the model's true XMLA endpoint.
 
-Options for a Python-side, Linux-CI-compatible equivalent, roughly cheapest to most involved:
-- **ADOMD.NET via pythonnet**: `Microsoft.AnalysisServices.AdomdClient.NetCore` (NuGet) targets .NET Core/Linux, so it isn't inherently Windows-only -- but it needs the .NET runtime present in the container image and a Python/.NET bridge (`pythonnet`), a real new dependency chain for one discovery call.
-- **Hand-rolled XMLA-over-SOAP**: XMLA is plain SOAP-over-HTTPS, so a raw `Execute` envelope posted with the existing AAD bearer token is possible in pure Python (`requests`) with no new runtime dependency -- but means implementing SOAP envelope construction and parsing the XMLA rowset response from scratch, with no existing client library to lean on.
-- **Leave the gap documented**: keep today's TMDL-only discovery and accept that a non-PBIP RLS-secured model simply can't be Playwright-tested under RLS yet.
+**What shipped**: a live XMLA/DAX query via ADOMD.NET, but through `pythonnet` directly rather than PowerShell -- and it turned out to need no new dependency at all. `pql-test==0.1.17` (already a hard, pinned dependency of this package) requires `pyadomd`, which requires `pythonnet`; both are already installed whenever `fab-test` is. `src/fab_test/scripts/playwright_validation/xmla_roles.py` is a small, self-contained module (deliberately *not* importing `pql_test`'s own private internals, which solve the same problem but aren't a published API) that:
+- Downloads the `Microsoft.AnalysisServices.AdomdClient` NuGet package to a user cache on first use (`lib/net472` on Windows, `lib/net8.0` elsewhere -- the same package `pql-test` uses, but that package only ever extracts the Windows-only `net472` folder).
+- Sets `PYTHONNET_RUNTIME=coreclr` before the first `import clr` on non-Windows -- pythonnet defaults to Mono there, which isn't installed on a bare CI runner, and this failed exactly that way on the first attempt (`RuntimeError: Could not find libmono`) before the fix.
+- Runs `EVALUATE SELECTCOLUMNS(INFO.ROLES(), "RoleName", [Name])` over the model's real XMLA endpoint (`powerbi://api.powerbi.com/v1.0/myorg/<WorkspaceName>`, addressed by *display name*, not GUID -- a separate two-call resolution added as `get_workspace_name`/`get_dataset_name` on `FabricRestClient`).
 
-Confirmed live (not just theoretical) that this is a real, present blocker, not a hypothetical edge case: dispatching against the workspace's `RLSTest*` datasets with `PLAYWRIGHT_USE_RLS`/`PLAYWRIGHT_USER_NAME` both set still failed GenerateToken with *"requires roles to be included in provided effective identity"* -- Power BI confirming these models have genuine named roles that today's TMDL-based discovery never finds (silently, as `[]`, indistinguishable from "no roles defined").
+**Verified live before writing any of the above**, not assumed from the NuGet package's folder layout: a throwaway spike workflow (`spike/adomd-linux`, landed on `main` temporarily with explicit authorization, then removed) confirmed the `net8.0` assembly genuinely loads and `AdomdConnection` instantiates on plain `ubuntu-latest` -- first attempt failed on the Mono/CoreCLR issue above, second attempt (after setting `PYTHONNET_RUNTIME=coreclr`) succeeded with no other runtime install needed.
+
+`get_semantic_model_roles` now falls back to `_discover_roles_via_xmla` whenever the TMDL-based lookup finds nothing (404 *or* an empty parts list -- both are "this path found nothing," not "the model has no roles"), and raises `ServiceClientError` (the same exception type and the same existing warning-logging path in `discovery.py::_discover_roles`) when the fallback itself can't run -- so "couldn't check" and "checked, found none" stay distinguishable, per the requirement below.
 
 **Requirements**:
-- Given a non-PBIP-enabled semantic model with RLS roles, should discover them, or should log a distinguishable warning (not silent `[]`) when discovery is genuinely not possible, so "no roles" and "couldn't check" never look the same in a doctor/CI run.
-- Given whichever approach is chosen, should not require a Windows-only runtime on the demo workflow's Linux container, since that's where this gap was actually found.
-- Given `generate_embed_token`'s `use_rls and user_name and role` guard, should only be revisited once discovery can actually return correct role names for these datasets -- loosening it before that (tried and reverted once already) breaks every non-RLS dataset instead.
+- Given a non-PBIP-enabled semantic model with RLS roles, should discover them, or should log a distinguishable warning (not silent `[]`) when discovery is genuinely not possible, so "no roles" and "couldn't check" never look the same in a doctor/CI run. ✅ `_discover_roles_via_xmla` raises `ServiceClientError` on failure, routing through `discovery.py`'s existing `::warning::` path.
+- Given whichever approach is chosen, should not require a Windows-only runtime on the demo workflow's Linux container, since that's where this gap was actually found. ✅ confirmed live, `net8.0` + `PYTHONNET_RUNTIME=coreclr`, no `setup-dotnet` step needed.
+- Given `generate_embed_token`'s `use_rls and user_name and role` guard, should only be revisited once discovery can actually return correct role names for these datasets -- loosening it before that (tried and reverted once already) breaks every non-RLS dataset instead. Not revisited in this task; now that discovery can return real role names for `RLSTest*`, the existing guard should be satisfied without changing it -- confirm with a live re-dispatch before considering this fully closed.
 
 ---
 
