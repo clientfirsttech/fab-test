@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import builtins
 from unittest.mock import MagicMock, patch
 
 import pytest
 
+from fab_test.scripts.playwright_validation import xmla_roles
 from fab_test.scripts.playwright_validation.xmla_roles import (
     XmlaQueryError,
     _build_connection_string,
@@ -152,3 +154,23 @@ def test_download_adomd_reuses_existing_cache(tmp_path) -> None:
 
     assert result == cache
     mock_urlretrieve.assert_not_called()
+
+
+def test_ensure_adomd_loaded_wraps_clr_runtime_failure(monkeypatch) -> None:
+    """pythonnet raises a bare RuntimeError -- not ImportError -- from
+    inside `import clr` itself when it can't create a CLR runtime (e.g. no
+    .NET installed in the container). Confirmed live: this escaped as an
+    uncaught traceback, once per report, before this except clause existed.
+    Must surface as XmlaQueryError instead."""
+    xmla_roles._adomd_cache.clear()
+    real_import = builtins.__import__
+
+    def _fake_import(name, *args, **kwargs):
+        if name == "clr":
+            raise RuntimeError("Can not determine dotnet root")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", _fake_import)
+
+    with pytest.raises(XmlaQueryError, match="Could not load pythonnet's CLR runtime"):
+        xmla_roles._ensure_adomd_loaded()
