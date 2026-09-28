@@ -1,7 +1,7 @@
 # fab-test
 
 <p align="center">
-  <img src="https://github.com/kerski/fab-test/blob/main/docs/images/fab-test-logo.png?raw=true" alt="fab-test logo" width="200">
+  <img src="https://github.com/kerski/fab-test/blob/main/docs/images/fab-test-logo.png?raw=true" alt="fab-test logo" width="400">
 </p>
 
 **The Power BI tooling ecosystem is scattered: Tabular Editor's BPA, PBIR Inspector, DAX tests, Playwright, each with its own install, its own invocation, its own output format.** `fab-test` brings them together behind one CLI and one result contract, so it doesn't matter who's asking: a developer running a quick local check, a CI/CD build agent gating a deployment, or an AI coding agent that needs a single command and a machine-readable verdict it can act on. Point it at a `.pbip`-format artifact and get the same validation everywhere: Best Practice Analyzer rules, PBIR report structure, DAX tests, and rendered-report checks, all through one command with a pass/fail answer trustworthy for human and machine alike.
@@ -52,6 +52,13 @@ cd fab-test
 python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -e .
+```
+
+To contribute, install the dev extras and the git hooks. The pre-commit hook runs [gitleaks](https://github.com/gitleaks/gitleaks) and blocks any commit whose staged changes contain a secret:
+
+```bash
+pip install -e ".[dev]"
+pre-commit install
 ```
 
 ### From a locally built wheel

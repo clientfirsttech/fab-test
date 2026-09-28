@@ -1,0 +1,18 @@
+# gitleaks configuration -- used by the pre-commit hook and by any manual
+# scan run from the repo root, e.g. `gitleaks git --log-opts="--all"`.
+#
+# Extends gitleaks' default ruleset; entries below only carve out known
+# false positives. Allowlist exact values, never whole files or paths, so a
+# real secret added next to one of these is still caught.
+title = "fab-test gitleaks config"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Azure built-in role definition IDs -- public constants, not secrets"
+regexTarget = "secret"
+regexes = [
+  # Key Vault Secrets User (.github/skills/synapse-migration/resources/security-governance.md)
+  '''^4633458b-17de-408a-b874-0445c86b69e6$''',
+]

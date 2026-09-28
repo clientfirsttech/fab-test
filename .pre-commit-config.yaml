@@ -1,0 +1,17 @@
+# Git hooks managed by pre-commit (https://pre-commit.com).
+#
+# One-time setup in a dev environment:
+#   pip install -e ".[dev]"
+#   pre-commit install
+#
+# Run every hook against the whole tree (not just staged files):
+#   pre-commit run --all-files
+repos:
+  # Blocks a commit whose staged changes contain a secret (client secrets,
+  # tokens, keys). Rules: gitleaks' defaults plus .gitleaks.toml. The
+  # `gitleaks` hook builds from source, so no separate gitleaks install is
+  # needed -- pre-commit bootstraps its own Go toolchain.
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks
