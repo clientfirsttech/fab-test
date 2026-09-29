@@ -31,6 +31,16 @@
       "minimum": 1,
       "description": "Per-artifact subprocess timeout in seconds [env: ANALYZER_TIMEOUT] (default: 200). Setting this overrides fab-test's own case-count-scaled timeout for playwright, which otherwise raises the ceiling for a report with a large page/bookmark/role matrix instead of using this flat number."
     },
+    "verbosity": {
+      "type": "string",
+      "enum": [
+        "summary",
+        "default",
+        "verbose",
+        "debug"
+      ],
+      "description": "How much a run prints when no -q/-v flag is passed [env: ANALYZER_VERBOSITY] (default: default). `summary` is -q (one line per artifact); `verbose` and `debug` are -v and -vv."
+    },
     "environment": {
       "type": "string",
       "description": "Default environment label, e.g. DEV/PROD/ANY [env: FABRIC_ENVIRONMENT]."
@@ -67,7 +77,7 @@
       "properties": {
         "eventhouse": {
           "type": "object",
-          "description": "Fabric Eventhouse ingest destination. Requires the [telemetry] extra (pip install fab-test[telemetry]) and a service principal granted the Database Ingestor role on the KQL database.",
+          "description": "Fabric Eventhouse ingest destination. Requires the [telemetry] extra (pip install cft-fab-test[telemetry]) and a service principal granted the Database Ingestor role on the KQL database.",
           "additionalProperties": false,
           "properties": {
             "uri": {
@@ -82,7 +92,7 @@
         },
         "lakehouse": {
           "type": "object",
-          "description": "Fabric Lakehouse ingest destination via OneLake. Requires the [telemetry-lakehouse] extra (pip install fab-test[telemetry-lakehouse]) and a service principal with write access to the Lakehouse.",
+          "description": "Fabric Lakehouse ingest destination via OneLake. Requires the [telemetry-lakehouse] extra (pip install cft-fab-test[telemetry-lakehouse]) and a service principal with write access to the Lakehouse.",
           "additionalProperties": false,
           "properties": {
             "workspace": {

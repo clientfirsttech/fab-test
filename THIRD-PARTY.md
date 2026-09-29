@@ -11,7 +11,7 @@ against, embed, or modify any of them.
 
 `pql-test` is different: it is a regular pinned `pip` dependency in
 `pyproject.toml` (not a `tool_install`-bootstrapped tool), so it **is**
-installed alongside `fab-test` for every `pip install fab-test` — it is the
+installed alongside `fab-test` for every `pip install cft-fab-test` — it is the
 one tool in this file that actually reaches every installer's environment.
 `invoke_pql_test.py` still calls its installed console-script entry point
 (`pql-test.exe`) as an external process rather than importing its code.

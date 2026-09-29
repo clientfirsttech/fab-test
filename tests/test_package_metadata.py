@@ -4,7 +4,7 @@ Scope
 -----
 The project page is the first thing a reader sees, and every URL on it was
 wrong: `[project.urls]` pointed at `kerski/fabric-ci-cd-dataops` while the
-repository is `kerski/fab-test`, and twelve of sixteen README links were
+repository is `clientfirsttech/fab-test`, and twelve of sixteen README links were
 repository-relative, so they resolved against the index host and 404'd.
 
 Trusted publishing and the project page both key off this metadata, so a
@@ -24,7 +24,7 @@ from pathlib import Path
 import pytest
 
 _ROOT = Path(__file__).resolve().parent.parent
-_REPOSITORY = "kerski/fab-test"
+_REPOSITORY = "clientfirsttech/fab-test"
 _STALE_REPOSITORY = "kerski/fabric-ci-cd-dataops"
 
 
@@ -93,7 +93,7 @@ def test_every_readme_link_resolves_off_the_project_page(readme):
     """README is the long description; relative links resolve against the index.
 
     On PyPI a `docs/QUICKSTART-LOCAL.md` href becomes
-    `https://pypi.org/project/fab-test/docs/QUICKSTART-LOCAL.md`, which is a
+    `https://pypi.org/project/cft-fab-test/docs/QUICKSTART-LOCAL.md`, which is a
     404 for the reader most likely to be following it -- someone who just
     found the package and has no checkout.
     """

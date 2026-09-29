@@ -1,8 +1,9 @@
 name: Publish to PyPI
 
-# Final releases only. The previous filter was `v[0-9]+.[0-9]+.[0-9]+*`, whose
-# trailing glob matches `v1.0.0.0.dev1` -- the first rehearsal tag would have
-# gone to production. Pre-releases go to publish-testpypi.yml.
+# Final releases and public pre-releases (alpha, beta, rc). The previous filter
+# was `v[0-9]+.[0-9]+.[0-9]+*`, whose trailing glob matches `v1.0.0.0.dev1` --
+# the first rehearsal tag would have gone to production. Dev releases go to
+# publish-testpypi.yml; each tag shape reaches exactly one of the two.
 #
 # The glob is the first line of defence, not the only one: check_release_target
 # reads the version out of the built wheel, because that is the artifact being
@@ -12,11 +13,27 @@ name: Publish to PyPI
 # carry four (1.0.0.0.dev1 leads to 1.0.0.0) and a glob that only accepted
 # three would silently never fire for the release it exists to publish.
 # Neither pattern ends in a glob, which is the whole bug being fixed.
+#
+# workflow_dispatch publishes without pushing a tag first: from main only, and
+# only once the typed version matches the built wheel -- the guard treats it
+# as the tag it replaces. The Create GitHub Release step then tags the commit.
 on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to publish, exactly as in src/fab_test/__init__.py (e.g. 1.8.1b1). Must match the built wheel. Runs from main only."
+        required: true
+        type: string
   push:
     tags:
       - "v[0-9]+.[0-9]+.[0-9]+"
       - "v[0-9]+.[0-9]+.[0-9]+.[0-9]+"
+      # A public beta (v1.8.1b1): PyPI serves it to `pip install --pre` and
+      # hides it from a bare `pip install`.
+      - "v[0-9]+.[0-9]+.[0-9]+[ab][0-9]+"
+      - "v[0-9]+.[0-9]+.[0-9]+rc[0-9]+"
+      - "v[0-9]+.[0-9]+.[0-9]+.[0-9]+[ab][0-9]+"
+      - "v[0-9]+.[0-9]+.[0-9]+.[0-9]+rc[0-9]+"
 
 jobs:
   publish:
@@ -25,7 +42,7 @@ jobs:
       name: pypi
       # Trusted publishing resolves by distribution name. This said
       # fabric-ci-cd-dataops, which is the repository, not what it builds.
-      url: https://pypi.org/p/fab-test
+      url: https://pypi.org/p/cft-fab-test
     permissions:
       id-token: write
       contents: write
@@ -54,8 +71,18 @@ jobs:
           twine check --strict dist/*
 
       # Must precede the upload: a guard that runs afterwards guards nothing.
-      - name: Refuse a pre-release or a mismatched tag
+      # The dispatch input reaches the script through env, never interpolated
+      # into `run:` -- a typed value spliced into a shell line is an injection.
+      - name: Refuse a dev release or a mismatched tag
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
         run: python .github/scripts/check_release_target.py
+
+      - name: Classify the release
+        id: release
+        run: |
+          echo "prerelease=$(python .github/scripts/check_release_target.py --print-prerelease)" >> "$GITHUB_OUTPUT"
+          echo "version=$(python .github/scripts/check_release_target.py --print-version)" >> "$GITHUB_OUTPUT"
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
@@ -65,5 +92,11 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          # A tag push already names its tag; a dispatch creates v<version> on
+          # the commit it built, so both paths leave the same tag behind.
+          tag_name: v${{ steps.release.outputs.version }}
+          target_commitish: ${{ github.sha }}
           generate_release_notes: true
+          # A beta must not become the repository's "Latest release".
+          prerelease: ${{ steps.release.outputs.prerelease == 'true' }}
           files: dist/*

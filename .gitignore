@@ -48,8 +48,19 @@ apm.yml
 # Local analyzer output
 fab-test-results/
 
+# A contributor's own fab-test.yml at the repo root. It carries personal
+# values (playwright_user_name is a real UPN) and dev-tenant endpoints, so it
+# is per-machine, not shared. `fab-test init` scaffolds one; see README.md's
+# contributing section. Anchored to the root so fixtures named fab-test.yml
+# elsewhere in the tree are unaffected.
+/fab-test.yml
+
 # Claude Code worktrees
 .claude/worktrees/
 
 # Power BI cache files (any folder level)
 **/cache.abf
+
+# Power BI Desktop local state (machine-bound signature, model data cache)
+**/.pbi/localSettings.json
+**/.pbi/cache.abf

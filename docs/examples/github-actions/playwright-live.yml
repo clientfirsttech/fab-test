@@ -69,12 +69,9 @@ jobs:
       # install -e .` if you're validating fab-test itself, not a report.
       - name: Install fab-test
         run: |
-          pip install \
-            --index-url https://test.pypi.org/simple/ \
-            --extra-index-url https://pypi.org/simple \
-            "fab-test==1.4.0.dev1"
-          # Once fab-test has a final release on PyPI, replace the three
-          # lines above with: pip install fab-test
+          # Pin the exact version: the package is cft-fab-test (the
+          # command is fab-test), and the current release is a beta.
+          pip install "cft-fab-test==1.9.0b1"
 
       # Separate from the pip install above -- pytest, pytest-playwright,
       # and pytest-html are dev-only dependencies of fab-test itself, and

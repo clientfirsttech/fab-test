@@ -44,6 +44,9 @@ Constraints {
   Call attach_report(envelope, output_path) before write_envelope, so --report/--open-report work
   (ANALYZER_OUTPUT_MODE=json) => log() goes to stderr; stdout stays pure JSON
   Honor ANALYZER_VERBOSITY and --verbose; verbosity never changes files on disk
+  (ANALYZER_VERBOSITY=summary) => print nothing to stdout on a passing run: `-q` prints its one line per artifact from the envelope, so any banner, path, or result line the wrapper adds is a token the caller pays for twice
+  (default verbosity) => name each fact once: the envelope and native paths in the banner or after the run, never both; the rules and tool paths only at verbose, since they are the same for every artifact and already in the envelope
+  (the wrapper explains a failure) => write it to stderr, and write an envelope whenever findings exist: `-q` hides stderr when findings account for the exit code and shows it when they do not
   Never write credentials to stdout, the envelope, the manifest, or telemetry
 
   // Identity — one name everywhere

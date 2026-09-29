@@ -23,3 +23,10 @@ personas:
       can act on without guessing.
     createdAt: 1790460895759
     updatedAt: 1790460895759
+  - id: s6ua5spy9sn1snxsdgivqour
+    name: Local Developer
+    description: >
+      Runs fab-test on a laptop against an open .pbip while iterating. Wants a
+      short, readable result and the next step, without CI-only noise.
+    createdAt: 1790708179951
+    updatedAt: 1790708179951

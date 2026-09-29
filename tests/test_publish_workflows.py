@@ -20,6 +20,7 @@ discovered during a release.
 """
 
 import importlib.util
+import re
 from pathlib import Path
 
 import pytest
@@ -119,7 +120,7 @@ def test_production_environment_names_the_distribution_this_repo_builds():
 
     assert urls, "no environment url declared"
     for url in urls:
-        assert url.rstrip("/").endswith("/fab-test"), url
+        assert url.rstrip("/").endswith("/cft-fab-test"), url
 
 
 @pytest.mark.fab_test
@@ -150,7 +151,7 @@ def test_production_accepts_this_project_s_release_shape():
 
 
 @pytest.mark.fab_test
-def test_production_refuses_a_prerelease_before_it_uploads():
+def test_production_refuses_a_dev_release_before_it_uploads():
     """Order matters: a guard that runs after the upload guards nothing."""
     workflow = _workflow(_PRODUCTION)
     guard = _step_index(workflow, "check_release_target.py")
@@ -195,15 +196,79 @@ def test_every_workflow_that_builds_a_dist_checks_what_it_built(workflow_name):
 
 
 @pytest.mark.fab_test
-@pytest.mark.parametrize("version", ["1.0.0.0.dev1", "1.0.1rc1", "2.0.0a1", "1.5.0b2"])
-def test_a_prerelease_is_refused_for_production(version):
-    """Every PEP 440 pre-release spelling, not only the one we happen to use."""
+@pytest.mark.parametrize("version", ["1.0.0.0.dev1", "1.8.1.dev3", "1.8.1b1.dev1", "2.0.0rc1.dev2"])
+def test_a_dev_release_is_refused_for_production(version):
+    """A dev release is a rehearsal build, including a dev build of a beta."""
     guard = _load_script("check_release_target.py")
 
     problem = guard.release_problem(version, tag=f"v{version}")
 
     assert problem is not None
-    assert "pre-release" in problem.lower(), problem
+    assert "dev release" in problem.lower(), problem
+
+
+@pytest.mark.fab_test
+@pytest.mark.parametrize("version", ["1.8.1b1", "2.0.0a1", "1.0.1rc1", "1.0.0.0b2"])
+def test_a_public_prerelease_is_allowed_for_production(version):
+    """Alpha, beta, and rc go to PyPI, where only `pip install --pre` sees them."""
+    guard = _load_script("check_release_target.py")
+
+    assert guard.release_problem(version, tag=f"v{version}") is None
+
+
+def _tag_matches(pattern: str, tag: str) -> bool:
+    """Match ``tag`` against a GitHub Actions tag filter pattern.
+
+    Only the syntax these workflows use: `*` (anything but `/`), `+` (one or
+    more of the preceding character or class), and `[...]` classes; every
+    other character is literal -- including `.`.
+    """
+    regex, i = "", 0
+    while i < len(pattern):
+        char = pattern[i]
+        if char == "[":
+            end = pattern.index("]", i)
+            regex += pattern[i : end + 1]
+            i = end + 1
+            continue
+        regex += {"*": "[^/]*", "+": "+"}.get(char, re.escape(char))
+        i += 1
+    return re.fullmatch(regex, tag) is not None
+
+
+@pytest.mark.fab_test
+@pytest.mark.parametrize(
+    ("tag", "expected"),
+    [
+        ("v1.8.1", _PRODUCTION),
+        ("v1.0.0.0", _PRODUCTION),
+        ("v1.8.1b1", _PRODUCTION),
+        ("v2.0.0a3", _PRODUCTION),
+        ("v1.8.1rc2", _PRODUCTION),
+        ("v1.0.0.0b1", _PRODUCTION),
+        ("v1.0.0.0.dev1", _REHEARSAL),
+        ("v1.8.1.dev4", _REHEARSAL),
+        ("v1.8.1b1.dev1", _REHEARSAL),
+    ],
+)
+def test_every_tag_shape_reaches_exactly_one_index(tag, expected):
+    """One tag, one index: a tag both workflows fire on publishes twice."""
+    firing = [
+        name
+        for name in (_PRODUCTION, _REHEARSAL)
+        if any(_tag_matches(p, tag) for p in _triggers(_workflow(name))["push"]["tags"])
+    ]
+
+    assert firing == [expected], f"{tag} fires {firing}"
+
+
+@pytest.mark.fab_test
+def test_a_prerelease_is_not_marked_the_latest_github_release():
+    """A beta that becomes "Latest release" is what the Releases page recommends."""
+    release = [s for s in _steps(_workflow(_PRODUCTION)) if "action-gh-release" in str(s.get("uses", ""))]
+
+    assert release, "no GitHub Release step found"
+    assert "prerelease" in str(release[0].get("with", {}).get("prerelease", "")), release[0]
 
 
 @pytest.mark.fab_test
@@ -231,6 +296,116 @@ def test_a_final_release_is_allowed_when_there_is_no_tag():
     guard = _load_script("check_release_target.py")
 
     assert guard.release_problem("1.0.1", tag="") is None
+
+
+# --------------------------------------------------------------------------
+# Manual dispatch of the production workflow
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.fab_test
+def test_production_can_be_dispatched_with_a_required_version():
+    """A manual publish must name what it publishes; there is no tag to do it."""
+    dispatch = _triggers(_workflow(_PRODUCTION)).get("workflow_dispatch") or {}
+    version = dispatch.get("inputs", {}).get("version", {})
+
+    assert version.get("required") is True, dispatch
+
+
+@pytest.mark.fab_test
+def test_the_dispatch_input_never_reaches_a_shell_line_directly():
+    """`${{ inputs.version }}` spliced into `run:` executes whatever was typed."""
+    for step in _steps(_workflow(_PRODUCTION)):
+        assert "inputs." not in str(step.get("run", "")), step
+
+
+@pytest.mark.fab_test
+def test_the_guard_receives_the_dispatch_input():
+    """The typed version is what stands in for the tag, so it must arrive."""
+    workflow = _workflow(_PRODUCTION)
+    guard = _steps(workflow)[_step_index(workflow, "check_release_target.py")]
+
+    assert "inputs.version" in str(guard.get("env", {}).get("RELEASE_VERSION", "")), guard
+
+
+@pytest.mark.fab_test
+def test_a_dispatched_release_tags_the_commit_it_built():
+    """A dispatch has no tag; the release step must create the same one a push would."""
+    release = [s for s in _steps(_workflow(_PRODUCTION)) if "action-gh-release" in str(s.get("uses", ""))]
+    with_ = release[0].get("with", {})
+
+    assert with_.get("tag_name") == "v${{ steps.release.outputs.version }}", with_
+    assert with_.get("target_commitish") == "${{ github.sha }}", with_
+
+
+@pytest.mark.fab_test
+@pytest.mark.parametrize("ref", ["refs/heads/dev", "refs/heads/feature/x", "refs/tags/v1.8.1b1", ""])
+def test_a_dispatch_off_main_is_refused(ref):
+    """A dispatch from a branch would publish a tree nobody merged."""
+    guard = _load_script("check_release_target.py")
+
+    problem = guard.dispatch_problem(ref, confirmed="1.8.1b1")
+
+    assert problem is not None and "main" in problem, problem
+
+
+@pytest.mark.fab_test
+def test_a_dispatch_with_no_version_is_refused():
+    guard = _load_script("check_release_target.py")
+
+    assert guard.dispatch_problem("refs/heads/main", confirmed="") is not None
+
+
+@pytest.mark.fab_test
+def test_a_dispatch_from_main_naming_a_version_passes_the_dispatch_check():
+    guard = _load_script("check_release_target.py")
+
+    assert guard.dispatch_problem("refs/heads/main", confirmed="1.8.1b1") is None
+
+
+def _run_guard(tmp_path, monkeypatch, wheel_version: str, env: dict[str, str]) -> int:
+    """Run the guard's ``main`` against a fake wheel under a simulated Actions env."""
+    guard = _load_script("check_release_target.py")
+    (tmp_path / "dist").mkdir()
+    (tmp_path / "dist" / f"cft_fab_test-{wheel_version}-py3-none-any.whl").touch()
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(guard.sys, "argv", ["check_release_target.py"])
+    for key in ("GITHUB_EVENT_NAME", "GITHUB_REF", "GITHUB_REF_TYPE", "GITHUB_REF_NAME", "RELEASE_VERSION"):
+        monkeypatch.delenv(key, raising=False)
+    for key, value in env.items():
+        monkeypatch.setenv(key, value)
+    return guard.main()
+
+
+@pytest.mark.fab_test
+@pytest.mark.parametrize(
+    ("typed", "expected_exit"),
+    [("1.8.1b1", 0), ("v1.8.1b1", 0), ("1.8.1b2", 1), ("1.8.1", 1), ("", 1)],
+)
+def test_a_dispatch_publishes_only_the_version_it_typed(tmp_path, monkeypatch, capsys, typed, expected_exit):
+    """End to end through ``main``: the typed version is checked against the wheel."""
+    code = _run_guard(
+        tmp_path,
+        monkeypatch,
+        "1.8.1b1",
+        {"GITHUB_EVENT_NAME": "workflow_dispatch", "GITHUB_REF": "refs/heads/main", "RELEASE_VERSION": typed},
+    )
+
+    assert code == expected_exit, capsys.readouterr().out
+
+
+@pytest.mark.fab_test
+def test_a_dispatch_still_refuses_a_dev_release(tmp_path, monkeypatch, capsys):
+    """Dispatch replaces the tag, not the dev-release refusal."""
+    code = _run_guard(
+        tmp_path,
+        monkeypatch,
+        "1.8.1.dev1",
+        {"GITHUB_EVENT_NAME": "workflow_dispatch", "GITHUB_REF": "refs/heads/main", "RELEASE_VERSION": "1.8.1.dev1"},
+    )
+
+    assert code == 1
+    assert "dev release" in capsys.readouterr().out
 
 
 @pytest.mark.fab_test

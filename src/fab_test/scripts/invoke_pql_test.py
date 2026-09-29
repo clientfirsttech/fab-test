@@ -329,8 +329,6 @@ def _narrate_header(
 def _narrate_outcome(
     status: str,
     message: str,
-    output_path: Path,
-    nat_out: Path,
     findings: list[dict[str, Any]],
     stderr: str,
 ) -> None:
@@ -343,11 +341,8 @@ def _narrate_outcome(
     """
     level = _verbosity()
     icons = {"passed": "✅", "skipped": "⏭️", "warning": "⚠️"}
-    if level >= _VERBOSITY_LEVELS["default"]:
-        if status in icons:
-            log(f"{icons[status]} {message}")
-        log(f"📁 Envelope: {output_path}")
-        log(f"📄 Native:   {nat_out}")
+    if level >= _VERBOSITY_LEVELS["default"] and status in icons:
+        log(f"{icons[status]} {message}")
     if status in {"passed", "skipped"}:
         return
     if status == "warning":
@@ -458,7 +453,7 @@ def run_pql_test(args: argparse.Namespace) -> int:
         desktop_port=desktop_port,
         desktop_model_name=desktop_model_name,
     )
-    _narrate_outcome(status, message, output_path, nat_out, findings, proc.stderr)
+    _narrate_outcome(status, message, findings, proc.stderr)
     # A warning exits 0 like pbir-a11y's: nothing asserted wrong, so a
     # platform gap does not turn CI red -- the annotation carries the news.
     if status in {"passed", "skipped", "warning"}:

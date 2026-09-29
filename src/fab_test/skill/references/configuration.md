@@ -30,6 +30,7 @@ If both `fab-test.yml` and `[tool.fab-test]` are present, `fab-test.yml` wins pe
 | `jobs` | integer | — | `1` |
 | `format` | string (`text`\|`json`) | — | `text` |
 | `timeout` | integer | `ANALYZER_TIMEOUT` | `200` |
+| `verbosity` | string (`summary`\|`default`\|`verbose`\|`debug`) | `ANALYZER_VERBOSITY` | `default` — `summary` is `-q`; a `-q`/`-v` flag wins over it. See [Output Verbosity](operations.md#output-verbosity) |
 | `environment` | string | `FABRIC_ENVIRONMENT` | (none) |
 | `workspace` | string | `FABRIC_WORKSPACE_ID` | (none) — display name or GUID |
 | `report` | boolean | `ANALYZER_REPORT` | `false` — see [Reports](reports.md) |
@@ -116,12 +117,12 @@ Filesystem paths in the payload, including those inside the embedded `results` e
 Prerequisites, each destination reported by its own `fab-test doctor` row:
 
 **Eventhouse (`telemetry-eventhouse` row)**
-- `pip install 'fab-test[telemetry]'` — the Kusto ingest client is **not** in the base package.
+- `pip install 'cft-fab-test[telemetry]'` — the Kusto ingest client is **not** in the base package.
 - Credentials: the same `FABRIC_TENANT_ID` / `FABRIC_SERVICE_PRINCIPAL_ID` / `FABRIC_SERVICE_PRINCIPAL_SECRET` the analyzers use, falling back to `DefaultAzureCredential` when none are set. A *partially* set principal is refused rather than silently falling back. There are no `EVENTHOUSE_*` credential variables.
 - The **Database Ingestor** role on the KQL database. `doctor` never reports it ✅ ready — a resolvable credential is not proof it may ingest, so the row shows `ℹ` with `configured; ingest permission unverified`.
 
 **Lakehouse (`telemetry-lakehouse` row)**
-- `pip install 'fab-test[telemetry-lakehouse]'` — the OneLake (ADLS Gen2) client is **not** in the base package.
+- `pip install 'cft-fab-test[telemetry-lakehouse]'` — the OneLake (ADLS Gen2) client is **not** in the base package.
 - The same service-principal credentials as above; there are no `LAKEHOUSE_*` credential variables either.
 - A workspace role (e.g. Contributor) or a direct share on the Lakehouse item. `doctor` never reports it ✅ ready either — the row shows `ℹ` with `configured; write permission unverified`.
 

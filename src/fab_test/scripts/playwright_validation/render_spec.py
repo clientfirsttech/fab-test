@@ -6,7 +6,7 @@ Power BI JavaScript client from CDN, embeds the report, and races the
 ``rendered`` event against ``error`` events on ``document.body``.
 
 Ships inside the installed package rather than under ``tests/`` (Playwright
-CI Guide epic, Render Spec Packaging task) -- a ``pip install fab-test``
+CI Guide epic, Render Spec Packaging task) -- a ``pip install cft-fab-test``
 consumer has no checkout of this repository's ``tests/`` directory for
 ``invoke_playwright.py`` to point pytest at, so every real run failed
 outright ("ERROR: usage: python -m pytest") the moment it was run from

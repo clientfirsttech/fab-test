@@ -4,7 +4,7 @@
 reads `analyzers.json` to learn where a missing tool can be downloaded
 from. All three were resolved only under the caller's own
 `.github/metadata/`, which is this repository's layout -- so a
-`pip install fab-test` anywhere else reported rules at a path that did not
+`pip install cft-fab-test` anywhere else reported rules at a path that did not
 exist, and offered no install URL for Tabular Editor at all.
 
 The repository copy still wins when present, so this repository and the

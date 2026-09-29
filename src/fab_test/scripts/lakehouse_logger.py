@@ -22,7 +22,7 @@ from typing import Any
 
 from ._telemetry import TelemetryDependencyError
 
-TELEMETRY_LAKEHOUSE_EXTRA_HINT = "pip install 'fab-test[telemetry-lakehouse]'"
+TELEMETRY_LAKEHOUSE_EXTRA_HINT = "pip install 'cft-fab-test[telemetry-lakehouse]'"
 
 ONELAKE_ENDPOINT = "https://onelake.dfs.fabric.microsoft.com"
 

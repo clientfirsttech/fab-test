@@ -29,7 +29,7 @@ pytestmark = pytest.mark.playwright
 
 def test_spec_path_resolves_inside_the_installed_package() -> None:
     """The spec pytest is pointed at lives under the package, not a repo
-    checkout's tests/ directory -- so it exists after `pip install fab-test`."""
+    checkout's tests/ directory -- so it exists after `pip install cft-fab-test`."""
     spec = _spec_path()
 
     assert spec.exists()
