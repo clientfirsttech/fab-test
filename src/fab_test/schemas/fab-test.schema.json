@@ -67,7 +67,7 @@
       "properties": {
         "eventhouse": {
           "type": "object",
-          "description": "Fabric Eventhouse ingest destination. Requires the [telemetry] extra (pip install fab-test[telemetry]) and a service principal granted the Database Ingestor role on the KQL database.",
+          "description": "Fabric Eventhouse ingest destination. Requires the [telemetry] extra (pip install cft-fab-test[telemetry]) and a service principal granted the Database Ingestor role on the KQL database.",
           "additionalProperties": false,
           "properties": {
             "uri": {
@@ -82,7 +82,7 @@
         },
         "lakehouse": {
           "type": "object",
-          "description": "Fabric Lakehouse ingest destination via OneLake. Requires the [telemetry-lakehouse] extra (pip install fab-test[telemetry-lakehouse]) and a service principal with write access to the Lakehouse.",
+          "description": "Fabric Lakehouse ingest destination via OneLake. Requires the [telemetry-lakehouse] extra (pip install cft-fab-test[telemetry-lakehouse]) and a service principal with write access to the Lakehouse.",
           "additionalProperties": false,
           "properties": {
             "workspace": {

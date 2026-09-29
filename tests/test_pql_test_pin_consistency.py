@@ -1,8 +1,10 @@
-"""pyproject.toml pins pql-test once; four documents restate that pin in prose.
+"""pyproject.toml pins pql-test once; two documents restate that pin in prose.
 
 Nothing fails today if a bump updates the pin and misses one of them, so the
-version quietly disagrees with itself across README.md, docs/RELEASE.md,
-.github/skills/fab-test/SKILL.md, and .github/workflows/publish-testpypi.yml.
+version quietly disagrees with itself across docs/RELEASE.md and
+.github/workflows/publish-testpypi.yml. README.md and SKILL.md used to restate
+it too, for the TestPyPI install (TestPyPI lacks the pinned pql-test); now that
+the package installs from PyPI, where the pin resolves on its own, they don't.
 See the Tool Version Currency epic's "Stop the pin from being duplicated"
 task.
 """
@@ -18,7 +20,7 @@ _PYPROJECT_TOML = _ROOT / "pyproject.toml"
 
 # Each pattern's single capture group is the version it claims is the pin.
 # Two shapes appear in the wild: the literal requirement (`pql-test==X`,
-# read the same way in README.md, docs/RELEASE.md, and SKILL.md) and the
+# read the same way in docs/RELEASE.md) and the
 # workflow comment's "vs the X we require" phrasing -- both name the pin,
 # neither names the stale TestPyPI number sitting next to it in the same
 # sentence.
@@ -28,9 +30,7 @@ _PIN_CLAIM_PATTERNS = (
 )
 
 _DOCUMENTED_CALLERS = (
-    Path("README.md"),
     Path("docs/RELEASE.md"),
-    Path(".github/skills/fab-test/SKILL.md"),
     Path(".github/workflows/publish-testpypi.yml"),
 )
 

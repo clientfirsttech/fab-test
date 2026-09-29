@@ -355,7 +355,7 @@ def test_the_telemetry_lakehouse_extra_declares_the_onelake_package():
     """Given the [telemetry-lakehouse] extra, should declare azure-storage-file-datalake."""
     extras = _project()["project"]["optional-dependencies"]
 
-    assert "telemetry-lakehouse" in extras, "pip install fab-test[telemetry-lakehouse] must resolve"
+    assert "telemetry-lakehouse" in extras, "pip install cft-fab-test[telemetry-lakehouse] must resolve"
     assert "azure-storage-file-datalake" in " ".join(extras["telemetry-lakehouse"])
 
 
@@ -366,7 +366,7 @@ def test_the_install_hint_matches_the_declared_extra_name():
 
     extras = _project()["project"]["optional-dependencies"]
 
-    assert "fab-test[telemetry-lakehouse]" in TELEMETRY_LAKEHOUSE_EXTRA_HINT
+    assert "cft-fab-test[telemetry-lakehouse]" in TELEMETRY_LAKEHOUSE_EXTRA_HINT
     assert "telemetry-lakehouse" in extras
 
 
@@ -407,7 +407,7 @@ def test_a_missing_extra_names_the_install_command(monkeypatch):
         load_lakehouse_dependencies()
 
     assert "pip install" in str(exc.value)
-    assert "fab-test[telemetry-lakehouse]" in str(exc.value)
+    assert "cft-fab-test[telemetry-lakehouse]" in str(exc.value)
 
 
 @pytest.mark.telemetry

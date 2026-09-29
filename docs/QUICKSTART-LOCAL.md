@@ -7,14 +7,10 @@ The project must be saved in PBIP format with the semantic model in **TMDL** and
 ## From install to first findings
 
 ```bash
-# 1. Install the pre-release from TestPyPI
-#    Both flags matter: the extra index resolves dependencies TestPyPI does
-#    not carry, and the exact pin is required because pip skips pre-releases.
-#    See README "Install" — `pip install fab-test` does not work yet.
-pip install \
-  --index-url https://test.pypi.org/simple/ \
-  --extra-index-url https://pypi.org/simple \
-  "fab-test==1.4.0.dev1"
+# 1. Install the beta from PyPI
+#    The exact pin is required because pip skips pre-releases (or pass --pre).
+#    The package is cft-fab-test; the command it installs is still fab-test.
+pip install "cft-fab-test==1.8.1b1"
 
 # 2. Check what's ready
 fab-test doctor --local

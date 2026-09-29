@@ -5,24 +5,23 @@ name: Publish to TestPyPI
 #   workflow_dispatch  -- rehearse without moving a tag. A tag is a claim about
 #                         a commit; needing to move one to retry a release is
 #                         how a tag ends up describing the wrong tree.
-#   a pre-release tag  -- v1.0.0.0.dev1, v1.0.1rc2, and so on. These are the
-#                         tags production refuses.
+#   a dev tag          -- v1.0.0.0.dev1, v1.8.1b1.dev2, and so on. These are
+#                         the tags production refuses.
 #
-# A final tag reaches publish.yml, not here.
+# A final or alpha/beta/rc tag reaches publish.yml, not here -- one tag, one
+# index. To rehearse a beta before tagging it, dispatch this workflow.
 on:
   workflow_dispatch:
   push:
     tags:
       - "v[0-9]+.[0-9]+.[0-9]+*.dev[0-9]+"
-      - "v[0-9]+.[0-9]+.[0-9]+*[ab][0-9]+"
-      - "v[0-9]+.[0-9]+.[0-9]+*rc[0-9]+"
 
 jobs:
   publish:
     runs-on: ubuntu-latest
     environment:
       name: testpypi
-      url: https://test.pypi.org/p/fab-test
+      url: https://test.pypi.org/p/cft-fab-test
     permissions:
       id-token: write
       contents: read
@@ -73,7 +72,7 @@ jobs:
             if /tmp/verify/bin/pip install \
                  --index-url https://test.pypi.org/simple/ \
                  --extra-index-url https://pypi.org/simple \
-                 "fab-test==${VERSION}"; then
+                 "cft-fab-test==${VERSION}"; then
               break
             fi
             echo "index has not caught up yet; retrying in 20s (attempt ${attempt}/6)"
