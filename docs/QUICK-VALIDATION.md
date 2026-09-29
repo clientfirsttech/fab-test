@@ -125,6 +125,17 @@ fab-test pql-test SampleModel-PQLAssert --env DEV
 
 `--artifact SampleModel-PQLAssert` still works as a deprecated alias.
 
+### Print only the result: `-q`
+
+```bash
+fab-test bpa -q
+fab-test local -q
+```
+
+One line per artifact — `<analyzer> <status> e=<errors> w=<warnings> <where>` — where `<where>` is the envelope path relative to the working directory (or the artifact name when the analyzer wrote no envelope). About 90% less output than a default run, with the same exit codes and result files. A failure the findings cannot explain still prints its remediation: a missing credential, a timeout, a crash with no findings. `-q` and `-v` together exit `2`.
+
+To pin it for a repository, set `verbosity: summary` in `fab-test.yml`; `-v` on the command line still wins for a single run. See [Configuring fab-test](#configuring-fab-test) for the precedence.
+
 ### Open the HTML report automatically
 
 ```bash
@@ -332,6 +343,20 @@ The workspace belongs in committed config; only the credentials come from secret
 Spell the workspace out in the target when a job spans more than one, and quote it — display names usually contain spaces. A GUID works in the same position and skips the name lookup. `auth status` is worth running first: it exits `127` before any analyzer starts if the service principal is missing or half-configured, which is a clearer failure than an analyzer timing out against an unreachable workspace.
 
 The resolved target lands in `run.json` under `target`, so an uploaded manifest records whether the job read files on disk or hit a workspace — and which one.
+
+### Pipeline snippet: terse output for a busy log or an agent
+
+A copy-pasteable step whose log holds one line per artifact. Failures still print their remediation, and the analyzer's `::error::` and `::warning::` annotations still reach GitHub as file annotations, so nothing that matters is lost:
+
+```yaml
+- name: Run local analyzers
+  run: fab-test local -q --artifact-dir .fabric/artifacts
+
+# or pin it once for every step and every contributor, in fab-test.yml:
+#   verbosity: summary
+```
+
+Use `--format json 2>/dev/null` instead when a later step needs the fields rather than the verdict; `-q --format json` keeps stdout identical and silences stderr for passing artifacts.
 
 ### Pipeline snippet: doctor as a gate, run.json as the artifact
 

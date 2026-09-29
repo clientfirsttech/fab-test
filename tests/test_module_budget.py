@@ -226,7 +226,7 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
         ),
     ),
     "src/fab_test/scripts/fab_test_execution.py": (
-        830,
+        845,
         (
             "2026-09-26: born over the hard budget adding "
             "_playwright_service_resolved_target (collapses _discover_for's "
@@ -246,7 +246,11 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
             "_verbosity_env, then +12 lines letting -q skip the per-artifact "
             "banner, capture the analyzer's stdout, and mute what a finished "
             "run's envelope already reports (Terse CLI Output epic). +2 more keeping "
-            "stderr visible for a nonzero exit with no findings."
+            "stderr visible for a nonzero exit with no findings. 2026-09-29: +10 "
+            "lines so a remediation every artifact shares is replayed once per "
+            "run (seen_stderr, State Each Result Once), then +5 to collapse only "
+            "failures the findings cannot explain, after review found identical "
+            "result lines from two artifacts were being swallowed."
         ),
     ),
 }

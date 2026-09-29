@@ -1,6 +1,6 @@
 # Terse CLI Output Epic
 
-**Status**: 🔄 IN-PROGRESS (3/7)
+**Status**: ✅ COMPLETED (2026-09-29)
 **Goal**: One line per artifact under `-q`, and each result stated once by default
 
 ## Overview
