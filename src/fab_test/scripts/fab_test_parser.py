@@ -106,7 +106,8 @@ def _add_common_flags(
         metavar="N",
         help="Run up to N artifacts in parallel for the same analyzer (default: 1)",
     )
-    parser.add_argument(
+    verbosity_group = parser.add_mutually_exclusive_group()
+    verbosity_group.add_argument(
         "-v",
         "--verbose",
         action="count",
@@ -115,6 +116,12 @@ def _add_common_flags(
             "Increase output verbosity (one -v for per-finding detail, "
             "two -v for command + stdout/stderr; same as ANALYZER_VERBOSITY)"
         ),
+    )
+    verbosity_group.add_argument(
+        "-q",
+        "--quiet",
+        action="store_true",
+        help="Print the least output that still reports the result (same as ANALYZER_VERBOSITY=summary)",
     )
     report_group = parser.add_mutually_exclusive_group()
     report_group.add_argument(

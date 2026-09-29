@@ -268,21 +268,21 @@ def _log_run_header(
     log(f"pbir-a11y  ->  {artifact_stem}")
     log("================================")
     log(f"Artifact: {artifact_path}")
-    log(f"Tool:     {a11y_path}")
+    # Identical for every artifact, so only -v pays for it.
+    if level >= _VERBOSITY_LEVELS["verbose"]:
+        log(f"Tool:     {a11y_path}")
     log(f"Envelope: {output_path}")
     log(f"Native JSON: {native_out}")
     log("")
 
 
 def _log_a11y_outcome(
-    outcome: dict[str, Any], findings: list[dict[str, Any]], output_path: Path, native_out: Path, level: int
+    outcome: dict[str, Any], findings: list[dict[str, Any]], level: int
 ) -> None:
     if level < _VERBOSITY_LEVELS["default"]:
         return
     if not findings:
         log(outcome["message"])
-    log(f"Envelope:    {output_path}")
-    log(f"Native JSON: {native_out}")
     if findings:
         log(
             f"{len(findings)} finding(s) "
@@ -346,7 +346,7 @@ def run_a11y(args: argparse.Namespace) -> int:
             duration_ms=elapsed_ms,
         )
     )
-    _log_a11y_outcome(outcome, findings, output_path, native_out, level)
+    _log_a11y_outcome(outcome, findings, level)
 
     if outcome["status"] == "error":
         print(f"::error::{outcome['message']}", file=sys.stderr)

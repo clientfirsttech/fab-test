@@ -3,3 +3,6 @@ storyMap:
     - file: rdl-static-analysis.yaml
       id: c9uzij8msuiecirjwg7hkh1c
       name: RDL Static Analysis
+    - file: terse-cli-output.yaml
+      id: o3tm4x418ja9f1mif2300424
+      name: Terse CLI Output

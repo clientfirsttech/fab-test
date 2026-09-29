@@ -1,6 +1,6 @@
 ---
 name: fab-test
-description: fab-test CLI reference for running Fabric artifact analyzers locally (fab-test 1.8.1b1). Covers all subcommands, flags, artifact isolation, result locations, and how fab-test differs from pytest. Use when invoking, troubleshooting, or extending local artifact validation.
+description: fab-test CLI reference for running Fabric artifact analyzers locally (fab-test 1.9.0b1). Covers all subcommands, flags, artifact isolation, result locations, and how fab-test differs from pytest. Use when invoking, troubleshooting, or extending local artifact validation.
 ---
 
 # fab-test
@@ -42,7 +42,7 @@ From PyPI — the package is **`cft-fab-test`** (the command is still
 pre-releases unless you pass `--pre` or name the version exactly:
 
 ```bash
-pip install "cft-fab-test==1.8.1b1"     # or: pip install --pre cft-fab-test
+pip install "cft-fab-test==1.9.0b1"     # or: pip install --pre cft-fab-test
 ```
 
 Either way this registers the `fab-test` console script. The `.venv` is searched automatically for tool binaries (e.g. `pql-test`) even when not on `PATH`.
@@ -87,6 +87,45 @@ Constraints {
 ```bash
 fab-test bpa --format json 2>/dev/null | jq .   # safe to pipe straight into jq
 ```
+
+### Spending fewer tokens: `-q`
+
+A default run states its result several ways for a person to skim. An agent that only needs to know whether it passed should ask for less.
+
+```
+OutputBudget {
+  fn choose(need) {
+    (only pass/fail and where the result is)   => fab-test ANALYZER -q               // ~10x smaller than default
+    (the result's fields, parsed)              => fab-test ANALYZER --format json 2>/dev/null
+    (why one rule fired on one artifact)       => read the envelope path -q printed, or re-run with -v
+  }
+}
+
+QuietLine {
+  shape: "<analyzer> <status> e=<errors> w=<warnings> <where>"
+  analyzer: the registry name, so "pql_test" and never "pql-test"
+  status: "passed" | "warning" | "failed" | "skipped"
+  where: envelope path relative to the working directory; the artifact name when the analyzer wrote no envelope. Always the last field, because artifact names contain spaces
+}
+
+Constraints {
+  -q prints exactly one QuietLine per artifact and nothing else on a passing run; exit codes and every file under fab-test-results/ are unchanged
+  -q and -v together exit 2
+  (-q and a failure the findings cannot explain: a preflight failure, a timeout, or a nonzero exit with no findings) => the remediation or the analyzer's own output is still printed
+  (-q --format json) => stdout is byte-identical to the same run without -q, and stderr is silent for passing artifacts
+  (CI is detected) => -q still passes the analyzer's ::error:: and ::warning:: annotations through, verbatim
+  (the same remediation applies to every artifact) => it is printed once per run, not once per artifact
+  Precedence: -q/-v flag > ANALYZER_VERBOSITY > `verbosity:` in fab-test.yml > default. Levels: summary (= -q), default, verbose (= -v), debug (= -vv)
+}
+```
+
+```bash
+fab-test bpa -q                     # bpa warning e=0 w=103 fab-test-results/bpa/SampleModel-PQLAssert/envelope.json
+fab-test local -q                   # one line per artifact across bpa, pbir, and pql_test
+fab-test config --show              # verbosity = 'summary' (fab-test.yml:verbosity)
+```
+
+A repository whose agents should always be terse can pin it once with `verbosity: summary` in `fab-test.yml`; a person who wants the full output for one run passes `-v` and it wins. See [references/operations.md](references/operations.md#output-verbosity).
 
 ### Discoverability: doctor → list → explain
 

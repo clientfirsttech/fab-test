@@ -22,6 +22,7 @@ _EXPECTED_KEYS = {
     "jobs",
     "format",
     "timeout",
+    "verbosity",
     "environment",
     "workspace",
     "playwright_user_name",

@@ -30,6 +30,7 @@ If both `fab-test.yml` and `[tool.fab-test]` are present, `fab-test.yml` wins pe
 | `jobs` | integer | — | `1` |
 | `format` | string (`text`\|`json`) | — | `text` |
 | `timeout` | integer | `ANALYZER_TIMEOUT` | `200` |
+| `verbosity` | string (`summary`\|`default`\|`verbose`\|`debug`) | `ANALYZER_VERBOSITY` | `default` — `summary` is `-q`; a `-q`/`-v` flag wins over it. See [Output Verbosity](operations.md#output-verbosity) |
 | `environment` | string | `FABRIC_ENVIRONMENT` | (none) |
 | `workspace` | string | `FABRIC_WORKSPACE_ID` | (none) — display name or GUID |
 | `report` | boolean | `ANALYZER_REPORT` | `false` — see [Reports](reports.md) |
