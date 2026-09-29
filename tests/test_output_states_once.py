@@ -181,6 +181,7 @@ def _failing_prerequisite(tmp_path: Path, monkeypatch, *, in_ci: bool, count: in
     output_dir = tmp_path / "results"
     monkeypatch.setattr(fab_test_execution, "_is_ci", lambda: in_ci)
     monkeypatch.setattr(fab_test_execution, "_send_telemetry", lambda *a, **k: None)
+    monkeypatch.setattr(fab_test_execution, "_preflight_error", lambda *a, **k: None)  # BPA is win32-only
     monkeypatch.setattr(fab_test_execution, "emit_workflow_annotations", lambda *a, **k: None)
     monkeypatch.setattr(
         fab_test_execution.subprocess,
@@ -237,6 +238,7 @@ def test_identical_result_lines_are_kept_for_artifacts_that_have_findings(tmp_pa
     for stem in ("Alpha", "Beta"):
         (artifact_dir / f"{stem}.SemanticModel").mkdir(parents=True)
     output_dir = tmp_path / "results"
+    monkeypatch.setattr(fab_test_execution, "_preflight_error", lambda *a, **k: None)  # BPA is win32-only
     monkeypatch.setattr(fab_test_execution, "_is_ci", lambda: False)
     monkeypatch.setattr(fab_test_execution, "_send_telemetry", lambda *a, **k: None)
 

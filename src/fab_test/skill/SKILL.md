@@ -42,7 +42,7 @@ From PyPI — the package is **`cft-fab-test`** (the command is still
 pre-releases unless you pass `--pre` or name the version exactly:
 
 ```bash
-pip install "cft-fab-test==1.8.1b1"     # or: pip install --pre cft-fab-test
+pip install "cft-fab-test==1.9.0b1"     # or: pip install --pre cft-fab-test
 ```
 
 Either way this registers the `fab-test` console script. The `.venv` is searched automatically for tool binaries (e.g. `pql-test`) even when not on `PATH`.

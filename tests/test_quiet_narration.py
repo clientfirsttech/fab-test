@@ -54,6 +54,8 @@ def _fake_run(output_dir: Path, findings_by_stem: dict[str, list[dict]], *, retu
 def _local_run(monkeypatch):
     monkeypatch.setattr(fab_test_execution, "_is_ci", lambda: False)
     monkeypatch.setattr(fab_test_execution, "_send_telemetry", lambda *a, **k: None)
+    # BPA is win32-only; the real preflight would exit 126 on a Linux runner before the fake runs.
+    monkeypatch.setattr(fab_test_execution, "_preflight_error", lambda *a, **k: None)
     monkeypatch.chdir(Path.cwd())
 
 
