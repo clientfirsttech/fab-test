@@ -196,7 +196,6 @@ def run_pqlint(args: argparse.Namespace) -> int:
         )
         if level >= _VERBOSITY_LEVELS["default"]:
             log(f"✅ {message}")
-            log(f"📁 Envelope: {output_path}")
         return 0
 
     message = f"pqlint found {len(findings)} finding(s)"
@@ -204,8 +203,6 @@ def run_pqlint(args: argparse.Namespace) -> int:
         output_path, "failed", findings, artifact_path,
         message=message, native_out=nat_out, duration_ms=elapsed_ms,
     )
-    if level >= _VERBOSITY_LEVELS["default"]:
-        log(f"📁 Envelope: {output_path}")
     _log_pqlint_findings(findings, level)
     if proc.stderr:
         print(f"::error::{proc.stderr}", file=sys.stderr)

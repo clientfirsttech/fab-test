@@ -232,6 +232,37 @@ fab-test playwright --dataset-id <DATASET_GUID> --dataset-workspace-id <WORKSPAC
 fab-test dependencies --semantic-model SalesModel --env dev --env-file .env
 ```
 
+### Keep the output short: `-q`
+
+A default run explains itself for a person: a banner, a result line, and a summary per artifact. When you only need to know whether it passed (an AI agent in an edit loop, a busy CI log), add `-q`:
+
+```console
+$ fab-test bpa -q
+bpa warning e=0 w=25 fab-test-results/bpa/Report with Bookmarks - Broken Visuals/envelope.json
+bpa warning e=0 w=103 fab-test-results/bpa/SampleModel-PQLAssert/envelope.json
+```
+
+One line per artifact: `<analyzer> <status> e=<errors> w=<warnings> <where>`, where `<where>` is the envelope with the findings. Exit codes and every file under `fab-test-results/` are unchanged, and a failure still says why: a missing credential, a timeout, or a crash prints its message above the lines.
+
+| Command | Before | Default now | `-q` |
+|---------|-------:|------------:|-----:|
+| `fab-test bpa` | 2,569 chars | 1,935 | 176 |
+| `fab-test pbir` | 5,195 | 3,043 | 324 |
+| `fab-test a11y` | 4,089 | 2,901 | 320 |
+| `fab-test pql-test` | 2,086 | 1,678 | 193 |
+| `fab-test local` | 9,850 | 6,656 | 693 |
+
+*Measured against this repository's four sample artifacts.* Default output got shorter too: each path is named once, and the Rules and Tool paths (the same for every artifact, and already in the envelope) appear only with `-v`.
+
+To make a repository terse for everyone who runs it, pin the level once instead of passing a flag:
+
+```yaml
+# fab-test.yml
+verbosity: summary      # summary | default | verbose | debug
+```
+
+A flag beats the environment variable (`ANALYZER_VERBOSITY`), which beats the file, so `fab-test bpa -v` still gives you the full output for one run. `-q` and `-v` together exit `2`. See [Output Verbosity](https://github.com/clientfirsttech/fab-test/blob/main/.github/skills/fab-test/references/operations.md#output-verbosity) for the levels.
+
 ### Playwright: the minimal working config
 
 Every other analyzer can fall back to `az login`; `playwright` cannot --

@@ -13,7 +13,8 @@
 | `--report` / `--no-report` | off | Write a readable HTML report beside each envelope [env: `ANALYZER_REPORT`] |
 | `--open-report` | off | Open the produced report/index in the default browser after the run; implies `--report`; a no-op under CI [env: `ANALYZER_OPEN_REPORT`] — see [Reports](reports.md#open-report) |
 | `--format {text,json}` | `text` | Aggregate summary output format (see the main SKILL.md's Agent Contract section for the stdout guarantee) |
-| `-v`, `--verbose` | off | Increase output verbosity (one `-v` = per-finding detail, two `-v` = command + stdout/stderr) |
+| `-v`, `--verbose` | off | Increase output verbosity (one `-v` = per-finding detail, two `-v` = command + stdout/stderr). Cannot be combined with `-q` (exit `2`) |
+| `-q`, `--quiet` | off | Print one line per artifact and nothing else on a passing run — see [Output Verbosity](operations.md#output-verbosity) [env: `ANALYZER_VERBOSITY=summary`, config: `verbosity: summary`] |
 | `--timeout SECONDS` | `200` | Per-artifact subprocess timeout [env: `ANALYZER_TIMEOUT`] |
 | `--jobs N` | `1` | Run up to N artifacts in parallel for the same analyzer |
 

@@ -76,7 +76,7 @@ steps:
           - Given a preflight failure or exit 126/127 under -q, should still print the remediation line
           - Given `verbosity` in fab-test.yml, should apply it with the existing flag > env > file > default precedence
           - Given -q and -v together, should reject the combination with exit 2
-        status: { state: backlog, comment: Terse CLI Output epic }
+        status: { state: released, comment: Terse CLI Output epic, 1.9.0.dev1 }
       - id: yx1x8w01ydj517qeczb1u9gq
         name: No CI annotations locally
         story: "As a Local Developer, I want ::notice:: lines only under CI, so that local output carries only what I need."
@@ -85,7 +85,7 @@ steps:
         functionalRequirements:
           - Given neither GITHUB_ACTIONS nor CI is set, should print tool-bootstrap notices as plain text or not at all
           - Given GITHUB_ACTIONS is set, should keep emitting ::notice:: unchanged
-        status: { state: backlog, comment: Terse CLI Output epic }
+        status: { state: released, comment: Terse CLI Output epic, 1.9.0.dev1 }
   - id: p6fgg84hsgdtowq9g6x7z5a7
     name: Read the result
     description: The caller reads stdout (and, when acting on findings, the envelope).
@@ -100,7 +100,7 @@ steps:
           - Given every artifact shares a rules file and tool, should print those paths once per analyzer run
           - Given pbir or pqlint, should print the envelope and native paths once per artifact
           - Given --format json, should leave stdout unchanged
-        status: { state: backlog, comment: Terse CLI Output epic }
+        status: { state: released, comment: Terse CLI Output epic, 1.9.0.dev1 }
       - id: dhv21morqieqh1itjnyvswqx
         name: Actionable verbose findings
         story: As an AI Agent, I want -v to group findings by rule with the full rule ID and a named severity, so that I can act without opening the envelope.
