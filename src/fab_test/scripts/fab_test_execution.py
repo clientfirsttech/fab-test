@@ -126,7 +126,9 @@ def _stderr_detail(stderr: str | None) -> str | None:
 
 
 def _verbosity_env(args: argparse.Namespace) -> str:
-    """Map fab-test -v/-vv flags to ANALYZER_VERBOSITY values."""
+    """Map fab-test -q/-v/-vv flags to ANALYZER_VERBOSITY values."""
+    if getattr(args, "quiet", False):
+        return "summary"
     count = getattr(args, "verbose", 0) or 0
     if count >= 2:
         return "debug"
@@ -303,13 +305,22 @@ def _run_artifact_process(
 
 
 def _emit_process_output(
-    proc: subprocess.CompletedProcess, capture_stdout: bool, ctx: "_RunContext", output_format: str
+    proc: subprocess.CompletedProcess,
+    capture_stdout: bool,
+    ctx: "_RunContext",
+    output_format: str,
+    *,
+    mute: bool = False,
 ) -> None:
-    """Re-narrate stdout (if captured) and stderr from a finished analyzer run."""
-    if capture_stdout:
+    """Re-narrate stdout (if captured) and stderr from a finished analyzer run.
+
+    ``mute`` drops what a finished run has already said through its envelope.
+    CI still gets stderr verbatim: a stripped ``::error::`` is a lost annotation.
+    """
+    if capture_stdout and not mute:
         _reemit_lines(proc.stdout, output_format)
 
-    if proc.stderr:
+    if proc.stderr and (ctx.in_ci or not mute):
         if ctx.in_ci:
             # Verbatim: GitHub renders `::error::` against the file, and a
             # stripped prefix is a lost annotation.
@@ -392,14 +403,17 @@ def _run_one_artifact(
     """Run one analyzer against one artifact. Returns (stem, exit_code)."""
     output_format = getattr(args, "output_format", "text")
     display_name = "." if _is_repository_scoped(name) else artifact.stem
-    _announce_artifact_run(name, display_name, index, total, ctx, output_format)
+    quiet = getattr(args, "quiet", False)
+    if not quiet:
+        _announce_artifact_run(name, display_name, index, total, ctx, output_format)
 
     cmd = _build_command(name, artifact, args, output_dir)
     # Under --format json, capture the child's stdout instead of inheriting it
     # (it would otherwise land in the middle of the JSON document) and
     # re-emit it as narration. --format text keeps today's direct inheritance
-    # so there is no added buffering latency.
-    capture_stdout = output_format == "json"
+    # so there is no added buffering latency -- except under -q, which must
+    # be able to drop what the envelope already says.
+    capture_stdout = output_format == "json" or quiet
 
     test_cases_path = None
     if name == "playwright" and not getattr(args, "impact_manifest", None):
@@ -413,11 +427,13 @@ def _run_one_artifact(
         return result
     proc = result
 
-    _emit_process_output(proc, capture_stdout, ctx, output_format)
-
     # Read the envelope and apply the error/warning threshold ourselves so
     # warnings never fail the build.
     envelope, aborted = _load_artifact_envelope(output_dir, name, artifact, proc.returncode)
+    # A nonzero exit with no findings at all -- no envelope, or a stale clean
+    # one from an earlier run -- has only its own output to say what went wrong.
+    unexplained = proc.returncode != 0 and not envelope.get("findings")
+    _emit_process_output(proc, capture_stdout, ctx, output_format, mute=quiet and not unexplained)
     artifact_code = _finalize_artifact_run(name, artifact, args, ctx, proc, envelope, aborted, output_dir)
     return (artifact.stem, artifact_code)
 

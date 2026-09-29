@@ -666,6 +666,12 @@ def _print_all_summary(
         print(json.dumps(summary, indent=2))
         return worst
 
+    if getattr(args, "quiet", False):
+        # Every artifact already printed its own line as its analyzer finished.
+        if not dry_run:
+            _write_and_open_index(rows, output_dir, args, analyzers)
+        return worst
+
     sep = "═" * 60
     print(f"\n{sep}")
     print("  fab-test all — aggregate summary")
@@ -782,6 +788,23 @@ def _artifact_line(
     )
 
 
+def _print_quiet_summary(name: str, results: list[tuple[str, int]], output_dir: Path | None) -> int:
+    """Print one ``-q`` line per artifact and return the worst exit code.
+
+    The line is ``<analyzer> <status> e=<errors> w=<warnings> <where>``.
+    ``<where>`` is the envelope path relative to the working directory, or the
+    artifact name when the analyzer wrote no envelope. Artifact names hold
+    spaces, so it stays the last field. Status is a word, never an icon.
+    """
+    for stem, code in results:
+        data = _read_artifact_envelope(output_dir, name, stem) if output_dir else None
+        errors, warnings = _envelope_error_warning_counts(data)
+        status = _artifact_status(data, code, errors, warnings)
+        where = _display_path(output_dir / name / stem / "envelope.json") if data else stem
+        print(f"{name} {status} e={errors} w={warnings} {where}")
+    return max((code for _, code in results), default=0)
+
+
 def _print_summary(
     name: str,
     results: list[tuple[str, int]],
@@ -827,6 +850,9 @@ def _print_summary(
             })
         print(json.dumps({"analyzer": name, "artifacts": rows}, indent=2))
         return max((code for _, code in results), default=0)
+
+    if getattr(args, "quiet", False):
+        return _print_quiet_summary(name, results, output_dir)
 
     sep = "─" * 52
     print(f"\n{sep}")
