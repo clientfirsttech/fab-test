@@ -24,7 +24,7 @@ from packaging.version import InvalidVersion, Version
 from fab_test import __version__
 
 _ROOT = Path(__file__).resolve().parent.parent
-_DISTRIBUTION = "fab-test"
+_DISTRIBUTION = "cft-fab-test"
 _VERSION_ATTR = "fab_test.__version__"
 
 
