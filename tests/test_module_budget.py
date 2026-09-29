@@ -36,7 +36,7 @@ TEST_HARD = 900
 # test_complexity_budget.py.
 EXEMPTIONS: dict[str, tuple[int, str]] = {
     "src/fab_test/scripts/fab_test_parser.py": (
-        1060,
+        1067,
         (
             "2026-08-31: +11 lines adding a `name` positional and --list to "
             "the skill subparser, so `fab-test skill` can list known skills "
@@ -82,7 +82,7 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
         ),
     ),
     "src/fab_test/scripts/fab_test_summary.py": (
-        925,
+        948,
         (
             "2026-09-01: +5 net lines teaching the summary that an analyzer can "
             "exit 0 and still be warning us -- _artifact_status now reads a "
@@ -110,7 +110,11 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
             "reported for `fab-test a11y` with multiple artifacts. New "
             "_index_row_fields factors out the envelope-reading rules shared "
             "with build_all_summary_rows so both index shapes classify status "
-            "identically."
+            "identically. "
+            "2026-09-29: +23 lines adding _print_quiet_summary and the -q "
+            "branch in `all`'s aggregate summary (Terse CLI Output epic); the "
+            "loop is its own function because inlining it pushed "
+            "_print_summary over the branch budget."
         ),
     ),
     "src/fab_test/scripts/fab_test_registry.py": (
@@ -162,7 +166,10 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
             "2026-08-30: +3 lines forwarding --workers to invoke_playwright.py "
             "when explicitly set on the outer CLI. "
             "2026-09-27: +10 lines adding --plan-only to the playwright "
-            "subparser (Playwright Generation Parity epic)."
+            "subparser (Playwright Generation Parity epic). "
+            "2026-09-29: +7 lines adding -q/--quiet beside -v in a mutually "
+            "exclusive group, so the two conflict at parse time with exit 2 "
+            "rather than in hand-written validation (Terse CLI Output epic)."
         ),
     ),
     "src/fab_test/scripts/invoke_playwright.py": (
@@ -219,7 +226,7 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
         ),
     ),
     "src/fab_test/scripts/fab_test_execution.py": (
-        814,
+        830,
         (
             "2026-09-26: born over the hard budget adding "
             "_playwright_service_resolved_target (collapses _discover_for's "
@@ -234,7 +241,12 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
             "_playwright_remote_target, _target_of) is a defensible seam to "
             "split into its own module -- not done here, since this task's "
             "job was the behavior, not a refactor of a file three separate "
-            "epics have now added to. Revisit if it keeps growing."
+            "epics have now added to. Revisit if it keeps growing. "
+            "2026-09-29: +2 lines mapping -q to the summary verbosity level in "
+            "_verbosity_env, then +12 lines letting -q skip the per-artifact "
+            "banner, capture the analyzer's stdout, and mute what a finished "
+            "run's envelope already reports (Terse CLI Output epic). +2 more keeping "
+            "stderr visible for a nonzero exit with no findings."
         ),
     ),
 }
