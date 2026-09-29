@@ -60,3 +60,7 @@ fab-test-results/
 
 # Power BI cache files (any folder level)
 **/cache.abf
+
+# Power BI Desktop local state (machine-bound signature, model data cache)
+**/.pbi/localSettings.json
+**/.pbi/cache.abf
