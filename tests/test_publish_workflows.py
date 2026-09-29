@@ -20,6 +20,7 @@ discovered during a release.
 """
 
 import importlib.util
+import re
 from pathlib import Path
 
 import pytest
@@ -119,7 +120,7 @@ def test_production_environment_names_the_distribution_this_repo_builds():
 
     assert urls, "no environment url declared"
     for url in urls:
-        assert url.rstrip("/").endswith("/fab-test"), url
+        assert url.rstrip("/").endswith("/cft-fab-test"), url
 
 
 @pytest.mark.fab_test
@@ -150,7 +151,7 @@ def test_production_accepts_this_project_s_release_shape():
 
 
 @pytest.mark.fab_test
-def test_production_refuses_a_prerelease_before_it_uploads():
+def test_production_refuses_a_dev_release_before_it_uploads():
     """Order matters: a guard that runs after the upload guards nothing."""
     workflow = _workflow(_PRODUCTION)
     guard = _step_index(workflow, "check_release_target.py")
@@ -195,15 +196,79 @@ def test_every_workflow_that_builds_a_dist_checks_what_it_built(workflow_name):
 
 
 @pytest.mark.fab_test
-@pytest.mark.parametrize("version", ["1.0.0.0.dev1", "1.0.1rc1", "2.0.0a1", "1.5.0b2"])
-def test_a_prerelease_is_refused_for_production(version):
-    """Every PEP 440 pre-release spelling, not only the one we happen to use."""
+@pytest.mark.parametrize("version", ["1.0.0.0.dev1", "1.8.1.dev3", "1.8.1b1.dev1", "2.0.0rc1.dev2"])
+def test_a_dev_release_is_refused_for_production(version):
+    """A dev release is a rehearsal build, including a dev build of a beta."""
     guard = _load_script("check_release_target.py")
 
     problem = guard.release_problem(version, tag=f"v{version}")
 
     assert problem is not None
-    assert "pre-release" in problem.lower(), problem
+    assert "dev release" in problem.lower(), problem
+
+
+@pytest.mark.fab_test
+@pytest.mark.parametrize("version", ["1.8.1b1", "2.0.0a1", "1.0.1rc1", "1.0.0.0b2"])
+def test_a_public_prerelease_is_allowed_for_production(version):
+    """Alpha, beta, and rc go to PyPI, where only `pip install --pre` sees them."""
+    guard = _load_script("check_release_target.py")
+
+    assert guard.release_problem(version, tag=f"v{version}") is None
+
+
+def _tag_matches(pattern: str, tag: str) -> bool:
+    """Match ``tag`` against a GitHub Actions tag filter pattern.
+
+    Only the syntax these workflows use: `*` (anything but `/`), `+` (one or
+    more of the preceding character or class), and `[...]` classes; every
+    other character is literal -- including `.`.
+    """
+    regex, i = "", 0
+    while i < len(pattern):
+        char = pattern[i]
+        if char == "[":
+            end = pattern.index("]", i)
+            regex += pattern[i : end + 1]
+            i = end + 1
+            continue
+        regex += {"*": "[^/]*", "+": "+"}.get(char, re.escape(char))
+        i += 1
+    return re.fullmatch(regex, tag) is not None
+
+
+@pytest.mark.fab_test
+@pytest.mark.parametrize(
+    ("tag", "expected"),
+    [
+        ("v1.8.1", _PRODUCTION),
+        ("v1.0.0.0", _PRODUCTION),
+        ("v1.8.1b1", _PRODUCTION),
+        ("v2.0.0a3", _PRODUCTION),
+        ("v1.8.1rc2", _PRODUCTION),
+        ("v1.0.0.0b1", _PRODUCTION),
+        ("v1.0.0.0.dev1", _REHEARSAL),
+        ("v1.8.1.dev4", _REHEARSAL),
+        ("v1.8.1b1.dev1", _REHEARSAL),
+    ],
+)
+def test_every_tag_shape_reaches_exactly_one_index(tag, expected):
+    """One tag, one index: a tag both workflows fire on publishes twice."""
+    firing = [
+        name
+        for name in (_PRODUCTION, _REHEARSAL)
+        if any(_tag_matches(p, tag) for p in _triggers(_workflow(name))["push"]["tags"])
+    ]
+
+    assert firing == [expected], f"{tag} fires {firing}"
+
+
+@pytest.mark.fab_test
+def test_a_prerelease_is_not_marked_the_latest_github_release():
+    """A beta that becomes "Latest release" is what the Releases page recommends."""
+    release = [s for s in _steps(_workflow(_PRODUCTION)) if "action-gh-release" in str(s.get("uses", ""))]
+
+    assert release, "no GitHub Release step found"
+    assert "prerelease" in str(release[0].get("with", {}).get("prerelease", "")), release[0]
 
 
 @pytest.mark.fab_test

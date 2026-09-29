@@ -1,8 +1,9 @@
 name: Publish to PyPI
 
-# Final releases only. The previous filter was `v[0-9]+.[0-9]+.[0-9]+*`, whose
-# trailing glob matches `v1.0.0.0.dev1` -- the first rehearsal tag would have
-# gone to production. Pre-releases go to publish-testpypi.yml.
+# Final releases and public pre-releases (alpha, beta, rc). The previous filter
+# was `v[0-9]+.[0-9]+.[0-9]+*`, whose trailing glob matches `v1.0.0.0.dev1` --
+# the first rehearsal tag would have gone to production. Dev releases go to
+# publish-testpypi.yml; each tag shape reaches exactly one of the two.
 #
 # The glob is the first line of defence, not the only one: check_release_target
 # reads the version out of the built wheel, because that is the artifact being
@@ -17,6 +18,12 @@ on:
     tags:
       - "v[0-9]+.[0-9]+.[0-9]+"
       - "v[0-9]+.[0-9]+.[0-9]+.[0-9]+"
+      # A public beta (v1.8.1b1): PyPI serves it to `pip install --pre` and
+      # hides it from a bare `pip install`.
+      - "v[0-9]+.[0-9]+.[0-9]+[ab][0-9]+"
+      - "v[0-9]+.[0-9]+.[0-9]+rc[0-9]+"
+      - "v[0-9]+.[0-9]+.[0-9]+.[0-9]+[ab][0-9]+"
+      - "v[0-9]+.[0-9]+.[0-9]+.[0-9]+rc[0-9]+"
 
 jobs:
   publish:
@@ -25,7 +32,7 @@ jobs:
       name: pypi
       # Trusted publishing resolves by distribution name. This said
       # fabric-ci-cd-dataops, which is the repository, not what it builds.
-      url: https://pypi.org/p/fab-test
+      url: https://pypi.org/p/cft-fab-test
     permissions:
       id-token: write
       contents: write
@@ -54,8 +61,12 @@ jobs:
           twine check --strict dist/*
 
       # Must precede the upload: a guard that runs afterwards guards nothing.
-      - name: Refuse a pre-release or a mismatched tag
+      - name: Refuse a dev release or a mismatched tag
         run: python .github/scripts/check_release_target.py
+
+      - name: Classify the release
+        id: release
+        run: echo "prerelease=$(python .github/scripts/check_release_target.py --print-prerelease)" >> "$GITHUB_OUTPUT"
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
@@ -66,4 +77,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
+          # A beta must not become the repository's "Latest release".
+          prerelease: ${{ steps.release.outputs.prerelease == 'true' }}
           files: dist/*

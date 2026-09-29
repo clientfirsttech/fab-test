@@ -62,7 +62,7 @@ def test_the_telemetry_extra_declares_both_kusto_packages():
     """
     extras = _project()["project"]["optional-dependencies"]
 
-    assert "telemetry" in extras, "pip install fab-test[telemetry] must resolve"
+    assert "telemetry" in extras, "pip install cft-fab-test[telemetry] must resolve"
     declared = " ".join(extras["telemetry"])
     assert "azure-kusto-data" in declared
     assert "azure-kusto-ingest" in declared
@@ -77,7 +77,7 @@ def test_the_install_hint_matches_the_declared_extra_name():
     """
     extras = _project()["project"]["optional-dependencies"]
 
-    assert "fab-test[telemetry]" in TELEMETRY_EXTRA_HINT
+    assert "cft-fab-test[telemetry]" in TELEMETRY_EXTRA_HINT
     assert "telemetry" in extras
 
 
@@ -130,7 +130,7 @@ def test_a_missing_extra_names_the_install_command(monkeypatch):
         load_ingest_dependencies()
 
     assert "pip install" in str(exc.value)
-    assert "fab-test[telemetry]" in str(exc.value)
+    assert "cft-fab-test[telemetry]" in str(exc.value)
     assert "Traceback" not in str(exc.value)
 
 

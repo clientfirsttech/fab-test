@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-09-29
+
+- 📦 - Distribution Renamed To `cft-fab-test` - PyPI refuses `fab-test` as too similar to the unrelated `fabtest`, so the package is now published as `cft-fab-test`: `pip install cft-fab-test`, `cft-fab-test[telemetry]`. **The command is unchanged** — the console script is still `fab-test`, and the import package is still `fab_test`. Both publish workflows, the trusted-publisher runbook (which also now names `clientfirsttech` as the owner), install docs, and the extras hints in the CLI's own error messages use the new name. Version is `1.8.1b1`, the first beta.
+- 🔒 - Root `fab-test.yml` No Longer Tracked - The repository's own `fab-test.yml` carried a real UPN (`playwright_user_name`), so it is now gitignored; contributors scaffold their own with `fab-test init` (see README's contributing section).
+
 ## 2026-09-28
 
 - 🔒 - ADOMD.NET Package Extraction Path Traversal - `_download_adomd` (RLS role discovery's XMLA fallback) wrote each NuGet package member to `cache / rel` with no check that the resolved path stayed inside the cache directory, the classic zip-slip shape (CWE-22). A compromised or malformed package could have written outside `~/.fab-test/adomd/...`. `_download_adomd` now refuses any member whose resolved destination falls outside the cache directory.

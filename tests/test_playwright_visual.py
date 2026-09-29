@@ -8,7 +8,7 @@ Power BI clients -- no real Fabric workspace or embed token. The pytest
 module that actually runs against a live workspace,
 `fab_test.scripts.playwright_validation.render_spec`, ships inside the
 installed package rather than under `tests/` (Playwright CI Guide epic,
-Render Spec Packaging task) so a `pip install fab-test` consumer has
+Render Spec Packaging task) so a `pip install cft-fab-test` consumer has
 something for `invoke_playwright.py` to point pytest at.
 
     pytest -m playwright tests/test_playwright_visual.py

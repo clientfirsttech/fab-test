@@ -34,8 +34,8 @@ After the build completes, `dist/` contains both a wheel and a source distributi
 
 ```text
 dist/
-  fab_test-1.0.0-py3-none-any.whl
-  fab_test-1.0.0.tar.gz
+  cft_fab_test-1.0.0-py3-none-any.whl
+  cft_fab_test-1.0.0.tar.gz
 ```
 
 ## Install the wheel in a virtual environment
@@ -45,7 +45,7 @@ Create a fresh virtual environment to test the packaged distribution exactly as 
 ```bash
 python -m venv .venv-test
 source .venv-test/bin/activate  # Windows: .venv-test\Scripts\activate
-pip install dist/fab_test-*.whl
+pip install dist/cft_fab_test-*.whl
 ```
 
 Verify the console scripts are registered:
@@ -274,7 +274,7 @@ workflow (dispatch inputs, `fab-test doctor` as a fail-fast step, uploading
 results, and a per-case step-summary table), see
 [docs/PLAYWRIGHT-CI.md](PLAYWRIGHT-CI.md) and
 [docs/examples/github-actions/playwright-live.yml](examples/github-actions/playwright-live.yml).
-[This repository's own demo workflow's run history](https://github.com/kerski/fab-test/actions/workflows/playwright-demo.yml)
+[This repository's own demo workflow's run history](https://github.com/clientfirsttech/fab-test/actions/workflows/playwright-demo.yml)
 is the working reference for what a real dispatch looks like, both green and
 red.
 
@@ -415,7 +415,7 @@ analyzers already use, and commit the address in `fab-test.yml`.
 
 ```yaml
 - name: Install fab-test with the telemetry extra
-  run: pip install 'fab-test[telemetry]'
+  run: pip install 'cft-fab-test[telemetry]'
 
 - name: Run analyzers
   env:
@@ -512,7 +512,7 @@ telemetry:
 
 ```yaml
 - name: Install fab-test with the Lakehouse telemetry extra
-  run: pip install 'fab-test[telemetry-lakehouse]'
+  run: pip install 'cft-fab-test[telemetry-lakehouse]'
 
 - name: Run analyzers
   env:

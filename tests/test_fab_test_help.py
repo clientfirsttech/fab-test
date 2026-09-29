@@ -80,7 +80,7 @@ def test_cli_help_shows_version_and_docs():
         check=False,
     )
     assert fab_test_version in result.stdout, "--help should show the package version"
-    assert "github.com/kerski/fab-test" in result.stdout, (
+    assert "github.com/clientfirsttech/fab-test" in result.stdout, (
         "--help should link to project documentation"
     )
 
