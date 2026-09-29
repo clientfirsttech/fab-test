@@ -5,7 +5,7 @@ Scope
 `bpa` and `pbir` are handed a rules file path, and `doctor` reads
 `analyzers.json` to learn where a missing tool can be downloaded from.
 Both were resolved only under the caller's own `.github/metadata/`, so a
-`pip install fab-test` outside this repository reported rules at a path
+`pip install cft-fab-test` outside this repository reported rules at a path
 that did not exist and no install URL for Tabular Editor at all.
 
 These tests guard the two halves of the fix: the files exist in the

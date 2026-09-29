@@ -403,8 +403,8 @@ a dataset nothing depends on exits `0` with a notice. `PLAYWRIGHT_DATASET_ID`
 in a `.env` never switches this on -- only the flag does.
 
 ```bash
-fab-test playwright --dataset-id 5bf5a7e1-65e5-4d74-944b-1ada5941a664 \
-  --dataset-workspace-id c4698d28-b05c-40bc-926c-707563ac85e7
+fab-test playwright --dataset-id 11111111-2222-3333-4444-555555555555 \
+  --dataset-workspace-id aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee
 ```
 
 **`--dataset-workspace-id` alone -- no `--dataset-id`, `--artifact`, target, or
@@ -421,7 +421,7 @@ call; a workspace with no semantic models, or none with dependent reports,
 exits `0` with a notice.
 
 ```bash
-fab-test playwright --dataset-workspace-id 798dfd00-0081-45d3-a7a7-f74f62e57277
+fab-test playwright --dataset-workspace-id aaaaaaaa-bbbb-cccc-dddd-ffffffffffff
 ```
 
 **`--dataset-workspace-id` with a bare `--artifact NAME` (or a target) and no
@@ -436,11 +436,11 @@ ahead of ordinary discovery.
 
 ```bash
 # "Sales Model" is a dataset in this workspace: runs its dependent reports
-fab-test playwright --dataset-workspace-id 798dfd00-0081-45d3-a7a7-f74f62e57277 \
+fab-test playwright --dataset-workspace-id aaaaaaaa-bbbb-cccc-dddd-ffffffffffff \
   --artifact "Sales Model"
 
 # "Invoice RDL" is not a dataset: refines to that one report
-fab-test playwright --dataset-workspace-id 798dfd00-0081-45d3-a7a7-f74f62e57277 \
+fab-test playwright --dataset-workspace-id aaaaaaaa-bbbb-cccc-dddd-ffffffffffff \
   --artifact "Invoice RDL"
 ```
 
@@ -454,8 +454,8 @@ fab-test playwright --artifact "Invoice RDL" --env dev
 
 # Forced explicitly, for a report with nothing checked in locally
 fab-test playwright --artifact "Invoice RDL" --env dev \
-  --dataset-id 4c353b5c-d311-4e90-b9d1-5766b87f59dc \
-  --dataset-workspace-id visual-error-testing
+  --dataset-id 66666666-7777-8888-9999-000000000000 \
+  --dataset-workspace-id "Sales Dev"
 ```
 
 **A paginated report is a flat `NAME.rdl` file, discovered the same way
@@ -528,7 +528,7 @@ fab-test playwright-impact --changed-artifacts changed-artifacts.json --env dev 
 fab-test playwright --impact-manifest fab-test-results/playwright/impact-manifest.json --env dev --env-file .env
 ```
 
-Browser setup -- `pytest`, `pytest-playwright`, and `pytest-html` are dev-only dependencies of this project, so a `pip install fab-test` consumer needs all three installed separately (plus `pytest-xdist`, needed the moment more than one case runs, which is the default for any report with more than one page):
+Browser setup -- `pytest`, `pytest-playwright`, and `pytest-html` are dev-only dependencies of this project, so a `pip install cft-fab-test` consumer needs all three installed separately (plus `pytest-xdist`, needed the moment more than one case runs, which is the default for any report with more than one page):
 
 ```bash
 playwright install chromium

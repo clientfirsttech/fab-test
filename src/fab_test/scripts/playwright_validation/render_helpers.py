@@ -5,7 +5,7 @@ Packaging task) so this repository's own unit tests
 (``tests/test_playwright_visual.py``) can exercise these functions with
 stubs, while the actual pytest module that runs against a live Fabric
 workspace (``render_spec.py``) ships inside the installed package -- a
-``pip install fab-test`` consumer has no checkout of this repository's
+``pip install cft-fab-test`` consumer has no checkout of this repository's
 ``tests/`` directory for ``invoke_playwright.py`` to point pytest at.
 """
 

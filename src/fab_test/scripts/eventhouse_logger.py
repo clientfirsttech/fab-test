@@ -46,7 +46,7 @@ VALID_TABLES = [
     "fabric_testbed_runs"
 ]
 
-TELEMETRY_EXTRA_HINT = "pip install 'fab-test[telemetry]'"
+TELEMETRY_EXTRA_HINT = "pip install 'cft-fab-test[telemetry]'"
 
 # The ingestion mapping each telemetry table must define. The tables carry a
 # single `Data: dynamic` column and downstream Eventhouse functions do the
