@@ -124,7 +124,7 @@ def test_a_missing_extra_is_reported_with_its_install_command(monkeypatch):
     row = _telemetry_readiness(_Args())
 
     assert row["ready"] is False
-    assert "fab-test[telemetry]" in row["remediation"]
+    assert "cft-fab-test[telemetry]" in row["remediation"]
 
 
 @pytest.mark.telemetry

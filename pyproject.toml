@@ -5,7 +5,7 @@ requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "fab-test"
+name = "cft-fab-test"
 # Read from fab_test.__version__ -- see [tool.setuptools.dynamic].
 dynamic = ["version"]
 requires-python = ">=3.12"
@@ -83,13 +83,13 @@ dev = [
 ]
 
 [project.urls]
-Repository = "https://github.com/kerski/fab-test"
-Documentation = "https://github.com/kerski/fab-test/blob/main/docs/QUICK-VALIDATION.md"
+Repository = "https://github.com/clientfirsttech/fab-test"
+Documentation = "https://github.com/clientfirsttech/fab-test/blob/main/docs/QUICK-VALIDATION.md"
 # The releases page, not a file: it is populated automatically by
 # publish.yml's generate_release_notes, so it cannot go stale, and
 # activity-log.md -- what this pointed at -- does not exist.
-Changelog = "https://github.com/kerski/fab-test/releases"
-Issues = "https://github.com/kerski/fab-test/issues"
+Changelog = "https://github.com/clientfirsttech/fab-test/releases"
+Issues = "https://github.com/clientfirsttech/fab-test/issues"
 
 [project.scripts]
 fab-test = "fab_test.scripts.fab_test:main"

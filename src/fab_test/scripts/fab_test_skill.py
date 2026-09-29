@@ -349,7 +349,7 @@ def _skill(args: argparse.Namespace) -> int:
     resolved = resolve_skill_dir(REPO_ROOT)
     if not (resolved.path / "SKILL.md").is_file():
         narrate(
-            f"fab-test skill: resource missing at {resolved.path} -- reinstall fab-test",
+            f"fab-test skill: resource missing at {resolved.path} -- reinstall cft-fab-test",
             output_format=output_format,
         )
         return 1

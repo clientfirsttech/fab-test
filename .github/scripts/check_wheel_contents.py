@@ -4,7 +4,7 @@ The wheel shipped no metadata at all for months and nothing noticed. `bpa`
 and `pbir` are handed a rules file path and `doctor` reads analyzers.json for
 the install URL of a missing tool, so a wheel without them resolves rules to
 a path that exists only in a checkout of this repository -- which is exactly
-what a `pip install fab-test` consumer does not have.
+what a `pip install cft-fab-test` consumer does not have.
 
 It survived because a `package-data` glob that matches no file is not a build
 error. `agents/*` and `skills/*/*` were declared against directories that do
