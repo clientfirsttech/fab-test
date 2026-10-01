@@ -7,17 +7,17 @@ offending fragment in it (DS-02 already did). See the RDL Finding Clarity epic.
 import pytest
 
 from fab_test.scripts._rdl_lint import (
+    _check_acc01_alt_text,
+    _check_acc03_table_caption,
     _check_ds05_no_select_star,
     _check_ds07_prefer_stored_procedures,
+    _check_lay02_avoid_total_pages,
+    _check_lay04_interactive_sort,
     _check_qry01_filter_in_query,
     _check_qry02_no_calculated_fields,
     _check_qry04_sort_in_query,
     _check_qry05_convert_types_in_query,
     _check_qry06_join_in_query,
-    _check_lay02_avoid_total_pages,
-    _check_lay04_interactive_sort,
-    _check_acc01_alt_text,
-    _check_acc03_table_caption,
 )
 
 from ._rdl_lint_fixtures import dataset, parse, report
@@ -26,7 +26,10 @@ pytestmark = [pytest.mark.rdl, pytest.mark.analyzers]
 
 
 def _sql_report(command_text: str, **kw) -> str:
-    source = '<DataSources><DataSource Name="DS1"><ConnectionProperties><DataProvider>SQL</DataProvider></ConnectionProperties></DataSource></DataSources>'
+    source = (
+        '<DataSources><DataSource Name="DS1"><ConnectionProperties><DataProvider>SQL</DataProvider>'
+        "</ConnectionProperties></DataSource></DataSources>"
+    )
     return report(source + "<DataSets>" + dataset("Sales", "DS1", command_text, **kw) + "</DataSets>")
 
 
@@ -68,7 +71,10 @@ class TestDs05:
         assert "SELECT * FROM PieData" in finding["message"]
 
     def test_dax_message_quotes_the_evaluate(self, tmp_path):
-        source = '<DataSources><DataSource Name="DS1"><ConnectionProperties><DataProvider>PBIDATASET</DataProvider></ConnectionProperties></DataSource></DataSources>'
+        source = (
+            '<DataSources><DataSource Name="DS1"><ConnectionProperties><DataProvider>PBIDATASET</DataProvider>'
+            "</ConnectionProperties></DataSource></DataSources>"
+        )
         xml = report(source + "<DataSets>" + dataset("Sales", "DS1", "EVALUATE 'Sales'") + "</DataSets>")
         root, namespace = parse(tmp_path, xml)
 

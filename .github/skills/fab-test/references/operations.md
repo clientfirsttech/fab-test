@@ -24,7 +24,7 @@ fab-test bpa -q              # one line per artifact
 fab-test rdl -q              # the same line for a paginated report: `rdl failed e=3 w=3 <envelope>`
 fab-test bpa -v              # per-finding detail
 fab-test pbir -vv            # resolved command + stdout/stderr
-fab-test rdl -v              # findings table (wrapped, never cut); -vv adds the active/planned rule counts
+fab-test rdl -v              # findings table (wrapped, never cut); -vv adds the active/planned rule counts (rdl runs no subprocess, so there is no command or stdout to show)
 fab-test all --verbose       # same as -v
 ```
 

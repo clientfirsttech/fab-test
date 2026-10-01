@@ -110,7 +110,8 @@ def _log_findings(level: int, findings: list[dict]) -> None:
 
 
 def _severity_counts(findings: list[dict]) -> tuple[int, int]:
-    errors = sum(1 for f in findings if f.get("severity") == "error")
+    # A missing or unknown severity counts as an error (aidd-analyzer-contract).
+    errors = sum(1 for f in findings if f.get("severity") not in ("warning", "info"))
     warnings = sum(1 for f in findings if f.get("severity") == "warning")
     return errors, warnings
 
@@ -118,9 +119,9 @@ def _severity_counts(findings: list[dict]) -> tuple[int, int]:
 def run_rdl_lint(args: argparse.Namespace) -> int:
     """Run the RDL static analyzer and return an exit code."""
     artifact_path = validate_path(args.artifact_path, "RDL artifact path")
-    rules_path = validate_path(
-        getattr(args, "rules_path", "") or str(_default_rules_path()), "Rules file"
-    )
+    # Not validate_path: a missing rules file must write an error envelope (below),
+    # not exit first and leave a stale envelope for the parent to report as current.
+    rules_path = Path(getattr(args, "rules_path", "") or str(_default_rules_path())).resolve()
 
     artifact_stem = artifact_path.stem
     output_path = (

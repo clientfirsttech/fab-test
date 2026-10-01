@@ -11,15 +11,14 @@ import xml.etree.ElementTree as ET
 from typing import Any
 
 from ._rdl_common import (
+    _RELATIONAL_PROVIDERS,
     CURRENT_RDL_NAMESPACE,
     Finding,
-    _RELATIONAL_PROVIDERS,
     _dataset_provider,
     _location,
     _parents,
     _snippet,
 )
-
 
 # --------------------------------------------------------------------------- #
 # Structure and data source rules (STR-01, DS-01, DS-02, DS-05, DS-07)
@@ -97,6 +96,7 @@ def _check_ds02_unused_datasets(root: ET.Element, _namespace: str, _rule: dict[s
 _SQL_SELECT_STAR = re.compile(r"(?i)\bselect\s+(?:(?:distinct|all)\s+)?(?:top\s*\(?\s*\d+\s*\)?\s*(?:percent\s+)?)?\*")
 
 
+# Known limit: a "--" inside a string literal is read as a comment start.
 _SQL_COMMENT = re.compile(r"--[^\n]*|/\*.*?\*/", re.S)
 
 
@@ -250,8 +250,9 @@ def _check_qry03_aggregate_in_query(root: ET.Element, _namespace: str, _rule: di
     return findings
 
 
+# (?<!\.) keeps a scalar call such as Math.Max( from counting as an aggregate.
 _AGGREGATE_CALL = re.compile(
-    r"(?i)\b(sum|count|countdistinct|avg|min|max|first|last|stdev|stdevp|var|varp|aggregate|runningvalue)\s*\("
+    r"(?i)(?<![\w.])(sum|count|countdistinct|avg|min|max|first|last|stdev|stdevp|var|varp|aggregate|runningvalue)\s*\("
 )
 
 
@@ -266,9 +267,14 @@ def _check_qry04_sort_in_query(root: ET.Element, _namespace: str, _rule: dict[st
             continue
         group = owner.find("Group") if owner.tag == "TablixMember" else None
         where = _location(parents, group if group is not None else owner)
-        expressions = ", ".join(e.findtext("Value") or "" for e in sort_expressions.iter("SortExpression"))
-        if _AGGREGATE_CALL.search(expressions):
+        plain = [
+            e.findtext("Value") or ""
+            for e in sort_expressions.iter("SortExpression")
+            if not _AGGREGATE_CALL.search(e.findtext("Value") or "")
+        ]
+        if not plain:
             continue  # ranking groups by a total is a report-side calculation, not a plain ORDER BY
+        expressions = ", ".join(plain)
         findings.append({
             "object": where,
             "message": (

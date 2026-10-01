@@ -17,7 +17,6 @@ from pathlib import Path
 from typing import Any
 
 from ._rdl_checks_query import (
-    _check_str01_current_schema,
     _check_ds01_no_embedded_credentials,
     _check_ds02_unused_datasets,
     _check_ds05_no_select_star,
@@ -29,23 +28,24 @@ from ._rdl_checks_query import (
     _check_qry05_convert_types_in_query,
     _check_qry06_join_in_query,
     _check_qry07_move_complex_sql,
+    _check_str01_current_schema,
 )
 from ._rdl_checks_report import (
-    _check_prm01_default_value,
-    _check_prm03_parameter_count,
-    _check_prm04_multivalue_nullable,
-    _check_prm05_show_parameter_values,
+    _check_acc01_alt_text,
+    _check_acc02_chart_alt_text_quality,
+    _check_acc03_table_caption,
+    _check_acc08_html_link_alt_text,
     _check_lay01_body_fits_page,
     _check_lay02_avoid_total_pages,
     _check_lay03_sub01_subreport_in_tablix,
     _check_lay04_interactive_sort,
     _check_lay05_large_reports_page_breaks,
     _check_lay06_avoid_embedded_images,
+    _check_prm01_default_value,
+    _check_prm03_parameter_count,
+    _check_prm04_multivalue_nullable,
+    _check_prm05_show_parameter_values,
     _check_sub02_subreport_count,
-    _check_acc01_alt_text,
-    _check_acc02_chart_alt_text_quality,
-    _check_acc03_table_caption,
-    _check_acc08_html_link_alt_text,
 )
 from ._rdl_common import (
     CURRENT_RDL_NAMESPACE,  # noqa: F401 -- re-exported for callers and tests
@@ -100,15 +100,21 @@ def parse_rdl(path: Path) -> tuple[ET.Element, str]:
 def load_rule_catalog(path: Path) -> list[dict[str, Any]]:
     """Load the RDL rule catalog's ``"rules"`` list from ``path``."""
     data = json.loads(path.read_text(encoding="utf-8"))
-    rules = data.get("rules", [])
+    rules = data.get("rules", []) if isinstance(data, dict) else None
+    if not isinstance(rules, list):
+        raise ValueError("a rules file is an object with a 'rules' list")  # noqa: TRY004 -- value validation
     seen: set[str] = set()
     for rule in rules:
-        rule_id = rule.get("id", "?")
+        if not isinstance(rule, dict) or not isinstance(rule.get("id"), str):
+            raise ValueError("every rule is an object with a string 'id'")  # noqa: TRY004 -- value validation
+        rule_id = rule["id"]
         if rule_id in seen:
             raise ValueError(f"duplicate rule id {rule_id}")
         seen.add(rule_id)
         if rule.get("status", "active") not in ("active", "planned"):
             raise ValueError(f"rule {rule_id} has status {rule['status']!r}; use 'active' or 'planned'")
+        if rule.get("severity", "error") not in ("error", "warning", "info"):
+            raise ValueError(f"rule {rule_id} has severity {rule['severity']!r}; use 'error', 'warning' or 'info'")
     return rules
 
 
@@ -122,9 +128,8 @@ def _is_active(rule: dict[str, Any]) -> bool:
 
 
 # Maps a rule ID to the function that checks it, given a parsed (namespace-
-# stripped) report root. Empty until later RDL Static Analysis epic tasks
-# register the STR/DS/QRY/PRM/LAY/SUB/ACC checks -- a catalog entry with no
-# function here yet is reported as "skip", not "pass" (build_test_results).
+# stripped) report root; filled by CHECKS.update below. A catalog entry with
+# no function here is reported as "skip", not "pass" (build_test_results).
 CHECKS: dict[str, RdlCheck] = {}
 
 
@@ -224,7 +229,10 @@ def build_test_results(
         urls = {"source_urls": rule["source_urls"]} if "source_urls" in rule else {}
         base = {"rule": rule_id, "severity": rule.get("severity", "warning")}
         if hits:
-            rows.extend({**base, "object": h.get("object", ""), "message": h["message"], "status": h["severity"], **urls} for h in hits)
+            rows.extend(
+                {**base, "object": h.get("object", ""), "message": h["message"], "status": h["severity"], **urls}
+                for h in hits
+            )
             continue
         status = "pass" if rule_id in implemented and not rule.get("disabled") else "skip"
         rows.append({**base, "object": "", "message": rule.get("description", ""), "status": status, **urls})

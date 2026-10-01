@@ -58,7 +58,8 @@ class TestFindingsTable:
             assert word in flat
 
     def test_a_long_object_path_is_wrapped_too(self):
-        row = [{"rule": "QRY-02", "severity": "warning", "object": "AVeryLongDatasetName › AVeryLongFieldName_" + "x" * 40, "message": "m"}]
+        long_object = "AVeryLongDatasetName › AVeryLongFieldName_" + "x" * 40
+        row = [{"rule": "QRY-02", "severity": "warning", "object": long_object, "message": "m"}]
 
         out = findings_table(row, 80)
 
@@ -98,3 +99,33 @@ class TestEdgeCells:
         out = findings_table(rows, 120)
 
         assert out.index("Warning") < out.index("Info")
+
+
+class TestDisplayWidth:
+    @staticmethod
+    def _width(text: str) -> int:
+        import unicodedata
+
+        return sum(2 if unicodedata.east_asian_width(c) in "WF" else 1 for c in text)
+
+    def test_double_width_text_never_overflows_the_terminal(self):
+        row = [{"rule": "DS-02", "severity": "error", "object": "データセット" * 8, "message": "漢字" * 40}]
+
+        out = findings_table(row, 80)
+
+        assert max(self._width(line) for line in out.splitlines()) <= 80
+
+    def test_every_character_survives_the_wrap(self):
+        message = "漢字" * 40
+        row = [{"rule": "R", "severity": "error", "object": "o", "message": message}]
+
+        out = findings_table(row, 80)
+
+        assert "".join(out.replace("│", "").split()).count("漢字") == 40
+
+    def test_a_long_unbroken_token_is_split_not_dropped(self):
+        row = [{"rule": "R", "severity": "error", "object": "o", "message": "x" * 200}]
+
+        out = findings_table(row, 80)
+
+        assert "".join(out.replace("│", "").split()).count("x") == 200

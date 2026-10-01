@@ -47,7 +47,7 @@ def _run(tmp_path: Path, *args: str, artifact: str = "DS-02", env: dict | None =
     return subprocess.run(
         [sys.executable, "-m", "fab_test.scripts.fab_test", "rdl", "--artifact-dir", str(artifacts),
          "--output-dir", str(tmp_path / "out"), *args],
-        cwd=tmp_path, env=full_env, capture_output=True, text=True, encoding="utf-8", timeout=120,
+        cwd=tmp_path, env=full_env, capture_output=True, text=True, encoding="utf-8", check=False, timeout=120,
     )
 
 
@@ -131,3 +131,34 @@ class TestLevels:
         out = _run(tmp_path, "-vv").stdout
 
         assert re.search(r"\d+ active, \d+ planned", out)
+
+
+class TestQuietEdges:
+    def test_the_environment_variable_alone_gives_the_quiet_line(self, tmp_path):
+        proc = _run(tmp_path, env={"ANALYZER_VERBOSITY": "summary"})
+
+        lines = proc.stdout.strip().splitlines()
+        assert len(lines) == 1 and _QUIET_LINE.match(lines[0]), proc.stdout
+
+    def test_a_malformed_report_is_still_one_line_with_an_error_count(self, tmp_path):
+        artifacts = tmp_path / "artifacts"
+        artifacts.mkdir()
+        (artifacts / "Broken.rdl").write_text("<Report", encoding="utf-8")
+        env = {**os.environ, "PYTHONPATH": str(_REPO / "src"), "PYTHONIOENCODING": "utf-8"}
+
+        proc = subprocess.run(
+            [sys.executable, "-m", "fab_test.scripts.fab_test", "rdl", "--artifact-dir", str(artifacts),
+             "--output-dir", str(tmp_path / "out"), "-q"],
+            cwd=tmp_path, env=env, capture_output=True, text=True, encoding="utf-8", check=False, timeout=120,
+        )
+
+        assert proc.stdout.strip().splitlines()[0].startswith("rdl failed e=1 w=0 ")
+        assert proc.returncode == 1
+
+    def test_a_missing_rules_file_is_not_hidden_by_an_earlier_run_under_q(self, tmp_path):
+        _run(tmp_path, "-q")
+
+        proc = _run(tmp_path, "-q", "--rules-path", str(tmp_path / "nope.json"))
+
+        assert proc.returncode == 1
+        assert proc.stdout.strip().splitlines()[0].startswith("rdl failed e=1 w=0 ")

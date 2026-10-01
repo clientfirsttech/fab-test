@@ -13,7 +13,7 @@ import it without either dragging the other along.
 
 from __future__ import annotations
 
-import textwrap
+import unicodedata
 from typing import Any
 
 from tabulate import tabulate
@@ -49,14 +49,48 @@ def truncate(text: Any, width: int) -> str:
     return text[: width - 3] + "..." if width > 3 else text[:width]
 
 
+def _width(text: str) -> int:
+    """Display columns ``text`` takes: East Asian wide characters count two."""
+    return sum(
+        0 if unicodedata.combining(c) else 2 if unicodedata.east_asian_width(c) in "WF" else 1 for c in text
+    )
+
+
+def _take(text: str, width: int) -> str:
+    """The longest prefix of ``text`` that fits ``width`` columns (at least one character)."""
+    used = 0
+    for index, char in enumerate(text):
+        used += _width(char)
+        if used > width and index:
+            return text[:index]
+    return text
+
+
 def wrap(text: Any, width: int) -> str:
-    """Fold ``text`` onto lines of at most ``width``, so a cell loses nothing.
+    """Fold ``text`` onto lines of at most ``width`` display columns, losing nothing.
 
     A findings message quotes the offending query or expression; cutting it
-    to fit would throw away the very thing it was written to show.
+    to fit would throw away the very thing it was written to show. Words are
+    kept whole where they fit and split only when one is wider than the line.
     """
-    lines = textwrap.wrap(" ".join(str(text).split()), width, break_long_words=True)
-    return "\n".join(lines) if lines else ""
+    lines: list[str] = []
+    current = ""
+    for word in str(text).split():
+        if current and _width(current) + 1 + _width(word) <= width:
+            current += " " + word
+            continue
+        if current:
+            lines.append(current)
+            current = ""
+        rest = word
+        while _width(rest) > width:
+            chunk = _take(rest, width)
+            lines.append(chunk)
+            rest = rest[len(chunk):]
+        current = rest
+    if current:
+        lines.append(current)
+    return chr(10).join(lines)
 
 
 _SEVERITY_ORDER = {"error": 0, "warning": 1, "info": 2}
@@ -89,9 +123,9 @@ def findings_table(findings: list[dict[str, Any]], terminal_width: int) -> str:
         for f in ordered
     ]
     # tabulate pads every header by two, so a column is never narrower than that.
-    rule_w = min(max(len("Rule") + 2, *(len(r[0]) for r in rows)), 25)
-    sev_w = min(max(len("Severity") + 2, *(len(r[1]) for r in rows)), 10)
-    obj_w = min(max(len("Object") + 2, *(len(r[2]) for r in rows)), 40)
+    rule_w = min(max(len("Rule") + 2, *(_width(r[0]) for r in rows)), 25)
+    sev_w = min(max(len("Severity") + 2, *(_width(r[1]) for r in rows)), 10)
+    obj_w = min(max(len("Object") + 2, *(_width(r[2]) for r in rows)), 40)
     # Keep room for a readable message: shrink the object column before it.
     while obj_w > 20 and terminal_width - rule_w - sev_w - obj_w - table_padding(4) < 40:
         obj_w -= 1

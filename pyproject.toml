@@ -195,7 +195,8 @@ ignore = [
 ]
 
 # The info glyph is deliberate in CLI output, not a typo for the letter i.
-allowed-confusables = ["ℹ"]
+# The finding-path separator (Dataset › Field) is deliberate, not a typo for ">".
+allowed-confusables = ["ℹ", "›"]
 
 # Thresholds for the non-gating complexity report (see the lint workflow).
 # Raising either of these is a decision, not a formality — say why in the commit.

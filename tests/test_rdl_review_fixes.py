@@ -115,13 +115,13 @@ class TestCatalogLoading:
     def test_an_unknown_status_is_rejected_by_name(self, tmp_path):
         path = self._write(tmp_path, [{"id": "X-01", "status": "Active"}])
 
-        with pytest.raises(ValueError, match="X-01.*Active"):
+        with pytest.raises(ValueError, match=r"X-01.*Active"):
             load_rule_catalog(path)
 
     def test_a_duplicate_rule_id_is_rejected(self, tmp_path):
         path = self._write(tmp_path, [{"id": "X-01"}, {"id": "X-01", "severity": "error"}])
 
-        with pytest.raises(ValueError, match="duplicate.*X-01"):
+        with pytest.raises(ValueError, match=r"duplicate.*X-01"):
             load_rule_catalog(path)
 
     def test_a_valid_catalog_loads(self, tmp_path):
@@ -178,7 +178,8 @@ class TestWrapperRobustness:
         artifact = tmp_path / "Sales.rdl"
         artifact.write_text(_CLEAN, encoding="utf-8")
         rules = tmp_path / "rules.json"
-        rules.write_text(json.dumps({"rules": [{"id": "FAKE-01"}, {"id": "FAKE-02", "disabled": True}]}), encoding="utf-8")
+        catalog = {"rules": [{"id": "FAKE-01"}, {"id": "FAKE-02", "disabled": True}]}
+        rules.write_text(json.dumps(catalog), encoding="utf-8")
         output = tmp_path / "env.json"
         CHECKS["FAKE-01"] = lambda *_: []
         CHECKS["FAKE-02"] = lambda *_: []
@@ -222,3 +223,89 @@ class TestVerboseSummaryDoesNotRepeatTheTable:
         _print_summary("pbir", [("Sales", 1)], tmp_path, "verbose")
 
         assert "Findings:" in capsys.readouterr().out
+
+
+class TestMissingRulesFile:
+    def test_a_missing_rules_file_writes_a_fresh_error_envelope_not_a_stale_one(self, tmp_path: Path):
+        artifact = tmp_path / "Sales.rdl"
+        artifact.write_text(_CLEAN, encoding="utf-8")
+        output = tmp_path / "env.json"
+        output.write_text(json.dumps({"status": "failed", "findings": [{"rule": "OLD"}]}), encoding="utf-8")
+
+        code = run_rdl_lint(_Args(artifact, tmp_path / "nope.json", output))
+
+        assert code == 1
+        envelope = json.loads(output.read_text(encoding="utf-8"))
+        assert [f["rule"] for f in envelope["findings"]] == ["RULES"]
+
+
+class TestSecondReview:
+    @pytest.mark.parametrize(
+        "body",
+        ["[]", '{"rules": null}', '{"rules": [1]}', '{"rules": [{"severity": "error"}]}', '{"rules": {"a": 1}}'],
+    )
+    def test_a_structurally_bad_catalog_is_a_value_error(self, tmp_path, body):
+        path = tmp_path / "rules.json"
+        path.write_text(body, encoding="utf-8")
+
+        with pytest.raises(ValueError):
+            load_rule_catalog(path)
+
+    def test_an_unknown_severity_is_rejected_by_name(self, tmp_path):
+        path = tmp_path / "rules.json"
+        path.write_text(json.dumps({"rules": [{"id": "X-01", "severity": "High"}]}), encoding="utf-8")
+
+        with pytest.raises(ValueError, match=r"X-01.*High"):
+            load_rule_catalog(path)
+
+    def test_an_unknown_finding_severity_counts_as_an_error(self, tmp_path: Path):
+        artifact = tmp_path / "Sales.rdl"
+        artifact.write_text(_CLEAN, encoding="utf-8")
+        rules = tmp_path / "rules.json"
+        rules.write_text(json.dumps({"rules": [{"id": "FAKE-01"}]}), encoding="utf-8")
+        output = tmp_path / "env.json"
+        CHECKS["FAKE-01"] = lambda *_: [{"object": "x", "message": "m", "severity": "critical"}]
+        try:
+            code = run_rdl_lint(_Args(artifact, rules, output))
+        finally:
+            del CHECKS["FAKE-01"]
+
+        assert code == 1
+        assert json.loads(output.read_text(encoding="utf-8"))["status"] == "failed"
+
+    def test_a_scalar_max_is_not_mistaken_for_an_aggregate_sort(self, tmp_path):
+        xml = _sort_report("=Math.Max(Fields!A.Value, 0)")
+        root, ns = parse(tmp_path, xml)
+
+        assert len(_check_qry04_sort_in_query(root, ns, {})) == 1
+
+    def test_a_mixed_sort_is_flagged_for_its_plain_expression(self, tmp_path):
+        xml = _sort_report("=Fields!Name.Value", "=Sum(Fields!X.Value)")
+        root, ns = parse(tmp_path, xml)
+
+        (finding,) = _check_qry04_sort_in_query(root, ns, {})
+
+        assert "=Fields!Name.Value" in finding["message"]
+        assert "Sum(" not in finding["message"]
+
+    def test_every_provider_in_the_real_fixtures_is_a_known_one(self):
+        from fab_test.scripts._rdl_common import _RELATIONAL_PROVIDERS
+        from fab_test.scripts._rdl_lint import parse_rdl
+
+        known = _RELATIONAL_PROVIDERS | {"PBIDATASET", "PQO", ""}
+        repo = Path(__file__).resolve().parent.parent
+        seen = set()
+        for rdl in (repo / ".fabric" / "artifacts").rglob("*.rdl"):
+            root, _ = parse_rdl(rdl)
+            seen |= {(p.text or "").strip().upper() for p in root.iter("DataProvider")}
+
+        assert seen <= known, f"unclassified providers: {seen - known}"
+
+
+def _sort_report(*expressions: str) -> str:
+    sorts = "".join(f"<SortExpression><Value>{e}</Value></SortExpression>" for e in expressions)
+    return report(
+        '<Body><ReportItems><Tablix Name="T1"><TablixRowHierarchy><TablixMembers><TablixMember>'
+        f'<Group Name="G1" /><SortExpressions>{sorts}</SortExpressions>'
+        "</TablixMember></TablixMembers></TablixRowHierarchy></Tablix></ReportItems></Body>"
+    )
