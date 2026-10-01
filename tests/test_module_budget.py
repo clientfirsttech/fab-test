@@ -38,7 +38,8 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
     "src/fab_test/scripts/fab_test_parser.py": (
         1097,
         (
-            "2026-09-30: merge of main into feat/rdl-static-analysis -- main's -q/verbosity additions plus this branch's rdl additions both landed here, so the ceiling is the sum of the two. "
+            "2026-09-30: merge of main into feat/rdl-static-analysis -- main's -q/verbosity additions "
+            "plus this branch's rdl additions both landed here, so the ceiling is the sum of the two. "
             "2026-09-27: +16 lines adding _add_rdl_subparser -- one more "
             "subcommand builder, same shape as every other one already here "
             "(_add_pql_lint_subparser is its closest model: no external-tool "
@@ -97,7 +98,8 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
     "src/fab_test/scripts/fab_test_summary.py": (
         954,
         (
-            "2026-10-01: +6 lines (_WRAPPER_PRINTS_FINDINGS) so the verbose summary does not repeat the findings table the rdl wrapper already printed (RDL review). "
+            "2026-10-01: +6 lines (_WRAPPER_PRINTS_FINDINGS) so the verbose summary does not repeat "
+            "the findings table the rdl wrapper already printed (RDL review). "
             "2026-09-01: +5 net lines teaching the summary that an analyzer can "
             "exit 0 and still be warning us -- _artifact_status now reads a "
             "`warning` envelope as a warning instead of falling through to "
@@ -134,7 +136,8 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
     "src/fab_test/scripts/fab_test_registry.py": (
         1026,
         (
-            "2026-09-30: merge of main into feat/rdl-static-analysis -- main's -q/verbosity additions plus this branch's rdl additions both landed here, so the ceiling is the sum of the two. "
+            "2026-09-30: merge of main into feat/rdl-static-analysis -- main's -q/verbosity additions "
+            "plus this branch's rdl additions both landed here, so the ceiling is the sum of the two. "
             "2026-09-27: +40 lines registering the rdl analyzer -- "
             "ANALYZER_REGISTRY/ANALYZER_SCOPES entries, _resolve_rdl_rules_path "
             "(mirrors _resolve_pbir_rules_path), build_rdl_command, and its "

@@ -11,6 +11,7 @@ machine -- no external tool, synthetic fixtures only.
 """
 
 import json
+from typing import ClassVar
 
 import pytest
 
@@ -224,7 +225,7 @@ class TestBuildTestResultsEveryHit:
     """A rule that fires on several elements shows every offender (RDL
     Finding Clarity epic) -- not only the first."""
 
-    _CATALOG = [{"id": "FAKE-01", "severity": "error", "disabled": False, "description": "d"}]
+    _CATALOG: ClassVar[list[dict]] = [{"id": "FAKE-01", "severity": "error", "disabled": False, "description": "d"}]
 
     def test_one_row_per_hit(self):
         findings = [

@@ -42,7 +42,10 @@ def test_quiet_reaches_subprocesses_under_json_format_too():
     assert _analyzer_sub_env(args, "json")["ANALYZER_VERBOSITY"] == "summary"
 
 
-@pytest.mark.parametrize("argv", [["bpa", "-q", "-v"], ["bpa", "-v", "--quiet"], ["rdl", "-q", "-vv"], ["all", "-q", "-vv"]])
+@pytest.mark.parametrize(
+    "argv",
+    [["bpa", "-q", "-v"], ["bpa", "-v", "--quiet"], ["rdl", "-q", "-vv"], ["all", "-q", "-vv"]],
+)
 def test_quiet_with_verbose_is_rejected_with_exit_2(argv, capsys):
     """Given -q together with -v, should exit 2 naming the conflict."""
     with pytest.raises(SystemExit) as excinfo:
