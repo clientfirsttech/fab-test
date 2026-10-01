@@ -32,6 +32,7 @@ _WRAPPERS = [
     "invoke_pql_test.py",
     "invoke_pbir_inspector.py",
     "invoke_pqlint.py",
+    "invoke_rdl_lint.py",
 ]
 
 

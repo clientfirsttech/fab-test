@@ -75,7 +75,7 @@ class TestQry02NoCalculatedFields:
         findings = _check_qry02_no_calculated_fields(root, namespace, {})
 
         assert len(findings) == 1
-        assert findings[0]["object"] == "Total"
+        assert findings[0]["object"] == "Sales › Total"
 
     def test_a_plain_datafield_passes(self, tmp_path):
         ds = (
@@ -132,16 +132,16 @@ class TestQry04SortInQuery:
     def test_flags_an_explicit_group_sort(self, tmp_path):
         xml = report(
             '<Body><ReportItems><Tablix Name="T1"><TablixRowHierarchy><TablixMembers>'
-            '<TablixMember><Group Name="G1">'
+            '<TablixMember><Group Name="G1" />'
             "<SortExpressions><SortExpression><Value>=Fields!X.Value</Value></SortExpression></SortExpressions>"
-            "</Group></TablixMember></TablixMembers></TablixRowHierarchy></Tablix></ReportItems></Body>"
+            "</TablixMember></TablixMembers></TablixRowHierarchy></Tablix></ReportItems></Body>"
         )
         root, namespace = parse(tmp_path, xml)
 
         findings = _check_qry04_sort_in_query(root, namespace, {})
 
         assert len(findings) == 1
-        assert findings[0]["object"] == "G1"
+        assert findings[0]["object"] == "T1 › G1"
 
     def test_no_sort_expressions_passes(self, tmp_path):
         xml = report(

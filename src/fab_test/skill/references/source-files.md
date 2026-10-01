@@ -9,7 +9,7 @@
 | `scripts/invoke_pql_test.py` | pql-test subprocess wrapper (venv-aware lookup, native JSON parsing) |
 | `scripts/invoke_pqlint.py` | pqlint subprocess wrapper |
 | `scripts/invoke_rdl_lint.py` | `rdl` CLI wrapper — envelope, `attach_report`, malformed-file handling; the pure rule logic lives in `_rdl_lint.py` |
-| `scripts/_rdl_lint.py` | `rdl`'s rule engine — namespace-agnostic XML parsing, the 28 Tier A rule check functions, the catalog loader, `test_results` builder |
+| `scripts/_rdl_lint.py` | `rdl`'s rule engine — namespace-agnostic XML parsing, the Tier A rule check functions, the catalog loader, `test_results` builder |
 | `scripts/invoke_playwright.py` | Playwright validation wrapper |
 | `scripts/invoke_playwright_impact.py` | Playwright impact manifest builder |
 | `scripts/invoke_playwright_dependencies.py` | Semantic-model dependency discovery wrapper |

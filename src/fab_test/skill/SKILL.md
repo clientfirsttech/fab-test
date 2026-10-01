@@ -29,7 +29,7 @@ Discovery matches on folder suffix (`*.SemanticModel`, `*.Report`), never on con
 | `pytest -m playwright` | Is the Playwright wrapper code correct? (mocked contract tests) |
 | `fab-test playwright` | Do my Power BI reports render without visual-load errors? (requires service-principal credentials) |
 | `pytest -m rdl` | Is the rdl rule engine correct? (always green, no external tool — pure Python) |
-| `fab-test rdl` | Do my paginated (`.rdl`) reports pass the 28 Tier A performance/correctness/accessibility rules? (no external tool required) |
+| `fab-test rdl` | Do my paginated (`.rdl`) reports pass the active performance/correctness/accessibility rules? (no external tool required) |
 
 ## Installation
 
@@ -281,7 +281,7 @@ The case a pipeline meets most is a `detail` populated on an aborted run: `fab-t
  fab-test bpa              — Tabular Editor Best Practice Analyzer (SemanticModel artifacts)
  fab-test pbir             — PBIR Inspector static report analysis (Report artifacts)
  fab-test a11y             — pbir-a11y accessibility checks (Report artifacts) — opt-in, not run by `fab-test all`
- fab-test rdl              — RDL static analysis: 28 Tier A rules for paginated reports (.rdl files) — no external tool
+ fab-test rdl              — RDL static analysis: the active rules for paginated reports (.rdl files) — no external tool
  fab-test pql-test         — pql-test DAX/PQL test runner (SemanticModel artifacts) [alias: pql_test]
  fab-test playwright       — Playwright visual/error validation (Report artifacts)
  fab-test playwright-impact — Build impacted-report manifest from changed artifacts [alias: playwright_impact]

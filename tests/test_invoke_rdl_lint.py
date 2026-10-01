@@ -202,3 +202,64 @@ class TestMain:
         with pytest.raises(SystemExit) as exc_info:
             main()
         assert exc_info.value.code == 0
+
+
+class TestVerboseOutput:
+    """`rdl --verbose` reads like PBIR Inspector's and BPA's: banner, context
+    lines, finding count, then a findings table."""
+
+    @staticmethod
+    def _run(tmp_path: Path, monkeypatch, verbosity: str):
+        artifact, rules_path, output = _write_fixture(tmp_path)
+        rules_path.write_text(
+            json.dumps({"rules": [{"id": "FAKE-01", "name": "n", "severity": "error", "disabled": False}]}),
+            encoding="utf-8",
+        )
+        monkeypatch.setenv("ANALYZER_VERBOSITY", verbosity)
+        CHECKS["FAKE-01"] = lambda _root, _namespace, _rule: [{"object": "DataSet1 › Test", "message": "calc field"}]
+        try:
+            run_rdl_lint(_Args(artifact, rules_path, output))
+        finally:
+            del CHECKS["FAKE-01"]
+
+    def test_verbose_prints_banner_context_count_and_table(self, tmp_path: Path, monkeypatch, capsys):
+        self._run(tmp_path, monkeypatch, "verbose")
+        out = capsys.readouterr().out
+
+        assert "RDL Static Analysis" in out
+        for label in ("Artifact:", "Rules:", "Envelope:", "Native JSON:"):
+            assert label in out
+        assert "1 finding(s) (1 error(s), 0 warning(s))" in out
+        assert "FAKE-01" in out
+        assert "DataSet1 › Test" in out
+        assert "╭" in out
+
+    def test_default_prints_no_table(self, tmp_path: Path, monkeypatch, capsys):
+        self._run(tmp_path, monkeypatch, "default")
+        out = capsys.readouterr().out
+
+        assert "╭" not in out
+        assert "DataSet1 › Test" not in out
+
+
+class TestPlannedRulesAreInvisible:
+    def test_a_clean_run_counts_only_active_rules_and_shows_no_planned_row(self, tmp_path: Path):
+        artifact, rules_path, output = _write_fixture(tmp_path)
+        rules_path.write_text(
+            json.dumps({"rules": [
+                {"id": "FAKE-01", "name": "n", "severity": "error", "disabled": False, "status": "active",
+                 "description": "d"},
+                {"id": "FAKE-02", "name": "n", "severity": "error", "disabled": False, "status": "planned",
+                 "description": "d"},
+            ]}),
+            encoding="utf-8",
+        )
+        CHECKS["FAKE-01"] = lambda _root, _namespace, _rule: []
+        try:
+            run_rdl_lint(_Args(artifact, rules_path, output))
+        finally:
+            del CHECKS["FAKE-01"]
+
+        data = json.loads(output.read_text(encoding="utf-8"))
+        assert [r["rule"] for r in data["test_results"]] == ["FAKE-01"]
+        assert "(1 rule(s)," in data["message"]

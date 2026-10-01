@@ -9,7 +9,7 @@ shared XML builders and why their shape matters.
 import pytest
 
 from fab_test.scripts._rdl_lint import (
-    _check_ds01_shared_data_source,
+    _check_ds01_no_embedded_credentials,
     _check_ds02_unused_datasets,
     _check_ds05_no_select_star,
     _check_ds07_prefer_stored_procedures,
@@ -37,39 +37,37 @@ class TestStr01CurrentSchema:
         assert _check_str01_current_schema(root, namespace, {}) == []
 
 
-class TestDs01SharedDataSource:
+class TestDs01NoEmbeddedCredentials:
     def test_pbidataset_embedded_connection_is_exempt(self, tmp_path):
-        """A bound semantic model has no shared-data-source alternative in
-        Fabric -- PBIDATASET is never flagged for embedding its connection."""
+        """PBIDATASET's connection is always embedded; it is never flagged."""
         source = data_source("DS1", "PBIDATASET", connect_string="Data Source=x")
         xml = report(f"<DataSources>{source}</DataSources>")
         root, namespace = parse(tmp_path, xml)
 
-        assert _check_ds01_shared_data_source(root, namespace, {}) == []
+        assert _check_ds01_no_embedded_credentials(root, namespace, {}) == []
 
-    def test_relational_embedded_connection_is_flagged(self, tmp_path):
+    def test_relational_embedded_connection_is_not_flagged(self, tmp_path):
+        """Power BI paginated reports have no SSRS-style shared data source
+        (.rds), so embedding the connection is the normal shape there."""
         source = data_source("DS1", "SQLAZURE", connect_string="Data Source=sql;Initial Catalog=db")
         xml = report(f"<DataSources>{source}</DataSources>")
         root, namespace = parse(tmp_path, xml)
 
-        findings = _check_ds01_shared_data_source(root, namespace, {})
-
-        assert len(findings) == 1
-        assert "shared data source" in findings[0]["message"]
+        assert _check_ds01_no_embedded_credentials(root, namespace, {}) == []
 
     def test_relational_data_source_reference_is_not_flagged(self, tmp_path):
         source = data_source("DS1", "SQLAZURE", reference="Shared.rsds")
         xml = report(f"<DataSources>{source}</DataSources>")
         root, namespace = parse(tmp_path, xml)
 
-        assert _check_ds01_shared_data_source(root, namespace, {}) == []
+        assert _check_ds01_no_embedded_credentials(root, namespace, {}) == []
 
     def test_embedded_password_is_flagged_without_being_echoed(self, tmp_path):
         source = data_source("DS1", "SQLAZURE", connect_string="Data Source=sql;Password=Sup3rSecret!")
         xml = report(f"<DataSources>{source}</DataSources>")
         root, namespace = parse(tmp_path, xml)
 
-        findings = _check_ds01_shared_data_source(root, namespace, {})
+        findings = _check_ds01_no_embedded_credentials(root, namespace, {})
 
         messages = " ".join(f["message"] for f in findings)
         assert "password" in messages.lower()

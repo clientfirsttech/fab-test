@@ -36,8 +36,12 @@ TEST_HARD = 900
 # test_complexity_budget.py.
 EXEMPTIONS: dict[str, tuple[int, str]] = {
     "src/fab_test/scripts/_rdl_lint.py": (
-        832,
+        881,
         (
+            "2026-09-30: +9 lines for rule status (_is_active; planned rules neither run nor show). "
+            "2026-09-30: +31 lines of location breadcrumbs (_parents, _location) and the real-shape QRY-04 check (RDL Finding Clarity epic; Tier B work should split the module as noted below). "
+            "2026-09-30: +7 lines of finding breadcrumbs (_snippet, _filter_text) so messages quote the offender (RDL Finding Clarity epic). "
+            "2026-09-30: +2 lines carrying a rule's source_urls onto its findings and test_results rows. "
             "2026-09-27: born over the hard budget adding ACC-01/02/03/08, "
             "the eighth and final Tier A rule-implementation task in the RDL "
             "Static Analysis epic -- 28 check functions across six rule "

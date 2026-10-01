@@ -98,7 +98,7 @@ class TestLay03Sub01SubreportInTablix:
 
         assert len(findings) == 1
         assert findings[0]["rule"] == "LAY-03/SUB-01"
-        assert findings[0]["object"] == "Sub1"
+        assert findings[0]["object"] == "T1 › Sub1"
 
     def test_run_checks_produces_one_finding_reported_under_both_catalog_ids(self, tmp_path):
         """End-to-end through run_checks + the catalog: one Subreport in one
@@ -138,7 +138,7 @@ class TestLay03Sub01SubreportInTablix:
         rows_by_rule = {row["rule"]: row for row in rows}
         assert rows_by_rule["LAY-03"]["status"] == "error"
         assert rows_by_rule["SUB-01"]["status"] == "error"
-        assert rows_by_rule["SUB-01"]["object"] == "Sub1"
+        assert rows_by_rule["SUB-01"]["object"] == "T1 › Sub1"
 
     def test_sub01_is_skip_with_its_own_description_when_nothing_fires(self, tmp_path):
         xml = report("<Body />")

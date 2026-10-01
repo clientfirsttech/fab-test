@@ -114,7 +114,7 @@ fab-test pql-test --dry-run
 fab-test bpa --tabular-editor-path "/path/to/TabularEditor.exe"
 fab-test pbir --inspector-path "/path/to/PBIRInspectorCLI"
 fab-test a11y                            # requires Node.js >= 18 + npm the first time (built from source, then cached)
-fab-test rdl                             # 28 Tier A rules for paginated (.rdl) reports -- no external tool
+fab-test rdl                             # active rules for paginated (.rdl) reports -- no external tool; --verbose lists each finding
 fab-test pql-test --env DEV
 ```
 

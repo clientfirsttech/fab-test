@@ -101,7 +101,7 @@ If `npm` or `node` is missing before the first build, `doctor` says which one di
 
 ### rdl
 
-Static analysis for paginated (`.rdl`) reports: 28 Tier A rules covering structure/schema, data sources, query pushdown, parameters, layout/subreports, and accessibility — see [plan/rdl-rule-set.md](../../../../plan/rdl-rule-set.md) for what each rule ID checks. Pure Python on the standard library; **no external tool, no install step** — `doctor` always reports it ready.
+Static analysis for paginated (`.rdl`) reports: the active rules (Tier A rules are enabled once a real fixture verifies each; `status` in the catalog, listed in `docs/RDL-RULES.md`) covering structure/schema, data sources, query pushdown, parameters, layout/subreports, and accessibility — see [plan/rdl-rule-set.md](../../../../plan/rdl-rule-set.md) for what each rule ID checks. Pure Python on the standard library; **no external tool, no install step** — `doctor` always reports it ready. Every finding and `test_results` row carries `source_urls`, the guidance links for its rule (`docs/RDL-RULES.md` lists them all). A finding's `object` is a path (`Dataset › Field`, `Tablix › Textbox`) and its `message` quotes the offending query or expression, so the message alone identifies the offender; a rule that fires on several elements has one `test_results` row per hit. `--verbose` prints a Rule/Severity/Object/Message findings table.
 
 | Flag | Default |
 |------|---------|

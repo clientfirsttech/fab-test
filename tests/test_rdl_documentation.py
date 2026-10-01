@@ -69,7 +69,8 @@ def test_the_agent_skill_documents_the_subcommand_and_rule_count():
     can act on an rdl envelope or tune the catalog."""
     text = _skill_text()
     assert "fab-test rdl" in text
-    assert "28" in text
+    assert "Tier A" in text
+    assert "docs/RDL-RULES.md" in text
     assert "--rdl-rules-path" in text
 
 
@@ -91,3 +92,44 @@ def test_the_agent_skill_documents_the_rule_overlay():
 def test_the_agent_skill_shows_rdl_in_the_fab_test_all_default_list():
     text = _skill_text()
     assert '"rdl"' in text
+
+
+def test_the_rule_reference_is_generated_from_the_catalog():
+    """docs/RDL-RULES.md is generated; a hand edit or a catalog change
+    without regenerating fails here (python tools/generate_rdl_rules_doc.py)."""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("gen", _ROOT / "tools" / "generate_rdl_rules_doc.py")
+    gen = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(gen)
+    assert (_ROOT / "docs" / "RDL-RULES.md").read_text(encoding="utf-8") == gen.render()
+
+
+def test_the_human_readme_points_at_the_rule_reference():
+    assert "docs/RDL-RULES.md" in _README.read_text(encoding="utf-8")
+
+
+def test_every_catalog_rule_has_a_source_link_except_the_untraced_sources():
+    """DS-07 (DMC blog) and LAY-01 (DataTaal guide) cite sources with no
+    known URL; they still need the Microsoft/MSSQLTips link they have."""
+    import json
+
+    rules = json.loads(
+        (_ROOT / "src" / "fab_test" / "metadata" / "rules" / "rdl-rules.json").read_text(encoding="utf-8")
+    )["rules"]
+    for rule in rules:
+        assert rule.get("source_urls"), rule["id"]
+        assert all(u.startswith("https://") for u in rule["source_urls"]), rule["id"]
+
+
+def test_the_rule_reference_explains_how_to_read_a_finding():
+    text = (_ROOT / "docs" / "RDL-RULES.md").read_text(encoding="utf-8")
+    assert "Reading a finding" in text
+    assert "Outer › Inner" in text
+
+
+@pytest.mark.fab_test
+def test_the_agent_skill_explains_finding_paths_and_per_hit_rows():
+    text = _skill_text()
+    assert "Dataset › Field" in text
+    assert "one `test_results` row per hit" in text

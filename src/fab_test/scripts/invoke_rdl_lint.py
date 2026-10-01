@@ -9,6 +9,7 @@ Static Analysis epic and plan/rdl-rule-set.md for what each rule ID means.
 import argparse
 import json
 import os
+import shutil
 import sys
 from pathlib import Path
 
@@ -24,6 +25,7 @@ from ._analyzer_envelope import (
 from ._metadata import RDL_RULES, default_repo_root, metadata_path
 from ._rdl_lint import CHECKS, RdlParseError, build_test_results, load_rule_catalog, parse_rdl, run_checks
 from ._report_html import attach_report
+from ._table_style import findings_table
 
 _VERBOSITY_LEVELS = {"summary": 0, "default": 1, "verbose": 2, "debug": 3}
 
@@ -78,6 +80,35 @@ def write_results(result: WrapperResult, rules_path: Path) -> None:
     write_envelope(result.output_path, env)
 
 
+def _log_run_header(
+    level: int, artifact_stem: str, artifact_path: Path, rules_path: Path, output_path: Path, native_out: Path
+) -> None:
+    """Print the pre-run banner, once verbosity clears the default threshold."""
+    if level < _VERBOSITY_LEVELS["default"]:
+        return
+    log("================================")
+    log(f"RDL Static Analysis  →  {artifact_stem}")
+    log("================================")
+    log(f"📋 Artifact: {artifact_path}")
+    log(f"📏 Rules:    {rules_path}")
+    log(f"📊 Envelope: {output_path}")
+    log(f"📄 Native JSON: {native_out}")
+    log("")
+
+
+def _log_findings(level: int, findings: list[dict], error_count: int, warning_count: int) -> None:
+    """Print the finding count, and the table at --verbose, like PBIR Inspector."""
+    if not findings or level < _VERBOSITY_LEVELS["default"]:
+        return
+    log(f"📊 {len(findings)} finding(s) ({error_count} error(s), {warning_count} warning(s))")
+    if level >= _VERBOSITY_LEVELS["verbose"]:
+        try:
+            width = max(shutil.get_terminal_size().columns, 80)
+        except OSError:
+            width = 120
+        log(findings_table(findings, width))
+
+
 def _severity_counts(findings: list[dict]) -> tuple[int, int]:
     errors = sum(1 for f in findings if f.get("severity") == "error")
     warnings = sum(1 for f in findings if f.get("severity") == "warning")
@@ -100,8 +131,7 @@ def run_rdl_lint(args: argparse.Namespace) -> int:
     native_out.parent.mkdir(parents=True, exist_ok=True)
 
     level = _verbosity()
-    if level >= _VERBOSITY_LEVELS["default"]:
-        log(f"📋 rdl  →  {artifact_stem}")
+    _log_run_header(level, artifact_stem, artifact_path, rules_path, output_path, native_out)
 
     catalog = load_rule_catalog(rules_path)
 
@@ -144,7 +174,7 @@ def run_rdl_lint(args: argparse.Namespace) -> int:
     else:
         skipped = sum(1 for row in test_results if row["status"] == "skip")
         status = "passed"
-        message = f"rdl lint passed with no findings ({len(catalog)} rule(s), {skipped} not yet implemented)"
+        message = f"rdl lint passed with no findings ({len(test_results)} rule(s), {skipped} not yet implemented)"
 
     write_results(
         WrapperResult(
@@ -158,7 +188,9 @@ def run_rdl_lint(args: argparse.Namespace) -> int:
     if level >= _VERBOSITY_LEVELS["default"]:
         icon = "✅" if status == "passed" else ("⚠️" if status == "warning" else "❌")
         log(f"{icon} {message}")
-        log(f"📁 Envelope: {output_path}")
+        log(f"📁 Envelope:    {output_path}")
+        log(f"📄 Native JSON: {native_out}")
+        _log_findings(level, findings, error_count, warning_count)
 
     if error_count:
         print(f"::error::{message}", file=sys.stderr)

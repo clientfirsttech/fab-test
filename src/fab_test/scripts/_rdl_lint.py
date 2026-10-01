@@ -85,6 +85,15 @@ def load_rule_catalog(path: Path) -> list[dict[str, Any]]:
     return data.get("rules", [])
 
 
+def _is_active(rule: dict[str, Any]) -> bool:
+    """A rule runs and shows in results only once verified against a real fixture.
+
+    "planned" rules stay in the catalog as the roadmap but are invisible to
+    a run; a catalog entry with no status (a custom catalog) is active.
+    """
+    return rule.get("status", "active") == "active"
+
+
 # Maps a rule ID to the function that checks it, given a parsed (namespace-
 # stripped) report root. Empty until later RDL Static Analysis epic tasks
 # register the STR/DS/QRY/PRM/LAY/SUB/ACC checks -- a catalog entry with no
@@ -107,7 +116,7 @@ def run_checks(root: ET.Element, namespace: str, catalog: list[dict[str, Any]]) 
     """
     findings: list[Finding] = []
     for rule in catalog:
-        if rule.get("disabled"):
+        if rule.get("disabled") or not _is_active(rule):
             continue
         check = CHECKS.get(rule["id"])
         if check is None:
@@ -117,6 +126,7 @@ def run_checks(root: ET.Element, namespace: str, catalog: list[dict[str, Any]]) 
                 **finding,
                 "rule": finding.get("rule", rule["id"]),
                 "severity": finding.get("severity", rule.get("severity", "warning")),
+                **({"source_urls": rule["source_urls"]} if "source_urls" in rule else {}),
             }
             for finding in check(root, namespace, rule)
         )
@@ -144,6 +154,37 @@ def _dataset_provider(root: ET.Element, query: ET.Element) -> str:
 
 _SIZE_PATTERN = re.compile(r"(?i)^\s*([\d.]+)\s*(in|cm|mm|pt)\s*$")
 _UNIT_TO_INCHES = {"in": 1.0, "cm": 1 / 2.54, "mm": 1 / 25.4, "pt": 1 / 72.0}
+
+
+def _snippet(text: str, width: int = 60) -> str:
+    """Collapse whitespace and cut ``text`` so a message can quote the offender."""
+    flat = " ".join(text.split())
+    return flat if len(flat) <= width else flat[: width - 3] + "..."
+
+
+_NAMED_ITEMS = frozenset({
+    "Tablix", "Textbox", "Chart", "Image", "Subreport", "Rectangle", "GaugePanel", "Map", "Group",
+})
+
+
+def _parents(root: ET.Element) -> dict[ET.Element, ET.Element]:
+    return {child: parent for parent in root.iter() for child in parent}
+
+
+def _location(parents: dict[ET.Element, ET.Element], element: ET.Element) -> str:
+    """Outer > Inner path of the named report items the element sits in or is.
+
+    A top-level item is just its name; one inside a Tablix is "T1 > Tb1".
+    An item with no name anywhere on its path falls back to its element
+    name rather than a bare "?".
+    """
+    names = []
+    node: ET.Element | None = element
+    while node is not None:
+        if node.tag in _NAMED_ITEMS and node.get("Name"):
+            names.append(node.get("Name"))
+        node = parents.get(node)
+    return " › ".join(reversed(names)) or element.tag
 
 
 def _size_in_inches(value: str | None) -> float | None:
@@ -179,14 +220,16 @@ def _check_str01_current_schema(_root: ET.Element, namespace: str, _rule: dict[s
 _CREDENTIAL_PATTERN = re.compile(r"(?i)\b(password|pwd)\s*=")
 
 
-def _check_ds01_shared_data_source(root: ET.Element, _namespace: str, _rule: dict[str, Any]) -> list[Finding]:
+def _check_ds01_no_embedded_credentials(root: ET.Element, _namespace: str, _rule: dict[str, Any]) -> list[Finding]:
+    # Deliberately does NOT ask for a shared data source (DataSourceReference):
+    # Power BI paginated reports don't support SSRS-style shared data sources
+    # (.rds), so an embedded connection is the normal shape there, not a smell.
     findings: list[Finding] = []
     for source in root.findall(".//DataSources/DataSource"):
         name = source.get("Name") or "?"
         conn_props = source.find("ConnectionProperties")
         if conn_props is None:
             continue
-        provider = (conn_props.findtext("DataProvider") or "").strip()
         connect_string = conn_props.findtext("ConnectString") or ""
         if _CREDENTIAL_PATTERN.search(connect_string):
             # Never echo the matched text itself -- only that something
@@ -194,19 +237,9 @@ def _check_ds01_shared_data_source(root: ET.Element, _namespace: str, _rule: dic
             findings.append({
                 "object": name,
                 "message": (
-                    "connect string appears to embed a password; use a shared "
-                    "data source or a secure credential store instead"
+                    "connect string appears to embed a password; use a Power BI "
+                    "cloud connection or the service's credential store instead"
                 ),
-            })
-        # PBIDATASET (a bound semantic model) and PQO (Power Query) are
-        # Power BI's own required embedded-connection shape -- Fabric has
-        # no shared "DataSourceReference" alternative for either, unlike a
-        # classic SSRS SQL/OLEDB connection, so only other providers are
-        # asked to use one.
-        if provider not in _NON_RELATIONAL_PROVIDERS and source.find("DataSourceReference") is None:
-            findings.append({
-                "object": name,
-                "message": "embeds its connection instead of referencing a shared data source (DataSourceReference)",
             })
     return findings
 
@@ -261,14 +294,18 @@ def _check_ds05_no_select_star(root: ET.Element, _namespace: str, _rule: dict[st
                 findings.append({
                     "object": name,
                     "message": (
-                        "EVALUATE of a whole table with no column projection is the "
-                        "DAX equivalent of SELECT * -- project only the columns the report uses"
+                        f"{_snippet(command_text)}: EVALUATE of a whole table with no column "
+                        "projection is the DAX equivalent of SELECT * -- project only the "
+                        "columns the report uses"
                     ),
                 })
         elif provider not in _NON_RELATIONAL_PROVIDERS and _SQL_SELECT_STAR.search(command_text):
             findings.append({
                 "object": name,
-                "message": "SELECT * fetches every column -- list only the columns the report uses",
+                "message": (
+                    f"{_snippet(command_text)}: SELECT * fetches every column -- "
+                    "list only the columns the report uses"
+                ),
             })
     return findings
 
@@ -289,8 +326,8 @@ def _check_ds07_prefer_stored_procedures(root: ET.Element, _namespace: str, _rul
             findings.append({
                 "object": name,
                 "message": (
-                    "uses inline SQL text; a stored procedure gets a cached plan, "
-                    "reuse, and fixes without republishing"
+                    f"{_snippet(command_text)}: inline SQL text; a stored procedure gets a "
+                    "cached plan, reuse, and fixes without republishing"
                 ),
             })
     return findings
@@ -301,6 +338,11 @@ def _check_ds07_prefer_stored_procedures(root: ET.Element, _namespace: str, _rul
 # --------------------------------------------------------------------------- #
 
 
+def _filter_text(filters: ET.Element) -> str:
+    """The filter expressions, quoted, so the message names what is filtered."""
+    return _snippet(", ".join(e.text or "" for e in filters.iter("FilterExpression")))
+
+
 def _check_qry01_filter_in_query(root: ET.Element, _namespace: str, _rule: dict[str, Any]) -> list[Finding]:
     findings: list[Finding] = []
     for dataset in root.findall(".//DataSets/DataSet"):
@@ -309,8 +351,8 @@ def _check_qry01_filter_in_query(root: ET.Element, _namespace: str, _rule: dict[
             findings.append({
                 "object": dataset.get("Name") or "?",
                 "message": (
-                    "DataSet/Filters present -- prefer a WHERE clause or query "
-                    "parameter; a report filter fetches everything first"
+                    f"DataSet/Filters present ({_filter_text(filters)}) -- prefer a WHERE "
+                    "clause or query parameter; a report filter fetches everything first"
                 ),
             })
     for tablix in root.iter("Tablix"):
@@ -319,8 +361,8 @@ def _check_qry01_filter_in_query(root: ET.Element, _namespace: str, _rule: dict[
             findings.append({
                 "object": tablix.get("Name") or "?",
                 "message": (
-                    "Tablix/Filters present -- prefer a WHERE clause or query "
-                    "parameter; a report filter fetches everything first"
+                    f"Tablix/Filters present ({_filter_text(filters)}) -- prefer a WHERE "
+                    "clause or query parameter; a report filter fetches everything first"
                 ),
             })
     return findings
@@ -334,9 +376,9 @@ def _check_qry02_no_calculated_fields(root: ET.Element, _namespace: str, _rule: 
             continue
         findings.extend(
             {
-                "object": field.get("Name") or "?",
+                "object": f"{dataset.get('Name') or '?'} › {field.get('Name') or '?'}",
                 "message": (
-                    "Field has a Value expression instead of DataField -- "
+                    f"calculated field {_snippet(field.findtext('Value') or '')} -- "
                     "move the expression into the query"
                 ),
             }
@@ -379,17 +421,24 @@ def _check_qry03_aggregate_in_query(root: ET.Element, _namespace: str, _rule: di
 
 
 def _check_qry04_sort_in_query(root: ET.Element, _namespace: str, _rule: dict[str, Any]) -> list[Finding]:
+    # Report Builder writes SortExpressions as a sibling of Group inside
+    # TablixMember, and at the Tablix level -- never inside Group.
+    parents = _parents(root)
     findings: list[Finding] = []
-    for group in root.iter("Group"):
-        sort_expressions = group.find("SortExpressions")
-        if sort_expressions is not None and sort_expressions.findall("SortExpression"):
-            findings.append({
-                "object": group.get("Name") or "?",
-                "message": (
-                    "Group has explicit SortExpressions -- an order the query "
-                    "could already provide via ORDER BY"
-                ),
-            })
+    for owner in [*root.iter("TablixMember"), *root.iter("Tablix")]:
+        sort_expressions = owner.find("SortExpressions")
+        if sort_expressions is None or not sort_expressions.findall("SortExpression"):
+            continue
+        group = owner.find("Group") if owner.tag == "TablixMember" else None
+        where = _location(parents, group if group is not None else owner)
+        expressions = ", ".join(e.findtext("Value") or "" for e in sort_expressions.iter("SortExpression"))
+        findings.append({
+            "object": where,
+            "message": (
+                f"sorts by {_snippet(expressions)} in the report -- an order the query "
+                "could already provide via ORDER BY"
+            ),
+        })
     return findings
 
 
@@ -411,7 +460,7 @@ def _check_qry05_convert_types_in_query(root: ET.Element, _namespace: str, _rule
     return [
         {
             "object": field,
-            "message": f"{func}({field}) is repeated across expressions -- cast once in the query",
+            "message": f"{func}({field}) is repeated {count} times across expressions -- cast once in the query",
         }
         for (func, field), count in sorted(counts.items())
         if count >= 2
@@ -422,6 +471,7 @@ _LOOKUP_CALL = re.compile(r"(?i)\b(Lookup|LookupSet|MultiLookup)\s*\(")
 
 
 def _check_qry06_join_in_query(root: ET.Element, _namespace: str, _rule: dict[str, Any]) -> list[Finding]:
+    parents = _parents(root)
     findings: list[Finding] = []
     for element in root.iter():
         text = (element.text or "").strip()
@@ -430,12 +480,11 @@ def _check_qry06_join_in_query(root: ET.Element, _namespace: str, _rule: dict[st
         match = _LOOKUP_CALL.search(text)
         if match is None:
             continue
-        snippet = text if len(text) <= 60 else text[:60] + "..."
         findings.append({
-            "object": snippet,
+            "object": _location(parents, element),
             "message": (
-                f"{match.group(1)}(...) in an expression -- replace with a SQL join, "
-                "or a Power BI semantic model when sources differ"
+                f"{_snippet(text)}: {match.group(1)}(...) in an expression -- replace with a "
+                "SQL join, or a Power BI semantic model when sources differ"
             ),
         })
     return findings
@@ -589,13 +638,14 @@ def _check_lay01_body_fits_page(root: ET.Element, _namespace: str, _rule: dict[s
 
 
 def _check_lay02_avoid_total_pages(root: ET.Element, _namespace: str, _rule: dict[str, Any]) -> list[Finding]:
+    parents = _parents(root)
     findings: list[Finding] = []
     for element in root.iter():
         text = (element.text or "").strip()
         if text.startswith("=") and "Globals!TotalPages" in text:
             findings.append({
-                "object": "Globals!TotalPages",
-                "message": "Globals!TotalPages slows PDF and image rendering",
+                "object": _location(parents, element),
+                "message": f"{_snippet(text)}: Globals!TotalPages slows PDF and image rendering",
             })
     return findings
 
@@ -607,10 +657,11 @@ def _check_lay03_sub01_subreport_in_tablix(
     exact same thing, so this produces one finding per offending
     Subreport, tagged with both IDs, rather than being dispatched twice.
     """
+    parents = _parents(root)
     return [
         {
             "rule": "LAY-03/SUB-01",
-            "object": subreport.get("Name") or tablix.get("Name") or "?",
+            "object": _location(parents, subreport),
             "message": (
                 "Subreport nested inside a Tablix runs once per row -- use a "
                 "nested data region, or a drillthrough link when rows are many"
@@ -622,9 +673,10 @@ def _check_lay03_sub01_subreport_in_tablix(
 
 
 def _check_lay04_interactive_sort(root: ET.Element, _namespace: str, _rule: dict[str, Any]) -> list[Finding]:
+    parents = _parents(root)
     return [
         {
-            "object": textbox.get("Name") or "?",
+            "object": _location(parents, textbox),
             "message": "UserSort on a textbox enables interactive sort -- use only when actually wanted",
         }
         for textbox in root.iter("Textbox")
@@ -635,6 +687,7 @@ def _check_lay04_interactive_sort(root: ET.Element, _namespace: str, _rule: dict
 def _check_lay05_large_reports_page_breaks(
     root: ET.Element, _namespace: str, _rule: dict[str, Any]
 ) -> list[Finding]:
+    parents = _parents(root)
     findings: list[Finding] = []
     for tablix in root.iter("Tablix"):
         groups = list(tablix.iter("Group"))
@@ -643,7 +696,7 @@ def _check_lay05_large_reports_page_breaks(
         has_page_break = any(group.find("PageBreak/BreakLocation") is not None for group in groups)
         if not has_page_break:
             findings.append({
-                "object": tablix.get("Name") or "?",
+                "object": _location(parents, tablix),
                 "message": (
                     "no Group/PageBreak/BreakLocation configured -- nothing shows "
                     "until the whole report renders on a large dataset"
@@ -661,8 +714,9 @@ def _check_lay06_avoid_embedded_images(root: ET.Element, _namespace: str, _rule:
         {"object": embedded.get("Name") or "?", "message": embedded_message}
         for embedded in root.findall(".//EmbeddedImages/EmbeddedImage")
     ]
+    parents = _parents(root)
     findings.extend(
-        {"object": image.get("Name") or "?", "message": inline_message}
+        {"object": _location(parents, image), "message": inline_message}
         for image in root.iter("Image")
         if (image.findtext("Source") or "").strip().lower() == "embedded"
     )
@@ -694,9 +748,10 @@ _ALT_TEXT_ELEMENTS = ("Image", "Chart", "GaugePanel", "Map")
 
 
 def _check_acc01_alt_text(root: ET.Element, _namespace: str, _rule: dict[str, Any]) -> list[Finding]:
+    parents = _parents(root)
     return [
         {
-            "object": element.get("Name") or "?",
+            "object": _location(parents, element),
             "message": f"{tag} has no ToolTip -- screen readers get nothing in the service or Accessible PDF",
         }
         for tag in _ALT_TEXT_ELEMENTS
@@ -709,6 +764,7 @@ _PLACEHOLDER_CHART_NAME = re.compile(r"(?i)^chart\d*$")
 
 
 def _check_acc02_chart_alt_text_quality(root: ET.Element, _namespace: str, _rule: dict[str, Any]) -> list[Finding]:
+    parents = _parents(root)
     findings: list[Finding] = []
     for chart in root.iter("Chart"):
         tooltip = (chart.findtext("ToolTip") or "").strip()
@@ -719,16 +775,17 @@ def _check_acc02_chart_alt_text_quality(root: ET.Element, _namespace: str, _rule
         name = chart.get("Name") or ""
         if tooltip == name or _PLACEHOLDER_CHART_NAME.match(tooltip):
             findings.append({
-                "object": name or "?",
+                "object": _location(parents, chart),
                 "message": f"ToolTip '{tooltip}' looks like a placeholder, not a description of what the chart shows",
             })
     return findings
 
 
 def _check_acc03_table_caption(root: ET.Element, _namespace: str, _rule: dict[str, Any]) -> list[Finding]:
+    parents = _parents(root)
     return [
         {
-            "object": tablix.get("Name") or "?",
+            "object": _location(parents, tablix),
             "message": "Tablix has no ToolTip -- add a caption summarising what the table conveys",
         }
         for tablix in root.iter("Tablix")
@@ -737,6 +794,7 @@ def _check_acc03_table_caption(root: ET.Element, _namespace: str, _rule: dict[st
 
 
 def _check_acc08_html_link_alt_text(root: ET.Element, _namespace: str, _rule: dict[str, Any]) -> list[Finding]:
+    parents = _parents(root)
     findings: list[Finding] = []
     for textbox in root.iter("Textbox"):
         has_html_run = any(
@@ -746,7 +804,7 @@ def _check_acc08_html_link_alt_text(root: ET.Element, _namespace: str, _rule: di
             continue
         if not (textbox.findtext("ToolTip") or "").strip():
             findings.append({
-                "object": textbox.get("Name") or "?",
+                "object": _location(parents, textbox),
                 "message": "renders an HTML TextRun (a hyperlink) but has no ToolTip",
             })
     return findings
@@ -754,7 +812,7 @@ def _check_acc08_html_link_alt_text(root: ET.Element, _namespace: str, _rule: di
 
 CHECKS.update({
     "STR-01": _check_str01_current_schema,
-    "DS-01": _check_ds01_shared_data_source,
+    "DS-01": _check_ds01_no_embedded_credentials,
     "DS-02": _check_ds02_unused_datasets,
     "DS-05": _check_ds05_no_select_star,
     "DS-07": _check_ds07_prefer_stored_procedures,
@@ -795,8 +853,7 @@ def build_test_results(
     own severity as status when it fired, "skip" when it is disabled or
     not yet implemented -- so `normalize_test_results` shows the whole
     catalog, not only whatever happened to produce a finding. When a rule
-    fires on more than one element, only the first hit's object/message is
-    shown here; `findings` itself carries all of them. A row's message is
+    fires on more than one element, each hit gets its own row. A row's message is
     the finding's own text when it fired, or the catalog's rule
     description otherwise -- readable either way, never a bare status word.
 
@@ -811,22 +868,14 @@ def build_test_results(
             hits_by_rule.setdefault(rule_id, []).append(finding)
 
     rows = []
-    for rule in catalog:
+    for rule in filter(_is_active, catalog):
         rule_id = rule["id"]
-        hits = hits_by_rule.get(rule_id)
-        if rule.get("disabled"):
-            status = "skip"
-        elif hits:
-            status = hits[0]["severity"]
-        elif rule_id in implemented:
-            status = "pass"
-        else:
-            status = "skip"
-        rows.append({
-            "rule": rule_id,
-            "severity": rule.get("severity", "warning"),
-            "object": hits[0].get("object", "") if hits else "",
-            "message": hits[0]["message"] if hits else rule.get("description", ""),
-            "status": status,
-        })
+        hits = [] if rule.get("disabled") else hits_by_rule.get(rule_id, [])
+        urls = {"source_urls": rule["source_urls"]} if "source_urls" in rule else {}
+        base = {"rule": rule_id, "severity": rule.get("severity", "warning")}
+        if hits:
+            rows.extend({**base, "object": h.get("object", ""), "message": h["message"], "status": h["severity"], **urls} for h in hits)
+            continue
+        status = "pass" if rule_id in implemented and not rule.get("disabled") else "skip"
+        rows.append({**base, "object": "", "message": rule.get("description", ""), "status": status, **urls})
     return rows

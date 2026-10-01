@@ -218,3 +218,50 @@ class TestBuildTestResults:
         assert rows_by_rule["FAKE-01"]["status"] == "error"
         assert rows_by_rule["FAKE-02"]["status"] == "error"
         assert rows_by_rule["FAKE-02"]["object"] == "x"
+
+
+class TestBuildTestResultsEveryHit:
+    """A rule that fires on several elements shows every offender (RDL
+    Finding Clarity epic) -- not only the first."""
+
+    _CATALOG = [{"id": "FAKE-01", "severity": "error", "disabled": False, "description": "d"}]
+
+    def test_one_row_per_hit(self):
+        findings = [
+            {"rule": "FAKE-01", "severity": "error", "object": "DataSet1", "message": "m1"},
+            {"rule": "FAKE-01", "severity": "error", "object": "DataSet2", "message": "m2"},
+            {"rule": "FAKE-01", "severity": "error", "object": "DataSet3", "message": "m3"},
+        ]
+
+        rows = build_test_results(self._CATALOG, findings, implemented={"FAKE-01"})
+
+        assert [(r["object"], r["message"], r["status"]) for r in rows] == [
+            ("DataSet1", "m1", "error"), ("DataSet2", "m2", "error"), ("DataSet3", "m3", "error"),
+        ]
+
+    def test_each_row_keeps_its_own_hit_severity(self):
+        findings = [
+            {"rule": "FAKE-01", "severity": "error", "object": "a", "message": "m"},
+            {"rule": "FAKE-01", "severity": "warning", "object": "b", "message": "m"},
+        ]
+
+        rows = build_test_results(self._CATALOG, findings, implemented={"FAKE-01"})
+
+        assert [r["status"] for r in rows] == ["error", "warning"]
+
+    def test_a_clean_rule_is_still_exactly_one_row(self):
+        rows = build_test_results(self._CATALOG, [], implemented={"FAKE-01"})
+
+        assert len(rows) == 1
+        assert rows[0]["status"] == "pass"
+
+    def test_source_urls_ride_on_every_hit_row(self):
+        catalog = [{**self._CATALOG[0], "source_urls": ["https://x"]}]
+        findings = [
+            {"rule": "FAKE-01", "severity": "error", "object": "a", "message": "m"},
+            {"rule": "FAKE-01", "severity": "error", "object": "b", "message": "m"},
+        ]
+
+        rows = build_test_results(catalog, findings, implemented={"FAKE-01"})
+
+        assert all(r["source_urls"] == ["https://x"] for r in rows)
