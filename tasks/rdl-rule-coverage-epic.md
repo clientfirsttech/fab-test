@@ -66,3 +66,12 @@ STR-02, LAY-07, SUB-03..SUB-06 and ACC-07 need a template, the network, other re
 
 **Requirements**:
 - Given each rule, should be recorded as deliberately out of scope for static analysis or given its own task, with the reason
+
+---
+
+## Quality gates
+
+Always last; nothing follows it.
+
+**Requirements**:
+- Given the finished epic, should pass `ruff check .` over the whole repo, the complexity and module-budget ratchets, and the coverage floor on the full suite, run as CI runs them (vision.md, Definition of Done)

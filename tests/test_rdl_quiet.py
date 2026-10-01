@@ -36,6 +36,8 @@ def _run(tmp_path: Path, *args: str, artifact: str = "DS-02", env: dict | None =
     artifacts.mkdir(parents=True, exist_ok=True)
     if artifact == "CLEAN":
         (artifacts / "CLEAN.rdl").write_text(_CLEAN, encoding="utf-8")
+    elif artifact == "BROKEN":
+        (artifacts / "BROKEN.rdl").write_text("<Report", encoding="utf-8")
     else:
         shutil.copy(_FIXTURES / f"{artifact}.rdl", artifacts / f"{artifact}.rdl")
     full_env = {
@@ -141,16 +143,7 @@ class TestQuietEdges:
         assert len(lines) == 1 and _QUIET_LINE.match(lines[0]), proc.stdout
 
     def test_a_malformed_report_is_still_one_line_with_an_error_count(self, tmp_path):
-        artifacts = tmp_path / "artifacts"
-        artifacts.mkdir()
-        (artifacts / "Broken.rdl").write_text("<Report", encoding="utf-8")
-        env = {**os.environ, "PYTHONPATH": str(_REPO / "src"), "PYTHONIOENCODING": "utf-8"}
-
-        proc = subprocess.run(
-            [sys.executable, "-m", "fab_test.scripts.fab_test", "rdl", "--artifact-dir", str(artifacts),
-             "--output-dir", str(tmp_path / "out"), "-q"],
-            cwd=tmp_path, env=env, capture_output=True, text=True, encoding="utf-8", check=False, timeout=120,
-        )
+        proc = _run(tmp_path, "-q", artifact="BROKEN")
 
         assert proc.stdout.strip().splitlines()[0].startswith("rdl failed e=1 w=0 ")
         assert proc.returncode == 1

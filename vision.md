@@ -106,7 +106,11 @@ the command I was asked about" is the failure mode, not the verification.
 
 Documentation follows the same three callers as the CLI itself. Shipping for one and not the others leaves the epic incomplete. Close an epic in this order — each step depends on the one before it, so doing them out of order means redoing one:
 
-1. **Ruff** — run `ruff check` over `src/` and fix anything it flags. A build that fails lint after the code is "done" is not done — catching it here is cheaper than catching it in CI.
+1. **Quality gates — always the last task of an epic's plan, run exactly as CI runs them.** A build that fails CI after the code is "done" is not done; catching it here is cheaper. All four, over the whole repository, not only the files the epic touched (an epic's own edits to older test files once failed CI on lint nobody had run there):
+   - `ruff check .` — the whole repo, `tests/` and `tools/` included, not just `src/`.
+   - The complexity ratchet (`tests/test_complexity_budget.py`) with `ruff` installed — it passes vacuously without it — and `tests/test_module_budget.py`.
+   - Coverage: the full suite with `--cov --cov-fail-under=80` (see [How Coverage Is Measured](#how-coverage-is-measured)); never on a narrowed run.
+   - The tests that depend on the environment, run once with `GITHUB_ACTIONS=true CI=true` set, since CI sets them and a local run does not.
 2. **Documentation** — update all three callers together with the `document` skill, so they never drift apart:
 
    | Caller | Deliverable | Where |

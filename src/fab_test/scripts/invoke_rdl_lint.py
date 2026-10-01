@@ -116,6 +116,40 @@ def _severity_counts(findings: list[dict]) -> tuple[int, int]:
     return errors, warnings
 
 
+def _analyze(
+    artifact_path: Path, rules_path: Path
+) -> tuple[list[dict], list[dict], tuple[str, str, str] | None]:
+    """Load the catalog, parse the report and run the checks.
+
+    Returns ``(catalog, findings, failure)``; ``failure`` is ``(rule, object,
+    message)`` when the rules file or the report could not be read, and the
+    findings are empty then.
+    """
+    try:
+        catalog = load_rule_catalog(rules_path)
+    except (OSError, ValueError) as exc:
+        return [], [], ("RULES", rules_path.name, f"could not load rules file {rules_path}: {exc}")
+    try:
+        root, namespace = parse_rdl(artifact_path)
+    except RdlParseError as exc:
+        return catalog, [], ("PARSE", artifact_path.name, str(exc))
+    return catalog, run_checks(root, namespace, catalog), None
+
+
+def _outcome(findings: list[dict], test_results: list[dict]) -> tuple[str, str, int, int]:
+    """Return ``(status, message, error_count, warning_count)`` for a finished run."""
+    error_count, warning_count = _severity_counts(findings)
+    if not findings:
+        checked = sum(1 for row in test_results if row["status"] == "pass")
+        return "passed", f"rdl lint passed with no findings ({checked} rule(s) checked)", 0, 0
+    status = "failed" if error_count else ("warning" if warning_count else "passed")
+    message = (
+        f"rdl lint found {len(findings)} finding(s) "
+        f"(errors: {error_count}, warnings: {warning_count})"
+    )
+    return status, message, error_count, warning_count
+
+
 def run_rdl_lint(args: argparse.Namespace) -> int:
     """Run the RDL static analyzer and return an exit code."""
     artifact_path = validate_path(args.artifact_path, "RDL artifact path")
@@ -134,29 +168,15 @@ def run_rdl_lint(args: argparse.Namespace) -> int:
     level = _verbosity()
     _log_run_header(level, artifact_stem, artifact_path, rules_path, output_path, native_out)
 
-    parse_error: str | None = None
-    error_rule, error_object = "PARSE", artifact_path.name
-    catalog: list[dict] = []
-    findings: list[dict] = []
     with Timer() as timer:
-        try:
-            catalog = load_rule_catalog(rules_path)
-        except (OSError, ValueError) as exc:
-            parse_error = f"could not load rules file {rules_path}: {exc}"
-            error_rule, error_object = "RULES", rules_path.name
-        else:
-            try:
-                root, namespace = parse_rdl(artifact_path)
-            except RdlParseError as exc:
-                parse_error = str(exc)
-            else:
-                findings = run_checks(root, namespace, catalog)
+        catalog, findings, failure = _analyze(artifact_path, rules_path)
 
-    if level >= _VERBOSITY_LEVELS["debug"] and parse_error is None:
+    if level >= _VERBOSITY_LEVELS["debug"] and failure is None:
         planned = sum(1 for rule in catalog if rule.get("status", "active") != "active")
         log(f"🔎 Rules: {len(catalog) - planned} active, {planned} planned (not run)")
 
-    if parse_error is not None:
+    if failure is not None:
+        error_rule, error_object, parse_error = failure
         findings = [{"rule": error_rule, "severity": "error", "object": error_object, "message": parse_error}]
         native_out.write_text(json.dumps(findings, indent=2), encoding="utf-8")
         write_results(
@@ -175,17 +195,7 @@ def run_rdl_lint(args: argparse.Namespace) -> int:
     test_results = build_test_results(catalog, findings, set(CHECKS))
     native_out.write_text(json.dumps(findings, indent=2), encoding="utf-8")
 
-    error_count, warning_count = _severity_counts(findings)
-    if findings:
-        status = "failed" if error_count else ("warning" if warning_count else "passed")
-        message = (
-            f"rdl lint found {len(findings)} finding(s) "
-            f"(errors: {error_count}, warnings: {warning_count})"
-        )
-    else:
-        checked = sum(1 for row in test_results if row["status"] == "pass")
-        status = "passed"
-        message = f"rdl lint passed with no findings ({checked} rule(s) checked)"
+    status, message, error_count, warning_count = _outcome(findings, test_results)
 
     write_results(
         WrapperResult(
