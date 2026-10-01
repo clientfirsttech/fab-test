@@ -31,7 +31,7 @@ For each family (parameters, layout/subreports, accessibility, query/data source
 
 ## Isolating fixtures
 
-`QRY-01.rdl` and `DS-03.rdl` also trip DS-01, DS-02, DS-05 and DS-07.
+`QRY-01.rdl` also trips DS-01, DS-02, DS-05 and DS-07. (The old `DS-03.rdl` was a `SELECT *` file, not a DS-03 fixture, and was removed on 2026-10-01.)
 
 **Requirements**:
 - Given a fixture named for one rule, should trip that rule and, where practical, no unrelated ones
@@ -54,7 +54,7 @@ Add a real `.rdl` per rule, in `.fabric/artifacts/rdl/`, for the 20 planned Tier
 Implement the rules marked B that need richer analysis than a presence check: STR-03, DS-03, DS-04, DS-06, PRM-02, PRM-06, ACC-04, ACC-05, ACC-06.
 
 **Requirements**:
-- Given `DS-03.rdl`, should fire DS-03 and turn the strict xfail in `tests/test_rdl_fixture_rules.py` into a pass
+- Given a real `DS-03.rdl` (a parameter whose valid values come from a dataset), should fire DS-03; a fixture added before its check exists stays a strict xfail in `tests/test_rdl_fixture_rules.py` until the check lands
 - Given each new rule, should be added to `rdl-rules.json` with `source_urls`, a fixture, and an entry in the check table, test-first
 - Given ACC-04, should confirm the saved element name for structure types in a real Report Builder file before checking it
 
