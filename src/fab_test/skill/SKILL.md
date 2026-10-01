@@ -1,6 +1,6 @@
 ---
 name: fab-test
-description: fab-test CLI reference for running Fabric artifact analyzers locally (fab-test 1.9.0b1). Covers all subcommands, flags, artifact isolation, result locations, and how fab-test differs from pytest. Use when invoking, troubleshooting, or extending local artifact validation.
+description: fab-test CLI reference for running Fabric artifact analyzers locally (fab-test 1.9.0b2). Covers all subcommands, flags, artifact isolation, result locations, and how fab-test differs from pytest. Use when invoking, troubleshooting, or extending local artifact validation.
 ---
 
 # fab-test
@@ -44,7 +44,7 @@ From PyPI — the package is **`cft-fab-test`** (the command is still
 pre-releases unless you pass `--pre` or name the version exactly:
 
 ```bash
-pip install "cft-fab-test==1.9.0b1"     # or: pip install --pre cft-fab-test
+pip install "cft-fab-test==1.9.0b2"     # or: pip install --pre cft-fab-test
 ```
 
 Either way this registers the `fab-test` console script. The `.venv` is searched automatically for tool binaries (e.g. `pql-test`) even when not on `PATH`.
@@ -92,7 +92,7 @@ fab-test bpa --format json 2>/dev/null | jq .   # safe to pipe straight into jq
 
 ### Spending fewer tokens: `-q`
 
-A default run states its result several ways for a person to skim. An agent that only needs to know whether it passed should ask for less.
+A default run states its result several ways for a person to skim. An agent that only needs to know whether it passed should ask for less. **Make `-q` the first invocation** and escalate only if it fails: re-run with `-v`, or read the envelope path `-q` prints, to learn why.
 
 ```
 OutputBudget {
