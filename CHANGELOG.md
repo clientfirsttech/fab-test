@@ -2,6 +2,7 @@
 
 ## 2026-10-01
 
+- 📦 - Version `1.9.0b3` - Fourth public beta, carrying the `fab-test rdl` static-analysis work (verified-rules-only, path-and-message findings, verbose table). Install docs and the skill pin the new version.
 - ✨ - `fab-test rdl` Only Runs Verified Rules - Each rule in `rdl-rules.json` is `active` or `planned`; a rule becomes active once a real Report Builder fixture named for it (`.fabric/artifacts/rdl/<RULE-ID>.rdl`) trips it, and planned rules neither run nor appear in results. Eight rules are active (STR-01, DS-02, DS-05, DS-07, QRY-01, QRY-02, QRY-04, ACC-03); the other Tier A rules wait for their fixtures. `docs/RDL-RULES.md` lists every rule with its source links.
 - ✨ - Findings Say Where And What - A finding's `object` is now a path (`Dataset › Field`, `Tablix › Textbox`) and its message quotes the offending query, filter or expression; a rule that fires on several elements has one `test_results` row per hit, and each row carries `source_urls`.
 - ✨ - `rdl` Verbose Output - `fab-test rdl -v` prints a wrapped Rule/Severity/Object/Message table in the house format, each path once, and `-q`/`-vv` follow the shared verbosity ladder.
