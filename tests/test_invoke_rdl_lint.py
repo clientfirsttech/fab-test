@@ -229,10 +229,26 @@ class TestVerboseOutput:
         assert "RDL Static Analysis" in out
         for label in ("Artifact:", "Rules:", "Envelope:", "Native JSON:"):
             assert label in out
-        assert "1 finding(s) (1 error(s), 0 warning(s))" in out
+        assert "found 1 finding(s) (errors: 1, warnings: 0)" in out
+        assert out.count("1 finding(s)") == 1
         assert "FAKE-01" in out
         assert "DataSet1 › Test" in out
         assert "╭" in out
+
+    def test_each_path_is_stated_once_and_rules_only_at_verbose(self, tmp_path: Path, monkeypatch, capsys):
+        self._run(tmp_path, monkeypatch, "default")
+        out = capsys.readouterr().out
+
+        assert out.count("Envelope:") == 1
+        assert out.count("Native JSON:") == 1
+        assert "Rules:" not in out
+
+    def test_verbose_adds_the_rules_path_still_once_each(self, tmp_path: Path, monkeypatch, capsys):
+        self._run(tmp_path, monkeypatch, "verbose")
+        out = capsys.readouterr().out
+
+        assert out.count("Rules:") == 1
+        assert out.count("Envelope:") == 1
 
     def test_default_prints_no_table(self, tmp_path: Path, monkeypatch, capsys):
         self._run(tmp_path, monkeypatch, "default")

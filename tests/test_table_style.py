@@ -44,14 +44,26 @@ class TestFindingsTable:
         assert "Error" in out
         assert "Warning" in out
 
-    def test_a_narrow_terminal_truncates_the_message_not_the_rule(self):
-        long = [{"rule": "DS-05", "severity": "error", "object": "DataSet1", "message": "x" * 300}]
+    def test_a_narrow_terminal_wraps_the_message_instead_of_cutting_it(self):
+        message = "SELECT * FROM PieData: SELECT * fetches every column -- list only the columns the report uses"
+        long = [{"rule": "DS-05", "severity": "error", "object": "DataSet1", "message": message}]
 
         out = findings_table(long, 80)
 
         assert "DS-05" in out
         assert max(len(line) for line in out.splitlines()) <= 80
-        assert "..." in out
+        assert "..." not in out
+        flat = " ".join(" ".join(line.strip("│ ").split()) for line in out.splitlines())
+        for word in message.split():
+            assert word in flat
+
+    def test_a_long_object_path_is_wrapped_too(self):
+        row = [{"rule": "QRY-02", "severity": "warning", "object": "AVeryLongDatasetName › AVeryLongFieldName_" + "x" * 40, "message": "m"}]
+
+        out = findings_table(row, 80)
+
+        assert max(len(line) for line in out.splitlines()) <= 80
+        assert "x" * 40 in "".join(out.replace("│", "").split())
 
     def test_no_findings_is_an_empty_string(self):
         assert findings_table([], 120) == ""

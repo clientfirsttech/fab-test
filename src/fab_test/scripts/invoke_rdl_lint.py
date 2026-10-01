@@ -90,23 +90,23 @@ def _log_run_header(
     log(f"RDL Static Analysis  →  {artifact_stem}")
     log("================================")
     log(f"📋 Artifact: {artifact_path}")
-    log(f"📏 Rules:    {rules_path}")
+    # Identical for every artifact and already in the envelope, so only -v pays for it.
+    if level >= _VERBOSITY_LEVELS["verbose"]:
+        log(f"📏 Rules:    {rules_path}")
     log(f"📊 Envelope: {output_path}")
     log(f"📄 Native JSON: {native_out}")
     log("")
 
 
-def _log_findings(level: int, findings: list[dict], error_count: int, warning_count: int) -> None:
-    """Print the finding count, and the table at --verbose, like PBIR Inspector."""
-    if not findings or level < _VERBOSITY_LEVELS["default"]:
+def _log_findings(level: int, findings: list[dict]) -> None:
+    """Print the findings table at -v; the result line above already counts them."""
+    if not findings or level < _VERBOSITY_LEVELS["verbose"]:
         return
-    log(f"📊 {len(findings)} finding(s) ({error_count} error(s), {warning_count} warning(s))")
-    if level >= _VERBOSITY_LEVELS["verbose"]:
-        try:
-            width = max(shutil.get_terminal_size().columns, 80)
-        except OSError:
-            width = 120
-        log(findings_table(findings, width))
+    try:
+        width = max(shutil.get_terminal_size().columns, 80)
+    except OSError:
+        width = 120
+    log(findings_table(findings, width))
 
 
 def _severity_counts(findings: list[dict]) -> tuple[int, int]:
@@ -188,9 +188,7 @@ def run_rdl_lint(args: argparse.Namespace) -> int:
     if level >= _VERBOSITY_LEVELS["default"]:
         icon = "✅" if status == "passed" else ("⚠️" if status == "warning" else "❌")
         log(f"{icon} {message}")
-        log(f"📁 Envelope:    {output_path}")
-        log(f"📄 Native JSON: {native_out}")
-        _log_findings(level, findings, error_count, warning_count)
+        _log_findings(level, findings)
 
     if error_count:
         print(f"::error::{message}", file=sys.stderr)

@@ -13,6 +13,7 @@ import it without either dragging the other along.
 
 from __future__ import annotations
 
+import textwrap
 from typing import Any
 
 from tabulate import tabulate
@@ -48,6 +49,16 @@ def truncate(text: Any, width: int) -> str:
     return text[: width - 3] + "..." if width > 3 else text[:width]
 
 
+def wrap(text: Any, width: int) -> str:
+    """Fold ``text`` onto lines of at most ``width``, so a cell loses nothing.
+
+    A findings message quotes the offending query or expression; cutting it
+    to fit would throw away the very thing it was written to show.
+    """
+    lines = textwrap.wrap(" ".join(str(text).split()), width, break_long_words=True)
+    return "\n".join(lines) if lines else ""
+
+
 _SEVERITY_ORDER = {"error": 0, "warning": 1}
 
 
@@ -55,8 +66,8 @@ def findings_table(findings: list[dict[str, Any]], terminal_width: int) -> str:
     """Render rule-shaped findings (rule/severity/object/message) as a table.
 
     Errors first, then by rule and object. The message takes whatever width
-    the other columns leave, so a narrow terminal truncates prose rather
-    than the rule ID or the offending object.
+    the other columns leave, and long cells wrap onto further lines rather
+    than being cut.
     """
     if not findings:
         return ""
@@ -87,7 +98,7 @@ def findings_table(findings: list[dict[str, Any]], terminal_width: int) -> str:
     msg_w = max(20, terminal_width - rule_w - sev_w - obj_w - table_padding(4))
     widths = (rule_w, sev_w, obj_w, msg_w)
     return tabulate(
-        [tuple(truncate(cell, w) for cell, w in zip(row, widths)) for row in rows],
+        [tuple(wrap(cell, w) for cell, w in zip(row, widths)) for row in rows],
         headers=("Rule", "Severity", "Object", "Message"),
         tablefmt=TABLE_FORMAT,
         stralign="left",
