@@ -22,8 +22,10 @@ _EXPECTED_KEYS = {
     "jobs",
     "format",
     "timeout",
+    "verbosity",
     "environment",
     "workspace",
+    "playwright_user_name",
 }
 
 # Resolved by metadata layer rather than by flag/env/config, so their origins

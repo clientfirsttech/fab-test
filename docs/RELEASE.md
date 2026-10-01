@@ -12,8 +12,8 @@ Two indexes, two workflows, and they never overlap:
 | Index | TestPyPI | PyPI |
 | Workflow | [`.github/workflows/publish-testpypi.yml`](../.github/workflows/publish-testpypi.yml) | [`.github/workflows/publish.yml`](../.github/workflows/publish.yml) |
 | GitHub environment | `testpypi` | `pypi` |
-| Fires on | `workflow_dispatch`, or a pre-release tag (`v1.0.0.0.dev1`, `v1.0.1rc2`, `v1.0.1b3`) | A final tag only (`v1.0.0` or `v1.0.0.0`) |
-| Guard | — | `check_release_target.py` reads the version out of the built wheel and refuses a pre-release or a tag that disagrees with it |
+| Fires on | `workflow_dispatch`, or a dev tag (`v1.0.0.0.dev1`, `v1.8.1b1.dev2`) | A final tag (`v1.0.0`, `v1.0.0.0`) or a public pre-release tag (`v1.8.1b1`, `v2.0.0a1`, `v1.0.1rc2`) |
+| Guard | — | `check_release_target.py` reads the version out of the built wheel and refuses a dev release or a tag that disagrees with it |
 
 A publish cannot be undone. Both indexes refuse a second upload of a version, so
 a wrong file is the file everyone installs, permanently. That is why the
@@ -38,8 +38,8 @@ add a pending publisher with exactly these values:
 
 | Field | Value |
 |---|---|
-| PyPI Project Name | `fab-test` |
-| Owner | `kerski` |
+| PyPI Project Name | `cft-fab-test` |
+| Owner | `clientfirsttech` |
 | Repository name | `fab-test` |
 | Workflow name | `publish-testpypi.yml` |
 | Environment name | `testpypi` |
@@ -51,16 +51,28 @@ and one environment name different:
 
 | Field | Value |
 |---|---|
-| PyPI Project Name | `fab-test` |
-| Owner | `kerski` |
+| PyPI Project Name | `cft-fab-test` |
+| Owner | `clientfirsttech` |
 | Repository name | `fab-test` |
 | Workflow name | `publish.yml` |
 | Environment name | `pypi` |
 
 Trusted publishing resolves by **distribution name**, not repository name. The
-distribution is `fab-test`; the repository this grew out of was
-`fabric-ci-cd-dataops`. Registering the latter would authorize a project nobody
-is publishing.
+distribution is `cft-fab-test`; the repository is `fab-test`, and the one this
+grew out of was `fabric-ci-cd-dataops`. Registering either repository name
+would authorize a project nobody is publishing.
+
+Why the prefix: PyPI refuses `fab-test` as too similar to the unrelated
+[`fabtest`](https://pypi.org/project/fabtest/) (it compares names with `-`,
+`_`, and `.` stripped). TestPyPI does not run that check, which is why an older
+`fab-test` project exists there; it is abandoned, and nothing publishes to it.
+Only the distribution name changed -- the `fab-test` console script and the
+`fab_test` import package did not.
+
+The owner is the GitHub organization the workflow runs in
+(`clientfirsttech`), not a personal account. A publisher registered under the
+wrong owner fails with `invalid-publisher` even though every other field
+matches.
 
 Also create both GitHub environments (Settings → Environments) with the names
 `testpypi` and `pypi`. A workflow naming an environment that does not exist fails
@@ -108,7 +120,7 @@ python -m venv /tmp/verify
 /tmp/verify/bin/pip install \
   --index-url https://test.pypi.org/simple/ \
   --extra-index-url https://pypi.org/simple \
-  "fab-test==1.0.0.0.dev2"
+  "cft-fab-test==1.0.0.0.dev2"
 
 /tmp/verify/bin/fab-test --version
 /tmp/verify/bin/fab-test doctor --local
@@ -130,8 +142,32 @@ retries for that reason, and a manual install may need the same patience.
   as a broken package and is not one.
 - **The exact pin** — `1.0.0.0.dev2` is a PEP 440 dev release. pip skips
   pre-releases unless you name a version exactly or pass `--pre`, so a bare
-  `pip install fab-test` finds no acceptable version even once the project
+  `pip install cft-fab-test` finds no acceptable version even once the project
   exists.
+
+---
+
+## Cutting a public beta (alpha, beta, rc)
+
+A beta goes to **production PyPI**, where pip hides it from a bare
+`pip install cft-fab-test` and serves it to `--pre` or an exact pin. Only a dev
+release (`.devN`) is refused there.
+
+1. Set `__version__` to the beta (`1.8.1b1`). PEP 440 spelling: no dot or dash
+   before `b1`.
+2. Rehearse it on TestPyPI first by dispatching **Publish to TestPyPI** -- a
+   `b`/`rc` tag no longer reaches that workflow, so dispatch is the only way in.
+3. Tag and push from `main`:
+
+   ```bash
+   git tag v1.8.1b1
+   git push origin v1.8.1b1
+   ```
+
+4. `publish.yml` fires, uploads to PyPI, and creates a GitHub Release marked as
+   a **pre-release**, so it never becomes the repository's "Latest release".
+5. A fix to a beta is the next beta (`1.8.1b2`): PyPI never accepts the same
+   version twice.
 
 ---
 
@@ -146,14 +182,14 @@ retries for that reason, and a manual install may need the same patience.
    ```
 
 3. `publish.yml` fires, runs the same build and metadata checks, then
-   `check_release_target.py` before the upload — it refuses a pre-release version
+   `check_release_target.py` before the upload — it refuses a dev release
    and refuses a tag that disagrees with the wheel. A guard that ran after the
    upload would guard nothing.
 4. On success it publishes to PyPI and creates a GitHub Release with generated
    notes.
-5. Update the README's install section: once the project exists on PyPI,
-   `pip install fab-test` is true for the first time and the "not yet" wording
-   has to go.
+5. Update the README's install section: after the first final release a bare
+   `pip install cft-fab-test` works, so the "beta" wording and the `--pre`
+   advice have to go.
 6. Leave the logo's `raw.githubusercontent.com` URL in the README as an
    absolute link, not a relative one. README.md is the literal
    `long_description` uploaded to both indexes (`readme = "README.md"` in
@@ -173,7 +209,7 @@ resolvable:
     pip install \
       --index-url https://test.pypi.org/simple/ \
       --extra-index-url https://pypi.org/simple \
-      "fab-test==1.4.0.dev1"
+      "cft-fab-test==1.9.0b1"
 
 - name: Check readiness
   run: fab-test doctor --format json
@@ -190,7 +226,7 @@ resolvable:
 ```
 
 After the first final release, drop both index flags and pin normally
-(`pip install "fab-test==1.0.0.0"`).
+(`pip install "cft-fab-test==1.0.0.0"`).
 
 The optional telemetry extras resolve from the same indexes and need the same
 `--extra-index-url` while the package lives on TestPyPI, because their Azure SDK
@@ -202,12 +238,12 @@ either extra alone, or both together for both destinations:
 pip install \
   --index-url https://test.pypi.org/simple/ \
   --extra-index-url https://pypi.org/simple \
-  "fab-test[telemetry]==1.4.2.dev1"
+  "cft-fab-test[telemetry]==1.4.2.dev1"
 
 pip install \
   --index-url https://test.pypi.org/simple/ \
   --extra-index-url https://pypi.org/simple \
-  "fab-test[telemetry,telemetry-lakehouse]==1.4.2.dev1"
+  "cft-fab-test[telemetry,telemetry-lakehouse]==1.4.2.dev1"
 ```
 
 Keep `--artifact-dir` explicit in CI, and see
@@ -262,7 +298,7 @@ jobs:
             await github.rest.issues.create({
               owner: context.repo.owner, repo: context.repo.repo,
               title,
-              body: "A newer fab-test release may carry an updated tool pin. See https://github.com/kerski/fab-test/blob/main/docs/RELEASE.md",
+              body: "A newer fab-test release may carry an updated tool pin. See https://github.com/clientfirsttech/fab-test/blob/main/docs/RELEASE.md",
               labels: ["tool-update"],
             });
 ```

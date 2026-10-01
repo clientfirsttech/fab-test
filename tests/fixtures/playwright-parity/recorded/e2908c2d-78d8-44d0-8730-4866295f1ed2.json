@@ -1,0 +1,41 @@
+{
+  "bookmarks": [
+    {
+      "bookmark_id": "4069a31f88c3cdcda01c",
+      "bookmark_name": "DDC",
+      "page_id": "5da315eb042003e41290"
+    },
+    {
+      "bookmark_id": "abec14a043093db454bd",
+      "bookmark_name": "-DC",
+      "page_id": "5da315eb042003e41290"
+    },
+    {
+      "bookmark_id": "803209fde3ed3bdd1de7",
+      "bookmark_name": "Bookmark 3",
+      "page_id": "c445606db5b0c068b994"
+    },
+    {
+      "bookmark_id": "6e4a4ff3acbc7820197d",
+      "bookmark_name": "---",
+      "page_id": "c445606db5b0c068b994"
+    }
+  ],
+  "dataset_id": "6280b7b2-8b52-4878-81f2-061cc6998499",
+  "golden_csv": "Report with Bookmarks - Broken Visuals.csv",
+  "pages": [
+    {
+      "page_id": "c445606db5b0c068b994",
+      "page_name": "Page A"
+    },
+    {
+      "page_id": "5da315eb042003e41290",
+      "page_name": "Page B"
+    }
+  ],
+  "report_id": "e2908c2d-78d8-44d0-8730-4866295f1ed2",
+  "report_name": "Report with Bookmarks - Broken Visuals",
+  "roles": [],
+  "use_rls": false,
+  "workspace_id": "c4698d28-b05c-40bc-926c-707563ac85e7"
+}

@@ -10,15 +10,48 @@ fab-test all --dry-run --artifact SampleModel-PQLAssert
 
 ## Output Verbosity
 
-`fab-test` honors `-v` / `--verbose` (mirrors `ANALYZER_VERBOSITY`):
+`fab-test` has one verbosity ladder. Three flags, an environment variable, and a config key all name a rung of it:
+
+| Level | Flag | `ANALYZER_VERBOSITY` / `verbosity:` | What it prints |
+|-------|------|-------------------------------------|----------------|
+| `summary` | `-q`, `--quiet` | `summary` | One line per artifact — see below |
+| `default` | (none) | `default` | Banner, result line, and summary per artifact. The Rules and Tool paths, which are the same for every artifact and already in the envelope, are left out |
+| `verbose` | `-v`, `--verbose` | `verbose` | Default plus the Rules and Tool paths and per-finding detail |
+| `debug` | `-vv` | `debug` | Verbose plus the resolved command and the analyzer's stdout/stderr |
 
 ```bash
+fab-test bpa -q              # one line per artifact
 fab-test bpa -v              # per-finding detail
 fab-test pbir -vv            # resolved command + stdout/stderr
 fab-test all --verbose       # same as -v
 ```
 
+Precedence is the same as every other setting: flag > `ANALYZER_VERBOSITY` > `verbosity:` in `fab-test.yml` > default. `-q` and `-v` together exit `2`. `ANALYZER_VERBOSITY` is case-insensitive; the `verbosity:` config value must be lowercase, like `format`, and an unknown value exits `2` naming the four levels.
+
 Result files under `fab-test-results/` are identical regardless of verbosity.
+
+### The `-q` line
+
+```
+<analyzer> <status> e=<errors> w=<warnings> <where>
+```
+
+```
+bpa warning e=0 w=103 fab-test-results/bpa/SampleModel-PQLAssert/envelope.json
+pbir failed e=29 w=1 fab-test-results/pbir/SampleModel-PQLAssert/envelope.json
+playwright failed e=0 w=0 ThinReport
+```
+
+`<analyzer>` is the registry name (`pql_test`, not `pql-test`). `<status>` is `passed`, `warning`, `failed`, or `skipped`. `<where>` is the envelope path relative to the working directory, or the artifact name when the analyzer wrote no envelope — it is last because artifact names contain spaces. Exit codes are unchanged, and a failure the findings cannot explain still prints its remediation above the lines: a missing credential, a timeout, or a crash with no findings. In CI the analyzer's `::error::`/`::warning::` annotations still pass through. When every artifact fails the same check, its message is printed once.
+
+Under `fab-test all`, each analyzer prints its own lines as it finishes and the aggregate table is left out.
+
+To pin it for a repository:
+
+```yaml
+# fab-test.yml
+verbosity: summary
+```
 
 ## Result Locations
 

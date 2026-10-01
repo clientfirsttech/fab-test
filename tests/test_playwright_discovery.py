@@ -8,6 +8,7 @@ BI/Fabric service is invoked.
 from __future__ import annotations
 
 import argparse
+import json
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -18,6 +19,7 @@ from fab_test.scripts.playwright_validation.discovery import (
     _discover_roles,
     acquire_embed_configs,
     resolve_discovery,
+    resolve_paginated_plan,
 )
 from fab_test.scripts.playwright_validation.power_bi_api import (
     EmbedContext,
@@ -247,3 +249,226 @@ def test_acquire_embed_configs_names_the_failing_role() -> None:
         pytest.raises(PowerBiApiError, match="role 'Manager'"),
     ):
         acquire_embed_configs(config, ["Manager"])
+
+
+def test_resolve_discovery_finds_roles_when_an_identity_is_configured() -> None:
+    """Given an effective-identity user but no PLAYWRIGHT_USE_RLS, should still
+    discover roles: a configured identity is what makes role testing possible,
+    and without this a secured model is silently tested under one identity."""
+    config = _config(use_rls=False, user_name="analyst@example.com")
+
+    with (
+        patch(f"{_DISCOVERY}.build_fabric_service_client"),
+        patch(f"{_DISCOVERY}.FabricRestClient") as mock_client,
+    ):
+        mock_client.return_value.get_report_pages.return_value = [
+            {"page_id": "p1", "page_name": "Page 1"}
+        ]
+        mock_client.return_value.get_report_bookmarks.return_value = []
+        mock_client.return_value.get_semantic_model_roles.return_value = ["Team A"]
+        _pages, roles = resolve_discovery(config, _args())
+
+    assert roles == ["Team A"]
+
+
+def test_resolve_discovery_skips_roles_with_neither_rls_nor_an_identity() -> None:
+    """Given no RLS flag and no identity, should not ask for roles -- there is
+    nothing a discovered role could be tested with."""
+    config = _config(use_rls=False, user_name="")
+
+    with (
+        patch(f"{_DISCOVERY}.build_fabric_service_client"),
+        patch(f"{_DISCOVERY}.FabricRestClient") as mock_client,
+    ):
+        mock_client.return_value.get_report_pages.return_value = []
+        mock_client.return_value.get_report_bookmarks.return_value = []
+        resolve_discovery(config, _args())
+
+    mock_client.return_value.get_semantic_model_roles.assert_not_called()
+
+
+def test_resolve_discovery_still_honors_roles_none_with_an_identity() -> None:
+    """--roles none stays the off switch even when an identity is configured."""
+    config = _config(use_rls=True, user_name="analyst@example.com")
+
+    with (
+        patch(f"{_DISCOVERY}.build_fabric_service_client"),
+        patch(f"{_DISCOVERY}.FabricRestClient") as mock_client,
+    ):
+        mock_client.return_value.get_report_pages.return_value = []
+        mock_client.return_value.get_report_bookmarks.return_value = []
+        resolve_discovery(config, _args(roles="none"))
+
+    mock_client.return_value.get_semantic_model_roles.assert_not_called()
+
+
+_QUERY_PARAMETER = {
+    "name": "ReportParameter1",
+    "multi_value": False,
+    "values_query": "EVALUATE SUMMARIZECOLUMNS('Table'[Column B])",
+    "value_column": "Table[Column B]",
+    "static_values": [],
+}
+
+
+def _paginated_client(mock_client, *, dataset_ids=None, definition="", rows=None):
+    mock_client.return_value.get_report_dataset_ids.return_value = dataset_ids or []
+    mock_client.return_value.get_paginated_report_definition.return_value = definition
+    mock_client.return_value.execute_dax_query.return_value = rows or []
+    return mock_client.return_value
+
+
+def test_paginated_plan_resolves_the_dataset_when_no_local_rdl_named_one() -> None:
+    """Given a paginated report with no dataset from a local file, should take
+    the one its datasources name -- or GenerateToken refuses the token."""
+    config = _config(report_type="paginated", dataset_id="")
+
+    with (
+        patch(f"{_DISCOVERY}.build_fabric_service_client"),
+        patch(f"{_DISCOVERY}.FabricRestClient") as mock_client,
+    ):
+        _paginated_client(mock_client, dataset_ids=["ds-remote"])
+        plan = resolve_paginated_plan(config)
+
+    assert plan.dataset_id == "ds-remote"
+    assert plan.parameter_sets == []
+
+
+def test_paginated_plan_keeps_a_dataset_already_known() -> None:
+    """Given a dataset from the local .rdl, should not ask the service again."""
+    config = _config(report_type="paginated", dataset_id="ds-local")
+
+    with (
+        patch(f"{_DISCOVERY}.build_fabric_service_client"),
+        patch(f"{_DISCOVERY}.FabricRestClient") as mock_client,
+    ):
+        client = _paginated_client(mock_client)
+        plan = resolve_paginated_plan(config)
+
+    assert plan.dataset_id == "ds-local"
+    client.get_report_dataset_ids.assert_not_called()
+
+
+def test_paginated_plan_takes_the_first_valid_value_of_a_single_value_parameter() -> None:
+    """Given a single-value parameter whose valid values come from a query,
+    should build one parameter set holding the first value the query returns."""
+    config = _config(
+        report_type="paginated",
+        dataset_id="ds-1",
+        report_parameters=json.dumps([_QUERY_PARAMETER]),
+    )
+
+    with (
+        patch(f"{_DISCOVERY}.build_fabric_service_client"),
+        patch(f"{_DISCOVERY}.FabricRestClient") as mock_client,
+    ):
+        _paginated_client(mock_client, rows=[{"Table[Column B]": 2}, {"Table[Column B]": 4}])
+        plan = resolve_paginated_plan(config)
+
+    assert plan.parameter_sets == [[{"name": "ReportParameter1", "value": "2"}]]
+
+
+def test_paginated_plan_takes_the_first_two_values_of_a_multi_value_parameter() -> None:
+    """Given a multi-value parameter, should repeat its name once per value --
+    the embed SDK's shape for selecting several values of one parameter."""
+    parameter = {**_QUERY_PARAMETER, "multi_value": True}
+    config = _config(
+        report_type="paginated",
+        dataset_id="ds-1",
+        report_parameters=json.dumps([parameter]),
+    )
+
+    with (
+        patch(f"{_DISCOVERY}.build_fabric_service_client"),
+        patch(f"{_DISCOVERY}.FabricRestClient") as mock_client,
+    ):
+        _paginated_client(
+            mock_client,
+            rows=[{"Table[Column B]": 2}, {"Table[Column B]": 4}, {"Table[Column B]": 6}],
+        )
+        plan = resolve_paginated_plan(config)
+
+    assert plan.parameter_sets == [
+        [
+            {"name": "ReportParameter1", "value": "2"},
+            {"name": "ReportParameter1", "value": "4"},
+        ]
+    ]
+
+
+def test_paginated_plan_reads_parameters_from_the_deployed_definition() -> None:
+    """Given no local .rdl, should read the declared parameters from the
+    report's own deployed definition."""
+    config = _config(report_type="paginated", dataset_id="ds-1")
+    definition = """<Report><ReportParameters>
+      <ReportParameter Name="Region"><ValidValues><ParameterValues>
+        <ParameterValue><Value>East</Value></ParameterValue>
+      </ParameterValues></ValidValues></ReportParameter>
+    </ReportParameters></Report>"""
+
+    with (
+        patch(f"{_DISCOVERY}.build_fabric_service_client"),
+        patch(f"{_DISCOVERY}.FabricRestClient") as mock_client,
+    ):
+        client = _paginated_client(mock_client, definition=definition)
+        plan = resolve_paginated_plan(config)
+
+    assert plan.parameter_sets == [[{"name": "Region", "value": "East"}]]
+    client.execute_dax_query.assert_not_called()
+
+
+def test_paginated_plan_keeps_only_the_baseline_when_values_cannot_be_queried() -> None:
+    """Given a valid-values query that fails (commonly the Execute Queries
+    tenant setting being off), should keep the baseline case and warn naming
+    the setting -- never fail the run."""
+    config = _config(
+        report_type="paginated",
+        dataset_id="ds-1",
+        report_parameters=json.dumps([_QUERY_PARAMETER]),
+    )
+
+    with (
+        patch(f"{_DISCOVERY}.build_fabric_service_client"),
+        patch(f"{_DISCOVERY}.FabricRestClient") as mock_client,
+        patch(f"{_DISCOVERY}.log") as log,
+    ):
+        client = _paginated_client(mock_client)
+        client.execute_dax_query.side_effect = ServiceClientError("HTTP 401")
+        plan = resolve_paginated_plan(config)
+
+    assert plan.parameter_sets == []
+    warning = " ".join(str(call.args[0]) for call in log.call_args_list)
+    assert "ReportParameter1" in warning
+    assert "Execute Queries" in warning
+
+
+def test_paginated_plan_skips_a_free_text_parameter() -> None:
+    """Given a parameter with no valid values, should not invent a value."""
+    parameter = {"name": "Notes", "multi_value": False}
+    config = _config(
+        report_type="paginated",
+        dataset_id="ds-1",
+        report_parameters=json.dumps([parameter]),
+    )
+
+    with (
+        patch(f"{_DISCOVERY}.build_fabric_service_client"),
+        patch(f"{_DISCOVERY}.FabricRestClient") as mock_client,
+    ):
+        _paginated_client(mock_client)
+        plan = resolve_paginated_plan(config)
+
+    assert plan.parameter_sets == []
+
+
+def test_paginated_plan_falls_back_when_authentication_fails() -> None:
+    """A client that cannot authenticate leaves the config as it was."""
+    config = _config(report_type="paginated", dataset_id="ds-local")
+
+    with patch(
+        f"{_DISCOVERY}.build_fabric_service_client", side_effect=RuntimeError("offline")
+    ):
+        plan = resolve_paginated_plan(config)
+
+    assert plan.dataset_id == "ds-local"
+    assert plan.parameter_sets == []

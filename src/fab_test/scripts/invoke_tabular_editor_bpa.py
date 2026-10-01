@@ -497,8 +497,10 @@ def _narrate_header(
     log(f"Tabular Editor BPA  →  {artifact_stem}")
     log("================================")
     log(f"📋 Model:   {tmdl_path}")
-    log(f"📏 Rules:   {bpa_rules_path}")
-    log(f"🔧 Tool:    {tabular_editor_path}")
+    # Identical for every artifact and already in the envelope, so only -v pays for them.
+    if _verbosity() >= _VERBOSITY_LEVELS["verbose"]:
+        log(f"📏 Rules:   {bpa_rules_path}")
+        log(f"🔧 Tool:    {tabular_editor_path}")
     log(f"📊 Envelope: {output_path}")
     log(f"📄 Native:  {native_out}")
     log("")
@@ -631,8 +633,6 @@ def run_bpa(args: argparse.Namespace) -> int:
         )
         if level >= _VERBOSITY_LEVELS["default"]:
             log(f"✅ {message}")
-            log(f"📁 Envelope: {output_path}")
-            log(f"📄 Native:   {native_out}")
         return 0
 
     message = _format_bpa_message(findings, test_summary, proc.returncode)

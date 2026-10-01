@@ -1,0 +1,119 @@
+# User journey: run fab-test and learn the result for the fewest tokens
+# Discovery measured on 2026-09-29 against the four .fabric/artifacts fixtures
+# (chars; ~4 chars per token):
+#   bpa 2,777 (ANALYZER_VERBOSITY=summary -> 924) | bpa -v 22,417 | pbir 5,447
+#   local 10,333 (summary -> 2,890) | doctor 1,513 | list 2,106
+#   bpa envelope.json 26-49 KB (findings ~50%, test_results ~43%)
+# Existing seams: ANALYZER_VERBOSITY already has a `summary` level honored by
+# the invoke_* wrappers but unreachable from a flag (_verbosity_env maps only
+# -v/-vv); narrate(quiet=...) in _cli_utils.py exists but is wired to nothing.
+id: o3tm4x418ja9f1mif2300424
+name: Terse CLI Output
+description: >
+  Every caller learns pass/fail, counts, and where to look without paying for
+  the same result three times. An agent in an edit loop gets one line per
+  artifact; default output states each result once; no new subsystem -- one
+  more rung on the existing verbosity ladder.
+createdAt: 1790708179951
+updatedAt: 1790708179951
+personas: [hxl1drwi9gxpwvszy63j5hla, vzm8qmbzgyzjoh0d42xuf7ch, s6ua5spy9sn1snxsdgivqour]
+
+painPoints:
+  - id: wfcbpprnz9dgf8ph97hgy2fc
+    name: Agent pays ~700 tokens per analyzer run to learn pass/fail
+    description: >
+      `fab-test bpa` on two artifacts prints 2,777 chars; `local` prints 10,333.
+      The only terse mode is an undocumented env var, and even it repeats the
+      parent's per-artifact progress plus the summary.
+    impact: 7
+    frequency: 9
+  - id: hgzkl2jcgx3by5slxndb4hh2
+    name: Each result stated three times
+    description: >
+      The analyzer banner ("72 tests, 62 passed..."), the parent's "found N
+      failed" line, and the summary row all say the same thing. pbir and
+      pqlint also print the envelope and native paths twice per artifact, and
+      the Rules/Tool paths are identical absolute paths on every artifact.
+    impact: 5
+    frequency: 10
+  - id: yy4c8s8i6p558h92ugrqoxuj
+    name: Verbose findings cost more and say less
+    description: >
+      `-v` renders a box table that truncates Rule IDs (AVOID_EXCESS...) and
+      shows severity as a bare number, so an agent still has to open a
+      26-49 KB envelope to act.
+    impact: 6
+    frequency: 6
+  - id: hr761x3nuj8qqd3jb5wpgtps
+    name: CI annotations leak into local runs
+    description: >
+      _analyzer_tool_bootstrap.py prints ::notice:: lines unconditionally,
+      though an _is_ci() check exists in the same module.
+    impact: 3
+    frequency: 8
+  - id: oumwsmzstagi3bol4nsts9q1
+    name: Envelopes are large to read
+    description: >
+      RuleName and Category repeat on every finding; test_results carries
+      every passed rule. Parked -- the envelope is a versioned contract and
+      changes must be additive (vision.md backward compat).
+    impact: 5
+    frequency: 4
+
+steps:
+  - id: twq0bo199d42ejqj2e3somk9
+    name: Run an analyzer
+    description: The caller runs `fab-test <analyzer>`, `all`, or `local`, optionally with -q.
+    userStories:
+      - id: r9takxdza14z0n5k2tbqfyqu
+        name: Quiet mode
+        story: As an AI Agent, I want `-q/--quiet` to print one line per artifact (analyzer, status, errors, warnings, envelope path), so that a run costs tens of tokens, not hundreds.
+        painPoint: wfcbpprnz9dgf8ph97hgy2fc
+        priority: 63
+        functionalRequirements:
+          - Given -q, should set ANALYZER_VERBOSITY=summary for the subprocess and suppress the parent's per-artifact progress lines
+          - Given -q with --format json, should leave stdout byte-identical and silence stderr narration only
+          - Given a preflight failure or exit 126/127 under -q, should still print the remediation line
+          - Given `verbosity` in fab-test.yml, should apply it with the existing flag > env > file > default precedence
+          - Given -q and -v together, should reject the combination with exit 2
+        status: { state: released, comment: Terse CLI Output epic, 1.9.0.dev1 }
+      - id: yx1x8w01ydj517qeczb1u9gq
+        name: No CI annotations locally
+        story: "As a Local Developer, I want ::notice:: lines only under CI, so that local output carries only what I need."
+        painPoint: hr761x3nuj8qqd3jb5wpgtps
+        priority: 24
+        functionalRequirements:
+          - Given neither GITHUB_ACTIONS nor CI is set, should print tool-bootstrap notices as plain text or not at all
+          - Given GITHUB_ACTIONS is set, should keep emitting ::notice:: unchanged
+        status: { state: released, comment: Terse CLI Output epic, 1.9.0.dev1 }
+  - id: p6fgg84hsgdtowq9g6x7z5a7
+    name: Read the result
+    description: The caller reads stdout (and, when acting on findings, the envelope).
+    userStories:
+      - id: om5m9efy2g0z1yo869aus48e
+        name: State each result once
+        story: As a CI Pipeline, I want default output to state each artifact's result once and print invariant Rules/Tool paths once per run, so that logs stay short and readable.
+        painPoint: hgzkl2jcgx3by5slxndb4hh2
+        priority: 50
+        functionalRequirements:
+          - Given default verbosity, should print each artifact's result count on one line only
+          - Given every artifact shares a rules file and tool, should print those paths once per analyzer run
+          - Given pbir or pqlint, should print the envelope and native paths once per artifact
+          - Given --format json, should leave stdout unchanged
+        status: { state: released, comment: Terse CLI Output epic, 1.9.0.dev1 }
+      - id: dhv21morqieqh1itjnyvswqx
+        name: Actionable verbose findings
+        story: As an AI Agent, I want -v to group findings by rule with the full rule ID and a named severity, so that I can act without opening the envelope.
+        painPoint: yy4c8s8i6p558h92ugrqoxuj
+        priority: 36
+        functionalRequirements:
+          - Given -v, should never truncate a rule ID
+          - Given -v, should show severity as a name (info, warning, error), not a number
+          - Given several findings for one rule, should list the rule once with its objects beneath it
+        status: { state: backlog, comment: Follow-up after the Terse CLI Output epic }
+      - id: i4ywo1v8g4o5w3u4u4vlbo8t
+        name: Compact envelopes
+        story: As an AI Agent, I want a smaller envelope, so that reading findings costs less.
+        painPoint: oumwsmzstagi3bol4nsts9q1
+        priority: 20
+        status: { state: backlog, comment: Parked -- envelope is a versioned contract; revisit only as an additive schema change }

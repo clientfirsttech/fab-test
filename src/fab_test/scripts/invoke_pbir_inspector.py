@@ -316,8 +316,10 @@ def _log_run_header(
     log(f"PBIR Inspector  →  {artifact_stem}")
     log("================================")
     log(f"📋 Artifact: {artifact_path}")
-    log(f"📏 Rules:    {rules_path}")
-    log(f"🔧 Tool:     {inspector_path}")
+    # Identical for every artifact and already in the envelope, so only -v pays for them.
+    if level >= _VERBOSITY_LEVELS["verbose"]:
+        log(f"📏 Rules:    {rules_path}")
+        log(f"🔧 Tool:     {inspector_path}")
     log(f"📊 Envelope: {output_path}")
     log(f"📄 Native JSON: {native_out}")
     log("")
@@ -475,8 +477,6 @@ def _classify_inspector_result(
 def _log_inspector_outcome(
     outcome: dict[str, Any],
     findings: list[dict[str, Any]],
-    output_path: Path,
-    native_out: Path,
     native_html_out: Path | None,
     level: int,
 ) -> None:
@@ -486,8 +486,6 @@ def _log_inspector_outcome(
     if not findings:
         icon = "✅" if outcome["status"] == "passed" else "❌"
         log(f"{icon} {outcome['message']}")
-    log(f"📁 Envelope:    {output_path}")
-    log(f"📄 Native JSON: {native_out}")
     if native_html_out:
         log(f"📄 Native HTML: {native_html_out}")
     if findings:
@@ -585,7 +583,7 @@ def run_inspector(args: argparse.Namespace) -> int:
         rules_path,
         native_html_out=native_html_out,
     )
-    _log_inspector_outcome(outcome, findings, output_path, native_out, native_html_out, level)
+    _log_inspector_outcome(outcome, findings, native_html_out, level)
 
     if outcome["status"] == "passed":
         return 0

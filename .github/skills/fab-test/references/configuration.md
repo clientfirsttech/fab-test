@@ -30,12 +30,19 @@ If both `fab-test.yml` and `[tool.fab-test]` are present, `fab-test.yml` wins pe
 | `jobs` | integer | — | `1` |
 | `format` | string (`text`\|`json`) | — | `text` |
 | `timeout` | integer | `ANALYZER_TIMEOUT` | `200` |
+| `verbosity` | string (`summary`\|`default`\|`verbose`\|`debug`) | `ANALYZER_VERBOSITY` | `default` — `summary` is `-q`; a `-q`/`-v` flag wins over it. See [Output Verbosity](operations.md#output-verbosity) |
 | `environment` | string | `FABRIC_ENVIRONMENT` | (none) |
 | `workspace` | string | `FABRIC_WORKSPACE_ID` | (none) — display name or GUID |
 | `report` | boolean | `ANALYZER_REPORT` | `false` — see [Reports](reports.md) |
 | `open_report` | boolean | `ANALYZER_OPEN_REPORT` | `false` — implies `report`; no-op under CI — see [Open Report](reports.md#open-report) |
+| `playwright_user_name` | string | `PLAYWRIGHT_USER_NAME` | (none) — effective-identity UPN for RLS embed tokens; only reaches cases that carry a discovered role |
 | `rules` | object | — | (none) — see Rule Overlays below |
 | `telemetry` | object | — | (none) — see Telemetry below |
+
+Declaring `playwright_user_name` is what lets an RLS-secured model be tested
+without a per-run environment variable: with a user configured, `playwright`
+discovers the model's roles and tests the page matrix under each one, minting
+one embed token per role. `PLAYWRIGHT_USER_NAME` still wins over the file.
 
 An unknown key exits `2` naming the key and the closest valid key (e.g. `artifac_dir` → "did you mean 'artifact_dir'?"); a key with the wrong type exits `2` naming the expected type.
 
@@ -110,12 +117,12 @@ Filesystem paths in the payload, including those inside the embedded `results` e
 Prerequisites, each destination reported by its own `fab-test doctor` row:
 
 **Eventhouse (`telemetry-eventhouse` row)**
-- `pip install 'fab-test[telemetry]'` — the Kusto ingest client is **not** in the base package.
+- `pip install 'cft-fab-test[telemetry]'` — the Kusto ingest client is **not** in the base package.
 - Credentials: the same `FABRIC_TENANT_ID` / `FABRIC_SERVICE_PRINCIPAL_ID` / `FABRIC_SERVICE_PRINCIPAL_SECRET` the analyzers use, falling back to `DefaultAzureCredential` when none are set. A *partially* set principal is refused rather than silently falling back. There are no `EVENTHOUSE_*` credential variables.
 - The **Database Ingestor** role on the KQL database. `doctor` never reports it ✅ ready — a resolvable credential is not proof it may ingest, so the row shows `ℹ` with `configured; ingest permission unverified`.
 
 **Lakehouse (`telemetry-lakehouse` row)**
-- `pip install 'fab-test[telemetry-lakehouse]'` — the OneLake (ADLS Gen2) client is **not** in the base package.
+- `pip install 'cft-fab-test[telemetry-lakehouse]'` — the OneLake (ADLS Gen2) client is **not** in the base package.
 - The same service-principal credentials as above; there are no `LAKEHOUSE_*` credential variables either.
 - A workspace role (e.g. Contributor) or a direct share on the Lakehouse item. `doctor` never reports it ✅ ready either — the row shows `ℹ` with `configured; write permission unverified`.
 

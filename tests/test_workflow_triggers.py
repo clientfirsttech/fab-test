@@ -15,8 +15,16 @@ whether the package builds and its tests pass. vision.md already named
 deployment a non-goal, and the reference implementation is a separate
 repository, so they were deleted rather than gated.
 
+`playwright-demo.yml` (Playwright CI Guide epic) is a deliberate, narrow
+exception to that: this repository's one workflow that carries
+service-principal credentials, to demonstrate `fab-test playwright` against
+a real workspace. `workflow_dispatch` only -- never `push`/`pull_request` --
+and gated behind a protected `fabric-demo` GitHub Environment, so the fork-PR
+problem above cannot recur; `tests/test_playwright_workflows_drift.py`
+guards both properties.
+
 What is left is what a package repository needs: build, publish, rehearse,
-and the setup GitHub Copilot's agent reads.
+the setup GitHub Copilot's agent reads, and that one narrow demo.
 
     pytest -m fab_test tests/test_workflow_triggers.py
 """
@@ -37,6 +45,7 @@ _EXPECTED_WORKFLOWS = {
     "publish-testpypi.yml",
     "copilot-setup-steps.yml",
     "check-tool-updates.yml",
+    "playwright-demo.yml",
 }
 
 _SELF_STARTING_TRIGGERS = ("push", "pull_request", "pull_request_target", "schedule")

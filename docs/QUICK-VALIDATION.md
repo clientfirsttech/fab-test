@@ -34,8 +34,8 @@ After the build completes, `dist/` contains both a wheel and a source distributi
 
 ```text
 dist/
-  fab_test-1.0.0-py3-none-any.whl
-  fab_test-1.0.0.tar.gz
+  cft_fab_test-1.0.0-py3-none-any.whl
+  cft_fab_test-1.0.0.tar.gz
 ```
 
 ## Install the wheel in a virtual environment
@@ -45,7 +45,7 @@ Create a fresh virtual environment to test the packaged distribution exactly as 
 ```bash
 python -m venv .venv-test
 source .venv-test/bin/activate  # Windows: .venv-test\Scripts\activate
-pip install dist/fab_test-*.whl
+pip install dist/cft_fab_test-*.whl
 ```
 
 Verify the console scripts are registered:
@@ -126,6 +126,17 @@ fab-test pql-test SampleModel-PQLAssert --env DEV
 ```
 
 `--artifact SampleModel-PQLAssert` still works as a deprecated alias.
+
+### Print only the result: `-q`
+
+```bash
+fab-test bpa -q
+fab-test local -q
+```
+
+One line per artifact — `<analyzer> <status> e=<errors> w=<warnings> <where>` — where `<where>` is the envelope path relative to the working directory (or the artifact name when the analyzer wrote no envelope). About 90% less output than a default run, with the same exit codes and result files. A failure the findings cannot explain still prints its remediation: a missing credential, a timeout, a crash with no findings. `-q` and `-v` together exit `2`.
+
+To pin it for a repository, set `verbosity: summary` in `fab-test.yml`; `-v` on the command line still wins for a single run. See [Configuring fab-test](#configuring-fab-test) for the precedence.
 
 ### Open the HTML report automatically
 
@@ -262,13 +273,23 @@ ambient sign-in cannot do.
 By default this discovers every page, each page's own bookmarks, and (when RLS
 is enabled) every semantic-model role, and tests the full matrix. Beyond the
 `Report.Read` / `Dataset.ReadWrite.All`-equivalent grant embedding already
-needed, the service principal also needs **`Report.Read.All`** (pages,
-bookmarks) and **`SemanticModel.Read.All`** (roles) to discover the matrix — a
-missing grant logs a warning and falls back to testing the single default
-page/role rather than failing the run. Add `--pages none --roles none` to the
-command above to keep the one-case-per-report shape every prior release had.
+needed, the service principal needs the full permission set in
+[docs/PLAYWRIGHT-CI.md](PLAYWRIGHT-CI.md#1-register-the-service-principal) to
+discover the matrix — a missing grant logs a warning and falls back to testing
+the single default page/role rather than failing the run. Add
+`--pages none --roles none` to the command above to keep the
+one-case-per-report shape every prior release had.
 
 See the [Configuration section of the fab-test skill](../.github/skills/fab-test/references/configuration.md#configuration) for the full settings list and rule-overlay keys.
+
+The snippet above is deliberately minimal -- for a complete, copy-ready
+workflow (dispatch inputs, `fab-test doctor` as a fail-fast step, uploading
+results, and a per-case step-summary table), see
+[docs/PLAYWRIGHT-CI.md](PLAYWRIGHT-CI.md) and
+[docs/examples/github-actions/playwright-live.yml](examples/github-actions/playwright-live.yml).
+[This repository's own demo workflow's run history](https://github.com/clientfirsttech/fab-test/actions/workflows/playwright-demo.yml)
+is the working reference for what a real dispatch looks like, both green and
+red.
 
 ### Pipeline snippet: a reviewable report as the build artifact
 
@@ -288,7 +309,7 @@ See the [Configuration section of the fab-test skill](../.github/skills/fab-test
       fab-test-results/index.html
       fab-test-results/**/report.html
       fab-test-results/**/TestRun.html
-      fab-test-results/playwright/test-cases/**
+      fab-test-results/playwright/**/test-cases/**
       fab-test-results/run.json
 ```
 
@@ -324,6 +345,20 @@ The workspace belongs in committed config; only the credentials come from secret
 Spell the workspace out in the target when a job spans more than one, and quote it — display names usually contain spaces. A GUID works in the same position and skips the name lookup. `auth status` is worth running first: it exits `127` before any analyzer starts if the service principal is missing or half-configured, which is a clearer failure than an analyzer timing out against an unreachable workspace.
 
 The resolved target lands in `run.json` under `target`, so an uploaded manifest records whether the job read files on disk or hit a workspace — and which one.
+
+### Pipeline snippet: terse output for a busy log or an agent
+
+A copy-pasteable step whose log holds one line per artifact. Failures still print their remediation, and the analyzer's `::error::` and `::warning::` annotations still reach GitHub as file annotations, so nothing that matters is lost:
+
+```yaml
+- name: Run local analyzers
+  run: fab-test local -q --artifact-dir .fabric/artifacts
+
+# or pin it once for every step and every contributor, in fab-test.yml:
+#   verbosity: summary
+```
+
+Use `--format json 2>/dev/null` instead when a later step needs the fields rather than the verdict; `-q --format json` keeps stdout identical and silences stderr for passing artifacts.
 
 ### Pipeline snippet: doctor as a gate, run.json as the artifact
 
@@ -425,7 +460,7 @@ analyzers already use, and commit the address in `fab-test.yml`.
 
 ```yaml
 - name: Install fab-test with the telemetry extra
-  run: pip install 'fab-test[telemetry]'
+  run: pip install 'cft-fab-test[telemetry]'
 
 - name: Run analyzers
   env:
@@ -522,7 +557,7 @@ telemetry:
 
 ```yaml
 - name: Install fab-test with the Lakehouse telemetry extra
-  run: pip install 'fab-test[telemetry-lakehouse]'
+  run: pip install 'cft-fab-test[telemetry-lakehouse]'
 
 - name: Run analyzers
   env:

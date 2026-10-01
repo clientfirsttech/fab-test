@@ -5,7 +5,7 @@ Packaging task) so this repository's own unit tests
 (``tests/test_playwright_visual.py``) can exercise these functions with
 stubs, while the actual pytest module that runs against a live Fabric
 workspace (``render_spec.py``) ships inside the installed package -- a
-``pip install fab-test`` consumer has no checkout of this repository's
+``pip install cft-fab-test`` consumer has no checkout of this repository's
 ``tests/`` directory for ``invoke_playwright.py`` to point pytest at.
 """
 
@@ -411,51 +411,6 @@ def _scan_for_error_modal(page: Any) -> bool:
     return False
 
 
-def _apply_report_parameters(page: Any, parameters: list[dict[str, Any]]) -> bool:
-    """Select real values for each declared report parameter and submit the
-    panel, driving the report's own rendered parameter combobox the way a
-    person would -- selectors confirmed via live DOM recon against
-    PaginatedExample-WithFilter/-WithMultiFilter: a combobox input
-    (``#{name}-input``), its options (``[id^="{name}-list"]``, with a
-    multi-value combobox's first option titled "Select All"), and a submit
-    button (``[data-testid="parameter-pane-submit-action"]``).
-
-    A report renders clean with no parameter applied -- the error this
-    exists to catch (e.g. a FilterExpression type mismatch) only appears
-    once a real value is actually selected, which nothing before this
-    function ever did. Returns True if any parameter's control was found
-    and interacted with, so the caller knows whether a second render check
-    is warranted at all.
-    """
-    applied = False
-    for parameter in parameters:
-        name = parameter.get("name", "")
-        if not name:
-            continue
-        take = 2 if parameter.get("multi_value") else 1
-        for frame in page.frames:
-            combo_input = frame.locator(f"#{name}-input")
-            if combo_input.count() == 0:
-                continue
-            with contextlib.suppress(Exception):
-                combo_input.first.click(timeout=3000)
-                frame.wait_for_timeout(500)
-                options = frame.locator(f"[id^='{name}-list']").filter(
-                    has_not_text="Select All"
-                )
-                for i in range(min(options.count(), take)):
-                    options.nth(i).click(timeout=3000)
-                page.keyboard.press("Escape")
-                submit = frame.locator(
-                    "[data-testid='parameter-pane-submit-action']"
-                )
-                if submit.count() > 0:
-                    submit.first.click(timeout=3000)
-                applied = True
-            break
-    return applied
-
-
 def _test_paginated_report(page: Any, case: dict[str, str]) -> None:
     """Embed a paginated (RDL) report and fail if an error modal is detected."""
     try:
@@ -469,6 +424,16 @@ def _test_paginated_report(page: Any, case: dict[str, str]) -> None:
 
     config = dict(base_config)
     config["type"] = "report"
+    # A parameterized case renders with its values applied at embed time --
+    # the embed SDK's own parameterValues, a multi-value parameter repeated
+    # once per value -- so it is an independent render, not a second pass
+    # over the baseline's parameter pane.
+    try:
+        parameter_values = json.loads(case.get("report_parameters") or "[]")
+    except json.JSONDecodeError:
+        parameter_values = []
+    if parameter_values:
+        config["parameterValues"] = parameter_values
 
     result_dir = _case_result_dir(case)
     result_dir.mkdir(parents=True, exist_ok=True)
@@ -520,22 +485,6 @@ def _test_paginated_report(page: Any, case: dict[str, str]) -> None:
         page.wait_for_load_state("networkidle", timeout=5000)
 
     error_found = _scan_for_error_modal(page)
-
-    # A clean no-filter render says nothing about a parameter's own
-    # FilterExpression -- that only breaks once a real value is selected,
-    # which the embed above never did. Applying the report's own declared
-    # parameters and re-checking is what catches it (Paginated Report
-    # Parameter Testing epic).
-    if not error_found:
-        try:
-            parameters = json.loads(case.get("report_parameters") or "[]")
-        except json.JSONDecodeError:
-            parameters = []
-        if parameters and _apply_report_parameters(page, parameters):
-            page.wait_for_timeout(rdl_wait_seconds * 1000)
-            with contextlib.suppress(Exception):
-                page.wait_for_load_state("networkidle", timeout=5000)
-            error_found = _scan_for_error_modal(page)
 
     _write_evidence(page, result_dir, console_logs, failed_requests)
 

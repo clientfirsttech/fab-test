@@ -48,6 +48,11 @@ def _is_ci() -> bool:
     return bool(os.environ.get("GITHUB_ACTIONS") or os.environ.get("CI"))
 
 
+def _notice(message: str) -> None:
+    """Print a progress note: a workflow command in CI, plain text elsewhere."""
+    print(f"::notice::{message}" if _is_ci() else message)
+
+
 def _cache_root(repo_root: Path) -> Path:
     return repo_root / ".fab-test-tools"
 
@@ -118,7 +123,7 @@ def _download(url: str, dest: Path, timeout: int = 120) -> None:
             downloaded += len(chunk)
             if _is_ci() and total_int:
                 pct = downloaded * 100 // total_int
-                print(f"::notice::Downloading tool archive: {pct}%")
+                _notice(f"Downloading tool archive: {pct}%")
 
 
 def _verify_checksum(path: Path, expected_sha256: str, analyzer_name: str) -> None:
@@ -582,7 +587,7 @@ def _download_and_cache(
     """Download ``install_url``, verify, extract, cache, and return the executable."""
     install_url_env_var = tool_install.get("install_url_env_var", "")
     source_name = install_url_env_var if _env(install_url_env_var, "") else "analyzers.json"
-    print(f"::notice::{analyzer_name}: executable not found; downloading from {source_name}")
+    _notice(f"{analyzer_name}: executable not found; downloading from {source_name}")
     expected_sha256 = _platform_specific(tool_install, "install_sha256", platform)
     executable_subpath = _platform_specific(tool_install, "executable_subpath", platform)
     with tempfile.TemporaryDirectory() as tmp:
@@ -600,7 +605,7 @@ def _download_and_cache(
             )
         executable = executable.resolve()
         _write_marker(cache_dir, executable)
-        print(f"::notice::{analyzer_name}: resolved executable at {executable}")
+        _notice(f"{analyzer_name}: resolved executable at {executable}")
         return executable
 
 
@@ -697,7 +702,7 @@ def _download_build_and_cache(
     """
     install_url_env_var = tool_install.get("install_url_env_var", "")
     source_name = install_url_env_var if _env(install_url_env_var, "") else "analyzers.json"
-    print(f"::notice::{analyzer_name}: executable not found; building from source ({source_name})")
+    _notice(f"{analyzer_name}: executable not found; building from source ({source_name})")
     expected_sha256 = tool_install.get("install_sha256")
     build_entrypoint = tool_install.get("build_entrypoint", "")
     extract_dir = cache_dir / "extracted"
@@ -718,7 +723,7 @@ def _download_build_and_cache(
         raise
     entrypoint = entrypoint.resolve()
     _write_marker(cache_dir, entrypoint)
-    print(f"::notice::{analyzer_name}: built entry point at {entrypoint}")
+    _notice(f"{analyzer_name}: built entry point at {entrypoint}")
     return entrypoint
 
 

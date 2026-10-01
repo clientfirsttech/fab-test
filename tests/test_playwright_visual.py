@@ -8,7 +8,7 @@ Power BI clients -- no real Fabric workspace or embed token. The pytest
 module that actually runs against a live workspace,
 `fab_test.scripts.playwright_validation.render_spec`, ships inside the
 installed package rather than under `tests/` (Playwright CI Guide epic,
-Render Spec Packaging task) so a `pip install fab-test` consumer has
+Render Spec Packaging task) so a `pip install cft-fab-test` consumer has
 something for `invoke_playwright.py` to point pytest at.
 
     pytest -m playwright tests/test_playwright_visual.py
@@ -112,49 +112,19 @@ def test_paginated_report_records_pass_when_no_error_modal_found(
     assert result["status"] == "pass"
 
 
-def _stub_powerbi_embed_with_parameter_panel(
-    page: Any, *, param_name: str = "ReportParameter1", multi_value: bool = False
-) -> None:
-    """Replace the real Power BI JS client and, on embed, render a fake
-    parameter panel that mimics the real Fluent UI structure found via live
-    DOM recon against PaginatedExample-WithFilter/-WithMultiFilter: a
-    combobox input (``#{name}-input``), its options
-    (``[id^="{name}-list"]``, a multi-value combobox's first option titled
-    "Select All"), and a submit button
-    (``[data-testid="parameter-pane-submit-action"]``). Selecting the
-    fake "2" option injects the error modal, simulating a filter value that
-    only fails once actually applied -- the initial no-filter render stays
-    clean.
+def _stub_powerbi_embed_failing_on_parameters(page: Any) -> None:
+    """Replace the real Power BI JS client with one that records the embed
+    config it was given, and injects the error modal only when that config
+    carries ``parameterValues`` -- a report that renders clean unfiltered and
+    breaks once a real value is applied, like PaginatedExample-WithMultiFilter.
     """
-    options_html = (
-        f"<div id='{param_name}-list0'>Select All</div>"
-        f"<div id='{param_name}-list1'>2</div>"
-        f"<div id='{param_name}-list2'>4</div>"
-        if multi_value
-        else f"<div id='{param_name}-list0'>2</div>"
-        f"<div id='{param_name}-list1'>4</div>"
-    )
-    panel_html = (
-        f"<input id='{param_name}-input' />"
-        f"<div id='{param_name}-options' style='display:none'>{options_html}</div>"
-        "<button data-testid='parameter-pane-submit-action'>View report</button>"
-    )
     page.add_init_script(
-        "window.powerbi = { embed: () => {"
-        f"document.body.insertAdjacentHTML('beforeend', {json.dumps(panel_html)});"
-        f"const opts = document.getElementById('{param_name}-options');"
-        "document.getElementById("
-        f"'{param_name}-input').addEventListener('click', () => {{"
-        "opts.style.display = 'block';"
-        "});"
-        "opts.querySelectorAll('div').forEach((opt) => {"
-        "opt.addEventListener('click', () => {"
-        "if (opt.textContent === '2') {"
+        "window.powerbi = { embed: (el, config) => {"
+        "window.__embedConfig = config;"
+        "if (config.parameterValues && config.parameterValues.length) {"
         "document.body.insertAdjacentHTML('beforeend', "
         "\"<div class='ms-Dialog-content'>Something went wrong</div>\");"
         "}"
-        "});"
-        "});"
         "} };"
     )
     page.route(
@@ -163,73 +133,53 @@ def _stub_powerbi_embed_with_parameter_panel(
     )
 
 
-def test_paginated_report_applies_a_single_value_parameter_and_catches_a_filter_error(
+def test_paginated_case_passes_its_parameter_set_at_embed_time(
     page, tmp_path: Path, monkeypatch
 ) -> None:
-    """A report that renders clean with no filter, but declares a
-    single-value parameter, gets that parameter applied and re-checked --
-    catching an error that only the filtered render exposes."""
+    """Given a parameterized case, should hand its values to the embed as
+    ``parameterValues`` -- the render is its own case, not a second pass
+    clicking the parameter pane -- and fail on the error that render shows."""
     monkeypatch.setenv("PLAYWRIGHT_RESULTS_ROOT", str(tmp_path))
     monkeypatch.setenv("PLAYWRIGHT_EMBED_CONFIG", json.dumps({"accessToken": "t"}))
-    _stub_powerbi_embed_with_parameter_panel(page, multi_value=False)
+    _stub_powerbi_embed_failing_on_parameters(page)
+    parameter_set = [
+        {"name": "ReportParameter1", "value": "2"},
+        {"name": "ReportParameter1", "value": "4"},
+    ]
 
     case = {
-        "test_case": "WithFilter",
+        "test_case": "WithMultiFilter_params",
         "report_type": "paginated",
         "render_wait_seconds": "1",
-        "report_parameters": json.dumps(
-            [{"name": "ReportParameter1", "multi_value": False}]
-        ),
+        "report_parameters": json.dumps(parameter_set),
     }
 
     with pytest.raises(pytest.fail.Exception, match="RDL error modal detected"):
         _test_paginated_report(page, case)
 
-    result = json.loads((_case_result_dir(case) / "result.json").read_text(encoding="utf-8"))
-    assert result["status"] == "error"
+    assert page.evaluate("() => window.__embedConfig.parameterValues") == parameter_set
 
 
-def test_paginated_report_applies_a_multi_value_parameter_skipping_select_all(
+def test_paginated_baseline_case_embeds_with_no_parameter_values(
     page, tmp_path: Path, monkeypatch
 ) -> None:
-    """A multi-value parameter's "Select All" option is skipped -- the first
-    two real values are picked instead."""
+    """Given a baseline case, should embed with no ``parameterValues`` at all,
+    and pass on a clean render -- its parameterized sibling is what tests
+    the values."""
     monkeypatch.setenv("PLAYWRIGHT_RESULTS_ROOT", str(tmp_path))
     monkeypatch.setenv("PLAYWRIGHT_EMBED_CONFIG", json.dumps({"accessToken": "t"}))
-    _stub_powerbi_embed_with_parameter_panel(page, multi_value=True)
+    _stub_powerbi_embed_failing_on_parameters(page)
 
     case = {
         "test_case": "WithMultiFilter",
         "report_type": "paginated",
         "render_wait_seconds": "1",
-        "report_parameters": json.dumps(
-            [{"name": "ReportParameter1", "multi_value": True}]
-        ),
-    }
-
-    with pytest.raises(pytest.fail.Exception, match="RDL error modal detected"):
-        _test_paginated_report(page, case)
-
-
-def test_paginated_report_with_no_declared_parameters_only_scans_once(
-    page, tmp_path: Path, monkeypatch
-) -> None:
-    """No declared parameters -- behavior is unchanged: embed, wait, scan
-    once. A clean render passes even though the stub's parameter panel
-    (never opened) would have injected an error if clicked."""
-    monkeypatch.setenv("PLAYWRIGHT_RESULTS_ROOT", str(tmp_path))
-    monkeypatch.setenv("PLAYWRIGHT_EMBED_CONFIG", json.dumps({"accessToken": "t"}))
-    _stub_powerbi_embed_with_parameter_panel(page, multi_value=False)
-
-    case = {
-        "test_case": "NoParameters",
-        "report_type": "paginated",
-        "render_wait_seconds": "1",
-        "report_parameters": "",
+        "report_parameters": "[]",
     }
 
     _test_paginated_report(page, case)
 
+    assert page.evaluate("() => 'parameterValues' in window.__embedConfig") is False
     result = json.loads((_case_result_dir(case) / "result.json").read_text(encoding="utf-8"))
     assert result["status"] == "pass"
 

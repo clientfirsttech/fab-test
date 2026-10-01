@@ -1,58 +1,68 @@
 # fab-test
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/kerski/fab-test/main/docs/images/fab-test-logo.png" alt="fab-test logo" width="200">
+  <img src="https://github.com/clientfirsttech/fab-test/blob/main/docs/images/fab-test-logo.png?raw=true" alt="fab-test logo" width="400">
 </p>
 
 **The Power BI tooling ecosystem is scattered: Tabular Editor's BPA, PBIR Inspector, DAX tests, Playwright, each with its own install, its own invocation, its own output format.** `fab-test` brings them together behind one CLI and one result contract, so it doesn't matter who's asking: a developer running a quick local check, a CI/CD build agent gating a deployment, or an AI coding agent that needs a single command and a machine-readable verdict it can act on. Point it at a `.pbip`-format artifact and get the same validation everywhere: Best Practice Analyzer rules, PBIR report structure, DAX tests, and rendered-report checks, all through one command with a pass/fail answer trustworthy for human and machine alike.
 
 ## Install
 
-### From PyPI (not yet)
+The package is **`cft-fab-test`**; the command it installs is **`fab-test`**.
+PyPI refuses the name `fab-test` as too similar to the unrelated
+[`fabtest`](https://pypi.org/project/fabtest/), so only the distribution name
+carries the prefix -- the console script, the `fab_test` import package, and
+every command in this README are unchanged.
 
-`pip install fab-test` does not work today. The name is unregistered on PyPI, so
-that command finds nothing. Until the first final release, use TestPyPI below, a
-locally built wheel, or an editable checkout.
+### From PyPI (beta)
 
-### From TestPyPI (pre-release)
-
-The current pre-release is `1.4.0.dev1`. Two things about the command below are
-not optional:
-
-- **`--extra-index-url https://pypi.org/simple`.** TestPyPI does not carry
-  `pql-test==0.1.17`; it has 0.1.11. Without the production index alongside
-  it, the install fails to resolve that dependency, not because anything is
-  wrong with `fab-test`.
-- **The exact pin.** `1.4.0.dev1` is a PEP 440 dev release, and pip skips
-  pre-releases unless you name one or pass `--pre`. A bare `pip install fab-test`
-  against TestPyPI finds no acceptable version.
+The current release is the beta `1.9.0b1`. pip skips pre-releases unless you
+pass `--pre` or name the version, so a bare `pip install cft-fab-test` finds
+nothing until the first final release.
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
 
-pip install \
-  --index-url https://test.pypi.org/simple/ \
-  --extra-index-url https://pypi.org/simple \
-  "fab-test==1.4.0.dev1"
+pip install --pre cft-fab-test          # or pin it: "cft-fab-test==1.9.0b1"
 
 fab-test --version
 ```
 
-TestPyPI is a rehearsal index, not a distribution channel; treat anything
-installed from it as disposable.
+In a pipeline, pin the exact version rather than `--pre`: `--pre` also lets
+pre-releases of *dependencies* in, not only this package.
 
 ### From source in editable mode (developers)
 
 Editable mode links the package source into the active environment so code changes are reflected immediately.
 
 ```bash
-git clone https://github.com/kerski/fab-test.git
+git clone https://github.com/clientfirsttech/fab-test.git
 cd fab-test
 python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -e .
 ```
+
+To contribute, install the dev extras and the git hooks. The pre-commit hook runs [gitleaks](https://github.com/gitleaks/gitleaks) and blocks any commit whose staged changes contain a secret:
+
+```bash
+pip install -e ".[dev]"
+pre-commit install
+```
+
+Then create your own `fab-test.yml` at the repo root. It is gitignored: it
+holds per-contributor values, such as the UPN `fab-test playwright` uses for
+RLS embed tokens, that must never be committed.
+
+```bash
+fab-test init            # scaffolds a commented fab-test.yml (and .fab-test/.env.example)
+```
+
+Uncomment only what you need. For the Playwright RLS tests, set
+`playwright_user_name` to a user in your own dev tenant (or export
+`PLAYWRIGHT_USER_NAME` instead, which wins over the file). Run
+`fab-test config --show` to confirm what is in effect.
 
 ### From a locally built wheel
 
@@ -68,7 +78,7 @@ Create a fresh virtual environment, activate it, and install the wheel:
 ```bash
 python -m venv .venv-test
 source .venv-test/bin/activate  # Windows: .venv-test\Scripts\activate
-pip install dist/fab_test-*.whl
+pip install dist/cft_fab_test-*.whl
 ```
 
 Verify the console scripts are registered:
@@ -102,7 +112,7 @@ A folder is an artifact because its name ends in a Fabric type suffix:
 CI rather than opened in Desktop: `deployed/Sales.SemanticModel` on its own
 is found.
 
-The suffixes come from [`artifact-map.json`](https://github.com/kerski/fab-test/blob/main/src/fab_test/metadata/artifact-map.json),
+The suffixes come from [`artifact-map.json`](https://github.com/clientfirsttech/fab-test/blob/main/src/fab_test/metadata/artifact-map.json),
 packaged with the distribution so an install outside this repository knows
 what an artifact looks like. A `.fab-test/metadata/artifact-map.json` (or
 the legacy `.github/metadata/artifact-map.json`) overrides it when present.
@@ -162,7 +172,7 @@ fab-test local --dry-run    # see the plan first
 fab-test local              # BPA, PBIR Inspector, and Desktop-bound pql-test
 ```
 
-A missing prerequisite (e.g. `pqlint` not installed) is reported as skipped with a remediation hint, not a failure. Likewise, if Power BI Desktop is not open, `pql-test` cannot reach the model and no DAX tests execute — that artifact reports `warning` with zero counts and exits 0, rather than a misleading `failed` or a green `passed` over a run in which nothing happened. See [`docs/QUICKSTART-LOCAL.md`](https://github.com/kerski/fab-test/blob/main/docs/QUICKSTART-LOCAL.md) for the full walkthrough.
+A missing prerequisite (e.g. `pqlint` not installed) is reported as skipped with a remediation hint, not a failure. Likewise, if Power BI Desktop is not open, `pql-test` cannot reach the model and no DAX tests execute — that artifact reports `warning` with zero counts and exits 0, rather than a misleading `failed` or a green `passed` over a run in which nothing happened. See [`docs/QUICKSTART-LOCAL.md`](https://github.com/clientfirsttech/fab-test/blob/main/docs/QUICKSTART-LOCAL.md) for the full walkthrough.
 
 ### Wrapper contract tests with pytest
 
@@ -229,6 +239,37 @@ fab-test playwright --dataset-id <DATASET_GUID> --dataset-workspace-id <WORKSPAC
 fab-test dependencies --semantic-model SalesModel --env dev --env-file .env
 ```
 
+### Keep the output short: `-q`
+
+A default run explains itself for a person: a banner, a result line, and a summary per artifact. When you only need to know whether it passed (an AI agent in an edit loop, a busy CI log), add `-q`:
+
+```console
+$ fab-test bpa -q
+bpa warning e=0 w=25 fab-test-results/bpa/Report with Bookmarks - Broken Visuals/envelope.json
+bpa warning e=0 w=103 fab-test-results/bpa/SampleModel-PQLAssert/envelope.json
+```
+
+One line per artifact: `<analyzer> <status> e=<errors> w=<warnings> <where>`, where `<where>` is the envelope with the findings. Exit codes and every file under `fab-test-results/` are unchanged, and a failure still says why: a missing credential, a timeout, or a crash prints its message above the lines.
+
+| Command | Before | Default now | `-q` |
+|---------|-------:|------------:|-----:|
+| `fab-test bpa` | 2,569 chars | 1,935 | 176 |
+| `fab-test pbir` | 5,195 | 3,043 | 324 |
+| `fab-test a11y` | 4,089 | 2,901 | 320 |
+| `fab-test pql-test` | 2,086 | 1,678 | 193 |
+| `fab-test local` | 9,850 | 6,656 | 693 |
+
+*Measured against this repository's four sample artifacts.* Default output got shorter too: each path is named once, and the Rules and Tool paths (the same for every artifact, and already in the envelope) appear only with `-v`.
+
+To make a repository terse for everyone who runs it, pin the level once instead of passing a flag:
+
+```yaml
+# fab-test.yml
+verbosity: summary      # summary | default | verbose | debug
+```
+
+A flag beats the environment variable (`ANALYZER_VERBOSITY`), which beats the file, so `fab-test bpa -v` still gives you the full output for one run. `-q` and `-v` together exit `2`. See [Output Verbosity](https://github.com/clientfirsttech/fab-test/blob/main/.github/skills/fab-test/references/operations.md#output-verbosity) for the levels.
+
 ### Playwright: the minimal working config
 
 Every other analyzer can fall back to `az login`; `playwright` cannot --
@@ -269,7 +310,7 @@ A run with 5 report x page x bookmark cases and 1 real failure now says so:
 `envelope.json`'s `test_results` carries one row per case with that case's own
 real outcome, so `findings` names only the case that actually failed instead of
 tagging all 5 identically. Each row also points at that case's own evidence
-(`fab-test-results/playwright/test-cases/<case>/screenshot.png`, plus
+(`fab-test-results/playwright/<report>/test-cases/<case>/screenshot.png`, plus
 `console.json`/`network.json` when there's something to capture) and links
 straight back to the report page/bookmark it validated on `app.powerbi.com`;
 `--report` renders both as links right in the table, and the same paths are in
@@ -283,15 +324,28 @@ any text it finds to `embed_error_details.txt` and folding it into the
 failure message -- so `envelope.json` names a permissions/token-scope problem
 instead of restating "did not render within 180000ms".
 
+**Running this in CI** is a separate setup from the local config above --
+service principal registration, tenant settings, workspace role, and the
+GitHub Environment/secrets a workflow reads. See
+[docs/PLAYWRIGHT-CI.md](https://github.com/clientfirsttech/fab-test/blob/main/docs/PLAYWRIGHT-CI.md)
+for the full walkthrough and
+[docs/examples/github-actions/playwright-live.yml](https://github.com/clientfirsttech/fab-test/blob/main/docs/examples/github-actions/playwright-live.yml)
+for a copy-ready workflow.
+
 ### Playwright tests every page, bookmark, and role by default
 
 `fab-test playwright` discovers a report's pages, each page's own bookmarks,
-and (when RLS is enabled) the semantic model's roles, and tests the full
-matrix, not just whichever tab opens first. Discovery needs `Report.Read.All`
-and `SemanticModel.Read.All` on the service principal in addition to what
-embedding already required; a missing grant logs a warning and falls back to
-testing the one default page rather than failing the run. Turn a dimension off
-with `--pages none` / `--roles none`:
+and (when RLS is in play) the semantic model's roles, and tests the full
+matrix, not just whichever tab opens first. It expands to one case per page,
+plus one per that page's *own* bookmark, repeated once per role -- a report
+with 2 pages, 1 bookmark on the first and 2 on the second, under 2 roles, is
+10 cases. Discovery needs the full
+permission set in
+[docs/PLAYWRIGHT-CI.md](https://github.com/clientfirsttech/fab-test/blob/main/docs/PLAYWRIGHT-CI.md#1-register-the-service-principal)
+on the service principal in addition to what embedding already required; a
+missing grant logs a warning and falls back to testing the one default page
+rather than failing the run. Turn a dimension off with `--pages none` /
+`--roles none`:
 
 ```bash
 # Every page, every page's bookmarks, every role
@@ -299,7 +353,22 @@ fab-test playwright --artifact "Not Working Visuals" --env dev
 
 # Only the default page/role, matching every prior release
 fab-test playwright --artifact "Not Working Visuals" --env dev --pages none --roles none
+
+# See the matrix without rendering it: writes test-cases.csv/json and exits 0,
+# minting no embed token and launching no browser
+fab-test playwright --artifact "Not Working Visuals" --env dev --plan-only
 ```
+
+Role discovery needs an effective-identity user to embed with. Declare it once
+in `fab-test.yml` instead of setting `PLAYWRIGHT_USER_NAME` per run:
+
+```yaml
+playwright_user_name: analyst@contoso.com
+```
+
+With a user configured, an RLS-secured model's roles are discovered and tested
+under one embed token each. `PLAYWRIGHT_USER_NAME` still wins over the file, and
+a case with no role embeds with no identity at all.
 
 ### Validating a paginated (RDL) report
 
@@ -312,15 +381,28 @@ alongside `NAME.Report` folders, and `--artifact NAME --env ENV` with no local
 match tries Fabric's `Report` item type first, then `PaginatedReport`, using
 whichever actually matches the name. If the report is bound to a Power BI
 dataset, its dataset ID and workspace are read straight out of the `.rdl`
-file's own `<DataSources>` block, too -- no GUID to look up and supply by hand.
+file's own `<DataSources>` block -- or, for a report that exists only in the
+workspace, from the report's own data sources -- so there is no GUID to look up
+and supply by hand.
 
 ```bash
 fab-test playwright --artifact "Invoice RDL" --env dev --env-file .env
 ```
 
+A report that declares parameters is tested twice: once with no parameters,
+and once with a real parameter set applied at embed time -- the first valid
+value of each single-value parameter and the first two of each multi-value
+one. The valid values are read the way the report itself reads them: a static
+list straight from the `.rdl`, or the parameter's own dataset query run against
+the report's dataset. That query needs the tenant's **Dataset Execute Queries
+REST API** setting to allow the service principal; without it, the report is
+tested with no parameters and a warning names the setting. Each case's row in
+`test_results` carries a `parameters` field, empty on the no-parameter case, so
+a failure names the values that caused it.
+
 `--report-type {report,paginated}` (or `PLAYWRIGHT_REPORT_TYPE`) forces it
 explicitly, for the rare case you need to -- never required for `--artifact`
-or local discovery. See [the fab-test skill's playwright flags reference](https://github.com/kerski/fab-test/blob/main/.github/skills/fab-test/references/flags.md) for the full behavior.
+or local discovery. See [the fab-test skill's playwright flags reference](https://github.com/clientfirsttech/fab-test/blob/main/.github/skills/fab-test/references/flags.md) for the full behavior.
 
 ### Naming what to test
 
@@ -342,7 +424,7 @@ fab-test pql-test "Sales Dev.Workspace/Sales.SemanticModel"   # a deployed model
 fab-test all local/Sales                                  # everything that can run locally
 ```
 
-Not every analyzer accepts every form: `bpa` reads files on disk and cannot fetch a deployed item. Run `fab-test list` for the Scopes column, and see the [targeting reference](https://github.com/kerski/fab-test/blob/main/.github/skills/fab-test/references/targeting-and-discovery.md#targeting) for the rules. `--artifact STEM` still works as a deprecated alias.
+Not every analyzer accepts every form: `bpa` reads files on disk and cannot fetch a deployed item. Run `fab-test list` for the Scopes column, and see the [targeting reference](https://github.com/clientfirsttech/fab-test/blob/main/.github/skills/fab-test/references/targeting-and-discovery.md#targeting) for the rules. `--artifact STEM` still works as a deprecated alias.
 
 ### Credentials
 
@@ -416,11 +498,11 @@ fab-test bpa --format json             # 3. run it; stdout is exactly one JSON d
 cat fab-test-results/run.json          # 4. read the manifest instead of globbing result dirs
 ```
 
-`--format json` guarantees stdout carries nothing but the payload; narration goes to stderr. When a run fails, `run.json` says why without a second file: an artifact whose analyzer aborted before writing an envelope carries the remediation message in its `detail` field (`"Pass --env, set FABRIC_ENVIRONMENT, ..."`), so uploading the manifest alone is enough to diagnose a red build. See the [Agent Contract](https://github.com/kerski/fab-test/blob/main/.github/skills/fab-test/SKILL.md#agent-contract) for exit codes, the JSON stdout guarantee, and the `run.json` schema.
+`--format json` guarantees stdout carries nothing but the payload; narration goes to stderr. When a run fails, `run.json` says why without a second file: an artifact whose analyzer aborted before writing an envelope carries the remediation message in its `detail` field (`"Pass --env, set FABRIC_ENVIRONMENT, ..."`), so uploading the manifest alone is enough to diagnose a red build. See the [Agent Contract](https://github.com/clientfirsttech/fab-test/blob/main/.github/skills/fab-test/SKILL.md#agent-contract) for exit codes, the JSON stdout guarantee, and the `run.json` schema.
 
-Full CLI reference: [`.github/skills/fab-test/SKILL.md`](https://github.com/kerski/fab-test/blob/main/.github/skills/fab-test/SKILL.md).
+Full CLI reference: [`.github/skills/fab-test/SKILL.md`](https://github.com/clientfirsttech/fab-test/blob/main/.github/skills/fab-test/SKILL.md).
 
-See [`docs/QUICK-VALIDATION.md`](https://github.com/kerski/fab-test/blob/main/docs/QUICK-VALIDATION.md) for a complete local build-and-test workflow, and [`docs/RELEASE.md`](https://github.com/kerski/fab-test/blob/main/docs/RELEASE.md) for how `fab-test` itself is published.
+See [`docs/QUICK-VALIDATION.md`](https://github.com/clientfirsttech/fab-test/blob/main/docs/QUICK-VALIDATION.md) for a complete local build-and-test workflow, and [`docs/RELEASE.md`](https://github.com/clientfirsttech/fab-test/blob/main/docs/RELEASE.md) for how `fab-test` itself is published.
 
 ## Configuration
 
@@ -441,7 +523,7 @@ Precedence, for every setting:
 | 3 | `fab-test.yml` (or `[tool.fab-test]` in `pyproject.toml`) | `jobs: 4` |
 | 4 (lowest) | Packaged default | `200` seconds |
 
-`fab-test.yml` is meant to be committed; it holds no credentials, only settings and rule overlays (tune one BPA/PBIR Inspector rule without forking the packaged rules file). Credentials belong in a `.env` file (auto-discovered, gitignored) or a pipeline's own secrets store. See the [Configuration section of the fab-test skill](https://github.com/kerski/fab-test/blob/main/.github/skills/fab-test/references/configuration.md#configuration) for the full settings list and rule-overlay keys.
+`fab-test.yml` is meant to be committed; it holds no credentials, only settings and rule overlays (tune one BPA/PBIR Inspector rule without forking the packaged rules file). Credentials belong in a `.env` file (auto-discovered, gitignored) or a pipeline's own secrets store. See the [Configuration section of the fab-test skill](https://github.com/clientfirsttech/fab-test/blob/main/.github/skills/fab-test/references/configuration.md#configuration) for the full settings list and rule-overlay keys.
 
 ### Telemetry (optional)
 
@@ -468,7 +550,7 @@ telemetry:
 
 `lakehouse:` accepts a friendly display name or the item's GUID — use the GUID if your tenant has OneLake friendly names disabled (the error looks like `FriendlyNameSupportDisabled`); `fab-test` detects which one you gave it automatically.
 
-**The Lakehouse's "Load to Tables" wizard doesn't see these files** — it only recognizes CSV and Parquet, not JSON/JSONL. Load them with a Spark notebook instead: see [the fab-test skill's Telemetry reference](https://github.com/kerski/fab-test/blob/main/.github/skills/fab-test/references/configuration.md#telemetry) for the two-line snippet.
+**The Lakehouse's "Load to Tables" wizard doesn't see these files** — it only recognizes CSV and Parquet, not JSON/JSONL. Load them with a Spark notebook instead: see [the fab-test skill's Telemetry reference](https://github.com/clientfirsttech/fab-test/blob/main/.github/skills/fab-test/references/configuration.md#telemetry) for the two-line snippet.
 
 **The tables create themselves on first use.** You need an Eventhouse and a KQL
 database; `fab-test` builds the rest. Before each run's first send it checks that
@@ -496,8 +578,8 @@ is why `fab-test` checks for it rather than assuming a table that exists is usab
 Three more things to know before the first run:
 
 - **Install the extra for each destination you use.** Neither client ships in the
-  base package: `pip install 'fab-test[telemetry]'` for Eventhouse's Kusto ingest
-  client, `pip install 'fab-test[telemetry-lakehouse]'` for Lakehouse's OneLake
+  base package: `pip install 'cft-fab-test[telemetry]'` for Eventhouse's Kusto ingest
+  client, `pip install 'cft-fab-test[telemetry-lakehouse]'` for Lakehouse's OneLake
   client. Shipping egress-capable clients to everyone who only reads files on a
   laptop is not a default worth having.
 - **Both reuse your existing credentials.** The same `FABRIC_TENANT_ID`,
@@ -570,22 +652,22 @@ a newer pin in a `fab-test` upgrade downloads the new binary rather than silentl
 whatever an older checkout had cached. `fab-test doctor` reports the resolved version
 alongside each tool's readiness, and names the environment variable or file path
 shadowing the pin if one is in play. See
-[docs/RELEASE.md](https://github.com/kerski/fab-test/blob/main/docs/RELEASE.md#bumping-a-wrapped-tools-pin)
+[docs/RELEASE.md](https://github.com/clientfirsttech/fab-test/blob/main/docs/RELEASE.md#bumping-a-wrapped-tools-pin)
 for the pin-bump procedure, and
-[.github/workflows/check-tool-updates.yml](https://github.com/kerski/fab-test/blob/main/.github/workflows/check-tool-updates.yml)
+[.github/workflows/check-tool-updates.yml](https://github.com/clientfirsttech/fab-test/blob/main/.github/workflows/check-tool-updates.yml)
 for the weekly job that watches upstream for you.
 
 ## Usage
 
-`fab-test` discovers and analyzes artifacts under your working directory. It is the local equivalent of the CI artifact validation gate. See the [Run manual tests locally](#run-manual-tests-locally) section above for common commands, and [`.github/skills/fab-test/SKILL.md`](https://github.com/kerski/fab-test/blob/main/.github/skills/fab-test/SKILL.md) for the full CLI reference.
+`fab-test` discovers and analyzes artifacts under your working directory. It is the local equivalent of the CI artifact validation gate. See the [Run manual tests locally](#run-manual-tests-locally) section above for common commands, and [`.github/skills/fab-test/SKILL.md`](https://github.com/clientfirsttech/fab-test/blob/main/.github/skills/fab-test/SKILL.md) for the full CLI reference.
 
 ## AI agent guidance
 
-The AIDD agent instructions and skills live in the repository, not in the wheel: [`.github/agents/`](https://github.com/kerski/fab-test/tree/main/.github/agents/) and [`.github/skills/`](https://github.com/kerski/fab-test/tree/main/.github/skills/). Clone the repository to get them. The `fab-test` CLI reference an agent needs is [`.github/skills/fab-test/SKILL.md`](https://github.com/kerski/fab-test/blob/main/.github/skills/fab-test/SKILL.md).
+The AIDD agent instructions and skills live in the repository, not in the wheel: [`.github/agents/`](https://github.com/clientfirsttech/fab-test/tree/main/.github/agents/) and [`.github/skills/`](https://github.com/clientfirsttech/fab-test/tree/main/.github/skills/). Clone the repository to get them. The `fab-test` CLI reference an agent needs is [`.github/skills/fab-test/SKILL.md`](https://github.com/clientfirsttech/fab-test/blob/main/.github/skills/fab-test/SKILL.md).
 
 ### The `fab-test` skill
 
-Unlike the other repository-only skills, the `fab-test` CLI reference skill (`SKILL.md` plus `references/*.md`) is also packaged inside the wheel, so a plain `pip install fab-test` -- no checkout, no clone -- can still hand it to an agent harness, and the copy it installs can never drift from the CLI version actually installed:
+Unlike the other repository-only skills, the `fab-test` CLI reference skill (`SKILL.md` plus `references/*.md`) is also packaged inside the wheel, so a plain `pip install cft-fab-test` -- no checkout, no clone -- can still hand it to an agent harness, and the copy it installs can never drift from the CLI version actually installed:
 
 ```bash
 fab-test skill                    # list the main skill and its reference topics
@@ -612,11 +694,11 @@ print(metadata.joinpath("analyzers.json"))       # tool install URLs doctor read
 
 ## License
 
-MIT. See [LICENSE](https://github.com/kerski/fab-test/blob/main/LICENSE).
+MIT. See [LICENSE](https://github.com/clientfirsttech/fab-test/blob/main/LICENSE).
 
 `fab-test` wraps, but does not redistribute, several external tools it
 downloads or builds at runtime — Tabular Editor 2, fab-inspector, and
 pbir-a11y (the latter under the source-available PolyForm Shield 1.0.0
 license, not MIT). See
-[THIRD-PARTY.md](https://github.com/kerski/fab-test/blob/main/THIRD-PARTY.md)
+[THIRD-PARTY.md](https://github.com/clientfirsttech/fab-test/blob/main/THIRD-PARTY.md)
 for what each permits.

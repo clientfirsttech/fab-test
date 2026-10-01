@@ -107,7 +107,8 @@ def _add_common_flags(
         metavar="N",
         help="Run up to N artifacts in parallel for the same analyzer (default: 1)",
     )
-    parser.add_argument(
+    verbosity_group = parser.add_mutually_exclusive_group()
+    verbosity_group.add_argument(
         "-v",
         "--verbose",
         action="count",
@@ -116,6 +117,12 @@ def _add_common_flags(
             "Increase output verbosity (one -v for per-finding detail, "
             "two -v for command + stdout/stderr; same as ANALYZER_VERBOSITY)"
         ),
+    )
+    verbosity_group.add_argument(
+        "-q",
+        "--quiet",
+        action="store_true",
+        help="Print the least output that still reports the result (same as ANALYZER_VERBOSITY=summary)",
     )
     report_group = parser.add_mutually_exclusive_group()
     report_group.add_argument(
@@ -535,6 +542,17 @@ def _add_playwright_subparser(subs: argparse._SubParsersAction) -> None:
             "deriving them from a local .rdl file's own <ReportParameters> "
             "block, as a JSON list of {\"name\": ..., \"multi_value\": ...} "
             "[internal: set by fab-test's own discovery]"
+        ),
+    )
+    playwright_p.add_argument(
+        "--plan-only",
+        action="store_true",
+        dest="plan_only",
+        help=(
+            "Show what would be tested: discover the page/bookmark/role "
+            "matrix, write test-cases.csv/json, and stop without minting an "
+            "embed token or launching a browser. Unlike --dry-run, which "
+            "only lists matching artifacts, this resolves each one"
         ),
     )
     playwright_p.add_argument(
@@ -1033,7 +1051,7 @@ def build_parser() -> argparse.ArgumentParser:
             "  126  Analyzer unsupported on this platform (see message for the supported OS)\n"
             "  127  Required external tool could not be resolved (see message for the fix)\n\n"
             f"Version: {_FAB_TEST_VERSION} | "
-            "Docs: https://github.com/kerski/fab-test/blob/main/docs/QUICK-VALIDATION.md"
+            "Docs: https://github.com/clientfirsttech/fab-test/blob/main/docs/QUICK-VALIDATION.md"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )

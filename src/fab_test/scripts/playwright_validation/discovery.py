@@ -11,12 +11,14 @@ from __future__ import annotations
 
 import argparse
 import dataclasses
+import json
 from typing import Any
 
 from .config import PlaywrightValidationConfig
 from .embed_config import build_embed_config
 from .fabric_service_client import build_fabric_service_client
 from .power_bi_api import PowerBiApiError, get_embed_context
+from .rdl_datasource import RdlReportParameter, parse_rdl_report_parameters_text
 from .service_client import FabricRestClient, FabricToken, ServiceClientError
 from .test_cases import DiscoveredBookmark, DiscoveredPage
 
@@ -108,8 +110,9 @@ def resolve_discovery(
     An explicit ``--page-ids``/``--bookmark-ids`` (or ``PLAYWRIGHT_PAGE_IDS``/
     ``PLAYWRIGHT_BOOKMARK_IDS``) skips page/bookmark discovery entirely --
     it is a statement about what to test, not a filter over what was found.
-    Role discovery only runs when RLS is in play (``config.use_rls``); with
-    no roles requested there is nothing a role matrix would add.
+    Role discovery runs when RLS is in play -- ``config.use_rls``, or an
+    effective-identity user being configured at all; with neither, there is
+    nothing a discovered role could be embedded with.
 
     A paginated report has neither dimension -- RDL reports have no
     page/bookmark matrix -- so both are skipped outright rather than
@@ -121,7 +124,13 @@ def resolve_discovery(
     discover_pages = not (config.page_ids or config.bookmark_ids) and getattr(
         args, "pages", "auto"
     ) != "none"
-    discover_roles = config.use_rls and getattr(args, "roles", "auto") != "none"
+    # An effective-identity user is enough on its own: it is what a role can
+    # actually be tested with, and requiring PLAYWRIGHT_USE_RLS as well is how
+    # a secured model ends up silently tested under one identity while its
+    # roles go unexercised. With no identity configured there is nothing a
+    # discovered role could be embedded with, so nothing is asked for.
+    rls_in_play = config.use_rls or bool(config.user_name)
+    discover_roles = rls_in_play and getattr(args, "roles", "auto") != "none"
 
     if not discover_pages and not discover_roles:
         return None, None
@@ -157,6 +166,128 @@ def resolve_discovery(
         else None
     )
     return pages, roles
+
+
+@dataclasses.dataclass(frozen=True)
+class PaginatedPlan:
+    """What a paginated report's cases need beyond its baseline config.
+
+    ``dataset_id`` is the one ``GenerateToken`` must be given (from the
+    local ``.rdl`` when there was one, else from the report's datasources).
+    ``parameter_sets`` holds at most one set -- the first valid value of each
+    single-value parameter and the first two of each multi-value one, a
+    multi-value parameter repeated once per value, the embed SDK's
+    ``parameterValues`` shape -- and is empty when the report declares no
+    parameter a value could be picked for.
+    """
+
+    dataset_id: str
+    parameter_sets: list[list[dict[str, str]]]
+
+
+def _declared_parameters(
+    config: PlaywrightValidationConfig, rest_client: FabricRestClient
+) -> list[RdlReportParameter]:
+    """Return the report's parameters: from its local .rdl, else its deployed one."""
+    try:
+        declared = json.loads(config.report_parameters or "[]")
+    except json.JSONDecodeError:
+        declared = []
+    if declared:
+        return [
+            RdlReportParameter(
+                name=entry.get("name", ""),
+                multi_value=bool(entry.get("multi_value")),
+                values_query=entry.get("values_query", ""),
+                value_column=entry.get("value_column", ""),
+                static_values=tuple(entry.get("static_values") or ()),
+            )
+            for entry in declared
+            if entry.get("name")
+        ]
+    try:
+        definition = rest_client.get_paginated_report_definition(
+            config.workspace_id, config.report_id
+        )
+    except ServiceClientError as exc:
+        log(f"::warning::Could not read the paginated report's definition ({exc}); testing it with no parameters.")
+        return []
+    return parse_rdl_report_parameters_text(definition)
+
+
+def _valid_values(
+    parameter: RdlReportParameter,
+    rest_client: FabricRestClient,
+    config: PlaywrightValidationConfig,
+    dataset_id: str,
+) -> list[str]:
+    """Return a parameter's valid values in the order the report offers them."""
+    if parameter.static_values:
+        return list(parameter.static_values)
+    if not (parameter.values_query and parameter.value_column and dataset_id):
+        return []
+    try:
+        rows = rest_client.execute_dax_query(
+            config.dataset_workspace_id or config.workspace_id,
+            dataset_id,
+            parameter.values_query,
+        )
+    except ServiceClientError as exc:
+        log(
+            f"::warning::Could not query valid values for parameter '{parameter.name}' "
+            f"({exc}); the \"Dataset Execute Queries REST API\" tenant setting must allow "
+            "the service principal. Testing the report with no parameters."
+        )
+        return []
+    values: list[str] = []
+    for row in rows:
+        value = row.get(parameter.value_column)
+        if value is not None and str(value) not in values:
+            values.append(str(value))
+    return values
+
+
+def resolve_paginated_plan(config: PlaywrightValidationConfig) -> PaginatedPlan:
+    """Resolve a paginated report's dataset and the parameter set to test.
+
+    Best-effort like the interactive discovery above: a report whose plan
+    cannot be resolved is still tested, with whatever the config already
+    had and no parameterized case.
+    """
+    fallback = PaginatedPlan(dataset_id=config.dataset_id, parameter_sets=[])
+    try:
+        client = build_fabric_service_client(
+            tenant_id=config.tenant_id,
+            client_id=config.client_id,
+            client_secret=config.client_secret,
+            cloud=config.cloud,
+        )
+    except Exception as exc:  # noqa: BLE001 - discovery is best-effort, never fatal
+        log(f"::warning::Could not authenticate for paginated report discovery ({exc}).")
+        return fallback
+    rest_client = FabricRestClient(
+        FabricToken(access_token=client.access_token, cloud=config.cloud)
+    )
+
+    dataset_id = config.dataset_id
+    if not dataset_id:
+        try:
+            found = rest_client.get_report_dataset_ids(config.workspace_id, config.report_id)
+        except ServiceClientError as exc:
+            log(f"::warning::Could not read the paginated report's data sources ({exc}).")
+            found = []
+        dataset_id = found[0] if found else ""
+
+    parameter_set: list[dict[str, str]] = []
+    for parameter in _declared_parameters(config, rest_client):
+        values = _valid_values(parameter, rest_client, config, dataset_id)
+        parameter_set.extend(
+            {"name": parameter.name, "value": value}
+            for value in values[: 2 if parameter.multi_value else 1]
+        )
+    return PaginatedPlan(
+        dataset_id=dataset_id, parameter_sets=[parameter_set] if parameter_set else []
+    )
 
 
 def acquire_embed_configs(

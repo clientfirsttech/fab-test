@@ -62,8 +62,9 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
         ),
     ),
     "src/fab_test/scripts/fab_test_parser.py": (
-        1079,
+        1097,
         (
+            "2026-09-30: merge of main into feat/rdl-static-analysis -- main's -q/verbosity additions plus this branch's rdl additions both landed here, so the ceiling is the sum of the two. "
             "2026-09-27: +16 lines adding _add_rdl_subparser -- one more "
             "subcommand builder, same shape as every other one already here "
             "(_add_pql_lint_subparser is its closest model: no external-tool "
@@ -120,7 +121,7 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
         ),
     ),
     "src/fab_test/scripts/fab_test_summary.py": (
-        925,
+        948,
         (
             "2026-09-01: +5 net lines teaching the summary that an analyzer can "
             "exit 0 and still be warning us -- _artifact_status now reads a "
@@ -148,12 +149,17 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
             "reported for `fab-test a11y` with multiple artifacts. New "
             "_index_row_fields factors out the envelope-reading rules shared "
             "with build_all_summary_rows so both index shapes classify status "
-            "identically."
+            "identically. "
+            "2026-09-29: +23 lines adding _print_quiet_summary and the -q "
+            "branch in `all`'s aggregate summary (Terse CLI Output epic); the "
+            "loop is its own function because inlining it pushed "
+            "_print_summary over the branch budget."
         ),
     ),
     "src/fab_test/scripts/fab_test_registry.py": (
-        1017,
+        1026,
         (
+            "2026-09-30: merge of main into feat/rdl-static-analysis -- main's -q/verbosity additions plus this branch's rdl additions both landed here, so the ceiling is the sum of the two. "
             "2026-09-27: +40 lines registering the rdl analyzer -- "
             "ANALYZER_REGISTRY/ANALYZER_SCOPES entries, _resolve_rdl_rules_path "
             "(mirrors _resolve_pbir_rules_path), build_rdl_command, and its "
@@ -209,11 +215,16 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
             "fab_test_execution.py's case-count-scaled timeout both need to "
             "agree on the same path (Playwright Case Scaling epic). "
             "2026-08-30: +3 lines forwarding --workers to invoke_playwright.py "
-            "when explicitly set on the outer CLI."
+            "when explicitly set on the outer CLI. "
+            "2026-09-27: +10 lines adding --plan-only to the playwright "
+            "subparser (Playwright Generation Parity epic). "
+            "2026-09-29: +7 lines adding -q/--quiet beside -v in a mutually "
+            "exclusive group, so the two conflict at parse time with exit 2 "
+            "rather than in hand-written validation (Terse CLI Output epic)."
         ),
     ),
     "src/fab_test/scripts/invoke_playwright.py": (
-        929,
+        1003,
         (
             "2026-09-26: +9 lines replacing the `_SPEC_PATH = Path(\"tests\") / "
             "\"test_playwright_visual.py\"` constant with `_spec_path()`, resolved "
@@ -245,6 +256,16 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
             "> packaged default) -- a small, cohesive addition to an already "
             "large file, not worth a forced split for ~20 lines. Revisit if "
             "it keeps growing. "
+            "2026-09-27: +48 lines adding --plan-only -- the flag, and the "
+            "envelope a plan writes instead of a render (Playwright "
+            "Generation Parity epic). This file is now the largest single "
+            "candidate for a split; the plan/envelope helpers are the "
+            "obvious seam. "
+            "2026-09-28: +26 lines wiring the paginated plan (dataset + "
+            "parameter set) into _run_single_report and adding the "
+            "`parameters` row field and embed-error `actual` (Playwright "
+            "Result Parity epic). Past 1,000 lines: the next growth here "
+            "should come with the split, not another exemption. "
             "2026-08-30: +47 lines adding _report_deep_link and threading "
             "cloud through _test_results_rows/_write_embed_error_envelope, so "
             "the HTML report can link back to the report page/bookmark a "
@@ -253,6 +274,34 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
             "resolve_report call and the resulting PlaywrightValidationConfig "
             "so a paginated target resolves against PaginatedReport instead of "
             "Report (Paginated Report Testing epic)."
+        ),
+    ),
+    "src/fab_test/scripts/fab_test_execution.py": (
+        845,
+        (
+            "2026-09-26: born over the hard budget adding "
+            "_playwright_service_resolved_target (collapses _discover_for's "
+            "impact-manifest/dataset-id/dataset-workspace-only early returns "
+            "into one call, both for readability and to keep _discover_for's "
+            "own return count under the pylint ceiling) and a last-resort "
+            "resolve_dataset_workspace_artifact fallback alongside the "
+            "existing _playwright_remote_target one, for --dataset-workspace-id "
+            "with a bare artifact and no local match (Playwright Dataset "
+            "Target epic, Every Dataset In A Workspace task). The file's own "
+            "discovery logic (_discover_for, _discover_rdl_files, "
+            "_playwright_remote_target, _target_of) is a defensible seam to "
+            "split into its own module -- not done here, since this task's "
+            "job was the behavior, not a refactor of a file three separate "
+            "epics have now added to. Revisit if it keeps growing. "
+            "2026-09-29: +2 lines mapping -q to the summary verbosity level in "
+            "_verbosity_env, then +12 lines letting -q skip the per-artifact "
+            "banner, capture the analyzer's stdout, and mute what a finished "
+            "run's envelope already reports (Terse CLI Output epic). +2 more keeping "
+            "stderr visible for a nonzero exit with no findings. 2026-09-29: +10 "
+            "lines so a remediation every artifact shares is replayed once per "
+            "run (seen_stderr, State Each Result Once), then +5 to collapse only "
+            "failures the findings cannot explain, after review found identical "
+            "result lines from two artifacts were being swallowed."
         ),
     ),
 }

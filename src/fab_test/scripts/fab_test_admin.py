@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from ._cli_utils import narrate
-from ._config import CONFIG_FILENAME, resolve_setting
+from ._config import CONFIG_FILENAME, resolve_setting, verbosity_level
 from ._credentials import probe_credentials
 from ._desktop import bridge_cli_path, detect_desktop_instances
 from ._fab_test_context import (
@@ -159,8 +159,10 @@ _SETTING_SPECS: list[tuple[str, str | None, Any, type | None]] = [
     ("jobs", None, 1, None),
     ("format", None, "text", None),
     ("timeout", "ANALYZER_TIMEOUT", _DEFAULT_SUBPROCESS_TIMEOUT, int),
+    ("verbosity", "ANALYZER_VERBOSITY", "default", verbosity_level),
     ("environment", "FABRIC_ENVIRONMENT", "", None),
     ("workspace", "FABRIC_WORKSPACE_ID", "", None),
+    ("playwright_user_name", "PLAYWRIGHT_USER_NAME", "", None),
 ]
 
 _SECRET_KEY_MARKERS = ("secret", "password", "token", "api_key")
@@ -250,8 +252,14 @@ _FAB_TEST_YML_TEMPLATE = """\
 # timeout: 200                     # per-artifact subprocess timeout in seconds [env: ANALYZER_TIMEOUT]
 #                                   # (playwright scales this up on its own for a large matrix;
 #                                   # setting this overrides that)
+# verbosity: default               # summary | default | verbose | debug [env: ANALYZER_VERBOSITY]
+#                                   # summary = -q (one line per artifact); -q/-v flags override this
 # environment: DEV                 # default environment label [env: FABRIC_ENVIRONMENT]
 # workspace: Sales Dev             # default workspace name or GUID [env: FABRIC_WORKSPACE_ID]
+# playwright_user_name: analyst@contoso.com
+#                                  # effective-identity UPN for RLS embed tokens
+#                                  # [env: PLAYWRIGHT_USER_NAME]; only used for
+#                                  # cases that carry a discovered role
 
 # Rule overlays: deltas applied to a packaged ruleset instead of forking it.
 # rules:

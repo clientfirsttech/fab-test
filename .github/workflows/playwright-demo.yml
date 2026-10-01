@@ -1,0 +1,225 @@
+# Manually triggered demo of `fab-test playwright` against a real Fabric
+# workspace, testing this repository's own current code (installed from the
+# checkout, not the published package -- see
+# docs/examples/github-actions/playwright-live.yml for the consumer-facing
+# version of this workflow).
+#
+# workflow_dispatch only, deliberately: this is the one workflow in this
+# repository that carries service-principal credentials, and pull_request
+# would run it against every fork PR with no access to those secrets at all
+# (tests/test_workflow_triggers.py enforces the trigger and Environment).
+
+name: Playwright demo
+
+on:
+  workflow_dispatch:
+    inputs:
+      artifact:
+        description: "Report name to test. Leave blank with dataset_workspace_id alone to run every dataset in the workspace."
+        required: false
+        default: ""
+      dataset_id:
+        description: "Semantic model ID -- tests every report built on it instead of one named report"
+        required: false
+        default: ""
+      dataset_workspace_id:
+        description: "Workspace ID the dataset above lives in, or -- alone -- every dataset in this workspace"
+        required: false
+        default: ""
+      environment:
+        description: "Environment label, resolved via .fab-test/metadata/environments.yml (test/prod have no workspace_id there yet -- use workspace_id below until they do)"
+        required: false
+        default: "dev"
+        type: choice
+        options: ["testbed", "dev", "test", "prod"]
+      workspace_id:
+        description: "Workspace ID override -- wins over 'environment' above; needed for test/prod until environments.yml carries their workspace_id"
+        required: false
+        default: ""
+      pages:
+        description: "Page dimension"
+        required: false
+        default: "auto"
+        type: choice
+        options: ["auto", "none"]
+      roles:
+        description: "RLS role dimension"
+        required: false
+        default: "auto"
+        type: choice
+        options: ["auto", "none"]
+      test_rls:
+        description: "Enable RLS role testing (sets PLAYWRIGHT_USE_RLS and PLAYWRIGHT_USER_NAME from the fabric-demo Environment's secret) -- without it, an RLS-secured dataset's GenerateToken call always fails with 'requires effective identity to be provided'"
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  playwright-demo:
+    name: fab-test playwright (demo)
+    runs-on: ubuntu-latest
+    # Protected Environment: required reviewers gate every dispatch, and
+    # only this Environment's secrets are visible to the job.
+    environment: fabric-demo
+    # Pre-bundles Chromium/Firefox/WebKit and their OS deps, skipping
+    # `playwright install --with-deps` (usually the slowest step here).
+    # `playwright` is unpinned in pyproject.toml, so it floats to whatever's
+    # latest on pip -- this tag drifting out of lockstep with that (a new
+    # release shipped between two runs of this same workflow) broke a real
+    # dispatch with "BrowserType.launch: Executable doesn't exist at
+    # /ms-playwright/chromium_headless_shell-<rev>/...": the image's own
+    # baked browser revision didn't match the newly-installed driver's.
+    # PLAYWRIGHT_PIN below forces the install to this exact version instead
+    # of trusting pyproject.toml's unpinned constraint -- bump both together.
+    # --user 1001: runs Chromium unsandboxed-but-non-root per Playwright's
+    # own CI guide (https://playwright.dev/python/docs/ci).
+    container:
+      image: mcr.microsoft.com/playwright/python:v1.63.0-noble
+      options: --user 1001
+    env:
+      PLAYWRIGHT_PIN: "1.63.0"
+      FABRIC_TENANT_ID: ${{ secrets.FABRIC_TENANT_ID }}
+      FABRIC_CLIENT_ID: ${{ secrets.FABRIC_CLIENT_ID }}
+      FABRIC_CLIENT_SECRET: ${{ secrets.FABRIC_CLIENT_SECRET }}
+      # Off by default: role discovery runs when PLAYWRIGHT_USE_RLS is set or
+      # an effective-identity user is configured, and without a
+      # PLAYWRIGHT_USER_NAME GenerateToken rejects any RLS-secured dataset
+      # outright ("requires effective identity to be provided") -- both stay
+      # unset unless test_rls opts in.
+      PLAYWRIGHT_USE_RLS: ${{ inputs.test_rls }}
+      PLAYWRIGHT_USER_NAME: ${{ inputs.test_rls && secrets.PLAYWRIGHT_USER_NAME || '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # Needed for two things this container image doesn't otherwise carry:
+      # the pbir analyzer (doctor already reports it as not-ready without
+      # this: ".NET 8+ runtime not found") and, since this run, RLS role
+      # discovery's XMLA fallback -- pythonnet's PYTHONNET_RUNTIME=coreclr
+      # still needs a real .NET runtime to find, and this container has
+      # none, confirmed live ("Can not determine dotnet root" / "Failed to
+      # create a .NET runtime (coreclr)"), unlike a bare ubuntu-latest
+      # runner, which ships one by default.
+      #
+      # DOTNET_INSTALL_DIR: the default install location
+      # (/usr/share/dotnet) isn't writable by uid 1001 (the container's
+      # --user 1001 above) -- confirmed live ("mkdir: cannot create
+      # directory '/usr/share/dotnet': Permission denied").
+      - name: Set a user-writable .NET install directory
+        run: echo "DOTNET_INSTALL_DIR=$HOME/.dotnet" >> "$GITHUB_ENV"
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: "8.0.x"
+
+      # This repository's own current code, plus the dev extras --
+      # pytest, pytest-playwright, pytest-html, and pytest-xdist are all
+      # declared in pyproject.toml's [project.optional-dependencies].dev,
+      # so one install covers fab-test and everything Playwright needs.
+      # The browsers themselves come from the container image above, not
+      # from this install -- "playwright==$PLAYWRIGHT_PIN" overrides
+      # pyproject.toml's unpinned constraint so the installed driver always
+      # matches the browser revision the image baked in, in case a newer
+      # release ships on pip between this file's own edits.
+      #
+      # --user: uid 1001 (set by the container's --user 1001 above) can't
+      # write to the site-packages actions/setup-python installed as
+      # whatever uid provisioned it, so `fab-test`'s console-script lands
+      # under $HOME/.local instead -- which the container's default PATH
+      # doesn't include, hence appending its bin dir to GITHUB_PATH here.
+      - name: Install fab-test from the checkout
+        run: |
+          pip install --user -e ".[dev]" "playwright==$PLAYWRIGHT_PIN"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      # `doctor` has no `--workspace-id` flag and no visibility into --env /
+      # environments.yml, so it reports every cloud analyzer as "no
+      # workspace ... resolved" and exits 1 even when the service principal
+      # is fully configured -- resolve the same workspace the run step below
+      # will use and export it as FABRIC_WORKSPACE_ID (the one source
+      # `doctor` does read) so this row reflects the real run.
+      - name: Confirm the service principal is ready
+        env:
+          FABRIC_WORKSPACE_ID: ${{ inputs.workspace_id }}
+        run: |
+          if [ -z "$FABRIC_WORKSPACE_ID" ]; then
+            export FABRIC_WORKSPACE_ID=$(python - <<'PY'
+          from fab_test.scripts.playwright_validation.resolver import (
+              ServiceResolutionError,
+              resolve_environment,
+          )
+
+          override = "${{ inputs.dataset_workspace_id }}"
+          try:
+              print(resolve_environment("${{ inputs.environment }}", workspace_id_override=override).workspace_id)
+          except ServiceResolutionError:
+              pass
+          PY
+          )
+          fi
+          fab-test doctor
+
+      # Bash arrays (`args=(...)`), not POSIX -- the container image above
+      # runs steps under `sh`, not `bash`, and `sh -e {0}` chokes on that
+      # syntax with "Syntax error: ( unexpected". `set --` builds the same
+      # variable-length arg list with plain POSIX positional parameters.
+      - name: Run fab-test playwright
+        id: playwright
+        run: |
+          set -- --env "${{ inputs.environment }}"
+          [ -n "${{ inputs.artifact }}" ] && set -- "$@" --artifact "${{ inputs.artifact }}"
+          [ -n "${{ inputs.dataset_id }}" ] && set -- "$@" --dataset-id "${{ inputs.dataset_id }}"
+          [ -n "${{ inputs.dataset_workspace_id }}" ] && set -- "$@" --dataset-workspace-id "${{ inputs.dataset_workspace_id }}"
+          [ -n "${{ inputs.workspace_id }}" ] && set -- "$@" --workspace-id "${{ inputs.workspace_id }}"
+          [ "${{ inputs.pages }}" = "none" ] && set -- "$@" --pages none
+          [ "${{ inputs.roles }}" = "none" ] && set -- "$@" --roles none
+          fab-test playwright "$@" --report
+
+      # Always -- the failed run is the one you most want to read. Every
+      # case's own evidence lives under playwright/<report>/test-cases/**;
+      # report.html links straight to it.
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fab-test-playwright-demo-results
+          path: |
+            fab-test-results/playwright/**/report.html
+            fab-test-results/playwright/**/envelope.json
+            fab-test-results/playwright/**/test-cases/**
+
+      - name: Write the per-case summary
+        if: always()
+        run: |
+          python <<'PY'
+          import glob
+          import json
+          import os
+
+          rows = []
+          for path in sorted(glob.glob("fab-test-results/playwright/*/envelope.json")):
+              with open(path, encoding="utf-8") as fh:
+                  envelope = json.load(fh)
+              for case in envelope.get("test_results", []):
+                  icon = "PASS" if case.get("status") == "pass" else "FAIL"
+                  link = case.get("report_link") or {}
+                  label = link.get("label", "")
+                  href = link.get("href", "")
+                  cell = f"[{label}]({href})" if href else label
+                  rows.append(
+                      f"| {envelope.get('artifact_path', '')} | {case.get('page_name', '')} | "
+                      f"{case.get('bookmark_name', '')} | {case.get('role', '')} | {icon} | {cell} |"
+                  )
+
+          summary_path = os.environ["GITHUB_STEP_SUMMARY"]
+          with open(summary_path, "a", encoding="utf-8") as fh:
+              fh.write("## Playwright demo results\n\n")
+              if rows:
+                  fh.write("| Report | Page | Bookmark | Role | Status | Link |\n")
+                  fh.write("|---|---|---|---|---|---|\n")
+                  fh.write("\n".join(rows) + "\n")
+              else:
+                  fh.write("No cases ran -- check the step above for why.\n")
+          PY

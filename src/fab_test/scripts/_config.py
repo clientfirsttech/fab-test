@@ -18,6 +18,9 @@ import yaml
 
 CONFIG_FILENAME = "fab-test.yml"
 
+# The ladder ANALYZER_VERBOSITY, -q, -v and -vv all name. Ordered quietest first.
+VERBOSITY_LEVELS = ("summary", "default", "verbose", "debug")
+
 # Every setting fab-test currently reads from a config file, and its
 # expected Python type. Keep in sync with the argparse defaults and
 # _resolve_timeout/_apply_environment_default in fab_test.py -- task 11
@@ -28,6 +31,9 @@ _VALID_KEYS: dict[str, type] = {
     "jobs": int,
     "format": str,
     "timeout": int,
+    # One rung of VERBOSITY_LEVELS, applied when no -q/-v flag is passed
+    # (Terse CLI Output). ANALYZER_VERBOSITY still wins over the file.
+    "verbosity": str,
     "environment": str,
     # Default workspace for targets that name an artifact but not a
     # workspace (Artifact Targeting and Auth §3). A display name or a GUID;
@@ -40,6 +46,11 @@ _VALID_KEYS: dict[str, type] = {
     # (Open Report Flag epic §1). Opt-in, implies `report`, suppressed
     # under CI.
     "open_report": bool,
+    # Effective-identity user for RLS embed tokens (Playwright Generation
+    # Parity §3). Falls back from PLAYWRIGHT_USER_NAME, which still wins:
+    # a caller that no longer supplies the variable per run declares the
+    # UPN once here instead.
+    "playwright_user_name": str,
     # Rule overlays (Config Consolidation §6-7): {"bpa": {...}, "pbir": {...}}.
     # Nested disable/severity/extend keys are validated by _rule_overlay.py
     # itself at use time, not here.
@@ -184,6 +195,14 @@ def _unknown_key(path: str, valid: Any) -> str:
     return f"unknown config key '{path}'{hint}"
 
 
+def _validate_verbosity(level: str) -> None:
+    """Refuse a verbosity that is not a rung of the ladder, naming the rungs."""
+    if level not in VERBOSITY_LEVELS:
+        raise ConfigError(
+            f"config key 'verbosity' must be one of {', '.join(VERBOSITY_LEVELS)}, got '{level}'"
+        )
+
+
 def validate_config(config: dict[str, Any]) -> None:
     """Validate a merged config dict's keys and value types.
 
@@ -206,6 +225,9 @@ def validate_config(config: dict[str, Any]) -> None:
                 f"config key '{key}' must be of type {expected_type.__name__}, "
                 f"got {type(value).__name__}"
             )
+
+    if "verbosity" in config:
+        _validate_verbosity(config["verbosity"])
 
     if "telemetry" in config:
         _validate_telemetry(config["telemetry"])
@@ -279,3 +301,33 @@ def resolve_setting(
     if key in file_config:
         return file_config[key], f"{CONFIG_FILENAME}:{key}"
     return packaged_default, "default"
+
+
+def verbosity_level(raw: str) -> str:
+    """Normalize a verbosity name, or raise ValueError so a bad env var falls through."""
+    level = raw.strip().lower()
+    if level not in VERBOSITY_LEVELS:
+        raise ValueError(raw)
+    return level
+
+
+def apply_verbosity_default(args: Any, file_config: dict[str, Any]) -> None:
+    """Fill -q/-v from ANALYZER_VERBOSITY or fab-test.yml when no flag was passed.
+
+    Precedence is flag > ANALYZER_VERBOSITY > fab-test.yml > default, like every
+    other setting. The result is written back as the flag it stands for, so the
+    parent's narration and the analyzer subprocesses read one value. A
+    subcommand without the flags (doctor, config, ...) is left alone.
+    """
+    if not hasattr(args, "quiet") or args.quiet or args.verbose:
+        return
+    level, _origin = resolve_setting(
+        "verbosity",
+        cli_value=None,
+        env_var="ANALYZER_VERBOSITY",
+        file_config=file_config,
+        packaged_default="default",
+        cast=verbosity_level,
+    )
+    args.quiet = level == "summary"
+    args.verbose = {"verbose": 1, "debug": 2}.get(level, 0)
