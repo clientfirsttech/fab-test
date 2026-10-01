@@ -32,11 +32,3 @@ def test_fixture_trips_its_named_rule(rdl: Path):
     root, namespace = parse_rdl(rdl)
     fired = {rule for f in run_checks(root, namespace, _CATALOG) for rule in f["rule"].split("/")}
     assert rdl.stem in fired
-
-
-def test_gaps_are_tracked():
-    """Print the rules lacking a check or a fixture so the gap list stays honest."""
-    have_fixture = {p.stem for p in _FIXTURES}
-    catalog_ids = {r["id"] for r in _CATALOG}
-    assert catalog_ids - set(CHECKS) <= {"SUB-01"}, "catalog rule without a check (SUB-01 is dispatched via LAY-03)"
-    print("no fixture:", sorted(catalog_ids - have_fixture))

@@ -17,7 +17,7 @@ def _parse(*argv: str) -> argparse.Namespace:
     return fab_test_module.build_parser().parse_args(list(argv))
 
 
-@pytest.mark.parametrize("analyzer", ["bpa", "pbir", "a11y", "pql-test", "playwright", "all", "local"])
+@pytest.mark.parametrize("analyzer", ["bpa", "pbir", "a11y", "rdl", "pql-test", "playwright", "all", "local"])
 def test_quiet_flag_is_accepted_by_every_running_analyzer(analyzer):
     """Given -q after any running subcommand, should parse it as quiet."""
     assert _parse(analyzer, "-q").quiet is True
@@ -42,7 +42,7 @@ def test_quiet_reaches_subprocesses_under_json_format_too():
     assert _analyzer_sub_env(args, "json")["ANALYZER_VERBOSITY"] == "summary"
 
 
-@pytest.mark.parametrize("argv", [["bpa", "-q", "-v"], ["bpa", "-v", "--quiet"], ["all", "-q", "-vv"]])
+@pytest.mark.parametrize("argv", [["bpa", "-q", "-v"], ["bpa", "-v", "--quiet"], ["rdl", "-q", "-vv"], ["all", "-q", "-vv"]])
 def test_quiet_with_verbose_is_rejected_with_exit_2(argv, capsys):
     """Given -q together with -v, should exit 2 naming the conflict."""
     with pytest.raises(SystemExit) as excinfo:

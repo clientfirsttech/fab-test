@@ -18,7 +18,7 @@ A review of `fab-test rdl --verbose` against `QRY-02.rdl` found two problems. Th
 **Requirements**:
 - Given `fab-test rdl --verbose` with findings, should print the same banner, Artifact/Rules/Envelope/Native JSON lines and finding count as PBIR Inspector, then a Rule/Severity/Object/Message table in `TABLE_FORMAT`
 - Given the table helper, should live in `_table_style.py` (no CLI-layer imports), be used by `rdl` and PBIR Inspector, and replace the duplicated `_truncate` in BPA
-- Given PBIR Inspector's verbose table, should now draw in `TABLE_FORMAT` and keep its sort order and columns
+- Given PBIR Inspector's verbose table, should now draw in `TABLE_FORMAT` and keep its columns; it now wraps long cells instead of cutting them (a review noted the object column also widened from 20 to 40)
 - Given `invoke_rdl_lint.py`, should be covered by the wrapper layering test
 
 ---

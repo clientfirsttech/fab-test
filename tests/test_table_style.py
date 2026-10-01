@@ -67,3 +67,34 @@ class TestFindingsTable:
 
     def test_no_findings_is_an_empty_string(self):
         assert findings_table([], 120) == ""
+
+
+class TestEdgeCells:
+    def test_numeric_looking_cells_are_not_reformatted_or_right_aligned(self):
+        row = [{"rule": "R", "severity": "error", "object": "007", "message": "1e5"}]
+
+        out = findings_table(row, 80)
+
+        assert "007" in out
+        assert "1e5" in out
+        assert "100000" not in out
+
+    def test_a_missing_severity_counts_as_an_error_and_sorts_first(self):
+        rows = [
+            {"rule": "B", "severity": "warning", "object": "o", "message": "m"},
+            {"rule": "A", "object": "o", "message": "m"},
+        ]
+
+        out = findings_table(rows, 120)
+
+        assert out.index("Error") < out.index("Warning")
+
+    def test_info_sorts_after_warning(self):
+        rows = [
+            {"rule": "A", "severity": "info", "object": "o", "message": "m"},
+            {"rule": "B", "severity": "warning", "object": "o", "message": "m"},
+        ]
+
+        out = findings_table(rows, 120)
+
+        assert out.index("Warning") < out.index("Info")

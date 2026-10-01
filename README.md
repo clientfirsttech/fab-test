@@ -247,6 +247,8 @@ A default run explains itself for a person: a banner, a result line, and a summa
 $ fab-test bpa -q
 bpa warning e=0 w=25 fab-test-results/bpa/Report with Bookmarks - Broken Visuals/envelope.json
 bpa warning e=0 w=103 fab-test-results/bpa/SampleModel-PQLAssert/envelope.json
+$ fab-test rdl -q
+rdl failed e=3 w=3 fab-test-results/rdl/QRY-02/envelope.json
 ```
 
 One line per artifact: `<analyzer> <status> e=<errors> w=<warnings> <where>`, where `<where>` is the envelope with the findings. Exit codes and every file under `fab-test-results/` are unchanged, and a failure still says why: a missing credential, a timeout, or a crash prints its message above the lines.

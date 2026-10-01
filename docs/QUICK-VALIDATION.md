@@ -131,6 +131,7 @@ fab-test pql-test SampleModel-PQLAssert --env DEV
 
 ```bash
 fab-test bpa -q
+fab-test rdl -q
 fab-test local -q
 ```
 

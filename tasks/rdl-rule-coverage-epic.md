@@ -41,7 +41,7 @@ For each family (parameters, layout/subreports, accessibility, query/data source
 
 ## Tier A fixtures
 
-Add a real `.rdl` per rule, in `.fabric/artifacts/rdl/`, for the 26 Tier A rules with none: STR-01, DS-01, DS-05, DS-07, QRY-02..QRY-07, PRM-01, PRM-03, PRM-04, PRM-05, LAY-01..LAY-06, SUB-01 (fires via LAY-03), SUB-02, ACC-01, ACC-02, ACC-03, ACC-08.
+Add a real `.rdl` per rule, in `.fabric/artifacts/rdl/`, for the 20 planned Tier A rules: DS-01, QRY-03, QRY-05, QRY-06, QRY-07, PRM-01, PRM-03, PRM-04, PRM-05, LAY-01..LAY-06, SUB-01 (fires via LAY-03), SUB-02, ACC-01, ACC-02, ACC-08. Then set each to `"status": "active"`. Known risks to check against the real file when promoting: LAY-05 flags every table (the default `Details` group counts as a group), QRY-03 treats any quoted second argument as a dataset scope and misses nested parentheses, SUB-01 shares LAY-03's switches.
 
 **Requirements**:
 - Given each fixture, should be authored or round-tripped in Report Builder rather than hand-written XML, so it reflects a real file

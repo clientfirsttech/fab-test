@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-10-01
+
+- ✨ - `fab-test rdl` Only Runs Verified Rules - Each rule in `rdl-rules.json` is `active` or `planned`; a rule becomes active once a real Report Builder fixture named for it (`.fabric/artifacts/rdl/<RULE-ID>.rdl`) trips it, and planned rules neither run nor appear in results. Eight rules are active (STR-01, DS-02, DS-05, DS-07, QRY-01, QRY-02, QRY-04, ACC-03); the other Tier A rules wait for their fixtures. `docs/RDL-RULES.md` lists every rule with its source links.
+- ✨ - Findings Say Where And What - A finding's `object` is now a path (`Dataset › Field`, `Tablix › Textbox`) and its message quotes the offending query, filter or expression; a rule that fires on several elements has one `test_results` row per hit, and each row carries `source_urls`.
+- ✨ - `rdl` Verbose Output - `fab-test rdl -v` prints a wrapped Rule/Severity/Object/Message table in the house format, each path once, and `-q`/`-vv` follow the shared verbosity ladder.
+- 🐛 - QRY-04 Never Fired On A Real Report - It looked for `SortExpressions` inside `Group`, but Report Builder writes them beside `Group` in `TablixMember` and under `Tablix`. A sort by an aggregate is no longer flagged.
+- 🐛 - DS-01 Asked For Something Power BI Doesn't Support - Paginated reports in the Power BI service have no shared data sources, so DS-01 now flags only a password in a connect string. DS-05, DS-07 and QRY-07 now apply only to SQL providers, and DS-05 ignores comments and catches `TOP`/`DISTINCT`.
+
 ## 2026-09-29
 
 - 📦 - Version `1.9.0b1` - Second public beta, carrying the terse CLI output work: `-q/--quiet`, the `verbosity` config key, and the shorter default output. Install docs and the skill pin the new version.

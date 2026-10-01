@@ -59,7 +59,7 @@ def wrap(text: Any, width: int) -> str:
     return "\n".join(lines) if lines else ""
 
 
-_SEVERITY_ORDER = {"error": 0, "warning": 1}
+_SEVERITY_ORDER = {"error": 0, "warning": 1, "info": 2}
 
 
 def findings_table(findings: list[dict[str, Any]], terminal_width: int) -> str:
@@ -74,7 +74,7 @@ def findings_table(findings: list[dict[str, Any]], terminal_width: int) -> str:
     ordered = sorted(
         findings,
         key=lambda f: (
-            _SEVERITY_ORDER.get(str(f.get("severity")).lower(), 2),
+            _SEVERITY_ORDER.get(str(f.get("severity") or "error").lower(), 0),
             str(f.get("rule") or "").lower(),
             str(f.get("object") or "").lower(),
         ),
@@ -82,7 +82,7 @@ def findings_table(findings: list[dict[str, Any]], terminal_width: int) -> str:
     rows = [
         (
             str(f.get("rule") or ""),
-            str(f.get("severity") or "").capitalize(),
+            str(f.get("severity") or "error").capitalize(),
             str(f.get("object") or ""),
             str(f.get("message") or ""),
         )
@@ -102,4 +102,5 @@ def findings_table(findings: list[dict[str, Any]], terminal_width: int) -> str:
         headers=("Rule", "Severity", "Object", "Message"),
         tablefmt=TABLE_FORMAT,
         stralign="left",
+        disable_numparse=True,
     )

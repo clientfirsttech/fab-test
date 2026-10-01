@@ -78,12 +78,12 @@ A finding names where the problem is and what was found:
 - **Object** is a path through the report, `Outer › Inner`: `DataSet1 › Test` for
   a calculated field, `Tablix1 › Textbox3` for a textbox inside a table. A
   top-level item is just its name.
-- **Message** quotes the offending query, filter or expression (cut to fit), so
+- **Message** quotes the offending query, filter or expression (a fragment, not the whole thing), so
   a CI annotation, which shows only the message, still identifies it.
 - A rule that fires on several elements gives one row per hit in the report's
   Results table.
 - `fab-test rdl --verbose` prints the findings as a Rule / Severity / Object /
-  Message table, like the other analyzers.
+  Message table; long cells wrap onto further lines rather than being cut.
 
 ## Testing the rules
 

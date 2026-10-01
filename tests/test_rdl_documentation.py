@@ -133,3 +133,10 @@ def test_the_agent_skill_explains_finding_paths_and_per_hit_rows():
     text = _skill_text()
     assert "Dataset › Field" in text
     assert "one `test_results` row per hit" in text
+
+
+def test_quiet_output_is_documented_for_all_three_callers():
+    """The human, the pipeline author and the agent each need `rdl -q`."""
+    assert "fab-test rdl -q" in _README.read_text(encoding="utf-8")
+    assert "fab-test rdl -q" in _QUICK_VALIDATION.read_text(encoding="utf-8")
+    assert "fab-test rdl -q" in _skill_text()

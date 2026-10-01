@@ -278,4 +278,4 @@ class TestPlannedRulesAreInvisible:
 
         data = json.loads(output.read_text(encoding="utf-8"))
         assert [r["rule"] for r in data["test_results"]] == ["FAKE-01"]
-        assert "(1 rule(s)," in data["message"]
+        assert "(1 rule(s) checked)" in data["message"]
