@@ -21,6 +21,7 @@ from ._analyzer_tool_bootstrap import (
     probe_executable,
     resolve_executable,
 )
+from ._artifact_types import load_artifact_map
 from ._credentials import configured_workspace, probe_credentials
 from ._desktop import (
     DesktopMatchError,
@@ -28,11 +29,11 @@ from ._desktop import (
     detect_desktop_instances,
     match_instance_to_artifact,
 )
-from ._metadata import ANALYZERS, BPA_RULES, PBIR_RULES, default_repo_root, metadata_path
+from ._metadata import ANALYZERS, BPA_RULES, PBIR_RULES, RDL_RULES, default_repo_root, metadata_path
 from ._pbip_discovery import discover_pbip_projects
 from ._report_html import resolve_report
-from ._rule_overlay import apply_overlay, apply_pbir_overlay
-from ._scan import find_artifact_dirs
+from ._rule_overlay import apply_overlay, apply_pbir_overlay, apply_rdl_overlay
+from ._scan import find_artifact_dirs, find_files_by_suffix
 from ._target import ResolvedTarget
 from .playwright_validation.rdl_datasource import (
     parse_rdl_power_bi_datasource,
@@ -65,6 +66,7 @@ _DEFAULT_BPA_RULES = str(metadata_path(BPA_RULES, REPO_ROOT))
 _DEFAULT_INSPECTOR_PATH = str(REPO_ROOT / "PBIR-Inspector" / "PBIRInspectorCLI")
 _DEFAULT_A11Y_PATH = str(REPO_ROOT / "pbir-a11y" / "dist" / "cli.js")
 _DEFAULT_PBIR_RULES = str(metadata_path(PBIR_RULES, REPO_ROOT))
+_DEFAULT_RDL_RULES = str(metadata_path(RDL_RULES, REPO_ROOT))
 
 ANALYZERS_JSON = metadata_path(ANALYZERS, REPO_ROOT)
 
@@ -78,6 +80,7 @@ ANALYZER_REGISTRY: dict[str, tuple[str, str]] = {
     "playwright": ("*.Report", "Playwright visual/error validation"),
     "playwright-impact": ("", "Playwright impact manifest builder"),
     "dependencies": ("", "Report dependency discovery"),
+    "rdl": ("*.rdl", "RDL (paginated report) static analysis"),
 }
 
 # Analyzers kept out of the advertised surface: absent from `--help`,
@@ -111,6 +114,7 @@ ANALYZER_SCOPES: dict[str, frozenset[str]] = {
     "pbir": frozenset({"path", "desktop"}),
     "a11y": frozenset({"path", "desktop"}),
     "pql_lint": frozenset({"path", "desktop"}),
+    "rdl": frozenset({"path", "desktop"}),
     "pql_test": frozenset({"path", "desktop", "workspace"}),
     "playwright": frozenset({"path", "workspace"}),
     "playwright-impact": frozenset({"path", "workspace"}),
@@ -281,18 +285,30 @@ def discover_artifacts(
     wrong. Every other scope narrows the scan by name, and by type when
     the target carries one — which is how ``Sales.SemanticModel`` stops
     selecting ``Sales.Report``.
+
+    A glob can name either a Fabric folder type (``*.SemanticModel``) or a
+    flat-file suffix (``*.rdl`` — a paginated report is a single file, not
+    a folder with a Fabric type suffix). Which shape it is comes from
+    ``artifact-map.json``: a suffix declared there is a folder; anything
+    else is a file. Both paths share the rest of this function's
+    filtering, so a flat-file analyzer gets the same target/path/type
+    narrowing a folder one already has.
     """
+    suffix = glob.lstrip("*")
+    is_folder_suffix = suffix in load_artifact_map(REPO_ROOT)
+
     if target is not None and target.path is not None:
         resolved = target.path.resolve()
-        return [resolved] if resolved.is_dir() and resolved.name.endswith(glob.lstrip("*")) else []
+        matches_shape = resolved.is_dir() if is_folder_suffix else resolved.is_file()
+        return [resolved] if matches_shape and resolved.name.endswith(suffix) else []
 
     if not artifact_dir.exists():
         return []
-    suffix = glob.lstrip("*")
-    artifacts = find_artifact_dirs(
-        artifact_dir,
-        (suffix,),
-        excluded_paths=[output_dir] if output_dir is not None else (),
+    excluded_paths = [output_dir] if output_dir is not None else ()
+    artifacts = (
+        find_artifact_dirs(artifact_dir, (suffix,), excluded_paths=excluded_paths)
+        if is_folder_suffix
+        else find_files_by_suffix(artifact_dir, suffix, excluded_paths=excluded_paths)
     )
     if target is None:
         return artifacts
@@ -341,6 +357,48 @@ def _resolve_pbir_rules_path(args: argparse.Namespace, output_dir: Path) -> Path
         return Path(_DEFAULT_PBIR_RULES)
     resolved = apply_pbir_overlay(Path(_DEFAULT_PBIR_RULES), overlay)
     return _write_resolved_rules(resolved, output_dir, "pbir")
+
+
+def _resolve_rdl_rules_path(args: argparse.Namespace, output_dir: Path) -> Path:
+    """Resolve the RDL rules file: overlay-applied unless --rules-path was
+    passed explicitly, in which case it's used verbatim.
+    """
+    explicit = getattr(args, "rdl_rules_path", _DEFAULT_RDL_RULES)
+    if explicit != _DEFAULT_RDL_RULES:
+        return Path(explicit)
+    overlay = getattr(args, "file_config", {}).get("rules", {}).get("rdl", {})
+    if not overlay:
+        return Path(_DEFAULT_RDL_RULES)
+    resolved = apply_rdl_overlay(Path(_DEFAULT_RDL_RULES), overlay)
+    return _write_resolved_rules(resolved, output_dir, "rdl")
+
+
+def build_rdl_command(
+    artifact: Path,
+    args: argparse.Namespace,
+    output_dir: Path,
+) -> list[str]:
+    """Build fab-test's own RDL static-analysis command for ``artifact``.
+
+    No external tool to resolve -- pure Python on the standard library, so
+    there is no ``--tool-path`` flag and nothing for ``resolve_tool`` to do.
+    ``--report``/``--open-report`` need no flag either: the wrapper's
+    ``attach_report`` reads ``ANALYZER_REPORT``, the same env var every
+    other in-process report already goes through.
+    """
+    rules_path = _resolve_rdl_rules_path(args, output_dir)
+    output = output_dir / "rdl" / artifact.stem / "envelope.json"
+    return [
+        sys.executable,
+        "-m",
+        _script_module("invoke_rdl_lint"),
+        "--artifact-path",
+        str(artifact),
+        "--rules-path",
+        str(rules_path),
+        "--output-path",
+        str(output),
+    ]
 
 
 def build_bpa_command(
@@ -742,6 +800,7 @@ _COMMAND_BUILDERS: dict[str, Any] = {
     "playwright": build_playwright_command,
     "playwright-impact": build_playwright_impact_command,
     "dependencies": build_dependencies_command,
+    "rdl": build_rdl_command,
 }
 
 

@@ -28,6 +28,8 @@ Discovery matches on folder suffix (`*.SemanticModel`, `*.Report`), never on con
 | `fab-test pql-test` | Do my semantic model DAX tests pass? (requires Power BI Desktop open) |
 | `pytest -m playwright` | Is the Playwright wrapper code correct? (mocked contract tests) |
 | `fab-test playwright` | Do my Power BI reports render without visual-load errors? (requires service-principal credentials) |
+| `pytest -m rdl` | Is the rdl rule engine correct? (always green, no external tool — pure Python) |
+| `fab-test rdl` | Do my paginated (`.rdl`) reports pass the active performance/correctness/accessibility rules? (no external tool required) |
 
 ## Installation
 
@@ -313,6 +315,7 @@ The case a pipeline meets most is a `detail` populated on an aborted run: `fab-t
  fab-test bpa              — Tabular Editor Best Practice Analyzer (SemanticModel artifacts)
  fab-test pbir             — PBIR Inspector static report analysis (Report artifacts)
  fab-test a11y             — pbir-a11y accessibility checks (Report artifacts) — opt-in, not run by `fab-test all`
+ fab-test rdl              — RDL static analysis: the active rules for paginated reports (.rdl files) — no external tool
  fab-test pql-test         — pql-test DAX/PQL test runner (SemanticModel artifacts) [alias: pql_test]
  fab-test playwright       — Playwright visual/error validation (Report artifacts)
  fab-test playwright-impact — Build impacted-report manifest from changed artifacts [alias: playwright_impact]
@@ -343,6 +346,6 @@ use the original underscore names regardless of which spelling you invoke.
 | [references/credentials.md](references/credentials.md) | You need to know how `fab-test` resolves an identity, or what `auth status`/`auth login` do |
 | [references/reports.md](references/reports.md) | You're generating or debugging the HTML `--report` output, the per-run index, or its search/sort/filter behavior |
 | [references/configuration.md](references/configuration.md) | You're touching `fab-test.yml`, precedence, telemetry, rule overlays, or metadata-file resolution |
-| [references/flags.md](references/flags.md) | You need the full global flag table or a specific subcommand's flags (`bpa`, `pbir`, `a11y`, `pql-test`, `playwright`, `playwright-impact`, `dependencies`, `all`, `local`) |
+| [references/flags.md](references/flags.md) | You need the full global flag table or a specific subcommand's flags (`bpa`, `pbir`, `a11y`, `rdl`, `pql-test`, `playwright`, `playwright-impact`, `dependencies`, `all`, `local`) |
 | [references/operations.md](references/operations.md) | You need `--dry-run`/verbosity behavior, the on-disk result layout, tool-resolution order, or pre-flight checks |
 | [references/source-files.md](references/source-files.md) | You're navigating or modifying the `fab-test` implementation itself |

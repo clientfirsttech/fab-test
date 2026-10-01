@@ -217,6 +217,13 @@ fab-test pbir --inspector-path "/path/to/PBIRInspectorCLI"
 # by default -- add "a11y" to fab_test_all in analyzers.json to opt in.
 fab-test a11y
 
+# Run the active (fixture-verified) rules against paginated (.rdl) reports -- pure Python,
+# no external tool, always ready. Included in `fab-test all` by default.
+# Every rule and its source links: docs/RDL-RULES.md
+# --verbose adds a findings table; each finding names its path (Dataset › Field)
+# and quotes the query or expression that broke the rule.
+fab-test rdl
+
 # Run pql-test DAX tests
 fab-test pql-test --env DEV
 
@@ -240,6 +247,8 @@ A default run explains itself for a person: a banner, a result line, and a summa
 $ fab-test bpa -q
 bpa warning e=0 w=25 fab-test-results/bpa/Report with Bookmarks - Broken Visuals/envelope.json
 bpa warning e=0 w=103 fab-test-results/bpa/SampleModel-PQLAssert/envelope.json
+$ fab-test rdl -q
+rdl failed e=3 w=3 fab-test-results/rdl/QRY-02/envelope.json
 ```
 
 One line per artifact: `<analyzer> <status> e=<errors> w=<warnings> <where>`, where `<where>` is the envelope with the findings. Exit codes and every file under `fab-test-results/` are unchanged, and a failure still says why: a missing credential, a timeout, or a crash prints its message above the lines.

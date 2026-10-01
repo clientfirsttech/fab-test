@@ -36,8 +36,22 @@ TEST_HARD = 900
 # test_complexity_budget.py.
 EXEMPTIONS: dict[str, tuple[int, str]] = {
     "src/fab_test/scripts/fab_test_parser.py": (
-        1067,
+        1097,
         (
+            "2026-09-30: merge of main into feat/rdl-static-analysis -- main's -q/verbosity additions "
+            "plus this branch's rdl additions both landed here, so the ceiling is the sum of the two. "
+            "2026-09-27: +16 lines adding _add_rdl_subparser -- one more "
+            "subcommand builder, same shape as every other one already here "
+            "(_add_pql_lint_subparser is its closest model: no external-tool "
+            "path flag, just --rules-path like _add_pbir_subparser's). "
+            "+13 lines adding --rdl-rules-path to _add_all_subparser, "
+            "dest=rdl_rules_path -- found live that reusing pbir's own "
+            "--rules-path/rules_path name here made `fab-test all` hand rdl "
+            "pbir's resolved rules path instead of its own, since that name "
+            "already defaults to _DEFAULT_PBIR_RULES on the `all` subparser; "
+            "this mirrors --bpa-rules-path/bpa_rules_path, bpa's own "
+            "dedicated flag for the same reason "
+            "(RDL Static Analysis epic). "
             "2026-08-31: +11 lines adding a `name` positional and --list to "
             "the skill subparser, so `fab-test skill` can list known skills "
             "and print one by name (fab-test Skill Listing). "
@@ -82,8 +96,10 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
         ),
     ),
     "src/fab_test/scripts/fab_test_summary.py": (
-        948,
+        954,
         (
+            "2026-10-01: +6 lines (_WRAPPER_PRINTS_FINDINGS) so the verbose summary does not repeat "
+            "the findings table the rdl wrapper already printed (RDL review). "
             "2026-09-01: +5 net lines teaching the summary that an analyzer can "
             "exit 0 and still be warning us -- _artifact_status now reads a "
             "`warning` envelope as a warning instead of falling through to "
@@ -118,8 +134,21 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
         ),
     ),
     "src/fab_test/scripts/fab_test_registry.py": (
-        977,
+        1026,
         (
+            "2026-09-30: merge of main into feat/rdl-static-analysis -- main's -q/verbosity additions "
+            "plus this branch's rdl additions both landed here, so the ceiling is the sum of the two. "
+            "2026-09-27: +40 lines registering the rdl analyzer -- "
+            "ANALYZER_REGISTRY/ANALYZER_SCOPES entries, _resolve_rdl_rules_path "
+            "(mirrors _resolve_pbir_rules_path), build_rdl_command, and its "
+            "_COMMAND_BUILDERS entry. Smaller than a11y's own registration "
+            "(PBIR Accessibility Integration epic) because rdl wraps no "
+            "external tool: no _BOOTSTRAPPED_ANALYZERS/_BOOTSTRAP_REGISTRY_NAME/"
+            "_TOOL_FLAG_HINTS entry, and no explicit-path branch in "
+            "resolve_tool/_readiness_without_version -- those already fall "
+            "through to \"no external tool required\" for any analyzer absent "
+            "from _BOOTSTRAPPED_ANALYZERS and _CLOUD_ANALYZERS (RDL Static "
+            "Analysis epic). "
             "2026-08-31: +28 lines adding _report_parameters_for_command, "
             "which derives --report-parameters from a discovered .rdl "
             "file's own <ReportParameters> block when not given explicitly "

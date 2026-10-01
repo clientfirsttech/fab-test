@@ -1,13 +1,17 @@
 # RDL Static Analysis Epic
 
-**Status**: 📋 PLANNED
-**Goal**: `fab-test rdl` runs the 28 Tier A rules from [plan/rdl-rule-set.md](../plan/rdl-rule-set.md) against local `.rdl` files, with no workspace and no new dependency.
+**Status**: ✅ COMPLETED (2026-09-27)
+**Goal**: `fab-test rdl` runs the 28 Tier A rules from [plan/rdl-rule-set.md](../../plan/rdl-rule-set.md) against local `.rdl` files, with no workspace and no new dependency.
 
 ## Overview
 
 Paginated reports are the only report type fab-test finds but never checks: `.rdl` files are read only to feed Playwright's rendering, so unused datasets, report-side filters and joins, page overflow, invalid parameter combinations, and missing alt text all surface after publish, if at all. No upstream analyzer reads RDL (Fab Inspector is PBIR/JSON only), so like `prompt_lint` this is an in-house analyzer. The checks are written in Python on stdlib `xml.etree`, and a JSON rule catalog holds each rule's ID, severity, source, and disabled flag, tuned through the same `rules.<analyzer>` overlay in `fab-test.yml` that BPA and PBIR use. Envelope, exit code, HTML report, CI annotations, and telemetry all follow the existing analyzer contract. Tier B (heuristic) and Tier C (cross-file, service, or manual) rules are left for follow-up epics.
 
 ---
+
+## Fixture policy
+
+Each remaining task adds one or a small set of real `.rdl` fixtures to `.fabric/artifacts/` — named for what they exercise (e.g. `PaginatedExample-SubreportInTablix.rdl`) — alongside the checks that read them, mirroring `PaginatedExample-BrokenRDL.rdl` and the existing broken-visuals samples. Real Report Builder output over hand-typed XML wherever the user can supply it; synthesized (an edited copy of an existing sample) otherwise. Fixtures land with their task, not ahead of it — a fixture with no check yet reading it goes stale silently. These feed both the `rdl` marker's contract tests and `fab-test rdl` used as a demo.
 
 ## Rule catalog and analyzer skeleton
 
@@ -114,3 +118,20 @@ Update all three callers with the `document` skill, then bump the MINOR version.
 - Given the README, should show `fab-test rdl` running on a sample `.rdl` and list each rule ID with its severity and source
 - Given the fab-test skill, should document `rdl`'s targets, exit codes, and finding shape in SudoLang, with the packaged copy kept identical (`tests/test_skill_resource.py`)
 - Given the pipeline docs, should give a copy-paste YAML step that fails only on High findings
+
+---
+
+## Closing notes (added at archive time)
+
+All 9 tasks (discovery + 8 implementation/documentation tasks) completed and
+committed independently on `feat/rdl-static-analysis`, each verified through
+the real installed CLI against the repository's own sample `.rdl` files
+before committing, not just through unit tests. See
+[plan.md](../../plan.md)'s Completed Epics entry for the full summary,
+including the real defects and judgment calls found along the way.
+
+The README's "list each rule ID with its severity and source" line in the
+Documentation task above was interpreted narrowly: the worked example and
+the skill's `references/flags.md` describe the rule *families* and point to
+`plan/rdl-rule-set.md` for the full 28-row table, rather than duplicating
+that table a third time in README.md itself.

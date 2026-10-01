@@ -14,6 +14,7 @@ from pathlib import Path
 import pytest
 
 from fab_test.scripts._artifact_types import artifact_types
+from fab_test.scripts._target import _FILE_SUFFIX_TYPES as _RECOGNIZED_FILE_SUFFIX_TYPES
 from fab_test.scripts._target import (
     TargetError,
     parse_target,
@@ -222,15 +223,19 @@ def test_every_analyzer_glob_names_a_declared_type():
     the type list pinned at two. A type exists because Fabric has it; an
     analyzer handles it because someone wrote a wrapper. The containment
     that does matter is this direction: an analyzer cannot claim a glob
-    for a type the map has never heard of.
+    for a type the map has never heard of -- or, since rdl, for a
+    recognized flat-file suffix parse_target accepts even though
+    artifact-map.json has no folder entry for it (see
+    _FILE_SUFFIX_TYPES in _target.py).
     """
     from fab_test.scripts.fab_test_registry import ANALYZER_REGISTRY
 
     from_globs = {
         glob.lstrip("*.") for glob, _description in ANALYZER_REGISTRY.values() if glob
     }
+    known = set(artifact_types(Path.cwd())) | set(_RECOGNIZED_FILE_SUFFIX_TYPES)
 
-    assert from_globs <= set(artifact_types(Path.cwd()))
+    assert from_globs <= known
 
 
 @pytest.mark.fab_test
@@ -249,3 +254,15 @@ def test_the_type_list_comes_from_the_map_not_the_code():
     root = Path(__file__).resolve().parent.parent
 
     assert len(artifact_types(root)) >= 9
+
+
+@pytest.mark.fab_test
+def test_rdl_type_suffix_parses_even_though_it_is_not_in_the_artifact_map():
+    """Sales.rdl -- a paginated report is a flat file, not a
+    NAME.PaginatedReport/ folder, so "rdl" is not a value in
+    artifact-map.json the way "SemanticModel"/"Report" are. It still needs
+    to parse as a typed target rather than raise "unknown artifact type"."""
+    target = parse_target("Sales.rdl")
+
+    assert target.name == "Sales"
+    assert target.type == "rdl"

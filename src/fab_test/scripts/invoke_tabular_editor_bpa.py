@@ -39,6 +39,7 @@ from ._analyzer_envelope import (
 from ._analyzer_process import run_tool
 from ._report_html import attach_report
 from ._table_style import TABLE_FORMAT, table_padding
+from ._table_style import truncate as _truncate
 
 _VERBOSITY_LEVELS = {"summary": 0, "default": 1, "verbose": 2, "debug": 3}
 
@@ -161,13 +162,6 @@ def _format_bpa_message(
         f"({error_count} error(s), {warning_count} warning(s), "
         f"exit code {exit_code})"
     )
-
-
-def _truncate(text: str, width: int) -> str:
-    text = str(text).replace("\n", " ").replace("\r", "")
-    if len(text) <= width:
-        return text
-    return text[: width - 3] + "..." if width > 3 else text[:width]
 
 
 def _bpa_rule_id(finding: dict[str, Any]) -> str:

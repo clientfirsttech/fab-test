@@ -17,6 +17,7 @@ from fab_test.scripts._rule_overlay import (
     RuleOverlayError,
     apply_overlay,
     apply_pbir_overlay,
+    apply_rdl_overlay,
 )
 
 _RULE_A = {"ID": "RULE_A", "Name": "Rule A", "Severity": 1}
@@ -237,5 +238,112 @@ def test_apply_pbir_overlay_never_rewrites_upstream_file(tmp_path):
     original_text = upstream.read_text(encoding="utf-8")
 
     apply_pbir_overlay(upstream, {"disable": ["RULE_A"]})
+
+    assert upstream.read_text(encoding="utf-8") == original_text
+
+
+# --------------------------------------------------------------------------- #
+# RDL's own rule shape: {"rules": [{"id", "disabled", "severity"}]} -- same
+# {"rules": [...]} envelope as PBIR, but "severity" is set directly rather
+# than through a "logType" indirection, and "info" is a valid label.
+# --------------------------------------------------------------------------- #
+
+_RDL_RULE_A = {"id": "DS-02", "name": "No unused datasets", "disabled": False, "severity": "error"}
+_RDL_RULE_B = {"id": "QRY-07", "name": "Move complex SQL into views", "disabled": False, "severity": "warning"}
+
+
+def _write_rdl_rules(path, rules):
+    path.write_text(json.dumps({"rules": rules}), encoding="utf-8")
+
+
+@pytest.mark.fab_test
+def test_apply_rdl_overlay_marks_a_rule_disabled(tmp_path):
+    """RDL's own convention: disabling sets disabled=true rather than removing the rule."""
+    upstream = tmp_path / "rules.json"
+    _write_rdl_rules(upstream, [_RDL_RULE_A, _RDL_RULE_B])
+
+    resolved = apply_rdl_overlay(upstream, {"disable": ["DS-02"]})
+
+    by_id = {r["id"]: r for r in resolved["rules"]}
+    assert by_id["DS-02"]["disabled"] is True
+    assert by_id["QRY-07"]["disabled"] is False
+
+
+@pytest.mark.fab_test
+def test_apply_rdl_overlay_overrides_severity(tmp_path):
+    """A severity override sets the catalog's own severity field directly."""
+    upstream = tmp_path / "rules.json"
+    _write_rdl_rules(upstream, [_RDL_RULE_A])
+
+    resolved = apply_rdl_overlay(upstream, {"severity": {"DS-02": "warning"}})
+
+    assert resolved["rules"][0]["severity"] == "warning"
+
+
+@pytest.mark.fab_test
+def test_apply_rdl_overlay_accepts_info_severity_label(tmp_path):
+    """Unlike PBIR, the RDL catalog has no restriction ruling out 'info'."""
+    upstream = tmp_path / "rules.json"
+    _write_rdl_rules(upstream, [_RDL_RULE_A])
+
+    resolved = apply_rdl_overlay(upstream, {"severity": {"DS-02": "info"}})
+
+    assert resolved["rules"][0]["severity"] == "info"
+
+
+@pytest.mark.fab_test
+def test_apply_rdl_overlay_extends_with_additional_rules(tmp_path):
+    """Rules from the extend file are appended."""
+    upstream = tmp_path / "rules.json"
+    _write_rdl_rules(upstream, [_RDL_RULE_A])
+    extra = tmp_path / "extra.json"
+    extra_rule = {"id": "CUSTOM", "name": "Custom", "disabled": False, "severity": "warning"}
+    _write_rdl_rules(extra, [extra_rule])
+
+    resolved = apply_rdl_overlay(upstream, {"extend": str(extra)})
+
+    ids = {r["id"] for r in resolved["rules"]}
+    assert ids == {"DS-02", "CUSTOM"}
+
+
+@pytest.mark.fab_test
+def test_apply_rdl_overlay_raises_for_unmatched_id(tmp_path):
+    """Disabling an unknown rule ID raises, naming it."""
+    upstream = tmp_path / "rules.json"
+    _write_rdl_rules(upstream, [_RDL_RULE_A])
+
+    with pytest.raises(RuleOverlayError, match="NONEXISTENT"):
+        apply_rdl_overlay(upstream, {"disable": ["NONEXISTENT"]})
+
+
+@pytest.mark.fab_test
+def test_apply_rdl_overlay_raises_for_unknown_severity_label(tmp_path):
+    """An unrecognized severity label (not info/warning/error) is rejected."""
+    upstream = tmp_path / "rules.json"
+    _write_rdl_rules(upstream, [_RDL_RULE_A])
+
+    with pytest.raises(RuleOverlayError, match="critical"):
+        apply_rdl_overlay(upstream, {"severity": {"DS-02": "critical"}})
+
+
+@pytest.mark.fab_test
+def test_apply_rdl_overlay_preserves_other_top_level_keys(tmp_path):
+    """Top-level keys besides "rules" (e.g. "notes") survive the overlay unchanged."""
+    upstream = tmp_path / "rules.json"
+    upstream.write_text(json.dumps({"rules": [_RDL_RULE_A], "notes": "Tier A only"}), encoding="utf-8")
+
+    resolved = apply_rdl_overlay(upstream, {})
+
+    assert resolved["notes"] == "Tier A only"
+
+
+@pytest.mark.fab_test
+def test_apply_rdl_overlay_never_rewrites_upstream_file(tmp_path):
+    """apply_rdl_overlay never mutates or rewrites the upstream file."""
+    upstream = tmp_path / "rules.json"
+    _write_rdl_rules(upstream, [_RDL_RULE_A])
+    original_text = upstream.read_text(encoding="utf-8")
+
+    apply_rdl_overlay(upstream, {"disable": ["DS-02"]})
 
     assert upstream.read_text(encoding="utf-8") == original_text

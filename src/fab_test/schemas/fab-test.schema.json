@@ -67,6 +67,9 @@
         },
         "pbir": {
           "$ref": "#/$defs/ruleOverlay"
+        },
+        "rdl": {
+          "$ref": "#/$defs/ruleOverlay"
         }
       }
     },

@@ -8,6 +8,9 @@
 | `scripts/invoke_pbir_inspector.py` | PBIR Inspector subprocess wrapper |
 | `scripts/invoke_pql_test.py` | pql-test subprocess wrapper (venv-aware lookup, native JSON parsing) |
 | `scripts/invoke_pqlint.py` | pqlint subprocess wrapper |
+| `scripts/invoke_rdl_lint.py` | `rdl` CLI wrapper — envelope, `attach_report`, malformed-file handling; the pure rule logic lives in `_rdl_lint.py` |
+| `scripts/_rdl_lint.py` | `rdl`'s rule engine — namespace-agnostic XML parsing, the catalog loader and its validation, the `CHECKS` dispatch table, `run_checks`, the `test_results` builder |
+| `scripts/_rdl_checks_query.py`, `scripts/_rdl_checks_report.py`, `scripts/_rdl_common.py` | `rdl`'s check functions by family (schema/data source/query; parameters/layout/subreports/accessibility) and the helpers they share |
 | `scripts/invoke_playwright.py` | Playwright validation wrapper |
 | `scripts/invoke_playwright_impact.py` | Playwright impact manifest builder |
 | `scripts/invoke_playwright_dependencies.py` | Semantic-model dependency discovery wrapper |

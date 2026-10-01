@@ -20,10 +20,12 @@ from fab_test.scripts.fab_test_registry import (
     _DEFAULT_A11Y_PATH,
     _DEFAULT_BPA_RULES,
     _DEFAULT_PBIR_RULES,
+    _DEFAULT_RDL_RULES,
     build_a11y_command,
     build_bpa_command,
     build_pbir_command,
     build_pql_test_command,
+    build_rdl_command,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -233,6 +235,80 @@ def test_build_pbir_command_ignores_overlay_when_rules_path_passed_explicitly(tm
     idx = cmd.index("--rules-path")
     assert cmd[idx + 1] == str(custom_rules)
     assert not (output_dir / "pbir" / "_resolved-rules.json").exists()
+
+
+@pytest.mark.fab_test
+def test_build_rdl_command_uses_default_rules_verbatim_when_no_overlay(tmp_path):
+    """No overlay configured: --rules-path points at the packaged default, unchanged."""
+    artifact = tmp_path / "Sales.rdl"
+    artifact.write_text("<Report />", encoding="utf-8")
+    args = argparse.Namespace(file_config={})
+
+    cmd = build_rdl_command(artifact, args, tmp_path / "results")
+
+    idx = cmd.index("--rules-path")
+    assert cmd[idx + 1] == _DEFAULT_RDL_RULES
+
+
+@pytest.mark.fab_test
+def test_build_rdl_command_writes_resolved_rules_when_overlay_configured(tmp_path):
+    """An overlay writes a resolved ruleset under output_dir and points --rules-path at it."""
+    artifact = tmp_path / "Sales.rdl"
+    artifact.write_text("<Report />", encoding="utf-8")
+    args = argparse.Namespace(file_config={"rules": {"rdl": {"disable": ["DS-02"]}}})
+    output_dir = tmp_path / "results"
+
+    cmd = build_rdl_command(artifact, args, output_dir)
+
+    idx = cmd.index("--rules-path")
+    resolved_path = Path(cmd[idx + 1])
+    assert resolved_path == output_dir / "rdl" / "_resolved-rules.json"
+    resolved_doc = json.loads(resolved_path.read_text(encoding="utf-8"))
+    by_id = {r["id"]: r for r in resolved_doc["rules"]}
+    assert by_id["DS-02"]["disabled"] is True
+
+
+@pytest.mark.fab_test
+def test_build_rdl_command_ignores_overlay_when_rdl_rules_path_passed_explicitly(tmp_path):
+    """--rules-path explicit override wins verbatim, even with an overlay configured."""
+    artifact = tmp_path / "Sales.rdl"
+    artifact.write_text("<Report />", encoding="utf-8")
+    custom_rules = tmp_path / "custom-rules.json"
+    custom_rules.write_text('{"rules": []}', encoding="utf-8")
+    args = argparse.Namespace(
+        rdl_rules_path=str(custom_rules),
+        file_config={"rules": {"rdl": {"disable": ["ANYTHING"]}}},
+    )
+    output_dir = tmp_path / "results"
+
+    cmd = build_rdl_command(artifact, args, output_dir)
+
+    idx = cmd.index("--rules-path")
+    assert cmd[idx + 1] == str(custom_rules)
+    assert not (output_dir / "rdl" / "_resolved-rules.json").exists()
+
+
+@pytest.mark.fab_test
+def test_build_rdl_command_is_not_confused_by_all_s_shared_pbir_rules_path(tmp_path):
+    """Regression: `fab-test all` defines a top-level --rules-path/rules_path
+    dedicated to pbir (mirroring --bpa-rules-path for bpa), defaulted to
+    _DEFAULT_PBIR_RULES. Found live: rdl's report under `fab-test all
+    --report` showed PBIR Inspector's own rule catalog, because
+    build_rdl_command originally read that same `args.rules_path` --
+    always "explicitly overridden" by PBIR's default, which is never
+    rdl's own _DEFAULT_RDL_RULES. rdl now reads args.rdl_rules_path
+    instead, a name `all` also defines but defaults to _DEFAULT_RDL_RULES,
+    same shape as bpa's own dedicated flag."""
+    artifact = tmp_path / "Sales.rdl"
+    artifact.write_text("<Report />", encoding="utf-8")
+    # Mirrors what `fab-test all`'s Namespace actually looks like: pbir's
+    # own flag present and at its own default, no rdl_rules_path override.
+    args = argparse.Namespace(rules_path=_DEFAULT_PBIR_RULES, file_config={})
+
+    cmd = build_rdl_command(artifact, args, tmp_path / "results")
+
+    idx = cmd.index("--rules-path")
+    assert cmd[idx + 1] == _DEFAULT_RDL_RULES
 
 
 @pytest.mark.fab_test

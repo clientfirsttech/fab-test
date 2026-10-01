@@ -104,6 +104,7 @@ The warning says how many checkouts it skipped and gives you the
 fab-test bpa --dry-run
 fab-test pbir --dry-run
 fab-test a11y --dry-run
+fab-test rdl --dry-run
 fab-test pql-test --dry-run
 ```
 
@@ -113,6 +114,7 @@ fab-test pql-test --dry-run
 fab-test bpa --tabular-editor-path "/path/to/TabularEditor.exe"
 fab-test pbir --inspector-path "/path/to/PBIRInspectorCLI"
 fab-test a11y                            # requires Node.js >= 18 + npm the first time (built from source, then cached)
+fab-test rdl                             # active rules for paginated (.rdl) reports -- no external tool; --verbose lists each finding
 fab-test pql-test --env DEV
 ```
 
@@ -129,6 +131,7 @@ fab-test pql-test SampleModel-PQLAssert --env DEV
 
 ```bash
 fab-test bpa -q
+fab-test rdl -q
 fab-test local -q
 ```
 
@@ -395,6 +398,24 @@ fails loudly instead of quietly analyzing nothing.
 ```
 
 This is the case where uploading `run.json` alone still tells you what to fix. It stays `null` when the analyzer *did* write an envelope — then `envelope_path` points at the findings, and those are the reason. Credential values are redacted out of `detail` on the way in, as they are from `command`.
+
+### Pipeline snippet: rdl static analysis (no runtime, fails only on High findings)
+
+`rdl` needs no external tool or runtime setup at all — no `doctor` gate, no `setup-node`/`setup-dotnet` step, nothing to cache. High-severity rules map to `error` and fail the build; Medium/Low map to `warning` and only annotate:
+
+```yaml
+- name: Run rdl static analysis
+  run: fab-test rdl --format json --artifact-dir .fabric/artifacts
+
+- name: Upload run manifest
+  uses: actions/upload-artifact@v4
+  if: always()
+  with:
+    name: fab-test-rdl-manifest
+    path: fab-test-results/run.json
+```
+
+To tune which rules gate the build, add a `rules.rdl` overlay in the committed `fab-test.yml` (`disable`/`severity` — see [Rule Overlays](../.github/skills/fab-test/references/configuration.md#rule-overlays)) rather than a CLI flag; there's no `--fail-on`-style flag here, since `rdl`'s severities are already the rule set's own High/Medium/Low, not a single runtime threshold.
 
 ### Pipeline snippet: pbir-a11y accessibility checks (needs Node)
 

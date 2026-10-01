@@ -440,6 +440,12 @@ def _artifact_summary_line(data: dict[str, Any]) -> str:
     return "no findings"
 
 
+# The rdl wrapper already prints its wrapped findings table at -v; repeating
+# it here, truncated, is the duplicate the RDL review found. pbir and bpa
+# predate the shared table and still repeat theirs.
+_WRAPPER_PRINTS_FINDINGS = frozenset({"rdl"})
+
+
 def _print_findings_for_artifact(name: str, stem: str, output_dir: Path) -> None:
     """Read an artifact's envelope and print its findings table."""
     envelope = output_dir / name / stem / "envelope.json"
@@ -865,7 +871,7 @@ def _print_summary(
         if report:
             reports.append(report)
         print(f"  {_artifact_summary_prefix(code, status)}  {stem}{summary}")
-        if code != 0 and verbose and output_dir is not None:
+        if code != 0 and verbose and output_dir is not None and name not in _WRAPPER_PRINTS_FINDINGS:
             _print_findings_for_artifact(name, stem, output_dir)
 
     # A report that is written but never named reads as a flag that did

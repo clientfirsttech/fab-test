@@ -21,7 +21,7 @@ Run `fab-test list` for this table at any time — it has a Scopes column.
 
 | Analyzer | path / name | `local/` | `WORKSPACE.Workspace/` |
 |----------|-------------|----------|------------------------|
-| `bpa`, `pbir`, `a11y` | yes | yes | **no** |
+| `bpa`, `pbir`, `a11y`, `rdl` | yes | yes | **no** |
 | `pql-test` | yes | yes | yes |
 | `playwright`, `playwright-impact`, `dependencies` | yes | **no** | yes |
 
@@ -62,10 +62,23 @@ alongside `Report` for the Paginated Report Testing epic, so
 `WORKSPACE.Workspace/NAME.PaginatedReport` parses). The packaged copy is the
 fallback so an install from PyPI or a run outside a checkout behaves
 identically; a malformed map takes the same path as a missing one and warns.
-A local paginated report is the one type here with no corresponding folder
-convention: it is a flat `NAME.rdl` file, discovered by `playwright`
-specifically (see [Flags](flags.md)) rather than through this suffix map.
-Adding a type means editing the map, not the code.
+Adding a folder type means editing the map, not the code.
+
+**Flat-file artifacts.** A paginated report has no corresponding folder
+convention — it is a flat `NAME.rdl` file, never a `NAME.PaginatedReport/`
+folder in practice. `discover_artifacts` decides the shape from the
+analyzer's own glob: a suffix declared in `artifact-map.json` is a folder,
+scanned the directory-suffix way described above; anything else (`*.rdl`)
+is a file, found by walking for a matching filename instead. Both shapes
+share the same target/path/type narrowing — `Sales.rdl` and
+`Sales.SemanticModel` both resolve as a typed target, a path target checks
+`is_file()` or `is_dir()` to match the right shape, and the run's own
+result folder is pruned from discovery either way. `rdl` (see [Flags](flags.md))
+is the one analyzer that reads `.rdl` files today; `playwright` also
+discovers them, for the deployed report's local `.rdl` when one exists
+(dataset auto-resolution — see the `playwright` section in
+[Flags](flags.md)), and resolves everything else about a paginated report
+live regardless.
 
 **What is pruned, and why it is load-bearing.** Nested git checkouts
 (worktrees, vendored clones), `.venv`, `venv`, `env`, `node_modules`,
@@ -104,13 +117,16 @@ nothing was pruned, so `skipped_checkouts: []` with an empty `artifacts`
 means the root genuinely holds no artifacts — that is the distinction the
 key exists to make.
 
-**Unhandled types.** All ten types parse, so a target can name one no
-analyzer reads. `fab-test bpa Sales.Notebook` exits `2` with
-`bpa reads SemanticModel artifacts; 'Sales.Notebook' is a Notebook, which no
-fab-test analyzer reads`; where another analyzer does read that type it is
-named instead. Under `all`, the analyzer is skipped with the same message
-rather than failing the batch. `fab-test list`'s Glob column shows which
-suffix each analyzer handles.
+**Unhandled types.** All ten `artifact-map.json` types parse, so a target
+can name one no analyzer reads. `fab-test bpa Sales.Notebook` exits `2`
+with `bpa reads SemanticModel artifacts; 'Sales.Notebook' is a Notebook,
+which no fab-test analyzer reads`; where another analyzer does read that
+type it is named instead. Under `all`, the analyzer is skipped with the
+same message rather than failing the batch. `fab-test list`'s Glob column
+shows which suffix each analyzer handles. `rdl` (a file suffix, not a
+Fabric item type) parses the same way from a separate, small vocabulary
+just for flat-file analyzers — `Sales.rdl` is a valid typed target even
+though "rdl" is not in the ten-type list above.
 
 **In CI, keep passing `--artifact-dir` explicitly.** A default that follows
 the working directory is right at a prompt and wrong in a build: pinning the

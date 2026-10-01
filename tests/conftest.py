@@ -12,7 +12,7 @@ from fab_test.scripts._analyzer_envelope import EnvelopeIdentity, build_envelope
 from fab_test.scripts._analyzer_report import AnalyzerReporter, _resolve_verbosity
 
 # pytest markers that belong to the analyzer contract tier.
-_ANALYZER_MARKERS = {"bpa", "pbir", "pql_test", "pql_lint"}
+_ANALYZER_MARKERS = {"bpa", "pbir", "pql_test", "pql_lint", "rdl"}
 
 # Artifact glob per marker — used by zero-artifact detection.
 _MARKER_SUFFIX = {
@@ -20,6 +20,7 @@ _MARKER_SUFFIX = {
     "pbir": "*.Report",
     "pql_test": "*.SemanticModel",
     "pql_lint": "*.SemanticModel",
+    "rdl": "*.rdl",
 }
 
 

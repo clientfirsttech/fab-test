@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-10-01
+
+- ✨ - `fab-test rdl` Only Runs Verified Rules - Each rule in `rdl-rules.json` is `active` or `planned`; a rule becomes active once a real Report Builder fixture named for it (`.fabric/artifacts/rdl/<RULE-ID>.rdl`) trips it, and planned rules neither run nor appear in results. Eight rules are active (STR-01, DS-02, DS-05, DS-07, QRY-01, QRY-02, QRY-04, ACC-03); the other Tier A rules wait for their fixtures. `docs/RDL-RULES.md` lists every rule with its source links.
+- ✨ - Findings Say Where And What - A finding's `object` is now a path (`Dataset › Field`, `Tablix › Textbox`) and its message quotes the offending query, filter or expression; a rule that fires on several elements has one `test_results` row per hit, and each row carries `source_urls`.
+- ✨ - `rdl` Verbose Output - `fab-test rdl -v` prints a wrapped Rule/Severity/Object/Message table in the house format, each path once, and `-q`/`-vv` follow the shared verbosity ladder.
+- 🐛 - QRY-04 Never Fired On A Real Report - It looked for `SortExpressions` inside `Group`, but Report Builder writes them beside `Group` in `TablixMember` and under `Tablix`. A sort by an aggregate is no longer flagged.
+- 🐛 - DS-01 Asked For Something Power BI Doesn't Support - Paginated reports in the Power BI service have no shared data sources, so DS-01 now flags only a password in a connect string. DS-05, DS-07 and QRY-07 now apply only to SQL providers, and DS-05 ignores comments and catches `TOP`/`DISTINCT`.
+
 ## 2026-09-29
 
 - 📦 - Version `1.9.0b2` - Third public beta. The skill now tells agents to make `-q` their first invocation and escalate to `-v` only when a run fails, to save tokens. Install docs and the skill pin the new version.
@@ -25,6 +33,7 @@
 - ✨ - `playwright_user_name` Config Key - The effective-identity UPN for RLS embed tokens can be declared once in `fab-test.yml` instead of set per run. `PLAYWRIGHT_USER_NAME` still wins. `user_name` is now emitted only on cases that carry a role — a token for a model with no RLS is rejected outright when it carries an identity.
 - ✅ - Playwright Test-Generation Parity - Six golden CSVs captured from the dev workspace (`tests/fixtures/playwright-parity/`) now pin the exact `page × bookmark × role` matrix each report must generate, replayed from recorded discovery responses in the default suite and re-driven through the real CLI in a credential-gated live test. `tools/record_playwright_parity_fixtures.py` re-records them.
 - ⬆️ - pbir_a11y Tool Version Bump - `analyzers.json`'s `pbir_a11y` entry now pins `pbir-a11y` v0.5.0 (up from v0.3.2), with a matching `install_url` and `install_sha256`. The pinned-version cache keys off `tool_install.version`, so this is a plain cache-miss upgrade — no wrapper or contract changes needed.
+- ✨ - RDL Static Analysis - `fab-test rdl` is a new analyzer for paginated (`.rdl`) reports: Tier A rules covering structure/schema, data sources, query pushdown, parameters, layout/subreports, and accessibility (`plan/rdl-rule-set.md`), implemented in pure Python with no external tool or runtime dependency — `doctor` always reports it ready. Discovery of flat-file artifacts (`*.rdl`, not a `*.Type/` folder) is now generic in `discover_artifacts`, not specific to `playwright`. Tuned via a `rules.rdl` overlay in `fab-test.yml`, same shape as `bpa`/`pbir`. Included in `fab-test all`/`fab-test local` by default. Two real defects found live against the repository's own sample artifacts and fixed before landing: `PaginatedExample-LocalSemanticModel.rdl` had a genuinely unused dataset (DS-02), and `fab-test all` was handing `rdl` PBIR Inspector's own rules file instead of its own, because `all`'s subparser already dedicates `--rules-path` to `pbir` — fixed with a dedicated `--rdl-rules-path`, the same shape `bpa` already has for the same reason. Version bumped to `1.7.0.dev1`.
 
 ## 2026-09-18
 

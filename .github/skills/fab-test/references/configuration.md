@@ -146,7 +146,7 @@ Telemetry never changes a run's exit code, never writes to stdout under `--forma
 
 ## Rule Overlays
 
-Tune one Best Practice Analyzer or PBIR Inspector rule without forking the packaged rules file:
+Tune one Best Practice Analyzer, PBIR Inspector, or `rdl` rule without forking the packaged rules file:
 
 ```yaml
 rules:
@@ -157,9 +157,14 @@ rules:
   pbir:
     disable: [REMOVE_CUSTOM_VISUALS_NOT_USED]
     severity: {SOME_RULE_ID: warning}            # warning | error (PBIR Inspector has no "info" level)
+  rdl:
+    disable: [DS-02]
+    severity: {QRY-07: info}                     # info | warning | error
 ```
 
-An overlay naming a rule ID that doesn't exist upstream exits `2` listing every unmatched ID. When any overlay is configured, the resolved ruleset is written to `<output_dir>/{bpa,pbir}/_resolved-rules.json` and passed to the tool; the envelope's `rules_file` field always names whichever rules file was actually used, so a finding is traceable back to the resolved ruleset it came from. Passing `--bpa-rules-path`/`--rules-path` explicitly bypasses the overlay entirely — that file is used verbatim.
+An overlay naming a rule ID that doesn't exist upstream exits `2` listing every unmatched ID. When any overlay is configured, the resolved ruleset is written to `<output_dir>/{bpa,pbir,rdl}/_resolved-rules.json` and passed to the tool; the envelope's `rules_file` field always names whichever rules file was actually used, so a finding is traceable back to the resolved ruleset it came from. Passing `--bpa-rules-path`/`--rules-path` explicitly bypasses the overlay entirely — that file is used verbatim; for `rdl` the equivalent explicit override is `--rdl-rules-path` specifically, not `--rules-path` — `rdl` needed its own flag name because `fab-test all` already dedicates `--rules-path` to `pbir` (the same reason `bpa` has its own `--bpa-rules-path`).
+
+Two of `rdl`'s rules read a threshold from their own catalog entry instead of a fixed constant — `QRY-07.max_lines` (default `50`, long `CommandText`) and `SUB-02.max_subreports` (default `49`, so `50` fails per the rule's own name). Neither `disable`/`severity`/`extend` can change one (`extend` only appends new rule objects, it never replaces an existing ID's fields) — to change a threshold, pass `--rdl-rules-path` at a fully custom copy of the catalog with that one field edited; there's no config-file way to override just the threshold today.
 
 The full schema ships with the package at `schemas/fab-test.schema.json` (draft 2020-12) for editor completion.
 
@@ -177,6 +182,7 @@ Five files drive the CLI. Each resolves through the same three layers, first mat
 |------|-------------------|
 | `rules/BPARules.json` | Yes |
 | `rules/pbi-inspector-custom-rules.json` | Yes |
+| `rules/rdl-rules.json` | Yes |
 | `analyzers.json` | Yes |
 | `artifact-map.json` | Yes |
 | `environments.yml` | **No** |

@@ -100,6 +100,25 @@ Every other bootstrapped analyzer (`bpa`, `pbir`) downloads a pre-built binary a
 
 If `npm` or `node` is missing before the first build, `doctor` says which one distinctly (Node absent vs. npm absent are different remediations) rather than a generic "tool not found." `doctor` also checks for Node.js >= 18 on every run, not only the first — a cache copied from elsewhere, or Node uninstalled after the fact, is reported as not-ready by `doctor` itself rather than only surfacing once `fab-test a11y` is actually run. If it somehow still runs without Node present, the wrapper reports a clear envelope error rather than a traceback, the same way a missing binary is handled for every other analyzer.
 
+### rdl
+
+Static analysis for paginated (`.rdl`) reports: the active rules (Tier A rules are enabled once a real fixture verifies each; `status` in the catalog, listed in `docs/RDL-RULES.md`) covering structure/schema, data sources, query pushdown, parameters, layout/subreports, and accessibility — see [plan/rdl-rule-set.md](../../../../plan/rdl-rule-set.md) for what each rule ID checks. Pure Python on the standard library; **no external tool, no install step** — `doctor` always reports it ready. Every finding and `test_results` row carries `source_urls`, the guidance links for its rule (`docs/RDL-RULES.md` lists them all). A finding's `object` is a path (`Dataset › Field`, `Tablix › Textbox`) and its `message` quotes the offending query or expression, so the message alone identifies the offender; a rule that fires on several elements has one `test_results` row per hit. `--verbose` prints a Rule/Severity/Object/Message findings table.
+
+| Flag | Default |
+|------|---------|
+| `--rules-path PATH` | resolved via the metadata layers (`.fab-test/metadata/rules/rdl-rules.json` > `.github/metadata/...` > packaged) |
+
+```bash
+fab-test rdl                     # every discovered .rdl file
+fab-test rdl Sales                # one artifact by name (a flat .rdl file, not a folder)
+fab-test rdl Sales.rdl            # name and type, explicit
+fab-test rdl --format json
+```
+
+A `.rdl` file is discovered the same way a folder artifact is — by suffix, recursively under `--artifact-dir` — except the suffix is a file extension, not a folder name, so `discover_artifacts` matches it with `find_files_by_suffix` instead of the directory-suffix scan every other analyzer uses (see [Discovery](targeting-and-discovery.md#discovery)). Every finding carries `rule`/`severity`/`object`/`message`; `test_results` (in the same rule shape as `pbir`, see [Reports](reports.md)) covers every active rule, passed or fired (one row per hit) — `status` is `pass`, `skip` (disabled in the overlay), `warning`, or `error` per row; planned rules never appear. Tune a rule with a `rules.rdl` overlay in `fab-test.yml` — see [Rule Overlays](configuration.md#rule-overlays).
+
+`LAY-03` and `SUB-01` both name "a Subreport nested in a Tablix" — the same check produces one finding tagged `"LAY-03/SUB-01"` rather than two separate findings for the same gap; both catalog rows in `test_results` show that one finding.
+
 ### pql-test
 
 | Flag | Env var | Description |
@@ -577,13 +596,13 @@ Current default list:
 
 ```json
 {
-  "fab_test_all": ["bpa", "pbir", "pql_test"]
+  "fab_test_all": ["bpa", "pbir", "pql_test", "rdl"]
 }
 ```
 
-`playwright` is excluded from `fab-test all` by default but remains available as a direct subcommand.
+`playwright` and `a11y` are excluded from `fab-test all` by default but remain available as direct subcommands.
 
-Accepts the union of flags from `bpa`, `pbir`, and `pql-test`, plus `--playwright-env-file` for Playwright support.
+Accepts the union of flags from `bpa`, `pbir`, `pql-test`, and `rdl`, plus `--playwright-env-file` for Playwright support.
 
 ```bash
 fab-test all \

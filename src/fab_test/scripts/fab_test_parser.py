@@ -25,6 +25,7 @@ from .fab_test_registry import (
     _DEFAULT_BPA_RULES,
     _DEFAULT_INSPECTOR_PATH,
     _DEFAULT_PBIR_RULES,
+    _DEFAULT_RDL_RULES,
     _DEFAULT_TE_PATH,
 )
 from .fab_test_registry import (
@@ -441,6 +442,28 @@ def _add_pql_lint_subparser(subs: argparse._SubParsersAction) -> None:
     _add_common_flags(pql_lint_p)
 
 
+def _add_rdl_subparser(subs: argparse._SubParsersAction) -> None:
+    rdl_p = subs.add_parser(
+        "rdl",
+        help="RDL static analysis — performance/correctness/a11y rules (.rdl files)",
+    )
+    _add_common_flags(rdl_p)
+    # dest is rdl_rules_path, not the more obvious rules_path: the `all`
+    # subparser already defines a top-level --rules-path/rules_path
+    # dedicated to pbir (mirrors --bpa-rules-path/bpa_rules_path for bpa).
+    # Reusing that name here would make `fab-test all` silently hand rdl
+    # pbir's own resolved rules path instead of its own -- found live via
+    # `fab-test all --report`, whose rdl report showed PBIR Inspector's
+    # rule catalog (RULE_TEMPLATE, ENSURE_ALTTEXT, ...) instead of rdl's.
+    rdl_p.add_argument(
+        "--rules-path",
+        default=_DEFAULT_RDL_RULES,
+        dest="rdl_rules_path",
+        metavar="PATH",
+        help=f"RDL rules JSON [default: {_DEFAULT_RDL_RULES}]",
+    )
+
+
 def _add_playwright_subparser(subs: argparse._SubParsersAction) -> None:
     playwright_p = subs.add_parser(
         "playwright",
@@ -679,6 +702,12 @@ def _add_all_subparser(subs: argparse._SubParsersAction) -> None:
         "--rules-path",
         default=_DEFAULT_PBIR_RULES,
         dest="rules_path",
+        metavar="PATH",
+    )
+    all_p.add_argument(
+        "--rdl-rules-path",
+        default=_DEFAULT_RDL_RULES,
+        dest="rdl_rules_path",
         metavar="PATH",
     )
     all_p.add_argument(
@@ -987,6 +1016,7 @@ _SUBPARSER_BUILDERS = (
     _add_a11y_subparser,
     _add_pql_test_subparser,
     _add_pql_lint_subparser,
+    _add_rdl_subparser,
     _add_playwright_subparser,
     _add_playwright_impact_subparser,
     _add_dependencies_subparser,

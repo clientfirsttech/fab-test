@@ -27,6 +27,13 @@ from pathlib import Path
 
 from ._artifact_types import artifact_types
 
+# Recognized ".Type" tokens that aren't Fabric folder types from
+# artifact-map.json. A paginated report is a flat NAME.rdl file, not a
+# NAME.PaginatedReport/ folder (Paginated Report RDL Data Source
+# Resolution epic), so "rdl" needs its own recognized type token
+# alongside the folder-suffix vocabulary `artifact_types` supplies.
+_FILE_SUFFIX_TYPES: tuple[str, ...] = ("rdl",)
+
 _LOCAL_SCHEME = "local"
 _WORKSPACE_SUFFIX = ".workspace"
 _SEPARATOR_PATTERN = re.compile(r"[/\\]")
@@ -249,7 +256,7 @@ def parse_target(raw: str, *, root: Path | None = None) -> ResolvedTarget:
     if not target:
         raise TargetError(f"empty target; {_ACCEPTED_FORMS}")
 
-    known = artifact_types(root if root is not None else Path.cwd())
+    known = artifact_types(root if root is not None else Path.cwd()) + _FILE_SUFFIX_TYPES
 
     if _EXPLICIT_PATH_PATTERN.match(target):
         return _parse_path(target, raw, known)

@@ -17,6 +17,7 @@ Constraints {
   (task adds to, or reviews a diff touching, a file over 400 lines) => load aidd-module-budgets
   (task plans, adds, reviews, or changes an analyzer subcommand, invoke_*.py wrapper, or its registration) => load aidd-analyzer-contract; its Constraints are the minimum bar for parity with the other analyzers
   (task involves code changes) => use aidd-tdd — write tests before implementation
+  (planning or executing an epic) => its last task is always "Quality gates" (whole-repo ruff, complexity and module-budget ratchets, coverage floor, CI-env run), per vision.md's Definition of Done; no task follows it
   All skills resolve to: .github/skills/<skill-name>/SKILL.md
   Epic files: tasks/<epic-name>-epic.md
 }
