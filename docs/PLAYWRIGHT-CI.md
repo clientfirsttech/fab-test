@@ -2,7 +2,7 @@
 
 `fab-test playwright` opens each published report in a real browser, page by page, and fails the run when a visual doesn't render. It is the one analyzer that needs a **service principal**: it has to generate an embed token, and an `az login` session can't do that.
 
-This guide takes you from nothing to a passing local run, then to the same run in GitHub Actions. Do these steps in order. Each step is a prerequisite for the next, and the local run is how you know the setup is right before you involve CI.
+This guide takes you from nothing to a passing local run, then to the same run in GitHub Actions. Prefer the Azure CLI to the portal? [GETTING-STARTED.md](GETTING-STARTED.md) scripts steps 1 and 3 below with `az`, including writing the client secret straight to `.fab-test/.env`. Do these steps in order. Each step is a prerequisite for the next, and the local run is how you know the setup is right before you involve CI.
 
 | Step | Where | Who usually does it |
 |------|-------|---------------------|

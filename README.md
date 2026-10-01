@@ -32,6 +32,11 @@ fab-test --version
 In a pipeline, pin the exact version rather than `--pre`: `--pre` also lets
 pre-releases of *dependencies* in, not only this package.
 
+New here? [docs/GETTING-STARTED.md](https://github.com/clientfirsttech/fab-test/blob/main/docs/GETTING-STARTED.md)
+walks from a fresh install through `fab-test init`, a service principal created
+with the Azure CLI (API permissions, client secret saved to `.fab-test/.env`,
+workspace roles), to a first `fab-test playwright` run from the console.
+
 ### From source in editable mode (developers)
 
 Editable mode links the package source into the active environment so code changes are reflected immediately.
