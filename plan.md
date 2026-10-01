@@ -4,6 +4,9 @@ Guiding vision and constraints: [vision.md](vision.md)
 
 ## Active Epics
 
+- **RDL Quiet Output** — 📋 PLANNED. `fab-test rdl` needs `-q/--quiet` and the rest of the verbosity ladder `main` already has for the other analyzers (this branch is 75 commits behind). See [tasks/rdl-quiet-output-epic.md](tasks/rdl-quiet-output-epic.md).
+- **RDL Finding Clarity** — ✅ all four tasks done (2026-09-30), not yet archived. `fab-test rdl --verbose` matches PBIR/BPA, findings carry a `Dataset › Field` path and quote the offender, every hit has a Results row, docs updated; also fixed QRY-04, which never fired on real RDL. See [tasks/rdl-finding-clarity-epic.md](tasks/rdl-finding-clarity-epic.md).
+- **RDL Rule Coverage** — 📋 PLANNED. Fixtures for the 26 Tier A rules with none, Tier B checks (DS-03 first; its fixture is a strict xfail in `tests/test_rdl_fixture_rules.py`), and Tier C triage. See [tasks/rdl-rule-coverage-epic.md](tasks/rdl-rule-coverage-epic.md).
 - **Playwright CI Guide** — 🔄 IN-PROGRESS (2/7). Setup guide drafted; 5 of 6 CLI/doc mismatches from the first local run are fixed, plus the render spec now ships inside the package instead of `tests/` (Render Spec Packaging). Remaining: the demo workflow, example workflow, drift test, and the live end-to-end run. A step-by-step guide (`docs/PLAYWRIGHT-CI.md`) covering service-principal grants, tenant settings, workspace role, and GitHub Environment setup, plus a copy-ready example workflow under `docs/examples/github-actions/` and a manually triggered `playwright-demo.yml` in this repository behind a protected `fabric-demo` Environment. The demo deliberately reverses the no-credentials policy in `tests/test_workflow_triggers.py` for that one workflow. Both workflows are guarded by a drift test and proven locally from `.fab-test/.env` first, then in CI. See [tasks/playwright-ci-guide-epic.md](tasks/playwright-ci-guide-epic.md).
 
 ## Standalone Tasks
