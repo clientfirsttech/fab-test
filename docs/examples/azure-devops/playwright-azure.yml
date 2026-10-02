@@ -3,7 +3,7 @@ pr: none
 pool:
   vmImage: ubuntu-latest
 variables:
-  - group: fab-demo
+  - group: fabric-demo
 steps:
   - checkout: self
   - task: UsePythonVersion@0

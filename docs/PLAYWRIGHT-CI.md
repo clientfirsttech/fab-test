@@ -232,17 +232,24 @@ error, not a broken-visual finding; raw connection diagnostics are withheld
 to avoid exposing authorization headers. There is no automatic local fallback.
 Plan-only does not require the Azure token or launch a browser.
 
+### Watching the browser locally
+
+Browsers are hidden by default, which is what CI wants. For a live demonstration on a
+developer machine, add `--headed` (optionally `--slow-mo 500` and `--workers 1`), or select
+[`headed.yml`](examples/playwright/headed.yml). Do not use these in CI: a hosted runner has
+no display, and Azure-hosted browsers ignore them with a warning.
+
 ### GitHub Actions and Azure DevOps
 
 The [GitHub Actions example](examples/github-actions/playwright-azure.yml)
-uses a protected Environment named `fab-demo`. Add the existing Fabric
+uses a protected Environment named `fabric-demo`. Add the existing Fabric
 credential secrets plus `PLAYWRIGHT_SERVICE_ACCESS_TOKEN` to that Environment.
 Store `PLAYWRIGHT_SERVICE_URL` and `FABRIC_WORKSPACE_ID` as Environment
 variables; the example also accepts an existing endpoint secret. Configure
 required reviewers and ensure the job's `environment:` name matches.
 
 The [Azure DevOps example](examples/azure-devops/playwright-azure.yml) uses
-an authorized variable group named `fab-demo`. Mark
+an authorized variable group named `fabric-demo`. Mark
 `FABRIC_CLIENT_SECRET` and `PLAYWRIGHT_SERVICE_ACCESS_TOKEN` secret, add the
 tenant/client IDs, endpoint, workspace ID, and `PLAYWRIGHT_ARTIFACT`, and map
 them explicitly into the test step's environment. Restrict group permissions.

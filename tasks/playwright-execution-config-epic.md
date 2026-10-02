@@ -11,7 +11,7 @@ To shorten CI report validation without changing its verdicts, let callers selec
 
 ## Prove Python Azure browser compatibility (completed 2026-10-01)
 
-Verified Python Playwright 1.63.0 and pytest-playwright 0.9.0: a direct remote Chromium smoke passed and paginated rendering was exercised. **Correction:** the isolated [proof harness](../tools/prove_azure_playwright.py) matrix run was not evidence of remote execution, because pytest-playwright's own fixtures overrode the harness's, so it ran locally. Remote matrix execution was first verified through the shipped adapter (a two-worker Azure run matched the local one-failed/one-passed verdict, and an invalid token was rejected as an execution error rather than passing locally). The harness's `ws_endpoint` key was also stale for Playwright 1.63, whose `connect()` takes `endpoint`.
+Verified Python Playwright 1.63.0 and pytest-playwright 0.9.0: a direct remote Chromium smoke passed and paginated rendering was exercised. **Correction:** the isolated proof harness (since retired) matrix run was not evidence of remote execution, because pytest-playwright's own fixtures overrode the harness's, so it ran locally. Remote matrix execution was first verified through the shipped adapter (a two-worker Azure run matched the local one-failed/one-passed verdict, and an invalid token was rejected as an execution error rather than passing locally). The harness's `ws_endpoint` key was also stale for Playwright 1.63, whose `connect()` takes `endpoint`.
 
 **Requirements**:
 - Given a user-provided endpoint and service access token, should prove a generated report case executes on an Azure-hosted browser through Python pytest without Node, npm, or a TypeScript runner.

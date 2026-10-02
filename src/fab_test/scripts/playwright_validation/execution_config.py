@@ -144,14 +144,24 @@ def add_execution_flags(parser: argparse.ArgumentParser) -> None:
         "--workers", type=int, default=None, metavar="N",
         help="Max generated-case pytest workers [env: PLAYWRIGHT_XDIST_WORKERS, default: 4]",
     )
+    parser.add_argument(
+        "--headed", action="store_true",
+        help="Show the local browser windows (for demonstrations; ignored on Azure-hosted browsers)",
+    )
+    parser.add_argument(
+        "--slow-mo", type=float, default=None, metavar="MS",
+        help="Pause MS milliseconds between browser actions so a viewer can follow (local browsers only)",
+    )
 
 
 def forward_execution_flags(command: list[str], args: argparse.Namespace) -> None:
-    """Forward the selected execution config and existing worker override."""
-    for name in ("playwright_config", "workers"):
+    """Forward the selected execution config, worker override, and demo flags."""
+    for name in ("playwright_config", "workers", "slow_mo"):
         value = getattr(args, name, None)
         if value is not None:
-            command.extend(["--" + name.replace("_", "-"), str(value)])
+            command.extend(["--" + name.replace("_", "-"), f"{value:g}" if name == "slow_mo" else str(value)])
+    if getattr(args, "headed", False):
+        command.append("--headed")
 
 
 def prepare_execution(args: argparse.Namespace, repo_root: Path) -> int | None:

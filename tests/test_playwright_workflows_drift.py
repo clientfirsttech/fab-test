@@ -141,14 +141,14 @@ def test_azure_examples_keep_python_and_publish_after_failure(platform):
     if platform == "github-actions":
         assert set(_triggers(data)) == {"workflow_dispatch"}
         job = data["jobs"]["validate"]
-        assert job["environment"] == "fab-demo"
+        assert job["environment"] == "fabric-demo"
         assert job["env"]["PLAYWRIGHT_SERVICE_ACCESS_TOKEN"] == "${{ secrets.PLAYWRIGHT_SERVICE_ACCESS_TOKEN }}"
         upload = next(step for step in job["steps"] if "upload-artifact" in step.get("uses", ""))
         assert upload["if"] == "always()"
         assert upload["with"]["path"] == "fab-test-results/"
     else:
         assert data["trigger"] == data["pr"] == "none"
-        assert data["variables"] == [{"group": "fab-demo"}]
+        assert data["variables"] == [{"group": "fabric-demo"}]
         run = next(step for step in data["steps"] if "bash" in step)
         assert run["env"]["PLAYWRIGHT_SERVICE_ACCESS_TOKEN"] == "$(PLAYWRIGHT_SERVICE_ACCESS_TOKEN)"
         publishers = [step for step in data["steps"] if step.get("task", "").startswith("Publish")]

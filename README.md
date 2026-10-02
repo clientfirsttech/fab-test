@@ -339,6 +339,18 @@ for the full walkthrough and
 [docs/examples/github-actions/playwright-live.yml](https://github.com/clientfirsttech/fab-test/blob/main/docs/examples/github-actions/playwright-live.yml)
 for a copy-ready workflow.
 
+**Showing the browser for a demonstration.** Browsers are hidden by default. Add
+`--headed` to watch the local windows, and `--slow-mo 500` to pause 500 ms between
+actions so an audience can follow. Use one worker so windows open one at a time:
+
+```bash
+fab-test playwright --artifact "Not Working Visuals" --env DEV --headed --slow-mo 500 --workers 1
+```
+
+The same settings live in [docs/examples/playwright/headed.yml](https://github.com/clientfirsttech/fab-test/blob/main/docs/examples/playwright/headed.yml)
+for `--playwright-config`. These flags apply to local browsers only; on Azure-hosted
+browsers there is no local window, so they are ignored with a warning.
+
 **Optional Azure-hosted browsers** keep Python Playwright and pytest on the
 invoking machine while moving browsers to Azure. Select a credential-free
 YAML file with `--playwright-config`; omitting it keeps local execution:

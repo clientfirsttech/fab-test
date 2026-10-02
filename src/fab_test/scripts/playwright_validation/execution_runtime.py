@@ -7,6 +7,7 @@ import inspect
 import json
 import os
 import shutil
+import sys
 from html import escape
 from pathlib import Path
 from typing import Any
@@ -22,6 +23,8 @@ from .execution_config import ExecutionConfig, resolve_execution_config
 EXECUTION_PATH = "FAB_TEST_PLAYWRIGHT_EXECUTION_CONFIG"
 EXECUTION_RUN_ID = "FAB_TEST_PLAYWRIGHT_RUN_ID"
 EXECUTION_REPORT_ROOT = "FAB_TEST_PLAYWRIGHT_REPORT_ROOT"
+EXECUTION_LAUNCH = "FAB_TEST_PLAYWRIGHT_LAUNCH_OVERRIDES"
+_PLUGIN = "fab_test.scripts.playwright_validation.execution_plugin"
 _XDIST_MAX_WORKERS = 4
 # Playwright renamed connect()'s first parameter from ws_endpoint to endpoint.
 _ENDPOINT_KEYWORD = (
@@ -103,11 +106,28 @@ def _resolve_xdist_workers(case_count: int, max_workers: int = 4) -> int | None:
     return min(case_count, max_workers) if case_count > 1 else None
 
 
+def launch_overrides(args: argparse.Namespace, config: ExecutionConfig) -> dict[str, Any]:
+    """Collect --headed/--slow-mo; Azure-hosted browsers cannot show a local window."""
+    overrides: dict[str, Any] = {}
+    if getattr(args, "headed", False):
+        overrides["headless"] = False
+    slow_mo = getattr(args, "slow_mo", None)
+    if slow_mo is not None:
+        if slow_mo < 0:
+            raise ConfigError("--slow-mo must be a nonnegative number of milliseconds")
+        overrides["slow_mo"] = slow_mo
+    if overrides and config.backend == "azure":
+        print("::warning::--headed/--slow-mo are ignored: Azure-hosted browsers have no local window", file=sys.stderr)
+        return {}
+    return overrides
+
+
 def prepare_wrapper_execution(args: argparse.Namespace) -> None:
     """Validate configuration and credentials before any Fabric API call."""
     root = Path.cwd()
     file_config, _ = merged_file_config(root, root / "pyproject.toml")
     args.execution_config = resolve_execution_config(getattr(args, "playwright_config", None), file_config, root)
+    args.execution_launch = launch_overrides(args, args.execution_config)
     if args.execution_config.path:
         args.workers = resolve_workers(args.execution_config, getattr(args, "workers", None))
     args.execution_environment = (
@@ -125,6 +145,9 @@ def apply_execution_environment(
     environment.pop(EXECUTION_PATH, None)
     environment.pop(EXECUTION_RUN_ID, None)
     environment.pop(EXECUTION_REPORT_ROOT, None)
+    environment.pop(EXECUTION_LAUNCH, None)
+    if getattr(args, "execution_launch", None):
+        environment[EXECUTION_LAUNCH] = json.dumps(args.execution_launch)
     if config.path:
         environment[EXECUTION_PATH] = str(config.path)
         environment[EXECUTION_RUN_ID] = str(uuid4())
@@ -140,6 +163,8 @@ def apply_execution_environment(
 def configure_pytest_execution(command: list[str], environment: dict[str, str]) -> None:
     """Load the optional adapter and keep its native reports with case evidence."""
     if not environment.get(EXECUTION_PATH):
+        if environment.get(EXECUTION_LAUNCH):
+            command += ["-p", _PLUGIN]
         return
     report_root = (
         Path(environment[EXECUTION_REPORT_ROOT]) if environment.get(EXECUTION_REPORT_ROOT)
@@ -150,7 +175,7 @@ def configure_pytest_execution(command: list[str], environment: dict[str, str]) 
         for prefix, path in replacements.items():
             if argument.startswith(prefix):
                 command[index] = f"{prefix}{path}"
-    command += ["-p", "fab_test.scripts.playwright_validation.execution_plugin"]
+    command += ["-p", _PLUGIN]
 
 
 def execution_failure(returncode: int, result_dirs: list[Path]) -> str | None:

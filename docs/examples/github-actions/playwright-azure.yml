@@ -11,7 +11,7 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-latest
-    environment: fab-demo
+    environment: fabric-demo
     env:
       FABRIC_TENANT_ID: ${{ secrets.FABRIC_TENANT_ID }}
       FABRIC_CLIENT_ID: ${{ secrets.FABRIC_CLIENT_ID }}

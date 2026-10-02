@@ -1,7 +1,8 @@
-"""pytest-playwright fixtures loaded only for an explicitly selected YAML."""
+"""pytest-playwright fixtures loaded for an explicit YAML or --headed/--slow-mo."""
 
 from __future__ import annotations
 
+import json
 import os
 import re
 from collections.abc import Callable
@@ -10,8 +11,8 @@ from typing import Any
 import pytest
 from playwright.sync_api import Browser, Error
 
-from .execution_config import resolve_execution_config
-from .execution_runtime import EXECUTION_PATH, EXECUTION_RUN_ID, browser_connection_options
+from .execution_config import ExecutionConfig, resolve_execution_config
+from .execution_runtime import EXECUTION_LAUNCH, EXECUTION_PATH, EXECUTION_RUN_ID, browser_connection_options
 
 
 class ExecutionFixtures:
@@ -19,18 +20,20 @@ class ExecutionFixtures:
 
     @pytest.fixture(scope="session")
     def execution_config(self):
-        """Load the already validated execution selection in each worker."""
-        return resolve_execution_config(os.environ[EXECUTION_PATH])
+        """Load the already validated selection; no YAML means unchanged local defaults."""
+        path = os.environ.get(EXECUTION_PATH)
+        return resolve_execution_config(path) if path else ExecutionConfig()
 
     @pytest.fixture(scope="session")
     def connect_options(self, execution_config) -> dict[str, Any] | None:
         """Use Azure only when explicitly configured; never silently fall back."""
-        return browser_connection_options(execution_config, os.environ, os.environ[EXECUTION_RUN_ID])
+        return browser_connection_options(execution_config, os.environ, os.environ.get(EXECUTION_RUN_ID, ""))
 
     @pytest.fixture(scope="session")
     def browser_type_launch_args(self, browser_type_launch_args, execution_config) -> dict[str, Any]:
-        """Apply the supported launch settings through the upstream fixture."""
-        return {**browser_type_launch_args, **execution_config.launch}
+        """Apply YAML launch settings, then command-line overrides, through the upstream fixture."""
+        overrides = json.loads(os.environ.get(EXECUTION_LAUNCH) or "{}")
+        return {**browser_type_launch_args, **execution_config.launch, **overrides}
 
     @pytest.fixture(scope="session")
     def browser_context_args(self, browser_context_args, execution_config) -> dict[str, Any]:

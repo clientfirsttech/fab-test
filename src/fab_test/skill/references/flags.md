@@ -185,6 +185,8 @@ Playwright validation can run in three modes: static `.env` mode, service-resolv
 | `--plan-only` | Discover the matrix, write `test-cases.csv`/`.json`, and stop — no embed token, no browser. Unlike `--dry-run`, which only lists matching artifacts, this resolves each one |
 | `--workers N` | Max `pytest-xdist` workers for running generated cases concurrently (default: `4`) [env: `PLAYWRIGHT_XDIST_WORKERS`] |
 | `--playwright-config PATH` | Optional validated local/Azure browser YAML [env: `PLAYWRIGHT_CONFIG_PATH`; config: `playwright_config`]. Not the global `--config` flag |
+| `--headed` | Show the local browser windows; off by default. Overrides `launch.headless` in the YAML. Ignored with a warning on Azure-hosted browsers |
+| `--slow-mo MS` | Pause MS milliseconds between browser actions (nonnegative; local browsers only; overrides `launch.slow_mo`). A negative value exits `2` |
 
 The execution selector resolves flag > process environment > fab-test config >
 local default. Flag/environment paths are relative to the invocation directory;
