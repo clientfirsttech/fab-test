@@ -26,6 +26,7 @@ _EXPECTED_KEYS = {
     "environment",
     "workspace",
     "playwright_user_name",
+    "playwright_config",
 }
 
 # Resolved by metadata layer rather than by flag/env/config, so their origins

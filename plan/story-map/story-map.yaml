@@ -6,3 +6,6 @@ storyMap:
     - file: terse-cli-output.yaml
       id: o3tm4x418ja9f1mif2300424
       name: Terse CLI Output
+    - file: playwright-execution-config.yaml
+      id: pwexec20261001journey0001
+      name: Playwright Execution Configuration

@@ -162,12 +162,109 @@ Against a report with a broken visual, the same command exits `1` and names only
 
 `--report` writes `report.html` next to it, which links each case to its screenshot.
 
+## Azure-hosted browsers
+
+This optional backend runs only the browsers on Azure. Python Playwright,
+pytest, and xdist run on your machine or CI runner; fab-test still generates
+the same page/bookmark/role cases and writes the same verdicts and evidence.
+No Node/npm runner, custom tests, cross-report sharding, or Azure portal
+reporter is installed. The proof used Python Playwright 1.63.0 with
+pytest-playwright 0.9.0; keep Playwright compatible with the workspace service.
+
+1. Create or select an Azure Playwright workspace and enable **access-token
+  authentication** in its authentication settings. This release uses a
+  service access token, not Entra authentication for the browser service.
+2. Copy its browser endpoint and create an access token. Store both locally
+  in `.fab-test/.env`, never in committed YAML or a chat message:
+
+  ```dotenv
+  PLAYWRIGHT_SERVICE_URL=wss://<regional-host>/playwrightworkspaces/<workspace-id>/browsers
+  PLAYWRIGHT_SERVICE_ACCESS_TOKEN=<service-access-token>
+  ```
+
+  Keep the three `FABRIC_*` credentials above: they generate Power BI embed
+  tokens and are not substitutes for this browser-service token. Process
+  environment values win over the selected env file. File selection is
+  `--env-file` > `PLAYWRIGHT_ENV_FILE` > `.fab-test/.env` > `./.env`.
+3. Install the Python pytest plugins from step 5. For Azure, skip the local
+  Chromium download; Python connects to remote browsers instead.
+4. Select the [credential-free example](examples/playwright/azure.yml):
+
+  ```bash
+  fab-test playwright --artifact "Not Working Visuals" --env DEV --report \
+    --playwright-config docs/examples/playwright/azure.yml --workers 8
+  ```
+
+The selector resolves `--playwright-config` > `PLAYWRIGHT_CONFIG_PATH` >
+`playwright_config` in fab-test config > local default. Flag/environment paths
+are invocation-relative; config-key paths are relative to their owning file.
+`fab-test config --show` shows the selection and origin. Set the environment
+selector when using `doctor`; it checks credentials without connecting:
+
+```powershell
+$env:PLAYWRIGHT_CONFIG_PATH = "docs/examples/playwright/azure.yml"
+fab-test doctor
+fab-test config --show
+```
+
+Omitting a selector keeps local execution even if Azure credentials exist.
+Use `backend: local` in YAML to customize local browsers without service
+credentials. Supported keys are `backend`, positive `workers`, `launch`
+(`headless`, string-list `args`, nonnegative `slow_mo`), `context` (`viewport`
+width/height, `locale`, `timezone_id`, `color_scheme`, `ignore_https_errors`),
+and Azure `connection` (`os`, `timeout_ms`, `expose_network`). Defaults are
+Linux, 30000 ms connection timeout, and `<loopback>` exposure. Broader network
+exposure is opt-in; choose it only when required for a trusted target.
+`PLAYWRIGHT_TIMEOUT_SECONDS` still controls report rendering, not connection.
+Arbitrary plugins, tests, reporters, and executable configurations are refused.
+
+Workers resolve `--workers` > `PLAYWRIGHT_XDIST_WORKERS` > YAML > `4`.
+Only cases within the current report are parallelized, capped by its case
+count. Begin with a modest limit and respect your Azure service quota; more
+workers do not guarantee faster reports. Contexts and browser sessions use
+pytest-playwright's normal teardown.
+
+For selected YAML, native pytest HTML and JUnit are written to
+`<output-dir>/playwright/<report>/report/index.html` and `results.xml`.
+The facade envelope, `report.html`, and `test-cases/` evidence keep their
+existing locations. Connection/authentication failure becomes an execution
+error, not a broken-visual finding; raw connection diagnostics are withheld
+to avoid exposing authorization headers. There is no automatic local fallback.
+Plan-only does not require the Azure token or launch a browser.
+
+### GitHub Actions and Azure DevOps
+
+The [GitHub Actions example](examples/github-actions/playwright-azure.yml)
+uses a protected Environment named `fab-demo`. Add the existing Fabric
+credential secrets plus `PLAYWRIGHT_SERVICE_ACCESS_TOKEN` to that Environment.
+Store `PLAYWRIGHT_SERVICE_URL` and `FABRIC_WORKSPACE_ID` as Environment
+variables; the example also accepts an existing endpoint secret. Configure
+required reviewers and ensure the job's `environment:` name matches.
+
+The [Azure DevOps example](examples/azure-devops/playwright-azure.yml) uses
+an authorized variable group named `fab-demo`. Mark
+`FABRIC_CLIENT_SECRET` and `PLAYWRIGHT_SERVICE_ACCESS_TOKEN` secret, add the
+tenant/client IDs, endpoint, workspace ID, and `PLAYWRIGHT_ARTIFACT`, and map
+them explicitly into the test step's environment. Restrict group permissions.
+
+Both examples build this repository's feature checkout with Python 3.12,
+publish all result evidence after failure, and propagate fab-test's nonzero
+exit code. For another repository, replace the source install with a pinned
+fab-test release containing `--playwright-config` and the same Python pytest
+plugins. These YAML examples were syntax-checked; live execution on either
+CI platform is a separate validation, not implied by the local Azure proof.
+Rotate tokens before expiry and immediately after accidental disclosure;
+update local and CI stores together. Do not echo, commit, or pass tokens on
+the command line. Browser offload does not upload results to the Azure portal.
+
 ## Exit codes
 
 | Exit | Meaning | What to do |
 |------|---------|------------|
 | `0` | Every case rendered | Nothing |
-| `1` | A case failed to render, **or** setup is incomplete: missing credentials, no environment, or a report name that isn't in the workspace | Read the line under `▶ fab-test playwright`. A setup problem names the variable or flag to set; a render failure names the visual |
+| `1` | A case failed or an attempted run had an execution error | Read the envelope and remediation; browser-service errors are not visual findings |
+| `2` | Invalid execution YAML or argument/configuration | Correct the named config path or setting |
+| `127` | Missing credentials or other prerequisites | Set the named variables and run `doctor` again |
 
 For example, an incomplete service principal names every missing variable:
 

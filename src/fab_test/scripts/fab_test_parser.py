@@ -34,6 +34,7 @@ from .fab_test_registry import (
 from .fab_test_registry import (
     HIDDEN_ANALYZERS as _HIDDEN_ANALYZERS,
 )
+from .playwright_validation.execution_config import add_execution_flags
 
 _GUID_RE = re.compile(
     r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
@@ -576,19 +577,7 @@ def _add_playwright_subparser(subs: argparse._SubParsersAction) -> None:
             "(default: auto)"
         ),
     )
-    playwright_p.add_argument(
-        "--workers",
-        type=int,
-        default=None,
-        dest="workers",
-        metavar="N",
-        help=(
-            "Max pytest-xdist workers for running generated cases "
-            "concurrently [env: PLAYWRIGHT_XDIST_WORKERS, default: 4]. "
-            "Raise this on a machine that can safely run more concurrent "
-            "browser instances (e.g. a beefier VM)."
-        ),
-    )
+    add_execution_flags(playwright_p)
 
 def _add_playwright_impact_subparser(subs: argparse._SubParsersAction) -> None:
     impact_p = subs.add_parser(

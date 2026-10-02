@@ -339,6 +339,22 @@ for the full walkthrough and
 [docs/examples/github-actions/playwright-live.yml](https://github.com/clientfirsttech/fab-test/blob/main/docs/examples/github-actions/playwright-live.yml)
 for a copy-ready workflow.
 
+**Optional Azure-hosted browsers** keep Python Playwright and pytest on the
+invoking machine while moving browsers to Azure. Select a credential-free
+YAML file with `--playwright-config`; omitting it keeps local execution:
+
+```bash
+fab-test playwright --artifact "Not Working Visuals" --env DEV \
+  --playwright-config docs/examples/playwright/azure.yml --workers 8 --report
+```
+
+Store `PLAYWRIGHT_SERVICE_URL` and `PLAYWRIGHT_SERVICE_ACCESS_TOKEN` in the
+gitignored `.fab-test/.env` or the process environment, separately from Fabric
+embedding credentials. See [Azure browser setup](https://github.com/clientfirsttech/fab-test/blob/main/docs/PLAYWRIGHT-CI.md#azure-hosted-browsers)
+for supported settings, token authentication, and Python-only GitHub Actions
+and Azure DevOps examples. More workers parallelize cases within one report,
+not reports; service limits still apply.
+
 ### Playwright tests every page, bookmark, and role by default
 
 `fab-test playwright` discovers a report's pages, each page's own bookmarks,

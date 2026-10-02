@@ -163,6 +163,7 @@ _SETTING_SPECS: list[tuple[str, str | None, Any, type | None]] = [
     ("environment", "FABRIC_ENVIRONMENT", "", None),
     ("workspace", "FABRIC_WORKSPACE_ID", "", None),
     ("playwright_user_name", "PLAYWRIGHT_USER_NAME", "", None),
+    ("playwright_config", "PLAYWRIGHT_CONFIG_PATH", "", None),
 ]
 
 _SECRET_KEY_MARKERS = ("secret", "password", "token", "api_key")
@@ -260,6 +261,8 @@ _FAB_TEST_YML_TEMPLATE = """\
 #                                  # effective-identity UPN for RLS embed tokens
 #                                  # [env: PLAYWRIGHT_USER_NAME]; only used for
 #                                  # cases that carry a discovered role
+# playwright_config: .fab-test/playwright.yml
+#                                  # optional local/Azure YAML [env: PLAYWRIGHT_CONFIG_PATH]
 
 # Rule overlays: deltas applied to a packaged ruleset instead of forking it.
 # rules:
@@ -307,6 +310,12 @@ PLAYWRIGHT_WORKSPACE_ID=
 PLAYWRIGHT_REPORT_ID=
 PLAYWRIGHT_REPORT_NAME=
 PLAYWRIGHT_DATASET_ID=
+
+# Optional Azure browsers: enable access-token authentication in the workspace.
+# Selected only by --playwright-config / PLAYWRIGHT_CONFIG_PATH / playwright_config.
+# Keep the access token here or in protected CI secrets, never in execution YAML.
+PLAYWRIGHT_SERVICE_URL=
+PLAYWRIGHT_SERVICE_ACCESS_TOKEN=
 
 # A paginated (RDL) report is validated with a different check than an
 # interactive one -- skips page/bookmark/role discovery and checks for an

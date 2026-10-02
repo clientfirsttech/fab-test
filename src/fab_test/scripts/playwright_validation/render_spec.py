@@ -59,7 +59,10 @@ def browser_type_launch_args(browser_type_launch_args: dict[str, Any]) -> dict[s
     working reference implementation (pbi-dataops-visual-error-testing),
     which launches Chromium the same way.
     """
-    return {**browser_type_launch_args, "args": ["--disable-web-security"]}
+    return {
+        **browser_type_launch_args,
+        "args": [*browser_type_launch_args.get("args", []), "--disable-web-security"],
+    }
 
 
 TEST_CASES = _load_test_cases()

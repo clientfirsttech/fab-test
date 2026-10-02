@@ -36,6 +36,7 @@ If both `fab-test.yml` and `[tool.fab-test]` are present, `fab-test.yml` wins pe
 | `report` | boolean | `ANALYZER_REPORT` | `false` — see [Reports](reports.md) |
 | `open_report` | boolean | `ANALYZER_OPEN_REPORT` | `false` — implies `report`; no-op under CI — see [Open Report](reports.md#open-report) |
 | `playwright_user_name` | string | `PLAYWRIGHT_USER_NAME` | (none) — effective-identity UPN for RLS embed tokens; only reaches cases that carry a discovered role |
+| `playwright_config` | string | `PLAYWRIGHT_CONFIG_PATH` | (none) - optional local/Azure execution YAML; relative to the owning config file; `--playwright-config` wins |
 | `rules` | object | — | (none) — see Rule Overlays below |
 | `telemetry` | object | — | (none) — see Telemetry below |
 

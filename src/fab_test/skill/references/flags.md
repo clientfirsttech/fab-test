@@ -184,6 +184,32 @@ Playwright validation can run in three modes: static `.env` mode, service-resolv
 | `--roles {auto,none}` | Discover RLS/OLS roles from the semantic model and test the page matrix under each one whenever RLS is in play — `PLAYWRIGHT_USE_RLS`, **or** an effective-identity user being configured at all (default: `auto`); `none` tests only `PLAYWRIGHT_ROLE` |
 | `--plan-only` | Discover the matrix, write `test-cases.csv`/`.json`, and stop — no embed token, no browser. Unlike `--dry-run`, which only lists matching artifacts, this resolves each one |
 | `--workers N` | Max `pytest-xdist` workers for running generated cases concurrently (default: `4`) [env: `PLAYWRIGHT_XDIST_WORKERS`] |
+| `--playwright-config PATH` | Optional validated local/Azure browser YAML [env: `PLAYWRIGHT_CONFIG_PATH`; config: `playwright_config`]. Not the global `--config` flag |
+
+The execution selector resolves flag > process environment > fab-test config >
+local default. Flag/environment paths are relative to the invocation directory;
+`playwright_config` paths are relative to their owning YAML or pyproject file.
+`config --show` reports the selection and origin; dry-run makes no browser
+connection. Worker limits resolve `--workers` > `PLAYWRIGHT_XDIST_WORKERS` >
+execution YAML > `4` and are bounded by the current report's case count.
+
+Execution YAML permits only `backend` (`local`/`azure`), positive `workers`,
+`launch` (`headless`, string-list `args`, nonnegative `slow_mo`), `context`
+(`viewport` width/height, `locale`, `timezone_id`, `color_scheme`,
+`ignore_https_errors`), and Azure `connection` (`os` linux/windows,
+positive `timeout_ms`, `expose_network`). Defaults are Linux, 30000 ms,
+and `<loopback>`. Report-render timeout remains `PLAYWRIGHT_TIMEOUT_SECONDS`.
+No custom tests, plugins, reporters, or executable config are accepted.
+
+Azure requires `PLAYWRIGHT_SERVICE_URL` and `PLAYWRIGHT_SERVICE_ACCESS_TOKEN`
+in process environment or the selected env file; process values win. Fabric
+credentials remain separate. Never put tokens or credential-bearing URLs in
+YAML. Invalid YAML exits `2`; missing service prerequisites exit `127`;
+connection failure writes an `error` envelope with `playwright_execution_error`,
+not a visual finding, and never falls back locally. Plan-only needs no Azure
+token. For selected YAML, native pytest HTML/JUnit are under each report's
+`report/` directory alongside the unchanged facade envelope and case evidence.
+See `docs/PLAYWRIGHT-CI.md` for authentication and Python-only CI examples.
 
 **By default, `playwright` tests every page, every page's own bookmarks, and every
 RLS role — not just the default tab.** `--pages none`/`--roles none` (or `PLAYWRIGHT_PAGE_IDS`/
