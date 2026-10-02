@@ -34,3 +34,7 @@ fab-test auth login --cloud USGov  # sovereign cloud
 With no delegable tool on PATH it exits `127` naming `az login` and the service-principal variables.
 
 > **`--env` is not `--cloud`.** In `fab-test`, `--env` is the *test environment label* (`DEV`, `PROD`, `ANY`) and exists on the analyzer subcommands. `--cloud` selects the *Azure cloud* and exists only on `auth login`. `pql-test` spells its cloud flag `--environment`; the names are deliberately kept apart here so the two never collide.
+
+## Azure-hosted browsers (`playwright`)
+
+The optional Azure browser backend needs two more values, separate from the Fabric service principal above: `PLAYWRIGHT_SERVICE_URL` (a credential-free `wss://` endpoint) and `PLAYWRIGHT_SERVICE_ACCESS_TOKEN`. They resolve process environment > `--env-file` > `PLAYWRIGHT_ENV_FILE` > `.fab-test/.env` > `./.env`, and are required only when an execution YAML selects `backend: azure`. A missing value exits `127` naming the variable; a rejected token is an `error` envelope (`playwright_execution_error`), never a visual finding or a local fallback. Never put either in YAML, and rotate the token on exposure.

@@ -110,6 +110,10 @@
         }
       }
     },
+    "playwright_config": {
+      "type": "string",
+      "description": "Optional local or Azure browser execution YAML, relative to this config file [env: PLAYWRIGHT_CONFIG_PATH]; --playwright-config wins."
+    },
     "playwright_user_name": {
       "type": "string",
       "description": "Effective-identity user (UPN) embedded in the RLS token `fab-test playwright` mints [env: PLAYWRIGHT_USER_NAME, which wins]. Only used for cases that carry a role."

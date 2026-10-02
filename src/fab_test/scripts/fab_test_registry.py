@@ -35,6 +35,8 @@ from ._report_html import resolve_report
 from ._rule_overlay import apply_overlay, apply_pbir_overlay, apply_rdl_overlay
 from ._scan import find_artifact_dirs, find_files_by_suffix
 from ._target import ResolvedTarget
+from .playwright_validation.execution_config import forward_execution_flags
+from .playwright_validation.execution_runtime import execution_readiness
 from .playwright_validation.rdl_datasource import (
     parse_rdl_power_bi_datasource,
     parse_rdl_report_parameters,
@@ -617,7 +619,9 @@ def _report_type_for_command(artifact: Path, args: argparse.Namespace) -> str:
     is left for the subprocess to auto-detect, exactly like a bare
     ``--artifact NAME`` always has.
     """
-    explicit = getattr(args, "report_type", "") or ""
+    explicit = getattr(args, "report_type", "") or (getattr(args, "playwright_report_types", None) or {}).get(
+        artifact.stem, ""
+    )
     if explicit:
         return explicit
     return _LOCAL_SUFFIX_TO_REPORT_TYPE.get(artifact.suffix, "")
@@ -728,9 +732,7 @@ def build_playwright_command(
     roles = getattr(args, "roles", "auto")
     if roles != "auto":
         cmd += ["--roles", roles]
-    workers = getattr(args, "workers", None)
-    if workers is not None:
-        cmd += ["--workers", str(workers)]
+    forward_execution_flags(cmd, args)
     return cmd
 
 
@@ -964,7 +966,7 @@ def check_readiness(name: str, args: argparse.Namespace | None) -> dict[str, Any
     `_cloud_readiness`'s five return statements for a field that never
     applies to them.
     """
-    result = _readiness_without_version(name, args)
+    result = execution_readiness(_readiness_without_version(name, args), name, args)
     result.setdefault("version", None)
     return result
 

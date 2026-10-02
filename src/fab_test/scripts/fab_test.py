@@ -111,6 +111,7 @@ from .fab_test_telemetry import (  # noqa: F401
     _telemetry_readiness,
     _validate_telemetry_payload,
 )
+from .playwright_validation.execution_config import prepare_execution
 
 # Ensure UTF-8 output on Windows where the default pipe encoding is cp1252.
 if hasattr(sys.stdout, "reconfigure"):
@@ -244,6 +245,7 @@ def _prepare_paths(args: argparse.Namespace) -> int | None:
 # because the environment default feeds them.
 _PREPARE_STEPS: tuple[Callable[[argparse.Namespace], int | None], ...] = (
     _prepare_config,
+    lambda args: prepare_execution(args, REPO_ROOT),
     _prepare_verbosity,
     _prepare_report_flags,
     _dispatch_admin_command,

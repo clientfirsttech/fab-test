@@ -51,6 +51,7 @@ _VALID_KEYS: dict[str, type] = {
     # a caller that no longer supplies the variable per run declares the
     # UPN once here instead.
     "playwright_user_name": str,
+    "playwright_config": str,
     # Rule overlays (Config Consolidation §6-7): {"bpa": {...}, "pbir": {...}}.
     # Nested disable/severity/extend keys are validated by _rule_overlay.py
     # itself at use time, not here.
@@ -107,6 +108,12 @@ def merged_file_config(
     """
     pyproject_config = load_pyproject_config(pyproject_path)
     yaml_config = load_config(repo_root, explicit_path)
+    for config, owner in (
+        (pyproject_config, pyproject_path),
+        (yaml_config, discover_config_path(repo_root, explicit_path)),
+    ):
+        if owner and isinstance(config.get("playwright_config"), str) and config["playwright_config"]:
+            config["playwright_config"] = str((owner.parent / config["playwright_config"]).resolve())
     warnings = []
     if pyproject_config and yaml_config:
         warnings.append(

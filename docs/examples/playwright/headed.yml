@@ -1,0 +1,5 @@
+backend: local
+workers: 1
+launch:
+  headless: false
+  slow_mo: 500

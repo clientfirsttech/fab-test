@@ -29,6 +29,7 @@ from ._analyzer_envelope import (
     envelope_path,
     write_envelope,
 )
+from ._config import ConfigError
 from ._report_html import attach_report
 from .playwright_validation.config import (
     PlaywrightValidationConfig,
@@ -39,6 +40,20 @@ from .playwright_validation.discovery import (
     acquire_embed_configs,
     resolve_discovery,
     resolve_paginated_plan,
+)
+from .playwright_validation.execution_config import add_execution_flags
+from .playwright_validation.execution_runtime import (
+    _XDIST_MAX_WORKERS as _XDIST_MAX_WORKERS,
+)
+from .playwright_validation.execution_runtime import (
+    EXECUTION_PATH,
+    _resolve_max_workers,
+    _resolve_xdist_workers,
+    apply_execution_environment,
+    configure_pytest_execution,
+    execution_failure,
+    prepare_wrapper_execution,
+    redact_execution_text,
 )
 from .playwright_validation.fabric_service_client import build_fabric_service_client
 from .playwright_validation.power_bi_api import PowerBiApiError
@@ -333,7 +348,8 @@ def _stream_subprocess(
         raise RuntimeError("Popen with stdout=PIPE must provide a stdout stream.")
 
     lines: list[str] = []
-    for line in proc.stdout:
+    for raw_line in proc.stdout:
+        line = redact_execution_text(raw_line, env)
         stripped = line.rstrip("\n")
         if verbose or _is_pytest_outcome_line(stripped):
             log(stripped)
@@ -343,35 +359,6 @@ def _stream_subprocess(
     return subprocess.CompletedProcess(
         command, returncode, stdout="".join(lines), stderr=""
     )
-
-
-# Each xdist worker opens its own browser instance -- unconditionally
-# maximal (e.g. pytest-xdist's own "-n auto", which sizes off CPU count)
-# risks exhausting local memory/CPU on a large matrix. This is the packaged
-# default only; --workers/PLAYWRIGHT_XDIST_WORKERS override it, e.g. on a
-# beefier VM that can safely run more concurrent browser instances.
-_XDIST_MAX_WORKERS = 4
-
-
-def _resolve_max_workers(explicit: int | None) -> int:
-    """Resolve the worker-count cap: --workers > PLAYWRIGHT_XDIST_WORKERS > default."""
-    if explicit is not None:
-        return explicit
-    raw = os.environ.get("PLAYWRIGHT_XDIST_WORKERS", "")
-    if raw:
-        try:
-            return int(raw)
-        except ValueError:
-            pass
-    return _XDIST_MAX_WORKERS
-
-
-def _resolve_xdist_workers(case_count: int, max_workers: int = _XDIST_MAX_WORKERS) -> int | None:
-    """Return the `-n` worker count for a run generating `case_count` cases,
-    or None to omit `-n` entirely -- a single case has nothing to parallelize."""
-    if case_count <= 1:
-        return None
-    return min(case_count, max_workers)
 
 
 def _run_pytest(
@@ -408,6 +395,7 @@ def _run_pytest(
     ]
 
     resolved_max_workers = _resolve_max_workers(max_workers)
+    configure_pytest_execution(command, env)
     workers = _resolve_xdist_workers(case_count, resolved_max_workers)
     if workers is not None:
         command += ["-n", str(workers)]
@@ -647,17 +635,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--impact-manifest",
         help="Path to an impacted-report manifest JSON.",
     )
-    parser.add_argument(
-        "--workers",
-        type=int,
-        default=None,
-        metavar="N",
-        help=(
-            "Max pytest-xdist workers for running generated cases concurrently "
-            "[env: PLAYWRIGHT_XDIST_WORKERS, default: 4]. Raise this on a "
-            "machine that can safely run more concurrent browser instances."
-        ),
-    )
+    add_execution_flags(parser)
     parser.add_argument(
         "-v",
         "--verbose",
@@ -868,13 +846,20 @@ def _run_single_report(
         test_cases_dir,
         embed_configs_by_role=embed_configs_by_role_for_env,
     )
+    apply_execution_environment(
+        env, args, [_case_result_dir(case, test_cases_dir) for case in cases],
+        report_root=output_path.parent / "report",
+    )
 
     with Timer() as timer:
         proc = _run_pytest(
             env, verbosity=level, case_count=len(cases), max_workers=getattr(args, "workers", None)
         )
 
-    success = proc.returncode == 0
+    setup_error = execution_failure(
+        proc.returncode, [_case_result_dir(case, test_cases_dir) for case in cases]
+    ) if env.get(EXECUTION_PATH) else None
+    success = proc.returncode == 0 and not setup_error
     message = (
         f"Playwright visual validation passed: {len(cases)} cases"
         if success
@@ -887,13 +872,20 @@ def _run_single_report(
         message += f" ({summary})"
 
     test_results = _test_results_rows(
-        cases, test_cases_dir, overall_success=success, cloud=config.cloud
+        cases, test_cases_dir, overall_success=success, cloud=config.cloud,
+        fallback_error=setup_error or "",
     )
-    findings = _findings_from_test_results(test_results)
+    message = setup_error or message
+    findings = (
+        [{
+            "rule": "playwright_execution_error", "severity": "error", "object": report_name, "message": message,
+        }]
+        if setup_error else _findings_from_test_results(test_results)
+    )
 
     env_out = build_envelope(
         EnvelopeIdentity("playwright", str(report_name)),
-        status="passed" if success else "failed",
+        status="error" if setup_error else ("passed" if success else "failed"),
         message=message,
         findings=findings,
         duration_ms=timer.elapsed_ms,
@@ -937,13 +929,14 @@ def _config_from_impact_report(
 def run_playwright_validation(args: argparse.Namespace) -> int:
     """Orchestrate the Playwright validation and write the result envelope."""
     try:
+        prepare_wrapper_execution(args)
         base_config = _build_config_from_args(args)
-    except ValueError as exc:
+    except (ConfigError, ValueError) as exc:
         # A missing prerequisite (readiness-probe contract), not a run
         # failure -- `_require_service_principal` and `load_config`'s
         # required-field check are the only raisers.
         log_error(str(exc))
-        return 127
+        return 2 if isinstance(exc, ConfigError) else 127
     except (ServiceResolutionError, PowerBiApiError) as exc:
         log_error(str(exc))
         return 1

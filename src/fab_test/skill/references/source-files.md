@@ -21,4 +21,7 @@
 | `scripts/playwright_validation/fabric_service_client.py` | Azure Identity service client for Fabric/Power BI REST APIs |
 | `scripts/playwright_validation/resolver.py` | Environment/workspace/report resolution |
 | `scripts/playwright_validation/render_spec.py` | pytest-playwright spec that embeds reports (ships in the package; `tests/test_playwright_visual.py` holds its unit tests) |
+| `scripts/playwright_validation/execution_config.py` | Optional execution YAML: selector (`--playwright-config` > `PLAYWRIGHT_CONFIG_PATH` > `playwright_config`), validation, and the shared `--playwright-config`/`--workers`/`--headed`/`--slow-mo` flags |
+| `scripts/playwright_validation/execution_runtime.py` | Credential-safe preparation: service credentials, worker precedence, launch overrides, native-report placement, redaction, and the unexecuted-case check |
+| `scripts/playwright_validation/execution_plugin.py` | pytest plugin loaded only for a selected YAML or a visibility override; registers fixtures after pytest-playwright so Azure/launch settings take effect |
 | `scripts/_analyzer_envelope.py` | Shared envelope schema builder |

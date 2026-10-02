@@ -124,3 +124,33 @@ def test_the_demo_workflow_names_a_protected_environment() -> None:
     ((_job_id, job),) = data["jobs"].items()
 
     assert job.get("environment"), "playwright-demo.yml's job names no environment"
+
+
+@pytest.mark.fab_test
+@pytest.mark.parametrize("platform", ["github-actions", "azure-devops"])
+def test_azure_examples_keep_python_and_publish_after_failure(platform):
+    path = _ROOT / "docs" / "examples" / platform / "playwright-azure.yml"
+    data = _load(path)
+    text = path.read_text(encoding="utf-8")
+    assert "fab-test playwright" in text
+    assert "--playwright-config" in text
+    assert "npm" not in text and "playwright install" not in text
+    assert "set -euo pipefail" in text
+    assert "continue-on-error" not in text and "continueOnError" not in text
+    assert "PLAYWRIGHT_SERVICE_ACCESS_TOKEN" in _GUIDE.read_text(encoding="utf-8")
+    if platform == "github-actions":
+        assert set(_triggers(data)) == {"workflow_dispatch"}
+        job = data["jobs"]["validate"]
+        assert job["environment"] == "fabric-demo"
+        assert job["env"]["PLAYWRIGHT_SERVICE_ACCESS_TOKEN"] == "${{ secrets.PLAYWRIGHT_SERVICE_ACCESS_TOKEN }}"
+        upload = next(step for step in job["steps"] if "upload-artifact" in step.get("uses", ""))
+        assert upload["if"] == "always()"
+        assert upload["with"]["path"] == "fab-test-results/"
+    else:
+        assert data["trigger"] == data["pr"] == "none"
+        assert data["variables"] == [{"group": "fabric-demo"}]
+        run = next(step for step in data["steps"] if "bash" in step)
+        assert run["env"]["PLAYWRIGHT_SERVICE_ACCESS_TOKEN"] == "$(PLAYWRIGHT_SERVICE_ACCESS_TOKEN)"
+        publishers = [step for step in data["steps"] if step.get("task", "").startswith("Publish")]
+        assert len(publishers) == 2
+        assert all(step["condition"] == "always()" for step in publishers)

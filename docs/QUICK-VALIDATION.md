@@ -292,6 +292,20 @@ results, and a per-case step-summary table), see
 is the working reference for what a real dispatch looks like, both green and
 red.
 
+For optional Azure-hosted browsers, set `PLAYWRIGHT_SERVICE_URL` and the secret
+`PLAYWRIGHT_SERVICE_ACCESS_TOKEN`, then select a YAML file:
+
+```bash
+fab-test playwright --artifact ThinReport --env PROD --report \
+  --playwright-config docs/examples/playwright/azure.yml --workers 8
+```
+
+Python pytest/xdist stays on the runner; only browsers move to Azure. No Node
+runner or local Chromium download is needed for this backend. Local execution
+remains the default. See [Azure setup](PLAYWRIGHT-CI.md#azure-hosted-browsers),
+the [GitHub Actions example](examples/github-actions/playwright-azure.yml), and
+the [Azure DevOps example](examples/azure-devops/playwright-azure.yml).
+
 ### Pipeline snippet: a reviewable report as the build artifact
 
 `run.json` is what a pipeline *parses*; `index.html` is what a person *opens* when the build goes red. Reports are opt-in, so a job that wants one asks for it:

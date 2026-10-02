@@ -1,0 +1,118 @@
+id: pwexec20261001journey0001
+name: Playwright Execution Configuration
+description: >
+  A developer validates the same generated Python report tests locally and
+  on Azure-hosted browsers, then runs a bounded parallel report matrix in
+  GitHub Actions or Azure DevOps with the same fab-test verdict and evidence.
+createdAt: 1790812800000
+updatedAt: 1790812800000
+personas: [s6ua5spy9sn1snxsdgivqour, hxl1drwi9gxpwvszy63j5hla, vzm8qmbzgyzjoh0d42xuf7ch]
+
+discovery:
+  confirmed:
+    - Python Playwright and pytest remain the default and only runner.
+    - Only fab-test-generated report tests run.
+    - Parallel cases within each report are sufficient initially.
+    - The user supplies an Azure browser service access token.
+    - Both GitHub Actions and Azure DevOps require examples.
+  proposed:
+    - An optional validated YAML execution config selected by --playwright-config.
+    - Local and Azure connection settings without arbitrary plugin execution.
+    - Existing --workers controls per-report xdist concurrency.
+  excluded:
+    - TypeScript configuration execution and a Node runner.
+    - Cross-report concurrency and CI sharding.
+    - Entra authentication in the first epic.
+    - Custom tests and a general provider plugin framework.
+    - Azure portal reporting and Azure resource provisioning.
+  proofGate: >
+    Verify the installed pytest-playwright remote connection fixture against
+    current Azure Workspaces token authentication and embed launch settings.
+    Browser processes move to Azure; Python test processes stay on the CI agent.
+  proofResults:
+    date: "2026-10-01"
+    status: >
+      Direct remote Chromium smoke passed. The isolated harness's matrix run is NOT evidence of remote
+      execution -- its fixtures were overridden by pytest-playwright, so it ran locally. Remote matrix
+      execution is verified only through the shipped adapter (see the epic's quality gates).
+    runner: Python Playwright 1.63.0 with pytest-playwright 0.9.0
+    interactive: Shipped adapter, two generated cases on two workers; one failed and one passed, matching the installed local CLI.
+    paginated: Generated report rendering passed; parameter expansion blocked by the Fabric executeQueries tenant setting.
+    evidence: Remote screenshots and normal report artifacts retrieved; supplied credentials absent from 36 textual proof artifacts.
+    checks: Ten focused behavior and module-budget tests passed; focused lint clean.
+  sources:
+    - https://learn.microsoft.com/en-us/javascript/api/overview/azure/playwright-readme?view=azure-node-latest
+    - https://learn.microsoft.com/en-us/azure/app-testing/playwright-workspaces/how-to-manage-authentication
+    - https://github.com/kerski/pbi-dataops-visual-error-testing/blob/main/playwright.service.config.ts
+
+painPoints:
+  - id: pwexec20261001pain000001
+    name: Browser execution limits CI report validation throughput
+    description: >
+      The user wants to offload browsers and increase parallelism without
+      replacing Python report tests or maintaining a separate testing contract.
+    impact: null
+    frequency: null
+    researchStatus: Severity and frequency were not quantified during discovery.
+
+steps:
+  - id: pwexec20261001step000001
+    name: Select execution settings
+    description: Keep the local default or explicitly select Azure browser execution.
+    userStories:
+      - id: pwexec20261001story000001
+        name: Optional execution configuration
+        story: >
+          As a Local Developer, I want to select browser execution settings,
+          so that the same generated report tests run locally and in Azure.
+        painPoint: pwexec20261001pain000001
+        functionalRequirements:
+          - Given no execution config, should preserve existing Python pytest behavior.
+          - Given an Azure config, should run only the generated report cases remotely.
+          - Given unsupported settings, should explain the correction before connecting.
+        status: { state: backlog, comment: Draft epic awaiting approval }
+  - id: pwexec20261001step000002
+    name: Supply service credentials
+    description: Set a service token separately from the Fabric embedding client secret.
+    userStories:
+      - id: pwexec20261001story000002
+        name: Safe credential placement
+        story: >
+          As a Local Developer, I want explicit local and CI token placement,
+          so that I can connect without committing or printing credentials.
+        painPoint: pwexec20261001pain000001
+        functionalRequirements:
+          - Given local testing, should load the token from the environment or selected gitignored env file.
+          - Given CI, should map protected secrets into the test process without prompts.
+          - Given a rejected connection, should report an authentication error rather than a visual failure.
+        status: { state: backlog, comment: Service access-token authentication selected }
+  - id: pwexec20261001step000003
+    name: Execute a bounded report matrix
+    description: Run parallel cases within one report and publish the existing result artifacts.
+    userStories:
+      - id: pwexec20261001story000003
+        name: Parallel Azure browser execution
+        story: >
+          As a CI Pipeline, I want bounded cloud browser execution,
+          so that report validation can scale without changing build verdicts.
+        painPoint: pwexec20261001pain000001
+        functionalRequirements:
+          - Given a worker cap, should limit concurrency within the current report.
+          - Given local and Azure runs, should preserve case identities and result semantics.
+          - Given GitHub Actions or Azure DevOps, should publish JUnit and evidence even after failure.
+        status: { state: backlog, comment: Cross-report concurrency deferred }
+  - id: pwexec20261001step000004
+    name: Inspect readiness and failures
+    description: Obtain safe execution provenance and remediation without reading secrets.
+    userStories:
+      - id: pwexec20261001story000004
+        name: Discoverable execution contract
+        story: >
+          As an AI Agent, I want safe configuration provenance and actionable
+          readiness errors, so that I can diagnose setup without guessing.
+        painPoint: pwexec20261001pain000001
+        functionalRequirements:
+          - Given a dry run, should identify selected execution settings without connecting.
+          - Given missing prerequisites, should name the correcting variable or config setting.
+          - Given JSON output and result artifacts, should retain the facade contract and redact credentials.
+        status: { state: backlog, comment: Existing analyzer contract applies }

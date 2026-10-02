@@ -36,8 +36,15 @@ TEST_HARD = 900
 # test_complexity_budget.py.
 EXEMPTIONS: dict[str, tuple[int, str]] = {
     "src/fab_test/scripts/fab_test_parser.py": (
-        1097,
+        1112,
         (
+            "2026-10-02: +15 lines replacing GUID-only --workspace-id and the "
+            "Boolean --from-workspace prototype with one shared, name-or-GUID "
+            "`--workspace`/`--workspace-id`/`--from-workspace` alias group on the "
+            "playwright subparser, plus _ArtifactDirAction and the opt-in "
+            "track_artifact_dir_explicit flag on _add_common_flags so playwright "
+            "alone can tell an explicit --artifact-dir from its default "
+            "(Playwright Workspace Discovery epic). "
             "2026-09-30: merge of main into feat/rdl-static-analysis -- main's -q/verbosity additions "
             "plus this branch's rdl additions both landed here, so the ceiling is the sum of the two. "
             "2026-09-27: +16 lines adding _add_rdl_subparser -- one more "
@@ -134,8 +141,10 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
         ),
     ),
     "src/fab_test/scripts/fab_test_registry.py": (
-        1026,
+        1028,
         (
+            "2026-10-02: +2 lines letting a per-report type from --from-workspace win over the "
+            "local suffix in _report_type_for_command (Playwright Workspace Reports). "
             "2026-09-30: merge of main into feat/rdl-static-analysis -- main's -q/verbosity additions "
             "plus this branch's rdl additions both landed here, so the ceiling is the sum of the two. "
             "2026-09-27: +40 lines registering the rdl analyzer -- "
@@ -255,8 +264,10 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
         ),
     ),
     "src/fab_test/scripts/fab_test_execution.py": (
-        845,
+        849,
         (
+            "2026-10-02: +4 lines importing and calling the --from-workspace resolver ahead of the "
+            "dataset modes in _playwright_service_resolved_target (Playwright Workspace Reports). "
             "2026-09-26: born over the hard budget adding "
             "_playwright_service_resolved_target (collapses _discover_for's "
             "impact-manifest/dataset-id/dataset-workspace-only early returns "
