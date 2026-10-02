@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-10-02
+
+- 📦 - Version `1.10.0.dev1` - Playwright execution configuration. Install docs and the skill pin the new version.
+- ✨ - Azure-Hosted Browsers For `fab-test playwright` - An optional YAML (`--playwright-config`, `PLAYWRIGHT_CONFIG_PATH`, or `playwright_config`) runs the same generated Python/pytest report tests on Azure Playwright Workspaces browsers, or on tuned local browsers (`backend`, `workers`, `launch`, `context`, `connection`). Python and pytest stay the only runner: no Node, custom tests, plugins or reporters. Azure uses `PLAYWRIGHT_SERVICE_URL` and `PLAYWRIGHT_SERVICE_ACCESS_TOKEN`, kept separate from the Fabric service principal. Omit the YAML and nothing changes. A connection or authentication failure is an `error` envelope (`playwright_execution_error`) and exit `1`, never a visual finding or a silent local fallback; a missing credential exits `127`; an invalid YAML exits `2`. Tokens are redacted from diagnostics, stale case evidence is cleared, and native HTML/JUnit land beside the envelope. Copy-ready GitHub Actions and Azure DevOps examples are in `docs/examples/`; neither has run live yet.
+- ✨ - `--headed` And `--slow-mo` For Demonstrations - `fab-test playwright --headed --slow-mo 500` shows the local browser windows; off by default and ignored with a warning on Azure-hosted browsers. `docs/examples/playwright/headed.yml` is the YAML form.
+- 🐛 - `PLAYWRIGHT_HEADLESS=false` Showed No Window - It only added a 2 second pause per case, because nothing passed `headless=False` to the browser launch. It now shows the window, at the lowest precedence (`--headed` > YAML `launch.headless` > `PLAYWRIGHT_HEADLESS=false` > headless). **Behavior change**: anyone who already set it now gets visible browsers, which fail on a runner with no display.
 ## 2026-10-01
 
 - 📦 - Version `1.9.0b3` - Fourth public beta, carrying the `fab-test rdl` static-analysis work (verified-rules-only, path-and-message findings, verbose table). Install docs and the skill pin the new version.
