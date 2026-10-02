@@ -122,12 +122,26 @@ def launch_overrides(args: argparse.Namespace, config: ExecutionConfig) -> dict[
     return overrides
 
 
+def headless_requested_false(environment: Any) -> bool:
+    """True when PLAYWRIGHT_HEADLESS asks for a visible local browser."""
+    return str(environment.get("PLAYWRIGHT_HEADLESS", "")).lower() == "false"
+
+
+def warn_ignored_headless(config: ExecutionConfig, env_file: Path) -> None:
+    """Azure-hosted browsers have no local window, so PLAYWRIGHT_HEADLESS=false cannot apply."""
+    value = _env_or_env_file("PLAYWRIGHT_HEADLESS", env_file)
+    if config.backend == "azure" and headless_requested_false({"PLAYWRIGHT_HEADLESS": value}):
+        message = "PLAYWRIGHT_HEADLESS=false is ignored: Azure-hosted browsers have no local window"
+        print(f"::warning::{message}", file=sys.stderr)
+
+
 def prepare_wrapper_execution(args: argparse.Namespace) -> None:
     """Validate configuration and credentials before any Fabric API call."""
     root = Path.cwd()
     file_config, _ = merged_file_config(root, root / "pyproject.toml")
     args.execution_config = resolve_execution_config(getattr(args, "playwright_config", None), file_config, root)
     args.execution_launch = launch_overrides(args, args.execution_config)
+    warn_ignored_headless(args.execution_config, resolve_env_file(args.env_file))
     if args.execution_config.path:
         args.workers = resolve_workers(args.execution_config, getattr(args, "workers", None))
     args.execution_environment = (
@@ -163,7 +177,7 @@ def apply_execution_environment(
 def configure_pytest_execution(command: list[str], environment: dict[str, str]) -> None:
     """Load the optional adapter and keep its native reports with case evidence."""
     if not environment.get(EXECUTION_PATH):
-        if environment.get(EXECUTION_LAUNCH):
+        if environment.get(EXECUTION_LAUNCH) or headless_requested_false(environment):
             command += ["-p", _PLUGIN]
         return
     report_root = (

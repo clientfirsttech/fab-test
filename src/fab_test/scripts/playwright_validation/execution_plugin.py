@@ -12,7 +12,13 @@ import pytest
 from playwright.sync_api import Browser, Error
 
 from .execution_config import ExecutionConfig, resolve_execution_config
-from .execution_runtime import EXECUTION_LAUNCH, EXECUTION_PATH, EXECUTION_RUN_ID, browser_connection_options
+from .execution_runtime import (
+    EXECUTION_LAUNCH,
+    EXECUTION_PATH,
+    EXECUTION_RUN_ID,
+    browser_connection_options,
+    headless_requested_false,
+)
 
 
 class ExecutionFixtures:
@@ -31,9 +37,11 @@ class ExecutionFixtures:
 
     @pytest.fixture(scope="session")
     def browser_type_launch_args(self, browser_type_launch_args, execution_config) -> dict[str, Any]:
-        """Apply YAML launch settings, then command-line overrides, through the upstream fixture."""
+        """Apply PLAYWRIGHT_HEADLESS, then YAML launch settings, then command-line overrides."""
         overrides = json.loads(os.environ.get(EXECUTION_LAUNCH) or "{}")
-        return {**browser_type_launch_args, **execution_config.launch, **overrides}
+        local = execution_config.backend == "local"
+        visible = {"headless": False} if local and headless_requested_false(os.environ) else {}
+        return {**browser_type_launch_args, **visible, **execution_config.launch, **overrides}
 
     @pytest.fixture(scope="session")
     def browser_context_args(self, browser_context_args, execution_config) -> dict[str, Any]:

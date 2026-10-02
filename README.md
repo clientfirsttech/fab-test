@@ -348,7 +348,8 @@ fab-test playwright --artifact "Not Working Visuals" --env DEV --headed --slow-m
 ```
 
 The same settings live in [docs/examples/playwright/headed.yml](https://github.com/clientfirsttech/fab-test/blob/main/docs/examples/playwright/headed.yml)
-for `--playwright-config`. These flags apply to local browsers only; on Azure-hosted
+for `--playwright-config`. Setting `PLAYWRIGHT_HEADLESS=false` (environment or `.env`) also shows the
+window; a YAML `launch.headless` or `--headed` takes precedence. These apply to local browsers only; on Azure-hosted
 browsers there is no local window, so they are ignored with a warning.
 
 **Optional Azure-hosted browsers** keep Python Playwright and pytest on the

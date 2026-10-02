@@ -236,7 +236,8 @@ Plan-only does not require the Azure token or launch a browser.
 
 Browsers are hidden by default, which is what CI wants. For a live demonstration on a
 developer machine, add `--headed` (optionally `--slow-mo 500` and `--workers 1`), or select
-[`headed.yml`](examples/playwright/headed.yml). Do not use these in CI: a hosted runner has
+[`headed.yml`](examples/playwright/headed.yml). `PLAYWRIGHT_HEADLESS=false` also shows the window, at the
+lowest precedence: YAML `launch.headless`, then `--headed`, override it. Do not use these in CI: a hosted runner has
 no display, and Azure-hosted browsers ignore them with a warning.
 
 ### GitHub Actions and Azure DevOps
