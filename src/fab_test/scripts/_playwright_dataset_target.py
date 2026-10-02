@@ -41,8 +41,9 @@ from ._target import target_from_args
 REPORT_WORKSPACES_ATTR = "playwright_report_workspaces"
 REPORT_NAMES_ATTR = "playwright_report_names"
 REPORT_DATASETS_ATTR = "playwright_report_datasets"
-# stem -> "report" | "paginated", set only by --from-workspace, which already
-# knows each item's Fabric type and so need not make the subprocess guess.
+# stem -> "report" | "paginated", set only by workspace-wide discovery,
+# which already knows each item's Fabric type and so need not make the
+# subprocess guess.
 REPORT_TYPES_ATTR = "playwright_report_types"
 
 _WORKSPACE_REPORT_TYPES = (("Report", "report"), ("PaginatedReport", "paginated"))
@@ -95,12 +96,22 @@ def _resolve_target_workspace(args: argparse.Namespace) -> str:
 
 
 def workspace_reports_requested(args: argparse.Namespace) -> bool:
-    """True when `--from-workspace` asks for every report in the workspace.
+    """True when a bare `--workspace`/`--workspace-id`/`--from-workspace`
+    (one shared target, name or GUID) asks for every report in the workspace.
 
     A named report keeps its own resolution (`--artifact` already resolves
-    remotely), so the flag only applies when nothing names a target.
+    remotely); an explicit `--artifact-dir` keeps the repository as the
+    denominator instead; and `--dataset-id`/`--dataset-workspace-id` keep
+    their own narrower selection -- so the flag only applies when none of
+    those name what to run.
     """
-    return bool(getattr(args, "from_workspace", False) and target_from_args(args) is None)
+    return bool(
+        getattr(args, "workspace_id", "")
+        and not getattr(args, "artifact_dir_explicit", False)
+        and not getattr(args, "dataset_id", "")
+        and not getattr(args, "dataset_workspace_id", "")
+        and target_from_args(args) is None
+    )
 
 
 def resolve_workspace_reports(args: argparse.Namespace) -> list[Path]:
@@ -120,8 +131,9 @@ def resolve_workspace_reports(args: argparse.Namespace) -> list[Path]:
     workspace_id = _resolve_target_workspace(args)
     if not workspace_id:
         print(
-            "  ✗ fab-test playwright: --from-workspace names no workspace to list reports from. "
-            "Pass --workspace-id, FABRIC_WORKSPACE_ID, or --env (resolved via environments.yml).",
+            "  ✗ fab-test playwright: --workspace names no workspace to list reports from. "
+            "Pass --workspace (name or GUID), FABRIC_WORKSPACE_ID, or --env (resolved via "
+            "environments.yml).",
             file=sys.stderr,
         )
         raise DatasetTargetExit(2)

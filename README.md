@@ -237,7 +237,7 @@ fab-test pql-test --env DEV
 fab-test playwright --artifact "Not Working Visuals" --env dev --env-file .env
 
 # Test only the reports built on one dataset (looked up live in the
-# dataset's workspace and, if set, the --workspace-id workspace)
+# dataset's workspace and, if set, the --workspace workspace)
 fab-test playwright --dataset-id <DATASET_GUID> --dataset-workspace-id <WORKSPACE_GUID>
 
 # Discover reports that depend on a deployed semantic model
@@ -287,13 +287,26 @@ rather than authenticating partway and failing on the embed-token call.
 shows a false green for a developer who is only signed in with `az login`.
 
 With a service principal set, a workspace resolves without `environments.yml`
-from any of -- in this order -- `--workspace-id`, `FABRIC_WORKSPACE_ID`, or
-`workspace:` in `fab-test.yml`. No `fab-test.yml` is required at all:
+from any of -- in this order -- `--workspace` (preferred; `--workspace-id` and
+`--from-workspace` are accepted aliases for the same name-or-GUID value),
+`FABRIC_WORKSPACE_ID`, or `workspace:` in `fab-test.yml`. No `fab-test.yml` is
+required at all:
 
 ```bash
-fab-test playwright --artifact "Not Working Visuals" --workspace-id "Sales Dev"
+fab-test playwright --artifact "Not Working Visuals" --workspace "Sales Dev"
 # or
 FABRIC_WORKSPACE_ID="Sales Dev" fab-test playwright --artifact "Not Working Visuals"
+```
+
+A bare `--workspace` with no `--artifact`/target and no explicit
+`--artifact-dir` tests every deployed Report and PaginatedReport in that
+workspace instead of scanning the repository -- so the run needs no checkout
+at all. `--workspace-id`/`--from-workspace` trigger the identical behavior;
+an ambient `FABRIC_WORKSPACE_ID` alone (no `--workspace` on the command line)
+keeps today's repository discovery:
+
+```bash
+fab-test playwright --workspace "Sales Dev"
 ```
 
 A repository that already pins its workspace in committed config can rely on
@@ -310,7 +323,8 @@ fab-test playwright --artifact "Not Working Visuals"
 ```
 
 `environments.yml` is only consulted when no workspace resolves from
-`--workspace-id`, `FABRIC_WORKSPACE_ID`, or `workspace:` in `fab-test.yml` --
+`--workspace` (or its `--workspace-id`/`--from-workspace` aliases),
+`FABRIC_WORKSPACE_ID`, or `workspace:` in `fab-test.yml` --
 a repository that already pins its workspace there keeps working unchanged.
 
 A run with 5 report x page x bookmark cases and 1 real failure now says so:

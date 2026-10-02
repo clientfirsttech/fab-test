@@ -1,6 +1,6 @@
 # Playwright Workspace Discovery Epic
 
-**Status**: PLANNED - awaiting targeting and compatibility approval
+**Status**: 🔄 IN-PROGRESS (targeting/compatibility approved; shared alias and workspace-wide discovery implemented and live-verified; remote RLS/paginated-parameter coverage and full documentation remain)
 **Goal**: Make explicitly workspace-targeted Playwright runs independent of repository artifact discovery.
 
 ## Overview

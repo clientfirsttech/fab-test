@@ -175,7 +175,7 @@ Playwright validation can run in three modes: static `.env` mode, service-resolv
 | `--env-file PATH` | Path to `.env` file with service-principal credentials and optional behavior settings |
 | `--artifact NAME` | Resolve the deployed report from this artifact name and the target environment |
 | `--env ENV` | Target environment label (e.g. `dev`, `test`, `prod`) [env: `FABRIC_ENVIRONMENT`] |
-| `--workspace-id ID` | Explicit workspace ID override [env: `FABRIC_WORKSPACE_ID`] |
+| `--workspace NAME_OR_ID` | Explicit workspace override, a name or a GUID. `--workspace-id` and `--from-workspace` are accepted aliases for the same value; prefer `--workspace` [env: `FABRIC_WORKSPACE_ID`] |
 | `--dataset-id ID` | Dataset / semantic-model ID. With `--artifact`, overrides that report's binding; with no report named, tests every report built on this dataset (see below) |
 | `--dataset-workspace-id ID` | Workspace ID the dataset lives in, when different from the report's own workspace [env: `PLAYWRIGHT_DATASET_WORKSPACE_ID`] |
 | `--report-type {report,paginated}` | Force the report type instead of auto-detecting it [env: `PLAYWRIGHT_REPORT_TYPE`] |
@@ -310,8 +310,8 @@ writes an error envelope, emits `::error::` to stderr, and returns `1` — and i
 `--impact-manifest` run, one report's failure does not stop the others.
 
 **`environments.yml` is optional once a workspace is already resolved.** When
-`--workspace-id`, `FABRIC_WORKSPACE_ID`, or `workspace:` in `fab-test.yml` already
-supplies a workspace, `environments.yml` is never opened — a missing file or an
+`--workspace` (or its `--workspace-id`/`--from-workspace` aliases), `FABRIC_WORKSPACE_ID`,
+or `workspace:` in `fab-test.yml` already supplies a workspace, `environments.yml` is never opened — a missing file or an
 absent `dev:` entry no longer fails a run whose workspace was never in question. It
 is read exactly as before only when no workspace resolves from any of those sources;
 a repository that already pins its workspace there is unaffected. `workspace:` is
@@ -456,6 +456,33 @@ in a `.env` never switches this on -- only the flag does.
 ```bash
 fab-test playwright --dataset-id 11111111-2222-3333-4444-555555555555 \
   --dataset-workspace-id aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee
+```
+
+**A bare `--workspace` (no `--artifact`/target, no explicit `--artifact-dir`, and
+no dataset selector) tests every deployed Report and PaginatedReport in that
+workspace, listed live from Fabric instead of scanned from the repository --
+so the run needs no checkout at all.** `--workspace-id` and `--from-workspace`
+trigger the identical behavior; they are the same flag under three names, not
+three separate modes. A workspace *name* resolves the same way a
+`WORKSPACE.Workspace/NAME.Type` target's workspace half does -- a GUID is used
+directly, a name is looked up and must be unambiguous. Naming a report
+(`--artifact`/a target), passing an explicit `--artifact-dir` (even `.`), or
+giving `--dataset-id`/`--dataset-workspace-id` all keep their own narrower
+selection instead -- a bare `--workspace` only applies when nothing else
+names what to run. An ambient `FABRIC_WORKSPACE_ID` or a `workspace:` in
+`fab-test.yml`, with no `--workspace` on the command line, is unaffected and
+keeps today's repository discovery -- only the explicit flag switches the
+denominator.
+
+```bash
+# Every Report/PaginatedReport deployed in this workspace -- no checkout needed
+fab-test playwright --workspace "Sales Dev"
+
+# Equivalent -- same shared flag
+fab-test playwright --workspace-id c4698d28-b05c-40bc-926c-707563ac85e7
+
+# A real --artifact-dir keeps the repository as the denominator instead
+fab-test playwright --workspace "Sales Dev" --artifact-dir .
 ```
 
 **`--dataset-workspace-id` alone -- no `--dataset-id`, `--artifact`, target, or

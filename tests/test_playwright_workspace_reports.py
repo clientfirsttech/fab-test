@@ -19,6 +19,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from fab_test.scripts._playwright_dataset_target import (
+    DatasetTargetExit,
+    resolve_workspace_reports,
+    workspace_reports_requested,
+)
 from fab_test.scripts.fab_test_execution import _discover_for, _run_analyzer
 from fab_test.scripts.fab_test_parser import build_parser
 from fab_test.scripts.fab_test_registry import build_playwright_command
@@ -50,7 +55,6 @@ def _args(artifact_dir: Path, **overrides) -> argparse.Namespace:
         "dataset_id": "",
         "dataset_workspace_id": "",
         "impact_manifest": None,
-        "from_workspace": True,
         "artifact_dir": str(artifact_dir),
         "output_dir": str(artifact_dir / "fab-test-results"),
         "output_format": "text",
@@ -71,11 +75,21 @@ def _item(item_id: str, name: str) -> dict:
     return {"id": item_id, "displayName": name}
 
 
-def test_flag_is_accepted_on_the_playwright_subcommand() -> None:
-    parsed = build_parser().parse_args(["playwright", "--from-workspace", "--workspace-id", WORKSPACE])
+@pytest.mark.parametrize("flag", ["--workspace", "--workspace-id", "--from-workspace"])
+def test_each_alias_sets_the_shared_workspace_target(flag) -> None:
+    parsed = build_parser().parse_args(["playwright", flag, WORKSPACE])
 
-    assert parsed.from_workspace is True
-    assert build_parser().parse_args(["playwright"]).from_workspace is False
+    assert parsed.workspace_id == WORKSPACE
+
+
+def test_a_workspace_name_is_accepted_not_only_a_guid() -> None:
+    parsed = build_parser().parse_args(["playwright", "--workspace", "My Workspace"])
+
+    assert parsed.workspace_id == "My Workspace"
+
+
+def test_without_any_alias_the_workspace_target_is_empty() -> None:
+    assert build_parser().parse_args(["playwright"]).workspace_id == ""
 
 
 def test_targets_come_from_the_workspace_not_from_local_folders(tmp_path) -> None:
@@ -110,6 +124,30 @@ def test_both_item_types_are_listed_in_the_resolved_workspace(tmp_path) -> None:
     listed = {call.args[1] for call in client.list_items.call_args_list}
     assert listed == {"Report", "PaginatedReport"}
     assert all(call.args[0] == WORKSPACE for call in client.list_items.call_args_list)
+
+
+def test_a_workspace_name_resolves_before_listing(tmp_path) -> None:
+    args = _args(tmp_path, workspace_id="My Workspace")
+    client = _client([_item("r1", "Sales")], [])
+    client.list_workspaces.return_value = [{"id": WORKSPACE, "displayName": "My Workspace"}]
+
+    with patch(_CLIENT, return_value=client):
+        artifacts = _discover_for("playwright", args, "*.Report")
+
+    assert artifacts == [Path("Sales.Report")]
+    assert {call.args[0] for call in client.list_items.call_args_list} == {WORKSPACE}
+
+
+def test_an_unresolvable_workspace_name_fails_before_listing(tmp_path, capsys) -> None:
+    args = _args(tmp_path, workspace_id="Nonexistent Workspace")
+    client = _client([], [])
+    client.list_workspaces.return_value = []
+
+    with patch(_CLIENT, return_value=client):
+        assert _run_analyzer("playwright", args, Path(args.output_dir)) == 1
+
+    client.list_items.assert_not_called()
+    assert "Nonexistent Workspace" in capsys.readouterr().err
 
 
 def test_each_target_forces_its_own_type_and_real_name(tmp_path) -> None:
@@ -151,13 +189,18 @@ def test_an_empty_workspace_finds_nothing_to_run(tmp_path) -> None:
 
 
 def test_no_workspace_refuses_before_any_network_call(tmp_path, capsys) -> None:
+    """Defensive: unreachable via the real CLI (the trigger itself requires a
+    workspace value), but `resolve_workspace_reports` is still called
+    directly by other tests, so it must not assume its own gate ran first.
+    """
     args = _args(tmp_path, workspace_id="")
 
-    with patch(_CLIENT) as build_client:
-        assert _run_analyzer("playwright", args, Path(args.output_dir)) == 2
+    with patch(_CLIENT) as build_client, pytest.raises(DatasetTargetExit) as excinfo:
+        resolve_workspace_reports(args)
 
+    assert excinfo.value.code == 2
     build_client.assert_not_called()
-    assert "--from-workspace" in capsys.readouterr().err
+    assert "--workspace" in capsys.readouterr().err
 
 
 def test_a_named_artifact_keeps_its_own_resolution(tmp_path) -> None:
@@ -173,10 +216,39 @@ def test_a_named_artifact_keeps_its_own_resolution(tmp_path) -> None:
 
 def test_without_the_flag_local_discovery_is_unchanged(tmp_path) -> None:
     (tmp_path / "Local.Report").mkdir()
-    args = _args(tmp_path, from_workspace=False)
+    args = _args(tmp_path, workspace_id="")
 
     with patch(_CLIENT) as build_client:
         artifacts = _discover_for("playwright", args, "*.Report")
 
     build_client.assert_not_called()
     assert [a.name for a in artifacts] == ["Local.Report"]
+
+
+def test_explicit_artifact_dir_keeps_repository_discovery(tmp_path) -> None:
+    """A real --artifact-dir on the CLI keeps the repo as the denominator
+    even with a workspace target given, distinguishing it from the default.
+    """
+    (tmp_path / "Local.Report").mkdir()
+    args = build_parser().parse_args(
+        ["playwright", "--workspace", WORKSPACE, "--artifact-dir", str(tmp_path)]
+    )
+
+    with patch(_CLIENT) as build_client:
+        artifacts = _discover_for("playwright", args, "*.Report")
+
+    build_client.assert_not_called()
+    assert [a.name for a in artifacts] == ["Local.Report"]
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"dataset_id": "ds1"},
+        {"dataset_workspace_id": WORKSPACE, "workspace_id": ""},
+    ],
+)
+def test_dataset_selectors_take_precedence_over_a_bare_workspace_target(tmp_path, overrides) -> None:
+    args = _args(tmp_path, **overrides)
+
+    assert workspace_reports_requested(args) is False

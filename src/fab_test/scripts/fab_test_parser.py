@@ -51,15 +51,35 @@ def _guid_type(value: str) -> str:
     return value
 
 
+class _ArtifactDirAction(argparse.Action):
+    """Records that --artifact-dir was passed on the CLI, not defaulted.
+
+    Playwright's workspace-wide discovery needs to tell "the caller typed
+    the default path" from "nothing was passed" -- comparing the resolved
+    value against the default string cannot do that (the default path is a
+    perfectly valid explicit choice too).
+    """
+
+    def __call__(self, parser, namespace, values, option_string=None):  # noqa: ARG002 - argparse Action signature
+        setattr(namespace, self.dest, values)
+        namespace.artifact_dir_explicit = True
+
+
 def _add_common_flags(
-    parser: argparse.ArgumentParser, *, artifact_dir_default=ARTIFACT_ROOT
+    parser: argparse.ArgumentParser,
+    *,
+    artifact_dir_default=ARTIFACT_ROOT,
+    track_artifact_dir_explicit: bool = False,
 ) -> None:
     parser.add_argument(
         "--artifact-dir",
         default=str(_PYPROJECT_CONFIG.get("artifact_dir", artifact_dir_default)),
         metavar="DIR",
+        action=_ArtifactDirAction if track_artifact_dir_explicit else "store",
         help="Root to discover artifacts under, recursively (default: the working directory)",
     )
+    if track_artifact_dir_explicit:
+        parser.set_defaults(artifact_dir_explicit=False)
     parser.add_argument(
         "--output-dir",
         default=str(_PYPROJECT_CONFIG.get("output_dir", RESULTS_ROOT)),
@@ -470,7 +490,7 @@ def _add_playwright_subparser(subs: argparse._SubParsersAction) -> None:
         "playwright",
         help="Playwright visual/error validation (Report artifacts)",
     )
-    _add_common_flags(playwright_p)
+    _add_common_flags(playwright_p, track_artifact_dir_explicit=True)
     playwright_p.add_argument(
         "--env-file",
         default=None,
@@ -486,12 +506,18 @@ def _add_playwright_subparser(subs: argparse._SubParsersAction) -> None:
         help="Path to impacted-report manifest JSON",
     )
     playwright_p.add_argument(
+        "--workspace",
         "--workspace-id",
+        "--from-workspace",
         default="",
         dest="workspace_id",
-        metavar="ID",
-        type=_guid_type,
-        help="Fabric workspace ID [env: FABRIC_WORKSPACE_ID]",
+        metavar="NAME_OR_ID",
+        help=(
+            "Workspace name or GUID [env: FABRIC_WORKSPACE_ID]; --workspace-id and "
+            "--from-workspace are accepted as aliases, prefer --workspace. Standalone, "
+            "with no --artifact and no explicit --artifact-dir, tests every Report and "
+            "PaginatedReport deployed in the workspace instead of scanning the repository"
+        ),
     )
     playwright_p.add_argument(
         "--env",
@@ -499,16 +525,6 @@ def _add_playwright_subparser(subs: argparse._SubParsersAction) -> None:
         dest="environment",
         metavar="ENV",
         help="Environment label (e.g. DEV, PROD, ANY) [env: FABRIC_ENVIRONMENT]",
-    )
-    playwright_p.add_argument(
-        "--from-workspace",
-        action="store_true",
-        dest="from_workspace",
-        help=(
-            "Test every report and paginated report in the workspace, listed "
-            "from Fabric instead of discovered under --artifact-dir, so the "
-            "run needs no checkout of the repository"
-        ),
     )
     playwright_p.add_argument(
         "--dataset-id",
