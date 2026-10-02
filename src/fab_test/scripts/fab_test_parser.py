@@ -501,6 +501,16 @@ def _add_playwright_subparser(subs: argparse._SubParsersAction) -> None:
         help="Environment label (e.g. DEV, PROD, ANY) [env: FABRIC_ENVIRONMENT]",
     )
     playwright_p.add_argument(
+        "--from-workspace",
+        action="store_true",
+        dest="from_workspace",
+        help=(
+            "Test every report and paginated report in the workspace, listed "
+            "from Fabric instead of discovered under --artifact-dir, so the "
+            "run needs no checkout of the repository"
+        ),
+    )
+    playwright_p.add_argument(
         "--dataset-id",
         default="",
         dest="dataset_id",

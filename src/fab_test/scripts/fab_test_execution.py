@@ -35,6 +35,8 @@ from ._playwright_dataset_target import (
     resolve_dataset_targets,
     resolve_dataset_workspace_artifact,
     resolve_dataset_workspace_targets,
+    resolve_workspace_reports,
+    workspace_reports_requested,
 )
 from ._playwright_timeout_scaling import (
     Narration as PlaywrightNarration,
@@ -565,6 +567,8 @@ def _playwright_service_resolved_target(args: argparse.Namespace) -> list[Path] 
     """
     if getattr(args, "impact_manifest", None):
         return [Path(".")]
+    if workspace_reports_requested(args):
+        return resolve_workspace_reports(args)
     if dataset_target_requested(args):
         return resolve_dataset_targets(args)
     if dataset_workspace_only_requested(args):

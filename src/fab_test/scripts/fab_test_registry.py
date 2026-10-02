@@ -619,7 +619,9 @@ def _report_type_for_command(artifact: Path, args: argparse.Namespace) -> str:
     is left for the subprocess to auto-detect, exactly like a bare
     ``--artifact NAME`` always has.
     """
-    explicit = getattr(args, "report_type", "") or ""
+    explicit = getattr(args, "report_type", "") or (getattr(args, "playwright_report_types", None) or {}).get(
+        artifact.stem, ""
+    )
     if explicit:
         return explicit
     return _LOCAL_SUFFIX_TO_REPORT_TYPE.get(artifact.suffix, "")

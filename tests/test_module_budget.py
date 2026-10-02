@@ -134,9 +134,10 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
         ),
     ),
     "src/fab_test/scripts/fab_test_registry.py": (
-        1026,
+        1028,
         (
-            "2026-09-30: merge of main into feat/rdl-static-analysis -- main's -q/verbosity additions "
+            "2026-10-02: +2 lines letting a per-report type from --from-workspace win over the "
+            "local suffix in _report_type_for_command (Playwright Workspace Reports). "            "2026-09-30: merge of main into feat/rdl-static-analysis -- main's -q/verbosity additions "
             "plus this branch's rdl additions both landed here, so the ceiling is the sum of the two. "
             "2026-09-27: +40 lines registering the rdl analyzer -- "
             "ANALYZER_REGISTRY/ANALYZER_SCOPES entries, _resolve_rdl_rules_path "
@@ -255,9 +256,10 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
         ),
     ),
     "src/fab_test/scripts/fab_test_execution.py": (
-        845,
+        849,
         (
-            "2026-09-26: born over the hard budget adding "
+            "2026-10-02: +4 lines importing and calling the --from-workspace resolver ahead of the "
+            "dataset modes in _playwright_service_resolved_target (Playwright Workspace Reports). "            "2026-09-26: born over the hard budget adding "
             "_playwright_service_resolved_target (collapses _discover_for's "
             "impact-manifest/dataset-id/dataset-workspace-only early returns "
             "into one call, both for readability and to keep _discover_for's "
