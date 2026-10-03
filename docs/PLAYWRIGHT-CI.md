@@ -364,7 +364,7 @@ The example workflow above reads one fixed `FABRIC_WORKSPACE_ID` per Environment
 ## Automated live CI
 
 `.github/workflows/live-ci.yml` runs on every same-repository pull request, on
-pushes to `main`/`develop`, and by hand. It uses the `fabric-demo` Environment's
+pushes to `main`/`dev`, and by hand. It uses the `fabric-demo` Environment's
 service principal against the `visual-error-testing` workspace to check
 `fab-test auth status`, a service-mode `rdl --workspace` run, and the live
 parity tests (`pytest -m integration`). Fork and dependabot PRs are skipped

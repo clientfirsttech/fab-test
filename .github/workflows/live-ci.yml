@@ -15,7 +15,7 @@ name: Live CI
 on:
   pull_request:
   push:
-    branches: [main, develop]
+    branches: [main, dev]
   workflow_dispatch:
 
 concurrency:
