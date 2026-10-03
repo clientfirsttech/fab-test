@@ -1,6 +1,6 @@
 # SQL Database Unit Testing (T-TEST) Epic
 
-**Status**: 📋 PLANNED — awaiting review of the targeting contract and open decisions below before any code is written.
+**Status**: 📋 PLANNED — decisions 1–5 recorded; awaiting decisions 6–8 and the example repository before any code is written.
 **Goal**: Add a `sqldb-test` analyzer that installs [T-TEST](https://github.com/uratol/t-test) idempotently into a Microsoft Fabric SQL database, runs its pure T-SQL unit tests, and reports through the same envelope, HTML report, exit codes, and telemetry as every other fab-test check.
 
 ## Overview
@@ -38,12 +38,16 @@ Lock the contract before changing the parser or registry, as the Playwright epic
 - Given a service principal (`FABRIC_TENANT_ID` + `FABRIC_SERVICE_PRINCIPAL_ID`/`FABRIC_CLIENT_ID` + secret, env > `--env-file` > `.fab-test/.env` > `./.env`), should authenticate non-interactively; given none, should fall back to `DefaultAzureCredential` (az login / VS Code / managed identity) — the existing `build_azure_credential` rule, so there is one credential path.
 - Given a human on a laptop with no cached login, should decide whether `--interactive` opens `InteractiveBrowserCredential`; CI must never prompt.
 - Given a partially configured principal, should fail with `IncompleteServicePrincipalError`'s remediation rather than fall back.
-- **Open decisions for review** (record answers here before task 2):
-  1. Subcommand and key: `sqldb-test` (registry key `sqldb_test`, alias `t-test`)?
-  2. SQL driver: `mssql-python` (pip-only, built-in Entra auth, no ODBC install) as a new optional extra `sqldb`, vs. `pyodbc` + ODBC Driver 18 + access token, vs. bootstrapping go-`sqlcmd` (text parsing only). Recommendation: `mssql-python` extra.
-  3. Repository mode — do test procedures reach the database via Fabric Git sync/deployment (fab-test only runs), or should an opt-in `--deploy-tests` apply `CREATE OR ALTER` for `[tests]` procedures found in the `.SQLDatabase` project? Deployment is a vision non-goal, so the default proposal is run-only.
-  4. Should a database with no `[tests]` procedures be `skipped` (proposed) or `warning`?
-  5. Pin the upstream T-TEST commit SHA and the exact bytes of `install.sql` (sha256) that fab-test vendors or downloads.
+- **Decisions** (recorded 2026-10-03 at review):
+  1. ✅ Subcommand `sqldb-test`, registry key `sqldb_test`, alias `t-test`.
+  2. ✅ SQL driver: `mssql-python` (pip-only, built-in Entra auth, no ODBC install) as a new optional extra `sqldb`. Missing extra => exit `127` naming `pip install "cft-fab-test[sqldb]"`, as other analyzers do for a missing tool.
+  3. ✅ Repository mode is **run-only**: test procedures reach the database through Fabric Git sync or the user's own deployment; fab-test never creates or alters `[tests]` procedures (deployment stays a vision non-goal).
+  4. ✅ A database with no user `[tests]` procedures is `skipped`, with a hint pointing to the `t-test` skill.
+  5. ✅ Upstream version: track the **latest** `install.sql` from the T-TEST default branch, verified by checksum — fab-test records the sha256 (and commit SHA) of the script it installs, compares it with the database's marker to decide no-op vs. upgrade, and the tool-update check surfaces when upstream changes.
+- **Still open**:
+  6. `--workspace WS` alone: test every deployed SQLDatabase in the workspace, or refuse and require `--artifact`?
+  7. Interactive login: offer `--interactive` (`InteractiveBrowserCredential`) for laptop users, or require `az login` first?
+  8. `fab-test all` / `local` inclusion: proposed — in `all` only when a workspace is configured; never in `local`.
 
 ---
 
@@ -53,8 +57,9 @@ Install or upgrade the framework without ever failing on a database that already
 
 **Requirements**:
 - Given a database with no `test` schema, should execute upstream `install.sql` split on `GO` batches, skipping the trailing `EXEC test.run` batch so install never reports self-test output as user results.
-- Given a database where T-TEST is already installed at the pinned version, should detect it (version marker via `sys.extended_properties` on schema `test`, e.g. `fab_test.t_test_version` = commit SHA + install.sql sha256) and do nothing.
-- Given an older or unknown install, should upgrade by rewriting each `CREATE` batch for the `test` schema to `CREATE OR ALTER` (schemas guarded with `IF SCHEMA_ID(...) IS NULL`), then update the marker; should never drop or alter anything in `[tests]` except the upstream self-test procedures.
+- Given a run, should fetch the latest `install.sql` from the T-TEST default branch (cached under the tool cache, refreshed per the existing update-check rules) and compute its sha256; given a download failure, should fall back to the cached copy with a `warning`, or exit with remediation when none is cached.
+- Given a database whose marker (`sys.extended_properties` on schema `test`, e.g. `fab_test.t_test_sha256` plus `fab_test.t_test_commit`) matches the script's sha256, should detect it and do nothing.
+- Given a marker with a different sha256, or a `test` schema with no marker, should upgrade by rewriting each `CREATE` batch for the `test` schema to `CREATE OR ALTER` (schemas guarded with `IF SCHEMA_ID(...) IS NULL`), then update the marker; should never drop or alter anything in `[tests]` except the upstream self-test procedures.
 - Given the upstream self-tests in `[tests]` (`test.*`), should install them only when `--include-framework-tests` is set, and always exclude them from user runs and results.
 - Given `--install never`, should fail readiness with remediation if T-TEST is absent; given `--install auto` (default) should install/upgrade; given `--install only`, should install and exit without running tests (CI pre-step).
 - Given the caller lacks `CREATE SCHEMA`/`ALTER` permission, should exit with an error envelope naming the required role (`db_owner` or `db_ddladmin`) rather than a raw driver error.
@@ -78,7 +83,7 @@ Turn each targeted database into a list of executed tests with structured result
 - Given `--timeout`, should cancel a hung test, record it as `error`, and continue.
 - Given results, should emit `test_results` in the test shape (`suite_name` = tested object schema, `test_name`, `passed`, `expected`, `actual` parsed from `assert_equals` messages where present) and one `error` finding per failed test (`rule` `TTEST-FAIL` / `TTEST-ERROR`, `object` = test proc), so existing summary and HTML tables render unchanged.
 - Given the analyzer contract, should exit 0 when all pass, 1 on any failure or tool/connection error (always writing an error envelope first), and honour `ANALYZER_OUTPUT_MODE=json`, `ANALYZER_VERBOSITY`, `-q`, and `--verbose`.
-- Given zero tests in `[tests]`, should apply the decision from task 1 (proposed: `skipped` with a hint to the `t-test` skill).
+- Given zero user tests in `[tests]`, should report `skipped` (decision 4) with a hint to the `t-test` skill.
 - Given `--native-output`, should write `native.txt` with the raw info-message stream so users can compare with an SSMS run.
 
 ---
