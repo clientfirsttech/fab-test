@@ -1,7 +1,7 @@
 # SQL Database Unit Testing (T-TEST) Epic
 
 **Status**: 📋 PLANNED — awaiting review of the targeting contract and open decisions below before any code is written.
-**Goal**: Add a `sqldb-test` analyzer that installs [T-TEST](https://github.com/uratol/t-test) idempotently into a Microsoft Fabric SQL database, runs its pure T-SQL unit tests, measures coverage, and reports through the same envelope, HTML report, exit codes, and telemetry as every other fab-test check.
+**Goal**: Add a `sqldb-test` analyzer that installs [T-TEST](https://github.com/uratol/t-test) idempotently into a Microsoft Fabric SQL database, runs its pure T-SQL unit tests, and reports through the same envelope, HTML report, exit codes, and telemetry as every other fab-test check.
 
 ## Overview
 
@@ -20,7 +20,7 @@ Facts that shape the plan (verified against upstream `install.sql`, 20 KB, MIT):
 - It ends with `EXEC test.run`, which runs the bundled self-tests in `[tests]` (e.g. `[tests].[test.format_message]`). Those self-tests would pollute user results unless excluded.
 - `test.run` reports through `RAISERROR(..., 0, 1) WITH NOWAIT` info messages and throws on failure; there is **no results table**. Structured per-test results therefore have to come from fab-test enumerating `test.test` and executing each test itself.
 - `test.log` declares `WITH EXECUTE AS 'dbo'`, and the self-test uses `IS DISTINCT FROM` (SQL 2022 compat). Both need a live check on Fabric SQL database before readiness is declared.
-- T-TEST has no coverage feature; coverage is fab-test's addition.
+- T-TEST has no coverage feature, and neither do tSQLt nor Flyway; code coverage is parked (see the Parked section).
 
 ---
 
@@ -43,8 +43,7 @@ Lock the contract before changing the parser or registry, as the Playwright epic
   2. SQL driver: `mssql-python` (pip-only, built-in Entra auth, no ODBC install) as a new optional extra `sqldb`, vs. `pyodbc` + ODBC Driver 18 + access token, vs. bootstrapping go-`sqlcmd` (text parsing only). Recommendation: `mssql-python` extra.
   3. Repository mode — do test procedures reach the database via Fabric Git sync/deployment (fab-test only runs), or should an opt-in `--deploy-tests` apply `CREATE OR ALTER` for `[tests]` procedures found in the `.SQLDatabase` project? Deployment is a vision non-goal, so the default proposal is run-only.
   4. Should a database with no `[tests]` procedures be `skipped` (proposed) or `warning`?
-  5. Statement-level coverage depends on Extended Events in Fabric SQL database — confirm on the example repo before committing to it (see Coverage task).
-  6. Pin the upstream T-TEST commit SHA and the exact bytes of `install.sql` (sha256) that fab-test vendors or downloads.
+  5. Pin the upstream T-TEST commit SHA and the exact bytes of `install.sql` (sha256) that fab-test vendors or downloads.
 
 ---
 
@@ -56,7 +55,7 @@ Install or upgrade the framework without ever failing on a database that already
 - Given a database with no `test` schema, should execute upstream `install.sql` split on `GO` batches, skipping the trailing `EXEC test.run` batch so install never reports self-test output as user results.
 - Given a database where T-TEST is already installed at the pinned version, should detect it (version marker via `sys.extended_properties` on schema `test`, e.g. `fab_test.t_test_version` = commit SHA + install.sql sha256) and do nothing.
 - Given an older or unknown install, should upgrade by rewriting each `CREATE` batch for the `test` schema to `CREATE OR ALTER` (schemas guarded with `IF SCHEMA_ID(...) IS NULL`), then update the marker; should never drop or alter anything in `[tests]` except the upstream self-test procedures.
-- Given the upstream self-tests in `[tests]` (`test.*`), should install them only when `--include-framework-tests` is set, and always exclude them from user runs and coverage.
+- Given the upstream self-tests in `[tests]` (`test.*`), should install them only when `--include-framework-tests` is set, and always exclude them from user runs and results.
 - Given `--install never`, should fail readiness with remediation if T-TEST is absent; given `--install auto` (default) should install/upgrade; given `--install only`, should install and exit without running tests (CI pre-step).
 - Given the caller lacks `CREATE SCHEMA`/`ALTER` permission, should exit with an error envelope naming the required role (`db_owner` or `db_ddladmin`) rather than a raw driver error.
 - Given `--dry-run`, should print the planned install action (none/install/upgrade) without connecting for writes.
@@ -84,28 +83,14 @@ Turn each targeted database into a list of executed tests with structured result
 
 ---
 
-## Code Coverage
-
-Report what the tests exercise, at two levels.
-
-**Requirements**:
-- Given the `test.test` view and `sys.objects` (types `P`, `FN`, `IF`, `TF`, `V`, `TR`; excluding `test`, `tests`, and `sys`), should compute **object coverage**: objects with at least one test vs. total, per schema, listing untested objects.
-- Given `--coverage statement` and a database where a database-scoped Extended Events session is permitted, should create a uniquely named session capturing `sp_statement_completed` / `sql_statement_completed` for the test connection, map `object_id` + offsets to statements, and report **statement/line coverage** per module; should always drop the session, even on failure.
-- Given Extended Events are unavailable or not permitted, should fall back to object coverage with an `info` finding explaining why, never fail the run.
-- Given `--coverage-min PCT`, should express a shortfall as an `error` finding (so `_artifact_exit_code` decides), matching the analyzer contract's rule for wrapper thresholds.
-- Given coverage results, should write `coverage.json` and a Cobertura `coverage.xml` beside the envelope, so GitHub Actions / Azure DevOps coverage publishers work without custom YAML.
-- Given repository mode, should optionally map module coverage back to the `.sql` files in the `.SQLDatabase` project for file-level annotations.
-
----
-
 ## HTML Report, Summary, And Telemetry
 
 Make results visible through the surfaces every analyzer already uses.
 
 **Requirements**:
-- Given an envelope, should call `attach_report` before `write_envelope` so `--report` / `--open-report` produce the per-artifact HTML with the test-results table, the findings table, and a coverage section (object table + statement heatmap when available) rendered by `_report_html.py`.
+- Given an envelope, should call `attach_report` before `write_envelope` so `--report` / `--open-report` produce the per-artifact HTML with the test-results table and the findings table rendered by `_report_html.py`.
 - Given a run over several databases, should appear in the run index, summary table, run manifest, CI annotations, and PR review comments with no new code in those consumers (envelope path parity: `<output>/sqldb_test/<db>/envelope.json`).
-- Given telemetry is enabled, should route to `fabric_dynamic_analysis` in `_telemetry_table` (it executes against a live service), with `artifact_type` `SQLDatabase`, test counts, coverage percentages, install action, and duration — never server names with credentials, tokens, or connection strings.
+- Given telemetry is enabled, should route to `fabric_dynamic_analysis` in `_telemetry_table` (it executes against a live service), with `artifact_type` `SQLDatabase`, test counts, install action, and duration — never server names with credentials, tokens, or connection strings.
 - Given `--telemetry --dry-run`, should show the payload that would ship.
 
 ---
@@ -120,7 +105,7 @@ Make the analyzer discoverable like its siblings (per `aidd-analyzer-contract` c
 - Given `fab_test_registry.py` and `fab_test_parser.py` sit at their module-budget ceilings, should split on their existing seams (or a new `_sqldb_target.py` / `sqldb_test/` package like `playwright_validation/`) rather than raise exemptions.
 - Given `fab-test doctor`, should report readiness: driver extra installed, credential resolvable, and (with `--workspace`) connectivity and T-TEST install state, each with a named remediation.
 - Given `fab-test all` and `fab-test local`, should decide inclusion: proposed — included in `all` only when a workspace is configured; excluded from `local` (needs a service).
-- Given a `rules.sqldb_test` overlay is not needed (no rules), should instead expose defaults (`install`, `coverage`, `coverage_min`, `schemas`) in `fab-test.schema.json` / `_config.py`.
+- Given a `rules.sqldb_test` overlay is not needed (no rules), should instead expose defaults (`install`, `schemas`, `limit_failed`) in `fab-test.schema.json` / `_config.py`.
 - Given tests, should add a `sqldb_test` pytest marker in `pytest.ini` and `tests/conftest.py`, with a fake-connection seam so unit tests need no database, plus one opt-in `integration` test against the example repo.
 
 ---
@@ -130,7 +115,7 @@ Make the analyzer discoverable like its siblings (per `aidd-analyzer-contract` c
 Prove both modes end to end with the user-supplied repo.
 
 **Requirements**:
-- Given the example repo (to be provided) checked out, should run repository mode with a service principal and with `az login`, and record per-database test counts, coverage, and install action.
+- Given the example repo (to be provided) checked out, should run repository mode with a service principal and with `az login`, and record per-database test counts and install action.
 - Given the same databases, should run remote mode from an empty directory with names and with GUIDs and produce identical results.
 - Given a second consecutive run, should show `install: no-op` and identical test verdicts.
 - Given the real CLI, should run `sqldb-test`, `all`, `list`, `explain`, `doctor`, `--report`, `--open-report`, `--output-format json`, `-q`, and `--telemetry --dry-run` (blast-radius rule).
@@ -140,8 +125,8 @@ Prove both modes end to end with the user-supplied repo.
 ## Document All Three Callers And Skills
 
 **Requirements**:
-- Given the human caller, should update README and `docs/QUICK-VALIDATION.md` with install, repository-mode, and remote-mode examples (names and GUIDs), auth options, coverage, and report screenshots.
-- Given the pipeline caller, should add copy-pasteable GitHub Actions and Azure DevOps snippets under `docs/examples/` (service principal secrets, `--install only` pre-step, Cobertura publish).
+- Given the human caller, should update README and `docs/QUICK-VALIDATION.md` with install, repository-mode, and remote-mode examples (names and GUIDs), auth options, and report screenshots.
+- Given the pipeline caller, should add copy-pasteable GitHub Actions and Azure DevOps snippets under `docs/examples/` (service principal secrets, `--install only` pre-step, JUnit-style results publish if needed).
 - Given the agent caller, should update the fab-test skill (`.github/skills/fab-test/` and `references/flags.md`, `reports.md`, `targeting-and-discovery.md`, `credentials.md`) in SudoLang, synced byte-for-byte to `src/fab_test/skill/`.
 - Given agents also need to *write* tests, should add a new `t-test` skill (`.github/skills/t-test/SKILL.md`, via `aidd-upskill`) covering naming (`[tests].[schema.object@action]`), `BEGIN TRAN/ROLLBACK`, assertion functions, the sentinel exception pattern, and when not to wrap in a transaction — linking to the `sqldb-*` skills for querying.
 - Given an epic-sized `src/` change, should bump MINOR in `src/fab_test/__init__.py` (`.dev1`) and re-stamp both skill frontmatters; add a CHANGELOG entry via `aidd-log`.
@@ -154,3 +139,16 @@ Prove both modes end to end with the user-supplied repo.
 - Given the whole repository, should pass `ruff check .`, `tests/test_complexity_budget.py` (with ruff installed), and `tests/test_module_budget.py`.
 - Given the full suite, should pass with `--cov --cov-fail-under=80` over `src/fab_test`.
 - Given CI-dependent tests, should pass once with `GITHUB_ACTIONS=true CI=true`.
+
+---
+
+## Parked: Code Coverage
+
+Parked 2026-10-03 at review. Neither T-TEST, tSQLt, nor Flyway ships code coverage; in the tSQLt ecosystem it comes from a separate tool, [SQLCover](https://github.com/GoEddie/SQLCover), which captures executed statements with Extended Events (Redgate SQL Test surfaces SQLCover's results). Whether a Fabric SQL database permits a database-scoped Extended Events session is unverified. Revisit after the core analyzer ships, using SQLCover as the reference design and the example repository to confirm Extended Events support. Captured requirements, for when it is unparked:
+
+- Given the `test.test` view and `sys.objects` (types `P`, `FN`, `IF`, `TF`, `V`, `TR`; excluding `test`, `tests`, and `sys`), should compute **object coverage**: objects with at least one test vs. total, per schema, listing untested objects.
+- Given `--coverage statement` and a database where a database-scoped Extended Events session is permitted, should create a uniquely named session capturing `sp_statement_completed` / `sql_statement_completed` for the test connection, map `object_id` + offsets to statements, and report **statement/line coverage** per module; should always drop the session, even on failure.
+- Given Extended Events are unavailable or not permitted, should fall back to object coverage with an `info` finding explaining why, never fail the run.
+- Given `--coverage-min PCT`, should express a shortfall as an `error` finding (so `_artifact_exit_code` decides), matching the analyzer contract's rule for wrapper thresholds.
+- Given coverage results, should write `coverage.json` and a Cobertura `coverage.xml` beside the envelope, so GitHub Actions / Azure DevOps coverage publishers work without custom YAML.
+- Given repository mode, should optionally map module coverage back to the `.sql` files in the `.SQLDatabase` project for file-level annotations.
