@@ -267,3 +267,25 @@ def test_given_typed_service_target_dry_run_should_list_the_item_without_credent
 def test_given_json_format_should_keep_stderr_silent_but_still_resolve_mode(tmp_path):
     result = _cli("bpa", "--dry-run", "--format", "json", "--artifact-dir", str(tmp_path))
     assert "mode=" not in result.stderr
+
+
+def test_given_dot_dot_names_should_never_escape_the_output_dir(fake, tmp_path):
+    client, _ = fake
+    client.items = [{"id": "m1", "displayName": ".."}]
+    args = _args("Dev.Workspace/Sales.SemanticModel", workspace_id=WS)
+    args.resolved_target = parse_target("Dev.Workspace/...SemanticModel", default_type="SemanticModel")
+    [artifact] = svc.export_for_analyzer("bpa", args, tmp_path / "out")
+    assert (tmp_path / "out").resolve() in artifact.resolve().parents
+    svc.finalize_exports(args)
+    assert (tmp_path / "out").exists()
+
+
+def test_given_json_secrets_should_be_redacted_in_kept_exports(fake, tmp_path):
+    client, _ = fake
+    client.items = [{"id": "m1", "displayName": "Sales"}]
+    args = _args("Dev.Workspace/Sales.SemanticModel", workspace_id=WS)
+    args.keep_export = True
+    [artifact] = svc.export_for_analyzer("bpa", args, tmp_path)
+    (artifact / "x.dat").write_text('{"password": "hunter2"}')
+    svc.finalize_exports(args)
+    assert "hunter2" not in (artifact / "x.dat").read_text()

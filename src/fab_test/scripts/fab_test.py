@@ -226,9 +226,12 @@ def _prepare_target(args: argparse.Namespace) -> int | None:
         return 2
 
     try:
+        # Standalone pql-test keeps meaning "the repository's models over XMLA":
+        # its --workspace-id is a connection setting, not a mode.
+        standalone_pql = args.analyzer == "pql_test" and args.resolved_target is None
         args.resolved_mode = resolve_mode(
             args.resolved_target,
-            workspace_flag=getattr(args, "workspace_id", ""),
+            workspace_flag="" if standalone_pql else getattr(args, "workspace_id", ""),
             artifact_dir_explicit=getattr(args, "artifact_dir_explicit", False),
         )
     except ModeError as exc:
@@ -342,7 +345,6 @@ def _dispatch_run(args: argparse.Namespace) -> int:
     # One flush for the whole run, `all` included: a sink per analyzer would
     # reopen the ingest client for each of them.
     manifest.telemetry_error = _close_telemetry(telemetry, args)
-    finalize_exports(args)
     manifest.write(output_dir, exit_code)
     return exit_code
 
@@ -368,7 +370,11 @@ def main() -> int:
         if exit_code is not None:
             return exit_code
 
-    return _dispatch_run(args)
+    try:
+        return _dispatch_run(args)
+    finally:
+        # Exports are test inputs, not results: gone on every exit path.
+        finalize_exports(args)
 
 
 if __name__ == "__main__":

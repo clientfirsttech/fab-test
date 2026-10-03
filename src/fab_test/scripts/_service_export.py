@@ -45,7 +45,7 @@ _UNSAFE = re.compile(r"[^\w.\- ]")
 _SECRET_ASSIGNMENT = re.compile(
     r"(?i)\b(password|pwd|accountkey|sharedaccesskey|client_?secret)\s*=\s*[^;\"'\r\n]+"
 )
-_TEXT_SUFFIXES = {".tmdl", ".json", ".pbir", ".pbism", ".rdl", ".platform", ".xml", ".txt"}
+_JSON_SECRET = re.compile(r'(?i)("(?:password|pwd|accountkey|sharedaccesskey|client_?secret)"\s*:\s*")[^"]*')
 _CI_VARIABLES = ("CI", "GITHUB_ACTIONS", "TF_BUILD")
 _FABRIC_SCOPE = "https://api.fabric.microsoft.com/.default"
 
@@ -54,7 +54,7 @@ class ServiceExportError(Exception):
     """A service export that cannot proceed; ``code`` is the CLI exit code."""
 
     def __init__(self, message: str, code: int = 1) -> None:
-        super().__init__(message)
+        super().__init__(redact_secrets(message))
         self.code = code
 
 
@@ -181,7 +181,8 @@ def _remediation(exc: Exception, label: str) -> ServiceExportError:
 
 
 def _safe(name: str) -> str:
-    return _UNSAFE.sub("_", name).strip() or "item"
+    """A single path segment: no separators, and never ``.``/``..``."""
+    return _UNSAFE.sub("_", name).strip().lstrip(".") or "item"
 
 
 def _write_parts(parts: list[dict[str, str]], dest: Path, item_type: str, name: str) -> Path:
@@ -293,6 +294,8 @@ def export_for_analyzer(name: str, args: argparse.Namespace, output_dir: Path) -
             except ServiceClientError as exc:
                 raise _remediation(exc, label) from exc
             root = output_dir / name / _safe(mode.workspace or workspace_id) / _safe(item["displayName"])
+            if output_dir.resolve() not in root.resolve().parents:
+                raise ServiceExportError(f"refusing export path outside {output_dir}", 1)
             roots.append(root)
             cache[key] = _write_parts(parts, root / "export", item_type, item["displayName"])
         artifacts.append(cache[key])
@@ -300,7 +303,8 @@ def export_for_analyzer(name: str, args: argparse.Namespace, output_dir: Path) -
 
 
 def _redact_text(text: str) -> str:
-    return _SECRET_ASSIGNMENT.sub(lambda m: f"{m.group(1)}=<redacted>", redact_secrets(text))
+    text = _SECRET_ASSIGNMENT.sub(lambda m: f"{m.group(1)}=<redacted>", redact_secrets(text))
+    return _JSON_SECRET.sub(lambda m: f"{m.group(1)}<redacted>", text)
 
 
 def finalize_exports(args: argparse.Namespace) -> None:
@@ -314,12 +318,16 @@ def finalize_exports(args: argparse.Namespace) -> None:
                     parent.rmdir()
             continue
         for path in root.rglob("*"):
-            if path.is_file() and path.suffix.lower() in _TEXT_SUFFIXES:
-                try:
-                    original = path.read_text(encoding="utf-8")
-                except (UnicodeDecodeError, OSError):
-                    continue
-                redacted = _redact_text(original)
-                if redacted != original:
-                    path.write_text(redacted, encoding="utf-8")
+            if path.is_symlink() or not path.is_file():
+                continue
+            try:
+                original = path.read_bytes().decode("utf-8")
+            except UnicodeDecodeError:
+                continue  # binary content carries no connection-string text
+            except OSError:
+                path.unlink(missing_ok=True)  # fail closed: never keep what cannot be audited
+                continue
+            redacted = _redact_text(original)
+            if redacted != original:
+                path.write_bytes(redacted.encode("utf-8"))
     roots.clear()
