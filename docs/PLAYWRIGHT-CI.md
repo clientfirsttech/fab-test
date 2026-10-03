@@ -359,3 +359,14 @@ The example workflow above reads one fixed `FABRIC_WORKSPACE_ID` per Environment
 3. Add an optional `workspace_id` dispatch input too, passed as `--workspace-id` when non-empty. It wins over `--env`, so a workspace not yet in `environments.yml` -- or a one-off run against somewhere else entirely -- never needs a workflow edit.
 
 `.github/workflows/playwright-demo.yml` in this repository is exactly this pattern, reading this repository's own `.fab-test/metadata/environments.yml`: `--env dev` already resolves to a real workspace with nothing else supplied, and `test`/`prod` fall back to the `workspace_id` override until their entries in that file carry a real workspace ID.
+
+
+## Automated live CI
+
+`.github/workflows/live-ci.yml` runs on every same-repository pull request, on
+pushes to `main`/`develop`, and by hand. It uses the `fabric-demo` Environment's
+service principal against the `visual-error-testing` workspace to check
+`fab-test auth status`, a service-mode `rdl --workspace` run, and the live
+parity tests (`pytest -m integration`). Fork and dependabot PRs are skipped
+(they cannot read the secrets); the workflow never uses `pull_request_target`.
+If the Environment requires reviewers, every run waits for approval.

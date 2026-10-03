@@ -441,6 +441,8 @@ def _add_pql_test_subparser(subs: argparse._SubParsersAction) -> None:
         help="pql-test DAX/PQL test runner (SemanticModel artifacts)",
     )
     _add_common_flags(pql_test_p)
+    add_workspace_flag(pql_test_p, aliases=False, dest="service_workspace")
+    add_service_flags(pql_test_p)
     pql_test_p.add_argument(
         "--workspace-id",
         default="",

@@ -10,19 +10,22 @@ from __future__ import annotations
 import argparse
 
 
-def add_workspace_flag(parser: argparse.ArgumentParser) -> None:
-    """``--workspace``: with no TARGET, pure service mode over the workspace."""
+def add_workspace_flag(parser: argparse.ArgumentParser, *, aliases: bool = True, dest: str = "workspace_id") -> None:
+    """``--workspace``: with no TARGET, pure service mode over the workspace.
+
+    ``pql-test`` passes ``aliases=False, dest="service_workspace"``: its own
+    ``--workspace-id`` is the XMLA connection setting and keeps that meaning.
+    """
+    names = ("--workspace", "--workspace-id", "--from-workspace") if aliases else ("--workspace",)
     parser.add_argument(
-        "--workspace",
-        "--workspace-id",
-        "--from-workspace",
+        *names,
         default="",
-        dest="workspace_id",
+        dest=dest,
         metavar="NAME_OR_ID",
         help=(
             "Workspace name or GUID. With no TARGET, tests every deployed item of this "
             "analyzer's type in the workspace (service mode); local folders are ignored "
-            "unless --artifact-dir is passed. --workspace-id/--from-workspace are aliases"
+            "unless --artifact-dir is passed" + (". --workspace-id/--from-workspace are aliases" if aliases else "")
         ),
     )
 

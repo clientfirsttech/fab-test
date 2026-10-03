@@ -36,8 +36,9 @@ TEST_HARD = 900
 # test_complexity_budget.py.
 EXEMPTIONS: dict[str, tuple[int, str]] = {
     "src/fab_test/scripts/fab_test_parser.py": (
-        1117,
+        1119,
         (
+            "2026-10-03: +2 lines giving pql-test the same --workspace and service flags (mode parity). "
             "2026-10-03: +5 lines attaching the shared service flags from _service_flags.py "
             "to the bpa/pbir/a11y/rdl/all/explain subparsers (Service Targeting epic). "
             "2026-10-02: +15 lines replacing GUID-only --workspace-id and the "

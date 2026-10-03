@@ -200,6 +200,20 @@ def _prepare_report_flags(args: argparse.Namespace) -> int | None:
     return None
 
 
+def _pql_workspace_conflict(args: argparse.Namespace) -> str | None:
+    """pql-test's --workspace (mode) and --workspace-id (XMLA) must agree."""
+    if args.analyzer != "pql_test":
+        return None
+    service_ws = (getattr(args, "service_workspace", "") or "").strip()
+    xmla_ws = (getattr(args, "workspace_id", "") or "").strip()
+    if service_ws and xmla_ws and service_ws != xmla_ws:
+        return (
+            f"--workspace '{service_ws}' and --workspace-id '{xmla_ws}' "
+            "name different workspaces; pass one or the other"
+        )
+    return None
+
+
 def _prepare_target(args: argparse.Namespace) -> int | None:
     """Resolve and validate the target onto ``args``, or return an exit code.
 
@@ -221,17 +235,22 @@ def _prepare_target(args: argparse.Namespace) -> int | None:
         return 2
 
     conflict = workspace_conflict(args.resolved_target, getattr(args, "workspace_id", ""))
+    conflict = conflict or _pql_workspace_conflict(args)
     if conflict:
         print(f"  ✗ fab-test: {conflict}", file=sys.stderr)
         return 2
 
     try:
-        # Standalone pql-test keeps meaning "the repository's models over XMLA":
-        # its --workspace-id is a connection setting, not a mode.
-        standalone_pql = args.analyzer == "pql_test" and args.resolved_target is None
+        # pql-test's --workspace-id is an XMLA connection setting, not a mode;
+        # its mode flag is --workspace (service_workspace), like the others'.
+        workspace_flag = (
+            getattr(args, "service_workspace", "")
+            if args.analyzer == "pql_test"
+            else getattr(args, "workspace_id", "")
+        )
         args.resolved_mode = resolve_mode(
             args.resolved_target,
-            workspace_flag="" if standalone_pql else getattr(args, "workspace_id", ""),
+            workspace_flag=workspace_flag,
             artifact_dir_explicit=getattr(args, "artifact_dir_explicit", False),
         )
     except ModeError as exc:

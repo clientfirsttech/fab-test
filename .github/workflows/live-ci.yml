@@ -1,0 +1,103 @@
+# Live CI: runs this repository's own code against the real
+# `visual-error-testing` workspace on every pull request and push, using the
+# service principal in the protected `fabric-demo` Environment. The live
+# contract tests (generation parity, result parity) skip silently without
+# credentials, so without this workflow they never ran in CI.
+#
+# Same-repository PRs only: a fork PR has no access to Environment secrets,
+# and dependabot's secrets are a separate store, so both are skipped rather
+# than failed. If the fabric-demo Environment has required reviewers, each
+# run waits for approval -- remove that rule (or add a branch policy) for
+# unattended CI.
+
+name: Live CI
+
+on:
+  pull_request:
+  push:
+    branches: [main, develop]
+  workflow_dispatch:
+
+concurrency:
+  group: live-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  live:
+    name: Live (visual-error-testing)
+    if: >-
+      github.event_name != 'pull_request' ||
+      (github.event.pull_request.head.repo.full_name == github.repository &&
+       github.actor != 'dependabot[bot]')
+    runs-on: ubuntu-latest
+    environment: fabric-demo
+    timeout-minutes: 45
+    # Same image and pin as playwright-demo.yml -- bump both together.
+    container:
+      image: mcr.microsoft.com/playwright/python:v1.63.0-noble
+      options: --user 1001
+    env:
+      PLAYWRIGHT_PIN: "1.63.0"
+      FABRIC_TENANT_ID: ${{ secrets.FABRIC_TENANT_ID }}
+      FABRIC_CLIENT_ID: ${{ secrets.FABRIC_CLIENT_ID }}
+      FABRIC_CLIENT_SECRET: ${{ secrets.FABRIC_CLIENT_SECRET }}
+      VISUAL_ERROR_TESTING_WORKSPACE: visual-error-testing
+      VISUAL_ERROR_TESTING_WORKSPACE_ID: c4698d28-b05c-40bc-926c-707563ac85e7
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set a user-writable .NET install directory
+        run: echo "DOTNET_INSTALL_DIR=$HOME/.dotnet" >> "$GITHUB_ENV"
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Install fab-test from the checkout
+        run: |
+          pip install --user -e ".[dev]" "playwright==$PLAYWRIGHT_PIN"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      # Fails fast, and with the right remediation, when the secrets are
+      # missing or the principal cannot see the workspace.
+      - name: Verify the credential and workspace access
+        run: fab-test auth status --workspace-id "$VISUAL_ERROR_TESTING_WORKSPACE_ID"
+
+      # Service mode (Service Targeting epic): export every deployed
+      # paginated report read-only and run the rdl rules over it. Findings
+      # (exit 1) are expected -- the workspace is built to contain errors --
+      # but a usage, credential or export failure (2, 126, 127) fails CI.
+      - name: Service mode smoke (rdl --workspace)
+        run: |
+          set +e
+          fab-test rdl --workspace "$VISUAL_ERROR_TESTING_WORKSPACE" --output-dir fab-test-results/live-rdl -q
+          code=$?
+          echo "rdl exit code: $code"
+          [ "$code" -le 1 ]
+
+      - name: Service mode smoke (pbir --workspace --dry-run)
+        run: fab-test pbir --workspace "$VISUAL_ERROR_TESTING_WORKSPACE" --dry-run
+
+      # The credential-gated contract tests: the generated matrix must match
+      # the goldens, and every case must pass or fail as the reference
+      # implementation did.
+      - name: Live parity tests
+        run: >-
+          pytest -m integration -q -p no:cacheprovider
+          tests/test_playwright_generation_parity_live.py
+          tests/test_playwright_result_parity_live.py
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fab-test-live-ci-results
+          path: |
+            fab-test-results/**/envelope.json
+            fab-test-results/**/report.html

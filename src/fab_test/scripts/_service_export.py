@@ -66,12 +66,17 @@ def service_item_type(name: str) -> str | None:
 def is_service_run(name: str, args: argparse.Namespace) -> bool:
     """True when ``name`` should materialize deployed items for this run.
 
-    `pql-test` only does so under `all`: standalone, its `--workspace-id`
-    keeps meaning "run the repository's models over XMLA", as before.
+    `pql-test` does so under `all` or an explicit `--workspace`: otherwise
+    its `--workspace-id` keeps meaning "run the repository's models over
+    XMLA", and a typed workspace target keeps its XMLA path, as before.
     """
     if getattr(args, "mode", "repo") != "service" or name not in SERVICE_ITEM_TYPES:
         return False
-    return name != "pql_test" or getattr(args, "analyzer", None) == "all"
+    return (
+        name != "pql_test"
+        or getattr(args, "analyzer", None) == "all"
+        or bool(getattr(args, "service_workspace", ""))
+    )
 
 
 def service_target_refusal(name: str, args: argparse.Namespace) -> str | None:
