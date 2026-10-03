@@ -66,11 +66,13 @@ def test_every_analyzer_accepts_the_path_scope():
 
 
 @pytest.mark.fab_test
-def test_only_api_backed_analyzers_accept_a_workspace():
-    """A file-reading analyzer would have to export the item first, a non-goal."""
+def test_only_service_capable_analyzers_accept_a_workspace():
+    """File readers accept it by exporting the item read-only (Service Targeting epic)."""
     accepting = {name for name, scopes in ANALYZER_SCOPES.items() if "workspace" in scopes}
 
-    assert accepting == {"pql_test", "playwright", "playwright-impact", "dependencies"}
+    assert accepting == {
+        "bpa", "pbir", "a11y", "rdl", "pql_test", "playwright", "playwright-impact", "dependencies"
+    }
 
 
 # --------------------------------------------------------------------------- #
@@ -93,22 +95,18 @@ def test_path_target_is_accepted_everywhere():
 @pytest.mark.fab_test
 def test_workspace_target_is_refused_for_a_file_reading_analyzer():
     """The message names the analyzer and the forms that do work."""
-    message = unsupported_scope_error("bpa", parse_target(_WORKSPACE_TARGET))
+    message = unsupported_scope_error("pql_lint", parse_target(_WORKSPACE_TARGET))
 
     assert message is not None
-    assert "bpa" in message
+    assert "pql_lint" in message
     assert "local/NAME" in message
     assert "./src/Sales.SemanticModel" in message
 
 
 @pytest.mark.fab_test
-def test_workspace_target_is_refused_for_a11y():
-    """a11y reads Report files on disk; it cannot fetch a deployed item."""
-    message = unsupported_scope_error("a11y", parse_target(_WORKSPACE_TARGET))
-
-    assert message is not None
-    assert "a11y" in message
-    assert "cannot fetch a deployed item" in message
+def test_workspace_target_is_accepted_for_a11y():
+    """a11y exports the deployed report read-only, then reads it off disk."""
+    assert unsupported_scope_error("a11y", parse_target(_WORKSPACE_TARGET)) is None
 
 
 @pytest.mark.fab_test
@@ -134,11 +132,11 @@ def test_desktop_target_is_refused_by_playwright():
 
 
 @pytest.mark.fab_test
-def test_cli_refuses_a_workspace_target_for_bpa(artifact_tree):
+def test_cli_refuses_a_workspace_target_for_pql_lint(artifact_tree):
     """Exit 2, and no analyzer subprocess or envelope."""
     output_dir = artifact_tree / "results"
     result = _run_cli(
-        "bpa",
+        "pql_lint",
         _WORKSPACE_TARGET,
         "--artifact-dir",
         str(artifact_tree),
@@ -147,7 +145,7 @@ def test_cli_refuses_a_workspace_target_for_bpa(artifact_tree):
     )
 
     assert result.returncode == 2
-    assert "bpa" in result.stderr
+    assert "pql_lint" in result.stderr
     assert not output_dir.exists(), "a refused scope must not write results"
 
 
@@ -175,7 +173,8 @@ def test_list_reports_the_accepted_scopes(artifact_tree):
     assert result.returncode == 0, result.stderr
     rows = {r["analyzer"]: r for r in json.loads(result.stdout)["analyzers"]}
     assert "workspace" in rows["pql-test"]["scopes"]
-    assert "workspace" not in rows["bpa"]["scopes"]
+    assert "workspace" in rows["bpa"]["scopes"]
+    assert "workspace" in rows["rdl"]["scopes"]
 
 
 # --------------------------------------------------------------------------- #

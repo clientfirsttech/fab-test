@@ -1,6 +1,6 @@
 # Service Targeting Epic
 
-**Status**: 🚧 IN-PROGRESS (Mode Resolver done: `scripts/_mode.py`; CLI wiring and remaining tasks pending) — all 9 decisions recorded 2026-10-03; contract locked, awaiting execution.
+**Status**: ✅ IMPLEMENTED (live verification against a real workspace pending; needs tenant credentials) — all 9 decisions recorded 2026-10-03.
 **Goal**: Let `fab-test bpa`, `pbir`, `a11y`, `rdl`, `pql-test`, and `all` run against deployed models and reports in the Fabric service, with one standardized rule deciding repo scan vs. service testing and one surfaced mode per run.
 
 ## Overview

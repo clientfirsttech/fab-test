@@ -42,8 +42,16 @@ from ._fab_test_context import (
     REPO_ROOT,
     RESULTS_ROOT,  # noqa: F401 -- re-exported: tests import this directly from `fab_test`
 )
+from ._mode import ModeError, resolve_mode
 from ._report_html import open_report_conflict
 from ._run_manifest import RunManifest
+from ._service_export import (
+    finalize_exports,
+    interactive_refusal,
+    is_service_run,
+    service_item_type,
+    service_target_refusal,
+)
 from ._target import TargetError, select_target, workspace_conflict
 
 # Re-exported: `_dispatch_admin_command`'s handler table and `_prepare_target`
@@ -204,7 +212,9 @@ def _prepare_target(args: argparse.Namespace) -> int | None:
     """
     try:
         args.resolved_target = select_target(
-            getattr(args, "target", None), getattr(args, "artifact", None)
+            getattr(args, "target", None),
+            getattr(args, "artifact", None),
+            default_type=service_item_type(args.analyzer),
         )
     except TargetError as exc:
         print(f"  ✗ fab-test: {exc}", file=sys.stderr)
@@ -215,14 +225,35 @@ def _prepare_target(args: argparse.Namespace) -> int | None:
         print(f"  ✗ fab-test: {conflict}", file=sys.stderr)
         return 2
 
-    if args.analyzer not in ("all", "local"):
-        refusal = _unsupported_scope_error(
-            args.analyzer, args.resolved_target
-        ) or _unsupported_type_error(args.analyzer, args.resolved_target)
-        if refusal:
-            print(f"  ✗ fab-test: {refusal}", file=sys.stderr)
-            return 2
+    try:
+        args.resolved_mode = resolve_mode(
+            args.resolved_target,
+            workspace_flag=getattr(args, "workspace_id", ""),
+            artifact_dir_explicit=getattr(args, "artifact_dir_explicit", False),
+        )
+    except ModeError as exc:
+        print(f"  ✗ fab-test: {exc}", file=sys.stderr)
+        return 2
+    args.mode = args.resolved_mode.mode
 
+    refusal = None
+    if args.analyzer not in ("all", "local"):
+        refusal = (
+            _unsupported_scope_error(args.analyzer, args.resolved_target)
+            or _unsupported_type_error(args.analyzer, args.resolved_target)
+            or service_target_refusal(args.analyzer, args)
+        )
+    refusal = refusal or (args.mode == "service" and interactive_refusal(args)) or None
+    if refusal:
+        print(f"  ✗ fab-test: {refusal}", file=sys.stderr)
+        return 2
+
+    # Under --format json or -q stderr stays silent; the mode is in the envelope.
+    if getattr(args, "output_format", "text") != "json" and not getattr(args, "quiet", False):
+        print(args.resolved_mode.banner(), file=sys.stderr)
+    if getattr(args, "dry_run", False) and is_service_run(args.analyzer, args) and args.resolved_target:
+        # A typed target is listed from its name alone: no token, no API call.
+        return None
     return _resolve_workspace_target(args)
 
 
@@ -311,6 +342,7 @@ def _dispatch_run(args: argparse.Namespace) -> int:
     # One flush for the whole run, `all` included: a sink per analyzer would
     # reopen the ingest client for each of them.
     manifest.telemetry_error = _close_telemetry(telemetry, args)
+    finalize_exports(args)
     manifest.write(output_dir, exit_code)
     return exit_code
 

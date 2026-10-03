@@ -207,6 +207,8 @@ def _print_doctor(rows: list[dict[str, Any]], output_format: str = "text") -> in
         colour = {True: "green", False: "red", None: "yellow"}[r["ready"]]
         reason = _paint(r["reason"], colour, enabled=paint)
         print(f"{icon} {r['analyzer']}: {reason}{location}")
+        if r.get("service"):
+            print(f"   {r['service']}")
         if r["ready"] is not True and r["remediation"]:
             # Yellow, not red: this is the actionable half, and colouring it
             # the same as the failure would flatten the distinction.

@@ -670,3 +670,12 @@ fab-test all \
 ```
 
 After all analyzers finish, `fab-test all` prints an aggregate summary table showing analyzer, artifact, status, errors, warnings, and output path, plus total errors and warnings across the run.
+
+## Service-mode flags (`bpa`, `pbir`, `a11y`, `rdl`, `all`)
+
+| Flag | Meaning |
+|------|---------|
+| `--workspace NAME_OR_ID` (aliases `--workspace-id`, `--from-workspace`) | With no TARGET, pure service mode over every deployed item of the analyzer's type |
+| `--keep-export` | Keep exported definitions under `fab-test-results/<analyzer>/<workspace>/<item>/export/` (redacted); default is delete after the run |
+| `--all` | Proceed when a workspace enumeration matches more than 50 items |
+| `--interactive` | Browser sign-in, in memory only; never in CI; gated by the `interactive_auth` flag |

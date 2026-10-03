@@ -58,7 +58,9 @@ def test_doctor_json_format_has_stable_keys():
     assert len(summary["analyzers"]) == len(visible_analyzers()) + 1
     assert summary["analyzers"][-1]["analyzer"] == "telemetry"
     for entry in summary["analyzers"]:
-        assert set(entry.keys()) == _DOCTOR_KEYS, f"key mismatch: {entry.keys()}"
+        # `service` is the optional per-analyzer service-readiness line
+        # (Service Targeting epic), present only for service-capable analyzers.
+        assert set(entry.keys()) - {"service"} == _DOCTOR_KEYS, f"key mismatch: {entry.keys()}"
 
 
 @pytest.mark.fab_test

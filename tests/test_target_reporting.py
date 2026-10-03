@@ -177,14 +177,14 @@ def test_explain_refuses_a_scope_the_analyzer_cannot_honor(artifact_tree):
     """Explaining an impossible command would be explaining a lie."""
     result = _run_cli(
         "explain",
-        "bpa",
+        "pql_lint",
         "Sales Dev.Workspace/Sales.SemanticModel",
         "--artifact-dir",
         str(artifact_tree),
     )
 
     assert result.returncode == 2
-    assert "bpa" in result.stderr
+    assert "pql_lint" in result.stderr
 
 
 @pytest.mark.fab_test

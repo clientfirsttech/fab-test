@@ -1,0 +1,21 @@
+name: fab-test service mode
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 5 * * 1"
+
+jobs:
+  deployed-content:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install cft-fab-test
+      - name: Test everything deployed in the workspace
+        run: fab-test all --workspace "Dev" --format json
+        env:
+          FABRIC_TENANT_ID: ${{ secrets.FABRIC_TENANT_ID }}
+          FABRIC_CLIENT_ID: ${{ secrets.FABRIC_CLIENT_ID }}
+          FABRIC_CLIENT_SECRET: ${{ secrets.FABRIC_CLIENT_SECRET }}

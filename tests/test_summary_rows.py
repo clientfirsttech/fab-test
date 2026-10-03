@@ -183,14 +183,14 @@ def test_prepare_target_rejects_an_unparseable_target(capsys):
 @pytest.mark.fab_test
 def test_prepare_target_rejects_a_scope_the_analyzer_cannot_honor(capsys):
     args = argparse.Namespace(
-        analyzer="bpa",
+        analyzer="pql_lint",
         target="Sales Dev.Workspace/Sales.SemanticModel",
         artifact=None,
         workspace_id="",
     )
 
     assert fab_test_module._prepare_target(args) == 2
-    assert "bpa" in capsys.readouterr().err
+    assert "pql_lint" in capsys.readouterr().err
 
 
 @pytest.mark.fab_test

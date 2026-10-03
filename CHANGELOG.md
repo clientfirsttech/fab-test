@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-10-03
+
+- ✨ - Service Targeting - `fab-test bpa`, `pbir`, `a11y` and `rdl` now accept `WORKSPACE.Workspace/NAME[.Type]` targets and `--workspace` (standalone, every deployed item of the analyzer's type), exporting the definition read-only through Fabric `getDefinition` and analyzing it through the unchanged invoke path. `fab-test all --workspace Dev` is the composite entry, including `pql-test` per model and `rdl` over paginated reports. One rule decides the mode: the TARGET (or its default) picks `repo`/`desktop`/`service`; flags and env vars never silently change it. Every run prints `mode=… workspace=… source=…` on stderr; envelopes gain additive `mode`/`source`, telemetry a `mode` dimension, `explain` and `doctor` show the mode and service readiness.
+- ✨ - Export Controls - Exports are deleted after the run unless `--keep-export` (redacted); more than 50 enumerated items exits `2` naming `--all`; `--interactive` browser sign-in (in memory, never in CI) sits behind the `interactive_auth` flag / `FAB_TEST_INTERACTIVE_AUTH=0`. A 404/403 from `getDefinition` is a named remediation, never a raw HTTP error.
+- 🔄 - **Behavior change** - `all --workspace-id X` is now service mode (deployed items) instead of remote XMLA over repository models. `--workspace-id` on `all` also takes a workspace name. Not yet verified against a live workspace.
+- 📦 - Version `1.11.0.dev1`.
+
 ## 2026-10-02
 
 - 📦 - Version `1.10.0.dev1` - Playwright execution configuration. Install docs and the skill pin the new version.
