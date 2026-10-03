@@ -1,6 +1,6 @@
 # SQL Database Unit Testing (T-TEST) Epic
 
-**Status**: 📋 PLANNED — decisions 1–5 recorded; awaiting decisions 6–8 and the example repository before any code is written.
+**Status**: 📋 PLANNED — all decisions recorded; awaiting the example repository before verification.
 **Goal**: Add a `sqldb-test` analyzer that installs [T-TEST](https://github.com/uratol/t-test) idempotently into a Microsoft Fabric SQL database, runs its pure T-SQL unit tests, and reports through the same envelope, HTML report, exit codes, and telemetry as every other fab-test check.
 
 ## Overview
@@ -24,19 +24,19 @@ Facts that shape the plan (verified against upstream `install.sql`, 20 KB, MIT):
 
 ---
 
-## Approve Targeting, Auth, And Open Decisions
+## Approve Targeting, Auth, And Decisions
 
 Lock the contract before changing the parser or registry, as the Playwright epic did.
 
 **Requirements**:
 - Given `fab-test sqldb-test` with no workspace flag, should discover `*.SQLDatabase` folders under the CWD/`--artifact-dir`, resolve each by display name in the configured workspace (`--workspace`, `FABRIC_WORKSPACE_ID`, `workspace:` in config, or `--env`), and test each deployed database.
 - Given `--workspace WS --artifact DB`, should test only that deployed SQL database, accept a GUID or display name for each, and never scan the repository.
-- Given `--workspace WS` alone, should require a decision: list every deployed SQLDatabase in the workspace (Playwright's standalone behaviour), or refuse and ask for `--artifact` (safer: it mutates databases by installing the framework).
+- Given `--workspace WS` alone (no `--artifact`, no explicit `--artifact-dir`), should list every deployed SQLDatabase in the workspace and test each (decision 6, Playwright's standalone behaviour), naming each database it will install into in the run output and `--dry-run`.
 - Given `--artifact-dir PATH --workspace WS`, should use the local folders as the denominator and resolve their names in WS, including when PATH is `.`.
 - Given the positional target grammar, should accept `WS.Workspace/DB.SQLDatabase` for remote and `./src/DB.SQLDatabase` / `DB.SQLDatabase` for repository, via `ANALYZER_SCOPES["sqldb_test"] = {"path", "workspace"}`.
 - Given a missing, ambiguous, or wrong-type name, should name the failure and remediation (use a GUID), never pick one arbitrarily.
 - Given a service principal (`FABRIC_TENANT_ID` + `FABRIC_SERVICE_PRINCIPAL_ID`/`FABRIC_CLIENT_ID` + secret, env > `--env-file` > `.fab-test/.env` > `./.env`), should authenticate non-interactively; given none, should fall back to `DefaultAzureCredential` (az login / VS Code / managed identity) — the existing `build_azure_credential` rule, so there is one credential path.
-- Given a human on a laptop with no cached login, should decide whether `--interactive` opens `InteractiveBrowserCredential`; CI must never prompt.
+- Given `--interactive` on a laptop, should sign in with `InteractiveBrowserCredential` (decision 7) in memory only: no device-code flow, no persistent or encrypted token cache (`cache_persistence_options` unset), nothing written to disk; the token lives for the process only. Given CI (`CI`/`GITHUB_ACTIONS`/`TF_BUILD` set) or no `--interactive`, should never prompt.
 - Given a partially configured principal, should fail with `IncompleteServicePrincipalError`'s remediation rather than fall back.
 - **Decisions** (recorded 2026-10-03 at review):
   1. ✅ Subcommand `sqldb-test`, registry key `sqldb_test`, alias `t-test`.
@@ -44,10 +44,9 @@ Lock the contract before changing the parser or registry, as the Playwright epic
   3. ✅ Repository mode is **run-only**: test procedures reach the database through Fabric Git sync or the user's own deployment; fab-test never creates or alters `[tests]` procedures (deployment stays a vision non-goal).
   4. ✅ A database with no user `[tests]` procedures is `skipped`, with a hint pointing to the `t-test` skill.
   5. ✅ Upstream version: track the **latest** `install.sql` from the T-TEST default branch, verified by checksum — fab-test records the sha256 (and commit SHA) of the script it installs, compares it with the database's marker to decide no-op vs. upgrade, and the tool-update check surfaces when upstream changes.
-- **Still open**:
-  6. `--workspace WS` alone: test every deployed SQLDatabase in the workspace, or refuse and require `--artifact`?
-  7. Interactive login: offer `--interactive` (`InteractiveBrowserCredential`) for laptop users, or require `az login` first?
-  8. `fab-test all` / `local` inclusion: proposed — in `all` only when a workspace is configured; never in `local`.
+  6. ✅ `--workspace WS` alone tests every deployed SQLDatabase in the workspace.
+  7. ✅ `--interactive` offers a browser sign-in for laptop users — no device code, and the token is never saved, cached to disk, or stored encrypted; `az login` / `DefaultAzureCredential` remains the default.
+  8. ✅ `sqldb-test` runs in `fab-test all` only when a workspace is configured; never in `fab-test local`.
 
 ---
 
@@ -109,7 +108,7 @@ Make the analyzer discoverable like its siblings (per `aidd-analyzer-contract` c
 - Given the registry, should add `ANALYZER_REGISTRY`, `ANALYZER_SCOPES`, `_COMMAND_BUILDERS`, `_CLOUD_ANALYZERS`, readiness, and `analyzers.json` (`analyzer_registry`, `artifact_analyzers.SQLDatabase.dynamic`).
 - Given `fab_test_registry.py` and `fab_test_parser.py` sit at their module-budget ceilings, should split on their existing seams (or a new `_sqldb_target.py` / `sqldb_test/` package like `playwright_validation/`) rather than raise exemptions.
 - Given `fab-test doctor`, should report readiness: driver extra installed, credential resolvable, and (with `--workspace`) connectivity and T-TEST install state, each with a named remediation.
-- Given `fab-test all` and `fab-test local`, should decide inclusion: proposed — included in `all` only when a workspace is configured; excluded from `local` (needs a service).
+- Given `fab-test all`, should include `sqldb-test` only when a workspace is configured, and otherwise list it as skipped with the flag that enables it; given `fab-test local`, should never include it (decision 8).
 - Given a `rules.sqldb_test` overlay is not needed (no rules), should instead expose defaults (`install`, `schemas`, `limit_failed`) in `fab-test.schema.json` / `_config.py`.
 - Given tests, should add a `sqldb_test` pytest marker in `pytest.ini` and `tests/conftest.py`, with a fake-connection seam so unit tests need no database, plus one opt-in `integration` test against the example repo.
 
