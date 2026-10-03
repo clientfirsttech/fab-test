@@ -32,8 +32,10 @@ from ._metadata import (
     metadata_path,
     resolve_metadata,
 )
+from ._mode import ModeError, ResolvedMode, resolve_mode
 from ._scan import find_skipped_checkouts as _find_skipped_checkouts
-from ._target import TargetError
+from ._service_export import service_item_type, service_readiness
+from ._target import TargetError, select_target
 from ._telemetry import eventhouse_rows, lakehouse_rows
 from .fab_test_execution import _manifest_target, _target_of
 from .fab_test_local import _LOCAL_ANALYZERS, _local_readiness
@@ -462,6 +464,9 @@ def _doctor(args: argparse.Namespace) -> int:
     # the menu should not refuse to answer a direct question about it.
     names = [only] if only else list(_visible_analyzers())
     rows = [{"analyzer": name, **_check_readiness(name, args)} for name in names]
+    for row in rows:
+        if service_item_type(row["analyzer"]) and row["analyzer"] != "pql_test":
+            row["service"] = service_readiness(args)
     if not only:
         # Reported alongside the analyzers because it fails the same ways --
         # a missing tool, a missing credential -- but never counted toward
@@ -515,6 +520,34 @@ def _list_analyzers(args: argparse.Namespace) -> int:
     return _print_list(rows, output_format, skipped_checkouts=checkouts)
 
 
+def _explain_mode(args: argparse.Namespace, name: str) -> ResolvedMode | int:
+    """Resolve the target and mode for `explain`, or return the exit code to stop on."""
+    try:
+        args.resolved_target = select_target(
+            getattr(args, "target", None),
+            getattr(args, "artifact", None),
+            default_type=service_item_type(name),
+        )
+    except TargetError as exc:
+        print(f"  ✗ fab-test explain: {exc}", file=sys.stderr)
+        return 2
+    refusal = _unsupported_scope_error(name, args.resolved_target) or _unsupported_type_error(
+        name, args.resolved_target
+    )
+    if refusal:
+        print(f"  ✗ fab-test explain: {refusal}", file=sys.stderr)
+        return 2
+    try:
+        resolved_mode = resolve_mode(
+            args.resolved_target, workspace_flag=getattr(args, "workspace_id", "")
+        )
+    except ModeError as exc:
+        print(f"  ✗ fab-test explain: {exc}", file=sys.stderr)
+        return 2
+    args.mode = resolved_mode.mode
+    return resolved_mode
+
+
 def _explain_analyzer(args: argparse.Namespace) -> int:
     """Show the resolved command for one analyzer without running it."""
     name = args.analyzer_name
@@ -531,20 +564,18 @@ def _explain_analyzer(args: argparse.Namespace) -> int:
     artifact_dir = Path(getattr(args, "artifact_dir", str(ARTIFACT_ROOT)))
     glob, _description = _ANALYZER_REGISTRY[name]
 
-    try:
-        args.resolved_target = _target_of(args)
-    except TargetError as exc:
-        print(f"  ✗ fab-test explain: {exc}", file=sys.stderr)
-        return 2
-    refusal = _unsupported_scope_error(name, args.resolved_target) or _unsupported_type_error(
-        name, args.resolved_target
-    )
-    if refusal:
-        print(f"  ✗ fab-test explain: {refusal}", file=sys.stderr)
-        return 2
+    resolved_mode = _explain_mode(args, name)
+    if isinstance(resolved_mode, int):
+        return resolved_mode
+    item_type = service_item_type(name)
 
     if _is_repository_scoped(name):
         artifact = Path(".")
+    elif resolved_mode.mode == "service" and item_type:
+        # Nothing is exported to explain a run: show the item that would be.
+        target = args.resolved_target
+        item = f"{target.name}.{item_type}" if target else f"<every {item_type}>"
+        artifact = Path(resolved_mode.workspace or "") / item
     else:
         matches = _discover(artifact_dir, glob, _target_of(args), output_dir=output_dir)
         # No real artifact to point at; show an illustrative command shape.
@@ -567,6 +598,8 @@ def _explain_analyzer(args: argparse.Namespace) -> int:
         "analyzer": name,
         "artifact": str(artifact),
         "target": _manifest_target(args),
+        "mode": resolved_mode.mode,
+        "source": resolved_mode.source,
         "command": command,
         "tool_path": readiness.get("resolved_path"),
         "rules_path": rules_path,
@@ -578,6 +611,7 @@ def _explain_analyzer(args: argparse.Namespace) -> int:
         return 0
 
     print(f"fab-test explain {name}")
+    print(f"  Mode:     {resolved_mode.banner()}")
     target = payload["target"]
     if target:
         located = target["workspace_id"] or target["workspace"] or target["path"] or "-"

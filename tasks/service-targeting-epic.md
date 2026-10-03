@@ -1,6 +1,7 @@
 # Service Targeting Epic
 
-**Status**: 📋 PLANNED — all 9 decisions recorded 2026-10-03; contract locked, awaiting execution.
+**Status**: ✅ IMPLEMENTED (live verification against a real workspace pending; needs tenant credentials) — all 9 decisions recorded 2026-10-03.
+**Known gaps**: live verification pending; service-run envelopes still live at `<analyzer>/<item-stem>/` (exports at `<analyzer>/<workspace>/<item>/export/`), so same-named items across workspaces share an envelope dir; `--interactive` tokens are not refreshed on long runs; a bare `--workspace` dry-run needs a token to enumerate.
 **Goal**: Let `fab-test bpa`, `pbir`, `a11y`, `rdl`, `pql-test`, and `all` run against deployed models and reports in the Fabric service, with one standardized rule deciding repo scan vs. service testing and one surfaced mode per run.
 
 ## Overview

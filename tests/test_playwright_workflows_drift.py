@@ -21,6 +21,7 @@ import yaml
 
 _ROOT = Path(__file__).resolve().parent.parent
 _DEMO = _ROOT / ".github" / "workflows" / "playwright-demo.yml"
+_LIVE_CI = _ROOT / ".github" / "workflows" / "live-ci.yml"
 _EXAMPLE = _ROOT / "docs" / "examples" / "github-actions" / "playwright-live.yml"
 _GUIDE = _ROOT / "docs" / "PLAYWRIGHT-CI.md"
 
@@ -154,3 +155,30 @@ def test_azure_examples_keep_python_and_publish_after_failure(platform):
         publishers = [step for step in data["steps"] if step.get("task", "").startswith("Publish")]
         assert len(publishers) == 2
         assert all(step["condition"] == "always()" for step in publishers)
+
+
+@pytest.mark.fab_test
+def test_live_ci_runs_on_prs_behind_the_environment_and_skips_forks() -> None:
+    """Live CI is the one self-starting workflow with credentials: it must
+    stay in the protected Environment and never run for a fork PR."""
+    data = _load(_LIVE_CI)
+    job = data["jobs"]["live"]
+
+    assert {"pull_request", "push", "workflow_dispatch"} <= set(_triggers(data))
+    assert "pull_request_target" not in _triggers(data)
+    assert job["environment"] == "fabric-demo"
+    assert "head.repo.full_name == github.repository" in job["if"]
+    for var in _CREDENTIAL_VARS:
+        assert var in job["env"], var
+
+
+@pytest.mark.fab_test
+def test_live_ci_runs_the_live_tests_and_uploads_results_after_failure() -> None:
+    text = _LIVE_CI.read_text(encoding="utf-8")
+    steps = _load(_LIVE_CI)["jobs"]["live"]["steps"]
+    upload = next(step for step in steps if "upload-artifact" in step.get("uses", ""))
+
+    assert "test_playwright_result_parity_live.py" in text
+    assert "test_playwright_generation_parity_live.py" in text
+    assert "fab-test rdl --workspace" in text
+    assert upload["if"] == "always()"

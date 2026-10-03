@@ -20,6 +20,7 @@ from ._fab_test_context import (
     REPO_ROOT,
     RESULTS_ROOT,
 )
+from ._service_flags import add_service_flags, add_workspace_flag
 from .fab_test_registry import (
     _DEFAULT_A11Y_PATH,
     _DEFAULT_BPA_RULES,
@@ -359,7 +360,9 @@ def _add_bpa_subparser(subs: argparse._SubParsersAction) -> None:
         "bpa",
         help="Tabular Editor Best Practice Analyzer (SemanticModel artifacts)",
     )
-    _add_common_flags(bpa_p)
+    _add_common_flags(bpa_p, track_artifact_dir_explicit=True)
+    add_workspace_flag(bpa_p)
+    add_service_flags(bpa_p)
     bpa_p.add_argument(
         "--tabular-editor-path",
         default=None,
@@ -383,7 +386,9 @@ def _add_pbir_subparser(subs: argparse._SubParsersAction) -> None:
         "pbir",
         help="PBIR Inspector — static report analysis (Report artifacts)",
     )
-    _add_common_flags(pbir_p)
+    _add_common_flags(pbir_p, track_artifact_dir_explicit=True)
+    add_workspace_flag(pbir_p)
+    add_service_flags(pbir_p)
     pbir_p.add_argument(
         "--inspector-path",
         default=None,
@@ -407,7 +412,9 @@ def _add_a11y_subparser(subs: argparse._SubParsersAction) -> None:
         "a11y",
         help="pbir-a11y — accessibility checks (Report artifacts)",
     )
-    _add_common_flags(a11y_p)
+    _add_common_flags(a11y_p, track_artifact_dir_explicit=True)
+    add_workspace_flag(a11y_p)
+    add_service_flags(a11y_p)
     a11y_p.add_argument(
         "--a11y-path",
         default=None,
@@ -434,6 +441,8 @@ def _add_pql_test_subparser(subs: argparse._SubParsersAction) -> None:
         help="pql-test DAX/PQL test runner (SemanticModel artifacts)",
     )
     _add_common_flags(pql_test_p)
+    add_workspace_flag(pql_test_p, aliases=False, dest="service_workspace")
+    add_service_flags(pql_test_p)
     pql_test_p.add_argument(
         "--workspace-id",
         default="",
@@ -468,7 +477,9 @@ def _add_rdl_subparser(subs: argparse._SubParsersAction) -> None:
         "rdl",
         help="RDL static analysis — performance/correctness/a11y rules (.rdl files)",
     )
-    _add_common_flags(rdl_p)
+    _add_common_flags(rdl_p, track_artifact_dir_explicit=True)
+    add_workspace_flag(rdl_p)
+    add_service_flags(rdl_p)
     # dest is rdl_rules_path, not the more obvious rules_path: the `all`
     # subparser already defines a top-level --rules-path/rules_path
     # dedicated to pbir (mirrors --bpa-rules-path/bpa_rules_path for bpa).
@@ -694,7 +705,7 @@ def _add_dependencies_subparser(subs: argparse._SubParsersAction) -> None:
 
 def _add_all_subparser(subs: argparse._SubParsersAction) -> None:
     all_p = subs.add_parser("all", help="Run all analyzers in sequence")
-    _add_common_flags(all_p)
+    _add_common_flags(all_p, track_artifact_dir_explicit=True)
     all_p.add_argument(
         "--tabular-editor-path",
         default=None,
@@ -725,13 +736,8 @@ def _add_all_subparser(subs: argparse._SubParsersAction) -> None:
         dest="rdl_rules_path",
         metavar="PATH",
     )
-    all_p.add_argument(
-        "--workspace-id",
-        default="",
-        dest="workspace_id",
-        metavar="ID",
-        type=_guid_type,
-    )
+    add_workspace_flag(all_p)
+    add_service_flags(all_p)
     all_p.add_argument(
         "--env",
         default="",
@@ -984,6 +990,7 @@ def _add_explain_subparser(subs: argparse._SubParsersAction) -> None:
         metavar="TARGET",
         help="Optional target to resolve and explain (e.g. local/Sales)",
     )
+    add_workspace_flag(explain_p)
     explain_p.add_argument(
         "--artifact-dir",
         default=str(_PYPROJECT_CONFIG.get("artifact_dir", ARTIFACT_ROOT)),

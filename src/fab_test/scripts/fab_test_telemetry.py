@@ -416,8 +416,13 @@ def _build_telemetry_payload(
     artifact: Path,
     envelope: dict[str, Any],
     environment: str,
+    mode: str = "",
 ) -> dict[str, Any]:
-    """Build a telemetry payload for an analyzer/artifact run."""
+    """Build a telemetry payload for an analyzer/artifact run.
+
+    ``mode`` (repo|desktop|service) is a dimension; the workspace name and
+    connection details are deliberately never recorded.
+    """
     errors, warnings = severity_counts(envelope.get("findings", []))
     ctx = _git_context()
     payload = {
@@ -439,6 +444,7 @@ def _build_telemetry_payload(
         "origin": _detect_origin(),
         "environment": environment,
         "analyzer": analyzer,
+        **({"mode": mode} if mode else {}),
         "status": envelope.get("status", "unknown"),
         "error_count": errors,
         "warning_count": warnings,
@@ -509,6 +515,7 @@ def _send_telemetry(
         artifact,
         envelope,
         getattr(args, "environment", "") or os.getenv("FABRIC_ENVIRONMENT", ""),
+        getattr(args, "mode", ""),
     )
     validated = _validate_telemetry_payload(payload, output_format)
     if validated is None:

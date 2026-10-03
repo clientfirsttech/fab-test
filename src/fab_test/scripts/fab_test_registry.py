@@ -108,15 +108,16 @@ def visible_analyzers() -> tuple[str, ...]:
 # Only pql_test truly *binds* to a running instance, which is why the
 # running-instance preflight keys off _DESKTOP_CAPABLE_ANALYZERS instead.
 #
-# None of them accept `workspace` except the ones that call the Fabric API.
-# Making bpa read a deployed item would mean exporting its definition
-# first, which is fabric-cicd-deployment's job and a stated non-goal.
+# bpa, pbir, a11y and rdl accept `workspace` too (Service Targeting epic):
+# a deployed item is exported read-only through Fabric getDefinition into
+# the on-disk shape they already read (see `_service_export`). Deploying
+# remains fabric-cicd-deployment's job; only test-input export is in scope.
 ANALYZER_SCOPES: dict[str, frozenset[str]] = {
-    "bpa": frozenset({"path", "desktop"}),
-    "pbir": frozenset({"path", "desktop"}),
-    "a11y": frozenset({"path", "desktop"}),
+    "bpa": frozenset({"path", "desktop", "workspace"}),
+    "pbir": frozenset({"path", "desktop", "workspace"}),
+    "a11y": frozenset({"path", "desktop", "workspace"}),
     "pql_lint": frozenset({"path", "desktop"}),
-    "rdl": frozenset({"path", "desktop"}),
+    "rdl": frozenset({"path", "desktop", "workspace"}),
     "pql_test": frozenset({"path", "desktop", "workspace"}),
     "playwright": frozenset({"path", "workspace"}),
     "playwright-impact": frozenset({"path", "workspace"}),
@@ -178,6 +179,8 @@ def unsupported_type_error(name: str, target: ResolvedTarget | None) -> str | No
         return None
     handled = glob.removeprefix("*.")
     if target.type == handled:
+        return None
+    if name == "rdl" and target.scope == "workspace" and target.type == "PaginatedReport":
         return None
 
     others = tuple(

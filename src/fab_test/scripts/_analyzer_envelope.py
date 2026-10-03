@@ -53,6 +53,10 @@ ENVELOPE_OPTIONAL_KEYS: frozenset = frozenset(
         # UTC ISO-8601 wall-clock time the analyzer run started, from
         # Timer. duration_ms says how long; this says when.
         "started_at",
+        # Service Targeting: which mode the run tested (repo|desktop|service)
+        # and which input decided it. Stamped by fab-test, not the wrapper.
+        "mode",
+        "source",
     }
 )
 
