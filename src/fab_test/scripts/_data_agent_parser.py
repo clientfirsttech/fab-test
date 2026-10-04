@@ -10,18 +10,22 @@ def add_data_agent_subparser(
     add_common_flags,
     add_workspace_flag,
 ) -> None:
-    """Register the ``data-agent`` analyzer and its nested ``init`` command."""
+    """Register the ``data-agent`` analyzer and its optional ``init`` form."""
     data_agent_p = subs.add_parser(
         "data-agent",
         aliases=["agent", "data_agent"],
         help="Promptfoo evaluation of deployed Fabric Data Agents (.DataAgent artifacts)",
     )
-    data_agent_subs = data_agent_p.add_subparsers(dest="data_agent_command", metavar="COMMAND")
-    init_p = data_agent_subs.add_parser("init", help="Scaffold a starter .DataAgent folder")
-    init_p.add_argument("name", metavar="NAME", help="Artifact stem (creates NAME.DataAgent)")
-    init_p.add_argument("--force", action="store_true", help="Overwrite an existing promptfooconfig.yaml")
     add_common_flags(data_agent_p, track_artifact_dir_explicit=True)
+    data_agent_p.add_argument(
+        "name",
+        nargs="?",
+        default=None,
+        metavar="NAME",
+        help="Artifact stem for `fab-test data-agent init NAME`",
+    )
     add_workspace_flag(data_agent_p)
+    data_agent_p.add_argument("--force", action="store_true", help="Overwrite an existing promptfooconfig.yaml")
     data_agent_p.add_argument(
         "--all",
         action="store_true",

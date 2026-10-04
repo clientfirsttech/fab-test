@@ -1,6 +1,6 @@
 # Fabric Data Agent Testing Epic
 
-**Status**: ✅ IMPLEMENTED — code, docs, workflow examples, and mocked validation landed 2026-10-04. Live-service verification remains **pending-live** because this session had no real deployed Data Agent to hit.
+**Status**: ✅ implemented; live verification pending — code, docs, workflow examples, and mocked validation landed 2026-10-04 because this session had no real deployed Data Agent to hit.
 **Goal**: A new `data-agent` analyzer that evaluates deployed Fabric Data Agents by running promptfoo with a packaged Python provider, following [fabric-data-agent-testing-template](https://github.com/clientfirsttech/fabric-data-agent-testing-template), under the repo/service mode standardization.
 
 ## Overview
@@ -29,7 +29,7 @@ WHY: Teams deploying Fabric Data Agents have no way to regression-test the agent
 - ✅ `fab-test data-agent init` scaffolding implemented.
 - ✅ README, QUICK-VALIDATION, fab-test skill, and GitHub Actions / Azure DevOps examples updated.
 - ✅ Installed-console-script and dry-run/mock verification completed locally.
-- 🟡 **pending-live**: end-to-end calls against a real deployed Data Agent, including the live >5-agent refusal and service-principal permissions, were not runnable in this session.
+- 🟡 implemented; live verification pending: end-to-end calls against a real deployed Data Agent, including the live >5-agent refusal and service-principal permissions, were not runnable in this session.
 
 ---
 

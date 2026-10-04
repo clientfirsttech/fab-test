@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import os
 import shutil
@@ -19,6 +20,7 @@ from ._credentials import (
     IncompleteServicePrincipalError,
     _parse_env_file,
     _resolve_env_path,
+    redact_secrets,
     resolve_service_principal,
 )
 from ._data_agent_resolution import resolve_data_agent_url
@@ -26,6 +28,7 @@ from ._report_html import attach_report
 from ._service_export import build_service_client
 
 _SUITE_FALLBACK = "Data Agent"
+_SECRET_ENV_HINTS = ("SECRET", "TOKEN", "PASSWORD", "KEY")
 
 
 def _native_output(output_path: Path) -> Path:
@@ -34,6 +37,54 @@ def _native_output(output_path: Path) -> Path:
 
 def _generated_config(output_path: Path) -> Path:
     return output_path.with_name("promptfooconfig.effective.yaml")
+
+
+def _html_output(output_path: Path) -> Path:
+    return output_path.with_name("report.html")
+
+
+def _load_authored_config(artifact_path: Path) -> dict[str, Any]:
+    authored = artifact_path / "promptfooconfig.yaml"
+    return yaml.safe_load(authored.read_text(encoding="utf-8")) or {}
+
+
+def _authored_provider_config(data: dict[str, Any]) -> dict[str, Any]:
+    providers = data.get("providers") or []
+    return dict((providers[0] if providers else {}).get("config") or {})
+
+
+def _authored_base_url(artifact_path: Path) -> str:
+    return str(_authored_provider_config(_load_authored_config(artifact_path)).get("base_url") or "").strip()
+
+
+def _uses_conversation(data: dict[str, Any]) -> bool:
+    for test in data.get("tests") or []:
+        vars_ = (test or {}).get("vars") or {}
+        if vars_.get("conversation") or vars_.get("conversation_id"):
+            return True
+    return False
+
+
+def _redaction_secrets(principal, env_file: str | None) -> tuple[str, ...]:
+    secrets = [getattr(principal, "client_secret", "")]
+    if env_file:
+        resolved = _resolve_env_path(env_file)
+        if resolved.exists():
+            for key, value in _parse_env_file(resolved).items():
+                if any(hint in key.upper() for hint in _SECRET_ENV_HINTS):
+                    secrets.append(value)
+    return tuple(secret for secret in secrets if secret)
+
+
+def _redact_text(text: str, secrets: tuple[str, ...]) -> str:
+    return redact_secrets(text, extra_values=secrets)
+
+
+def _scrub_file(path: Path | None, secrets: tuple[str, ...]) -> None:
+    if path is None or not path.exists():
+        return
+    with contextlib.suppress(OSError):
+        path.write_text(_redact_text(path.read_text(encoding="utf-8", errors="replace"), secrets), encoding="utf-8")
 
 
 def _status(test_results: list[dict[str, Any]]) -> tuple[str, str]:
@@ -51,36 +102,60 @@ def generate_effective_config(
     artifact_path: Path,
     output_path: Path,
     provider_path: Path,
-    agent_url: str,
+    agent_url: str | None,
 ) -> Path:
     """Write the promptfoo config fab-test actually runs."""
-    authored = artifact_path / "promptfooconfig.yaml"
-    data = yaml.safe_load(authored.read_text(encoding="utf-8")) or {}
-    providers = data.get("providers") or []
-    configured_urls = (((providers[0] if providers else {}).get("config") or {}).get("fabric_urls") or {})
-    merged_urls = {"agent1": agent_url, **configured_urls}
+    data = _load_authored_config(artifact_path)
+    provider_config = _authored_provider_config(data)
+    configured_urls = provider_config.get("fabric_urls", {}) or {}
+    merged_urls = {**({"agent1": agent_url} if agent_url else {}), **configured_urls}
+    base_url = str(provider_config.get("base_url") or agent_url or "").strip()
+    if not base_url and not merged_urls:
+        raise RuntimeError("No Data Agent URL configured. Add providers[].config.base_url or fabric_urls.")
+    effective_provider_config = {**provider_config}
+    if base_url:
+        effective_provider_config["base_url"] = base_url
+    if merged_urls:
+        effective_provider_config["fabric_urls"] = merged_urls
+    effective_provider_config.setdefault("timeout", 60)
+    effective_provider_config.setdefault("max_retries", 3)
+    effective_provider_config.setdefault("retry_delay", 2)
     data["providers"] = [
         {
             "id": f"file://{provider_path}",
-            "config": {
-                "base_url": agent_url,
-                "fabric_urls": merged_urls,
-                "timeout": 60,
-                "max_retries": 1,
-                "retry_delay": 2,
-            },
+            "config": effective_provider_config,
         }
     ]
-    data["evaluateOptions"] = {**(data.get("evaluateOptions") or {}), "maxConcurrency": 1}
-    data["commandLineOptions"] = {**(data.get("commandLineOptions") or {}), "workers": 1}
+    if _uses_conversation(data):
+        data["evaluateOptions"] = {**(data.get("evaluateOptions") or {}), "maxConcurrency": 1}
+        data["commandLineOptions"] = {**(data.get("commandLineOptions") or {}), "workers": 1}
     generated = _generated_config(output_path)
     generated.parent.mkdir(parents=True, exist_ok=True)
     generated.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
     return generated
 
 
+def _provider_error(row: dict[str, Any]) -> str:
+    response = row.get("response") or {}
+    return str(response.get("error") or row.get("error") or "").strip()
+
+
+def _resolve_html_path(result_path: Path, html_path: str, fallback_html_path: Path | None) -> str:
+    if html_path:
+        resolved = Path(html_path)
+        if not resolved.is_absolute():
+            resolved = result_path.parent / resolved
+        return str(resolved)
+    if fallback_html_path is not None and fallback_html_path.exists():
+        return str(fallback_html_path)
+    return ""
+
+
 def map_promptfoo_results(
-    result_path: Path, *, suite_name: str = _SUITE_FALLBACK
+    result_path: Path,
+    *,
+    suite_name: str = _SUITE_FALLBACK,
+    fallback_html_path: Path | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], str]:
     """Map promptfoo JSON results to fab-test findings and test_results."""
     data = json.loads(result_path.read_text(encoding="utf-8"))
@@ -92,6 +167,7 @@ def map_promptfoo_results(
         passed = bool(row.get("success"))
         response = (row.get("response") or {}).get("output") or ""
         components = ((row.get("gradingResult") or {}).get("componentResults") or [])
+        provider_error = _provider_error(row)
         failure_reason = next(
             (
                 component.get("reason")
@@ -101,14 +177,20 @@ def map_promptfoo_results(
             ),
             "",
         )
+        if provider_error:
+            failure_reason = provider_error
         if not passed and not failure_reason:
             failure_reason = response or "assertion failed"
         test_results.append(
             {
                 "suite_name": suite_name,
                 "test_name": description,
-                "expected": "all assertions pass",
-                "actual": response or failure_reason,
+                "expected": (
+                    "provider returns a response without transport errors"
+                    if provider_error
+                    else "all assertions pass"
+                ),
+                "actual": provider_error or response or failure_reason,
                 "passed": passed,
                 "status": "pass" if passed else "fail",
             }
@@ -116,13 +198,17 @@ def map_promptfoo_results(
         if not passed:
             findings.append(
                 {
-                    "rule": "promptfoo_assertion_failed",
+                    "rule": "promptfoo_provider_error" if provider_error else "promptfoo_assertion_failed",
                     "severity": "error",
                     "object": description,
                     "message": str(failure_reason),
                 }
             )
-    return findings, test_results, str(data.get("outputPath") or "")
+    return findings, test_results, _resolve_html_path(
+        result_path,
+        str(data.get("outputPath") or ""),
+        fallback_html_path,
+    )
 
 
 def _write_envelope(
@@ -165,11 +251,36 @@ def _provider_env(principal, env_file: str | None) -> dict[str, str]:
     return env
 
 
+def _resolve_principal_or_write_error(args, artifact_path: Path, output_path: Path, timer: Timer):
+    try:
+        principal = resolve_service_principal(getattr(args, "data_agent_env_file", None))
+    except IncompleteServicePrincipalError as exc:
+        _write_envelope(
+            output_path,
+            artifact_path=artifact_path,
+            status="error",
+            message=f"{exc}. Run `fab-test auth status`.",
+            timer=timer,
+        )
+        return None, 127
+    if principal is None:
+        _write_envelope(
+            output_path,
+            artifact_path=artifact_path,
+            status="error",
+            message=_service_principal_error(),
+            timer=timer,
+        )
+        return None, 127
+    return principal, None
+
+
 def run_promptfoo_eval(
     promptfoo_path: str,
     config_path: Path,
     output_path: Path,
     *,
+    html_output_path: Path,
     env: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     """Run promptfoo eval and capture its JSON output file."""
@@ -183,9 +294,20 @@ def run_promptfoo_eval(
             str(config_path),
             "--output",
             str(output_path),
+            "--output",
+            str(html_output_path),
         ]
     else:
-        command = [str(executable), "eval", "--config", str(config_path), "--output", str(output_path)]
+        command = [
+            str(executable),
+            "eval",
+            "--config",
+            str(config_path),
+            "--output",
+            str(output_path),
+            "--output",
+            str(html_output_path),
+        ]
     return subprocess.run(
         command,
         capture_output=True,
@@ -221,6 +343,13 @@ def _resolve_agent_url(args: argparse.Namespace) -> str:
     return resolve_data_agent_url(client, args.workspace_id, args.artifact_name)
 
 
+def _missing_native_output_message(native_output: Path) -> str:
+    return (
+        f"promptfoo exited without writing {native_output.name}. "
+        "Verify the promptfoo CLI path and that the runner supports --output for JSON/HTML reports."
+    )
+
+
 def _args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--artifact-path", required=True)
@@ -237,6 +366,8 @@ def main(argv: list[str] | None = None) -> int:
     artifact_path = Path(args.artifact_path).resolve()
     output_path = Path(args.output_path).resolve()
     promptfoo_config = artifact_path / "promptfooconfig.yaml"
+    native_output = _native_output(output_path)
+    native_html_output = _html_output(output_path)
     with Timer() as timer:
         if not promptfoo_config.exists():
             _write_envelope(
@@ -247,45 +378,55 @@ def main(argv: list[str] | None = None) -> int:
                 timer=timer,
             )
             return 0
-        try:
-            principal = resolve_service_principal(getattr(args, "data_agent_env_file", None))
-        except IncompleteServicePrincipalError as exc:
-            _write_envelope(
-                output_path,
-                artifact_path=artifact_path,
-                status="error",
-                message=f"{exc}. Run `fab-test auth status`.",
-                timer=timer,
-            )
-            return 127
-        if principal is None:
-            _write_envelope(
-                output_path,
-                artifact_path=artifact_path,
-                status="error",
-                message=_service_principal_error(),
-                timer=timer,
-            )
-            return 127
+        principal, exit_code = _resolve_principal_or_write_error(args, artifact_path, output_path, timer)
+        if exit_code is not None:
+            return exit_code
+        secrets = _redaction_secrets(principal, getattr(args, "data_agent_env_file", None))
         try:
             promptfoo_path = _resolve_promptfoo_path(args.promptfoo_path)
-            agent_url = _resolve_agent_url(args)
+        except RuntimeError as exc:
+            _write_envelope(
+                output_path,
+                artifact_path=artifact_path,
+                status="error",
+                message=_redact_text(str(exc), secrets),
+                timer=timer,
+            )
+            return 127
+        config_path: Path | None = None
+        try:
+            agent_url = _authored_base_url(artifact_path) or _resolve_agent_url(args)
             config_path = generate_effective_config(
                 artifact_path=artifact_path,
                 output_path=output_path,
                 provider_path=Path(__file__).with_name("fabric_data_agent_provider.py"),
                 agent_url=agent_url,
             )
-            native_output = _native_output(output_path)
             proc = run_promptfoo_eval(
                 promptfoo_path,
                 config_path,
                 native_output,
+                html_output_path=native_html_output,
                 env=_provider_env(principal, getattr(args, "data_agent_env_file", None)),
             )
+            _scrub_file(native_output, secrets)
             if proc.returncode in (0, 1):
+                if not native_output.exists():
+                    _write_envelope(
+                        output_path,
+                        artifact_path=artifact_path,
+                        status="error",
+                        message=_missing_native_output_message(native_output),
+                        timer=timer,
+                        payload={
+                            "native_output_path": native_output if native_output.exists() else None,
+                        },
+                    )
+                    return 1
                 findings, test_results, html_path = map_promptfoo_results(
-                    native_output, suite_name=args.artifact_name
+                    native_output,
+                    suite_name=args.artifact_name,
+                    fallback_html_path=native_html_output,
                 )
                 status, message = _status(test_results)
                 _write_envelope(
@@ -303,7 +444,7 @@ def main(argv: list[str] | None = None) -> int:
                 )
                 result = 1 if findings else 0
             else:
-                message = (proc.stderr or proc.stdout or "promptfoo crashed").strip()
+                message = _redact_text((proc.stderr or proc.stdout or "promptfoo crashed").strip(), secrets)
                 _write_envelope(
                     output_path,
                     artifact_path=artifact_path,
@@ -320,12 +461,14 @@ def main(argv: list[str] | None = None) -> int:
                 output_path,
                 artifact_path=artifact_path,
                 status="error",
-                message=str(exc),
+                message=_redact_text(str(exc), secrets),
                 timer=timer,
             )
             return 1
-        else:
-            return result
+        finally:
+            _scrub_file(config_path, secrets)
+            _scrub_file(native_output, secrets)
+        return result
 
 
 if __name__ == "__main__":

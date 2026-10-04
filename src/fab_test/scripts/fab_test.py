@@ -152,7 +152,17 @@ def _dispatch_admin_command(args: argparse.Namespace) -> int | None:
     Returns ``None`` when ``args.analyzer`` isn't one of these, so the
     caller knows to fall through to the analyzer-running path instead.
     """
-    if args.analyzer == "data_agent" and getattr(args, "data_agent_command", "") == "init":
+    if args.analyzer == "data_agent" and getattr(args, "name", None) and getattr(args, "target", None) != "init":
+        print(
+            "  ✗ fab-test data-agent: unexpected extra NAME; use `fab-test data-agent init NAME` "
+            "or pass one TARGET",
+            file=sys.stderr,
+        )
+        return 2
+    if args.analyzer == "data_agent" and getattr(args, "target", None) == "init":
+        if not getattr(args, "name", None):
+            print("  ✗ fab-test data-agent init: missing NAME", file=sys.stderr)
+            return 2
         return _data_agent_init(args)
     handler = _ADMIN_COMMAND_HANDLERS.get(args.analyzer)
     return handler(args) if handler else None

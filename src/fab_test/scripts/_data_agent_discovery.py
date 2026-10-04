@@ -8,6 +8,7 @@ from pathlib import Path
 from ._data_agent_resolution import resolve_data_agent_item
 from ._service_export import ServiceExportError, build_service_client
 from ._target import target_from_args
+from .playwright_validation.resolver import ServiceResolutionError
 
 ENUMERATION_LIMIT = 5
 _UNSAFE = re.compile(r"[^\w.\- ]")
@@ -39,7 +40,10 @@ def paired_service_artifacts(args, output_dir: Path, local_artifacts: list[Path]
     client = build_service_client(args)
     workspace_id = getattr(args, "workspace_id", "")
     if target is not None and target.name:
-        item = resolve_data_agent_item(client, workspace_id, target.name)
+        try:
+            item = resolve_data_agent_item(client, workspace_id, target.name)
+        except ServiceResolutionError as exc:
+            raise ServiceExportError(str(exc), 1) from exc
         return [by_name.get(item.display_name, _placeholder(output_dir, workspace_id, item.display_name))]
     items = client.list_items(workspace_id, "DataAgent")
     if len(items) > ENUMERATION_LIMIT and not getattr(args, "all_items", False):
