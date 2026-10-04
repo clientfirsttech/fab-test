@@ -136,7 +136,7 @@ Every bump must also re-stamp the version named in the fab-test skill's own fron
 ## Non-Goals
 
 - Replacing the analyzers it wraps, or reimplementing their rules.
-- Being a general-purpose Fabric deployment tool. (An earlier attempt at deployment automation, `fabric-cicd-deployment`, is retired — see that skill's own note. This project stays static-analysis and rendered-report validation only.)
+- Being a general-purpose Fabric deployment tool. Read-only, ephemeral export of a deployed item as a test input (Service Targeting) is in scope; deployment is not. (An earlier attempt at deployment automation, `fabric-cicd-deployment`, is retired — see that skill's own note. This project stays static-analysis and rendered-report validation only.)
 - Requiring a Fabric workspace or service principal for local static analysis.
 
 ## Current Plan

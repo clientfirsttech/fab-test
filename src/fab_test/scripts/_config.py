@@ -39,6 +39,10 @@ _VALID_KEYS: dict[str, type] = {
     # workspace (Artifact Targeting and Auth §3). A display name or a GUID;
     # a positional WORKSPACE.Workspace/... target overrides it.
     "workspace": str,
+    # Feature flag for `--interactive` browser sign-in in service mode
+    # (Service Targeting epic): on|off (YAML's bare on/off arrive as bools).
+    # Checked below rather than by type, since both spellings are valid.
+    "interactive_auth": object,
     # Generate a readable HTML report beside each envelope (Human-Readable
     # Reports §5). Opt-in: false unless asked for.
     "report": bool,
@@ -235,6 +239,12 @@ def validate_config(config: dict[str, Any]) -> None:
 
     if "verbosity" in config:
         _validate_verbosity(config["verbosity"])
+
+    flag = config.get("interactive_auth")
+    if "interactive_auth" in config and not (
+        isinstance(flag, bool) or str(flag).strip().lower() in ("on", "off")
+    ):
+        raise ConfigError("config key 'interactive_auth' must be on or off")
 
     if "telemetry" in config:
         _validate_telemetry(config["telemetry"])

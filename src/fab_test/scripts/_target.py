@@ -155,8 +155,14 @@ def _parse_desktop(segments: list[str], raw: str, known: tuple[str, ...]) -> Res
     )
 
 
-def _parse_workspace(segments: list[str], raw: str, known: tuple[str, ...]) -> ResolvedTarget:
-    """Parse ``WORKSPACE.Workspace/NAME.Type``, the Fabric CLI form."""
+def _parse_workspace(
+    segments: list[str], raw: str, known: tuple[str, ...], default_type: str | None = None
+) -> ResolvedTarget:
+    """Parse ``WORKSPACE.Workspace/NAME.Type``, the Fabric CLI form.
+
+    ``default_type`` is the analyzer's own type, which lets an untyped
+    ``WORKSPACE.Workspace/NAME`` resolve the way an untyped repo target does.
+    """
     if len(segments) != 2:
         raise TargetError(
             f"'{raw.strip()}' has {len(segments)} path segments; a workspace target is "
@@ -169,6 +175,8 @@ def _parse_workspace(segments: list[str], raw: str, known: tuple[str, ...]) -> R
     if not item:
         raise TargetError(f"'{raw.strip()}' names no artifact; {_ACCEPTED_FORMS}")
     name, artifact_type = _split_type(item, known)
+    if artifact_type is None and default_type is not None:
+        artifact_type = default_type
     if artifact_type is None:
         raise TargetError(
             f"'{item}' needs an explicit type in a workspace target -- a deployed item "
@@ -219,7 +227,9 @@ def workspace_conflict(
     )
 
 
-def select_target(positional: str | None, artifact_flag: str | None) -> ResolvedTarget | None:
+def select_target(
+    positional: str | None, artifact_flag: str | None, *, default_type: str | None = None
+) -> ResolvedTarget | None:
     """Resolve the one target from the positional argument and ``--artifact``.
 
     ``--artifact`` predates the grammar and keeps working, routed through
@@ -234,10 +244,12 @@ def select_target(positional: str | None, artifact_flag: str | None) -> Resolved
             f"('{artifact_flag}'), not both"
         )
     raw = positional or artifact_flag
-    return parse_target(raw) if raw else None
+    return parse_target(raw, default_type=default_type) if raw else None
 
 
-def parse_target(raw: str, *, root: Path | None = None) -> ResolvedTarget:
+def parse_target(
+    raw: str, *, root: Path | None = None, default_type: str | None = None
+) -> ResolvedTarget:
     """Parse ``raw`` into a `ResolvedTarget`, or raise `TargetError`.
 
     ``root`` is where the artifact-type map is read from, defaulting to the
@@ -267,5 +279,5 @@ def parse_target(raw: str, *, root: Path | None = None) -> ResolvedTarget:
     if first == _LOCAL_SCHEME and len(segments) > 1:
         return _parse_desktop(segments, raw, known)
     if first.endswith(_WORKSPACE_SUFFIX):
-        return _parse_workspace(segments, raw, known)
+        return _parse_workspace(segments, raw, known, default_type)
     return _parse_path(target, raw, known)

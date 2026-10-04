@@ -57,6 +57,11 @@
       "type": "string",
       "description": "Default Fabric workspace for targets that name an artifact but not a workspace. A display name or a GUID [env: FABRIC_WORKSPACE_ID]; a positional WORKSPACE.Workspace/NAME.Type target overrides it."
     },
+    "interactive_auth": {
+      "type": ["string", "boolean"],
+      "enum": ["on", "off", true, false],
+      "description": "Feature flag for --interactive browser sign-in in service mode. Default on; off refuses --interactive with exit 2 [env: FAB_TEST_INTERACTIVE_AUTH=0 also disables]. Never prompts in CI."
+    },
     "rules": {
       "type": "object",
       "description": "Rule overlays: deltas applied to a packaged ruleset instead of forking it.",

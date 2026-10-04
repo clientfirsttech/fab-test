@@ -36,8 +36,11 @@ TEST_HARD = 900
 # test_complexity_budget.py.
 EXEMPTIONS: dict[str, tuple[int, str]] = {
     "src/fab_test/scripts/fab_test_parser.py": (
-        1112,
+        1119,
         (
+            "2026-10-03: +2 lines giving pql-test the same --workspace and service flags (mode parity). "
+            "2026-10-03: +5 lines attaching the shared service flags from _service_flags.py "
+            "to the bpa/pbir/a11y/rdl/all/explain subparsers (Service Targeting epic). "
             "2026-10-02: +15 lines replacing GUID-only --workspace-id and the "
             "Boolean --from-workspace prototype with one shared, name-or-GUID "
             "`--workspace`/`--workspace-id`/`--from-workspace` alias group on the "
@@ -103,8 +106,10 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
         ),
     ),
     "src/fab_test/scripts/fab_test_summary.py": (
-        954,
+        956,
         (
+            "2026-10-03: +2 lines printing the per-analyzer service-readiness line in doctor "
+            "(Service Targeting epic). "
             "2026-10-01: +6 lines (_WRAPPER_PRINTS_FINDINGS) so the verbose summary does not repeat "
             "the findings table the rdl wrapper already printed (RDL review). "
             "2026-09-01: +5 net lines teaching the summary that an analyzer can "
@@ -141,8 +146,10 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
         ),
     ),
     "src/fab_test/scripts/fab_test_registry.py": (
-        1028,
+        1031,
         (
+            "2026-10-03: +3 lines adding the workspace scope to bpa/pbir/a11y/rdl and "
+            "accepting PaginatedReport for rdl (Service Targeting epic). "
             "2026-10-02: +2 lines letting a per-report type from --from-workspace win over the "
             "local suffix in _report_type_for_command (Playwright Workspace Reports). "
             "2026-09-30: merge of main into feat/rdl-static-analysis -- main's -q/verbosity additions "
@@ -264,8 +271,10 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
         ),
     ),
     "src/fab_test/scripts/fab_test_execution.py": (
-        849,
+        884,
         (
+            "2026-10-03: +35 lines for the service-export hook in _discover_for, "
+            "ServiceExportError handling, and _stamp_mode (Service Targeting epic). "
             "2026-10-02: +4 lines importing and calling the --from-workspace resolver ahead of the "
             "dataset modes in _playwright_service_resolved_target (Playwright Workspace Reports). "
             "2026-09-26: born over the hard budget adding "

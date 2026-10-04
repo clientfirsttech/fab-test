@@ -649,3 +649,23 @@ Remove-Item -Recurse -Force .venv-test, dist
 
 - [`fab-test` CLI reference](../.github/skills/fab-test/SKILL.md)
 - [`pytest.ini`](../pytest.ini) for test markers and configuration
+
+
+## Testing deployed items (service mode)
+
+```bash
+fab-test bpa "Dev.Workspace/Sales.SemanticModel"   # typed target -> mode=service
+fab-test bpa "Dev.Workspace/Sales"                 # untyped, resolved by the analyzer's type
+fab-test bpa --workspace Dev                       # every semantic model in the workspace
+fab-test all --workspace Dev --keep-export         # every service-capable analyzer; keep redacted exports
+fab-test all --workspace Dev --all                 # proceed past the 50-item limit
+fab-test bpa --workspace Dev --dry-run             # list what would be exported
+```
+
+| Mode | Credential | Failure |
+|------|-----------|---------|
+| `repo` | none | - |
+| `desktop` | none | exit `127` if no instance has the artifact |
+| `service` | env service principal, then `.env`, then `DefaultAzureCredential`, then `--interactive` | exit `127` naming the variables and `fab-test auth status` |
+
+`--workspace` with no target ignores local folders unless `--artifact-dir` is passed. `local/NAME` with `--workspace` exits `2`.

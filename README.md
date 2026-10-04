@@ -474,7 +474,7 @@ fab-test pql-test "Sales Dev.Workspace/Sales.SemanticModel"   # a deployed model
 fab-test all local/Sales                                  # everything that can run locally
 ```
 
-Not every analyzer accepts every form: `bpa` reads files on disk and cannot fetch a deployed item. Run `fab-test list` for the Scopes column, and see the [targeting reference](https://github.com/clientfirsttech/fab-test/blob/main/.github/skills/fab-test/references/targeting-and-discovery.md#targeting) for the rules. `--artifact STEM` still works as a deprecated alias.
+Not every analyzer accepts every form. Run `fab-test list` for the Scopes column, and see the [targeting reference](https://github.com/clientfirsttech/fab-test/blob/main/.github/skills/fab-test/references/targeting-and-discovery.md#targeting) for the rules. `--artifact STEM` still works as a deprecated alias.
 
 ### Credentials
 
