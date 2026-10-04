@@ -1,6 +1,6 @@
 # Fabric Data Agent Testing Epic
 
-**Status**: 📋 PLANNED — all 11 discovery decisions recorded 2026-10-04.
+**Status**: ✅ IMPLEMENTED — code, docs, workflow examples, and mocked validation landed 2026-10-04. Live-service verification remains **pending-live** because this session had no real deployed Data Agent to hit.
 **Goal**: A new `data-agent` analyzer that evaluates deployed Fabric Data Agents by running promptfoo with a packaged Python provider, following [fabric-data-agent-testing-template](https://github.com/clientfirsttech/fabric-data-agent-testing-template), under the repo/service mode standardization.
 
 ## Overview
@@ -21,9 +21,21 @@ WHY: Teams deploying Fabric Data Agents have no way to regression-test the agent
 10. ✅ **`fab-test data-agent init`** scaffolds a starter `promptfooconfig.yaml` + `.env.example` from the template's shape. A generic/`playwright` init is out of this epic's scope — recorded as a standalone follow-up task in plan.md.
 11. ✅ **Independent** of the blocked Promptfoo Skill Evaluation epic — this epic's promptfoo tool seam may incidentally help it, but neither blocks the other. The win32-arm64 limitation (`@libsql/win32-arm64-msvc` unpublished) is surfaced by `doctor`, not solved here.
 
+## Completion Summary
+
+- ✅ Promptfoo tool seam implemented: analyzer metadata, npm bootstrap, doctor readiness, tool-update checks, and THIRD-PARTY notice.
+- ✅ Python provider implemented and unit-tested with mocked token + Data Agent API responses.
+- ✅ Data Agent URL resolution, wrapper mapping, mode wiring, alias parsing, telemetry routing, and `fab-test all` gating implemented.
+- ✅ `fab-test data-agent init` scaffolding implemented.
+- ✅ README, QUICK-VALIDATION, fab-test skill, and GitHub Actions / Azure DevOps examples updated.
+- ✅ Installed-console-script and dry-run/mock verification completed locally.
+- 🟡 **pending-live**: end-to-end calls against a real deployed Data Agent, including the live >5-agent refusal and service-principal permissions, were not runnable in this session.
+
 ---
 
 ## Promptfoo Tool Seam
+
+**Status**: ✅ done
 
 Register promptfoo as a wrapped external tool so install, readiness, and provenance behave like every other wrapped tool.
 
@@ -35,6 +47,8 @@ Register promptfoo as a wrapped external tool so install, readiness, and provena
 ---
 
 ## Python Provider Module
+
+**Status**: ✅ done
 
 Port the template's `provider.ts` to promptfoo's Python provider contract, shipped inside the package.
 
@@ -50,6 +64,8 @@ Port the template's `provider.ts` to promptfoo's Python provider contract, shipp
 
 ## Agent URL Resolution
 
+**Status**: ✅ done
+
 Resolve a Data Agent's API URL from its name via the Fabric API (decision 4).
 
 **Requirements**:
@@ -62,6 +78,8 @@ Resolve a Data Agent's API URL from its name via the Fabric API (decision 4).
 
 ## Config Discovery And Effective Config Generation
 
+**Status**: ✅ done
+
 Each `*.DataAgent` folder authors only tests; fab-test generates the effective promptfoo config.
 
 **Requirements**:
@@ -72,6 +90,8 @@ Each `*.DataAgent` folder authors only tests; fab-test generates the effective p
 ---
 
 ## Analyzer Wrapper (`invoke_data_agent.py`)
+
+**Status**: ✅ done
 
 Run `promptfoo eval --output results.json` and map results to the one contract.
 
@@ -86,6 +106,8 @@ Run `promptfoo eval --output results.json` and map results to the one contract.
 
 ## Registration And Mode Wiring
 
+**Status**: ✅ done
+
 All analyzer-contract touch points plus the Service Targeting mode rule.
 
 **Requirements**:
@@ -99,6 +121,8 @@ All analyzer-contract touch points plus the Service Targeting mode rule.
 
 ## Init Scaffolding
 
+**Status**: ✅ done
+
 `fab-test data-agent init` writes a starter so green-field setup is one command (decision 10).
 
 **Requirements**:
@@ -110,13 +134,18 @@ All analyzer-contract touch points plus the Service Targeting mode rule.
 
 ## Verify Live Against A Real Data Agent
 
+**Status**: 🟡 pending-live
+
 **Requirements**:
 - Given a real deployed Data Agent and a service principal, should run bare repo mode, a typed service target, and `--workspace` enumeration through the installed console script, including a deliberately failing assertion, a multi-turn conversation, and the missing-credentials `127` path.
 - Given the blast-radius rule, should exercise `all`, `list`, `explain`, `doctor`, `-q`, `--format json`, `--dry-run`, `--report`, and the >5-agent refusal with and without `--all`.
+- Verified here instead: the installed console-script path, dry-run path, init scaffolding, promptfoo result mapping, and provider lifecycle were covered with mocked/token-endpoint tests and local CLI contract tests. Real service execution is deferred until a workspace hosts a deployed Data Agent for the test principal.
 
 ---
 
 ## Document All Three Callers
+
+**Status**: ✅ done
 
 **Requirements**:
 - Given the human caller, should update README and `docs/QUICK-VALIDATION.md` with the `.DataAgent` convention, `init`, mode matrix, SP setup (workspace role + data-source access, per the template's README), and the 5-agent threshold.
@@ -127,6 +156,8 @@ All analyzer-contract touch points plus the Service Targeting mode rule.
 ---
 
 ## Quality Gates
+
+**Status**: ✅ done — `ruff check .`, budget tests, full `pytest --cov --cov-fail-under=80`, and CI-mode `pytest` all passed in this branch
 
 **Requirements**:
 - Given the whole repository, should pass `ruff check .`, `tests/test_complexity_budget.py`, and `tests/test_module_budget.py` — plan the new modules' seams up front rather than grow existing files at their ceilings.

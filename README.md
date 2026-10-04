@@ -202,47 +202,51 @@ pytest -m analyzers
 
 > **Note:** Some wrapper contract tests launch the installed console scripts (`tabular-editor-bpa`, `fab-test`, etc.) as subprocesses. Those scripts must be on `PATH`, so always activate the virtual environment before running `pytest`.
 
-### Artifact validation with fab-test
+### Test your Fabric artifacts locally (fab-test)
 
-`fab-test` discovers artifacts under your working directory, in the TMDL/PBIR layout described in [Assumed project format](#assumed-project-format). It requires the corresponding external tools for each analyzer.
+`fab-test` is for real artifact validation; `pytest` is for the wrapper contract.
+
+| Command | What it tests |
+|---------|---------------|
+| `pytest -m pql_test` | The `pql-test` wrapper contract with mocks |
+| `fab-test pql-test --env DEV` | The actual DAX/PQL tests in your semantic model |
+| `pytest -m data_agent` | The packaged Data Agent provider/wrapper with mocked token + API calls |
+| `fab-test data-agent --workspace Dev` | The authored promptfoo cases in `*.DataAgent/promptfooconfig.yaml` against the deployed Data Agent |
+
+Install the console script from a checkout:
 
 ```bash
-# Discover which artifacts would be analyzed
+pip install -e .
+```
+
+```bash
+# Discover first
 fab-test bpa --dry-run
 
-# Run BPA against SemanticModel artifacts
+# One analyzer per artifact type
 fab-test bpa --tabular-editor-path "/path/to/TabularEditor.exe"
-
-# Run PBIR Inspector against Report artifacts
 fab-test pbir --inspector-path "/path/to/PBIRInspectorCLI"
+fab-test a11y                         # requires Node.js >= 18 and npm
+fab-test rdl                          # no external tool; rule catalog: docs/RDL-RULES.md
+fab-test pql-test --env DEV --artifact SampleModel-PQLAssert
 
-# Run pbir-a11y accessibility checks against Report artifacts (requires
-# Node.js >= 18 and npm the first time -- it's built from source, then
-# cached; see fab-test doctor --analyzer a11y). Not run by `fab-test all`
-# by default -- add "a11y" to fab_test_all in analyzers.json to opt in.
-fab-test a11y
+# Data Agent tests live in NAME.DataAgent/promptfooconfig.yaml
+fab-test data-agent init "Sales Agent"
+fab-test data-agent --artifact "Sales Agent.DataAgent"
+fab-test data-agent --workspace Dev
 
-# Run the active (fixture-verified) rules against paginated (.rdl) reports -- pure Python,
-# no external tool, always ready. Included in `fab-test all` by default.
-# Every rule and its source links: docs/RDL-RULES.md
-# --verbose adds a findings table; each finding names its path (Dataset › Field)
-# and quotes the query or expression that broke the rule.
-fab-test rdl
-
-# Run pql-test DAX tests
-fab-test pql-test --env DEV
-
-# Run Playwright visual validation (always needs a service principal --
-# see "Playwright: the minimal working config" below)
+# Service-backed report validation
 fab-test playwright --artifact "Not Working Visuals" --env dev --env-file .env
-
-# Test only the reports built on one dataset (looked up live in the
-# dataset's workspace and, if set, the --workspace workspace)
-fab-test playwright --dataset-id <DATASET_GUID> --dataset-workspace-id <WORKSPACE_GUID>
-
-# Discover reports that depend on a deployed semantic model
 fab-test dependencies --semantic-model SalesModel --env dev --env-file .env
+
+# Batch entry points
+fab-test all --artifact SampleModel-PQLAssert
+fab-test local --artifact-dir .
 ```
+
+For the full CLI reference — flags, credentials, result paths, `.DataAgent`
+conventions, and the 5-agent workspace threshold — see
+[`fab-test skill docs`](https://github.com/clientfirsttech/fab-test/blob/main/.github/skills/fab-test/SKILL.md).
 
 ### Keep the output short: `-q`
 

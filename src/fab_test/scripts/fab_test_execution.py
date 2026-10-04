@@ -24,6 +24,7 @@ from ._analyzer_envelope import severity_counts
 from ._cli_utils import CHECKOUT_REMEDIATION, narrate, skipped_checkout_lines
 from ._config import resolve_setting
 from ._credentials import configured_workspace, redact_secrets
+from ._data_agent_discovery import discover_data_agent_artifacts
 from ._fab_test_context import (
     _DEFAULT_SUBPROCESS_TIMEOUT,
     _PYPROJECT_CONFIG,
@@ -39,6 +40,7 @@ from ._playwright_dataset_target import (
     resolve_workspace_reports,
     workspace_reports_requested,
 )
+from ._playwright_discovery import resolve_playwright_artifacts
 from ._playwright_timeout_scaling import (
     Narration as PlaywrightNarration,
 )
@@ -615,30 +617,22 @@ def _discover_for(name: str, args: argparse.Namespace, glob: str) -> list[Path]:
     """
     if _is_repository_scoped(name):
         return [Path(".")]
+    output_dir = Path(getattr(args, "output_dir", RESULTS_ROOT))
+    if name == "data_agent":
+        return discover_data_agent_artifacts(_discover, args, glob, output_dir)
+    discovered = _discover(Path(args.artifact_dir), glob, _target_of(args), output_dir=output_dir)
     if is_service_run(name, args):
         return export_for_analyzer(name, args, Path(getattr(args, "output_dir", RESULTS_ROOT)))
     if name == "playwright":
-        resolved = _playwright_service_resolved_target(args)
-        if resolved is not None:
-            return resolved
-    output_dir = Path(getattr(args, "output_dir", RESULTS_ROOT))
-    discovered = _discover(Path(args.artifact_dir), glob, _target_of(args), output_dir=output_dir)
-    if name == "playwright":
-        # playwright's own registered glob only ever covers *.Report, so a
-        # paginated report -- a flat .rdl file, never discovered by the
-        # directory-suffix scan above -- needs its own lookup or a batch run
-        # (no --artifact) would never find one at all.
-        discovered = discovered + _discover_rdl_files(args, output_dir)
-        if not discovered:
-            remote = _playwright_remote_target(args)
-            if remote is not None:
-                return [remote]
-            # Last resort: --dataset-workspace-id with a bare name and no
-            # local match -- resolve it against Fabric to tell a report
-            # from a dataset (Playwright Dataset Target epic).
-            dataset_remote = resolve_dataset_workspace_artifact(args)
-            if dataset_remote is not None:
-                return dataset_remote
+        return resolve_playwright_artifacts(
+            args,
+            discovered,
+            output_dir,
+            _playwright_service_resolved_target,
+            _discover_rdl_files,
+            _playwright_remote_target,
+            resolve_dataset_workspace_artifact,
+        )
     return discovered
 
 

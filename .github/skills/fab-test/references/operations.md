@@ -78,6 +78,11 @@ fab-test-results/
       envelope.json
       native.json     ← full pql-test JSON (model_path, passed, failed, results[])
       report.html     ← generated, only with --report
+  data_agent/
+    <artifact-stem>/
+      envelope.json
+      native.json     ← full promptfoo JSON output
+      report.html     ← generated, only with --report
   rdl/
     <artifact-stem>/
       envelope.json
@@ -106,7 +111,7 @@ Optional keys — **absent, never null**, so a consumer tests presence:
 | `started_at` | UTC ISO-8601 wall-clock time the run started. `duration_ms` says how long; this says when. |
 
 
-For `pql_test`, the envelope also contains `test_results` (full result array from pql-test, native shape). For `bpa`, it contains one entry per rule TE2 evaluated (`RuleName`/`RuleID`/`Severity`/`Category`/`ObjectName` plus a computed `status` of `pass`/`error`/`warning`), passed and failed alike — unlike `findings`, which stays failure-only. `pbir` matches the same idea in the shared `rule`/`severity`/`object`/`message` shape (each with a `status`), so telemetry can see every rule PBIR Inspector evaluated, not only the ones that failed — `pbir`'s own `TestRun.html` still has its own filter UI, so this field feeds telemetry, not the shared report's full-list filter, for that analyzer specifically. `rdl` matches `pbir`'s shape: one row per active rule that passed or is disabled, and one row per hit for a rule that fired (so a rule firing on four datasets has four rows), `status` one of `pass`/`skip`/`warning`/`error` — `skip` means disabled in the overlay. Planned rules (`status: planned` in the catalog) have no row at all; they do not run and never show in a user's results. `playwright` uses the pql-test-shaped `test_results` too (one row per generated report x page x bookmark case), plus an `evidence` map per row (`screenshot`/`console`/`network` paths, whichever exist) that the shared renderer turns into links when `--report` is on (see the `playwright` section in [Flags](flags.md)). All five are `[]` when the analyzer produced no per-test breakdown.
+For `pql_test`, the envelope also contains `test_results` (full result array from pql-test, native shape). `data_agent` uses the same top-level idea: `test_results` is promptfoo's per-case result list, while `findings` carries the failed assertions normalized to `rule`/`severity`/`object`/`message`. For `bpa`, it contains one entry per rule TE2 evaluated (`RuleName`/`RuleID`/`Severity`/`Category`/`ObjectName` plus a computed `status` of `pass`/`error`/`warning`), passed and failed alike — unlike `findings`, which stays failure-only. `pbir` matches the same idea in the shared `rule`/`severity`/`object`/`message` shape (each with a `status`), so telemetry can see every rule PBIR Inspector evaluated, not only the ones that failed — `pbir`'s own `TestRun.html` still has its own filter UI, so this field feeds telemetry, not the shared report's full-list filter, for that analyzer specifically. `rdl` matches `pbir`'s shape: one row per active rule that passed or is disabled, and one row per hit for a rule that fired (so a rule firing on four datasets has four rows), `status` one of `pass`/`skip`/`warning`/`error` — `skip` means disabled in the overlay. Planned rules (`status: planned` in the catalog) have no row at all; they do not run and never show in a user's results. `playwright` uses the pql-test-shaped `test_results` too (one row per generated report x page x bookmark case), plus an `evidence` map per row (`screenshot`/`console`/`network` paths, whichever exist) that the shared renderer turns into links when `--report` is on (see the `playwright` section in [Flags](flags.md)). All six are `[]` when the analyzer produced no per-test breakdown.
 
 `status` values: `passed` | `failed` | `warning` | `skipped` | `error` | `timeout` | `dry-run`.
 
@@ -142,6 +147,12 @@ The committed `install_url` is useful for local development because it lets a te
 
 Downloaded tools are extracted into `.fab-test-tools/<analyzer>/`, recorded in a marker file, and reused on subsequent runs. This directory is ignored by git so executables are never committed.
 
+`data-agent` bootstraps differently: promptfoo is a pinned npm package cached
+under `.fab-test-tools/data_agent/<platform>/<version>/package/`, then the
+packaged Python provider is injected into an effective promptfoo config at run
+time. `fab-test doctor --analyzer data-agent` checks both the promptfoo cache
+and whether the required service-principal variables are present.
+
 ## Pre-flight Checks
 
 `fab-test` performs tool existence checks before running subprocesses:
@@ -149,3 +160,4 @@ Downloaded tools are extracted into `.fab-test-tools/<analyzer>/`, recorded in a
 - **bpa**: errors with download hint if `TabularEditor.exe` is missing
 - **pbir**: errors with path hint if `PBIRInspectorCLI` is missing
 - **pql_test**: silently falls back to `python -m pql_test` if `pql-test` is not on PATH; then checks `.venv`
+- **data_agent**: errors with npm/promptfoo remediation if promptfoo is missing, and with service-principal remediation if `FABRIC_TENANT_ID`, `FABRIC_CLIENT_ID`, or `FABRIC_CLIENT_SECRET` is absent

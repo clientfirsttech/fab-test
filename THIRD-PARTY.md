@@ -2,7 +2,8 @@
 
 `fab-test` is MIT-licensed (see [LICENSE](LICENSE)), and does not vendor or
 redistribute the binaries below — none of them ship inside the wheel. Each is
-downloaded (or, for pbir-a11y, built from source) at runtime by
+downloaded (or, for pbir-a11y, built from source; for promptfoo, installed as a
+cached npm package) at runtime by
 `_analyzer_tool_bootstrap.py` and cached under `.fab-test-tools/`, from the
 URL/repository declared in `analyzers.json`'s `tool_install` block for that
 analyzer. `fab-test` calls each one as an external process (or, for
@@ -21,6 +22,7 @@ one tool in this file that actually reaches every installer's environment.
 | [Tabular Editor 2](https://github.com/TabularEditor/TabularEditor) | `bpa` | MIT | [TabularEditor/TabularEditor license](https://github.com/TabularEditor/TabularEditor/blob/master/LICENSE) |
 | [fab-inspector](https://github.com/NatVanG/fab-inspector) (PBIR Inspector) | `pbir` | MIT | [NatVanG/fab-inspector license](https://github.com/NatVanG/fab-inspector/blob/main/LICENSE) |
 | [pbir-a11y](https://github.com/Juls-BI/pbir-a11y) | `a11y` | PolyForm Shield 1.0.0 | [Juls-BI/pbir-a11y license](https://github.com/Juls-BI/pbir-a11y/blob/main/LICENSE) |
+| [promptfoo](https://github.com/promptfoo/promptfoo) | `data_agent` | MIT | [promptfoo/promptfoo license](https://github.com/promptfoo/promptfoo/blob/main/LICENSE) |
 | [pql-test](https://pypi.org/project/pql-test/) | `pql_test` | Business Source License 1.1 | Bundled at `pql_test-<version>.dist-info/licenses/LICENSE.txt` in any `fab-test` install |
 
 ## pbir-a11y: PolyForm Shield 1.0.0

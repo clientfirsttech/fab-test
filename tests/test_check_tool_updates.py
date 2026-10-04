@@ -258,6 +258,20 @@ def test_pypi_reads_the_pin_from_pyproject_toml_and_reports_drift(tmp_path, monk
     assert result["url"] == "https://pypi.org/project/pql-test/0.1.13/"
 
 
+def test_npm_reports_drift_from_the_pinned_version(monkeypatch):
+    tool_install = {"version": "0.96.0", "release_source": {"type": "npm", "package": "promptfoo"}}
+    monkeypatch.setattr(
+        c, "_get_json", lambda url, timeout=c._TIMEOUT: {"dist-tags": {"latest": "0.97.0"}}
+    )
+
+    result = c._check_npm("data_agent", tool_install)
+
+    assert result["current"] == "0.96.0"
+    assert result["available"] == "0.97.0"
+    assert result["status"] == c.STATUS_UPDATE_AVAILABLE
+    assert result["url"] == "https://www.npmjs.com/package/promptfoo/v/0.97.0"
+
+
 def test_pypi_reports_current_when_the_pin_matches_latest(tmp_path, monkeypatch):
     pyproject = tmp_path / "pyproject.toml"
     pyproject.write_text('[project]\ndependencies = ["pql-test==0.1.13"]\n', encoding="utf-8")

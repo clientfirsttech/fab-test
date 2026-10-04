@@ -23,6 +23,7 @@ Run `fab-test list` for this table at any time — it has a Scopes column.
 |----------|-------------|----------|------------------------|
 | `bpa`, `pbir`, `a11y`, `rdl` | yes | yes | yes — exports the deployed definition read-only |
 | `pql-test` | yes | yes | yes |
+| `data-agent` | yes | **no** | yes — runs the local `.DataAgent` promptfoo cases against the deployed Data Agent's live API |
 | `playwright`, `playwright-impact`, `dependencies` | yes | **no** | yes |
 
 The file-reading analyzers accept `local/` because the artifact is on disk either way — only `pql-test` actually *binds* to the running instance. They accept a workspace target by exporting the deployed item's definition through Fabric `getDefinition` (TMDL for a semantic model, PBIR for a report, the `.rdl` for a paginated report) into the run's output directory and analyzing that, so a service run reports through the same envelope, exit codes, HTML report and telemetry as a repo run. The export is **read-only and ephemeral**: it is deleted after the run unless `--keep-export` is passed (kept files are redacted for connection-string secrets). Exporting a deployed item *for testing* is in scope; deploying remains out of scope. Targets that no analyzer can honor — `pql-lint` with a workspace target — still exit `2` and name the forms that work:
@@ -42,13 +43,15 @@ $ fab-test pql_lint "Sales Dev.Workspace/Sales.SemanticModel"
 |------------|------|
 | `fab-test bpa`, `bpa Sales.SemanticModel`, `bpa ./src/Sales.SemanticModel` | `repo` |
 | `fab-test pql-test local/Sales` | `desktop` (an ambient `FABRIC_WORKSPACE_ID` never turns it remote) |
+| `fab-test data-agent`, `data-agent Sales Agent.DataAgent` | `repo` — local `.DataAgent` tests against the deployed agent of the same name |
+| `fab-test data-agent --workspace Dev` | `service` — enumerate deployed Data Agents in that workspace and pair them with local `.DataAgent` tests when present |
 | `fab-test bpa "Dev.Workspace/Sales.SemanticModel"` | `service` — typed target |
 | `fab-test bpa "Dev.Workspace/Sales"` | `service` — untyped, resolved by the analyzer's own type |
 | `fab-test bpa --workspace Dev` | `service` — every deployed item of the analyzer's type; local folders are ignored unless `--artifact-dir` is passed |
 | `fab-test all --workspace Dev` | `service` — every service-capable analyzer, including `pql-test` per model and `rdl` over paginated reports |
 | `--workspace X` with a target naming workspace Y, or `local/NAME` with `--workspace` | exit `2` |
 
-`workspace:` in `fab-test.yml` and `FABRIC_WORKSPACE_ID` supply a default workspace; they never flip a bare invocation to service. A workspace enumeration over **50** items stops with exit `2` naming `--all` (never a prompt); `--all` forces it. `--dry-run` lists the items; a typed target needs no token. A `getDefinition` 404 (item not in enhanced/Git-integration format) or 403 exits `1` with a named remediation; missing credentials exit `127`.
+`workspace:` in `fab-test.yml` and `FABRIC_WORKSPACE_ID` supply a default workspace; they never flip a bare invocation to service. A workspace enumeration over **50** items stops with exit `2` naming `--all` (never a prompt); `--all` forces it. `data-agent` is stricter: more than **5 agents** stops with exit `2` naming `--all`, because each run is a live promptfoo conversation and therefore slow. `--dry-run` lists the items; a typed target needs no token. A `getDefinition` 404 (item not in enhanced/Git-integration format) or 403 exits `1` with a named remediation; missing credentials exit `127`.
 
 `fab-test all` **skips** an analyzer that cannot honor the target and says so, rather than failing the batch — so `fab-test all local/Sales` still runs everything that reads files.
 
@@ -70,6 +73,9 @@ suffix, at any depth, with or without a `.pbip` beside it. A committed
 `.pbip`-paired ones were. `.pbip` pairing still supplies the `[from X.pbip]`
 note and the Desktop binding — it no longer decides whether an artifact
 exists.
+
+For `data-agent`, the local artifact is a `*.DataAgent/` folder that contains
+`promptfooconfig.yaml`. `fab-test data-agent init NAME` scaffolds that shape.
 
 **Where the suffixes come from.** `artifact-map.json`, resolved via the metadata
 layers (`.fab-test/metadata/` > `.github/metadata/` > packaged with the

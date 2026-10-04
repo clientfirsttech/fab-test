@@ -1,0 +1,35 @@
+trigger: none
+pr: none
+
+pool:
+  vmImage: ubuntu-latest
+
+steps:
+  - checkout: self
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: "3.12"
+  - script: python -m pip install -e ".[dev]"
+    displayName: Install fab-test
+  - bash: |
+      set -euo pipefail
+      fab-test doctor --analyzer data-agent
+      fab-test data-agent --workspace "$FABRIC_WORKSPACE_ID" --report
+    displayName: Validate .DataAgent promptfooconfig.yaml cases
+    env:
+      FABRIC_TENANT_ID: $(FABRIC_TENANT_ID)
+      FABRIC_CLIENT_ID: $(FABRIC_CLIENT_ID)
+      FABRIC_CLIENT_SECRET: $(FABRIC_CLIENT_SECRET)
+      FABRIC_WORKSPACE_ID: $(FABRIC_WORKSPACE_ID)
+  - task: PublishTestResults@2
+    condition: always()
+    inputs:
+      testResultsFormat: JUnit
+      testResultsFiles: "fab-test-results/**/*.xml"
+      failTaskOnFailedTests: false
+      testRunTitle: fab-test data-agent
+  - task: PublishPipelineArtifact@1
+    condition: always()
+    inputs:
+      targetPath: fab-test-results
+      artifact: fab-test-data-agent-results

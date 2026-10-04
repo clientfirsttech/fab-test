@@ -201,7 +201,7 @@ def resolve_environment(
 
 def _normalize_name(name: str) -> str:
     """Strip the Fabric type suffix from an artifact display name."""
-    suffixes = (".SemanticModel", ".Report")
+    suffixes = (".SemanticModel", ".Report", ".DataAgent")
     for suffix in suffixes:
         if name.endswith(suffix):
             return name[: -len(suffix)]

@@ -81,7 +81,19 @@ pytest -m pql_test      # pql-test wrapper only
 
 > **Note:** Some wrapper contract tests launch the installed console scripts (`tabular-editor-bpa`, `fab-test`, etc.) as subprocesses. Those scripts must be on `PATH`, so always activate the virtual environment before running `pytest`.
 
-## Run artifact analyzers with fab-test
+## Run analyzers locally before pushing
+
+`pytest` is the framework contract layer; `fab-test` is the real artifact layer.
+
+### pytest: wrapper contract checks
+
+```bash
+pytest -m fab_test
+pytest -m pql_test
+pytest -m data_agent
+```
+
+### fab-test: real `.fabric` artifacts and `.DataAgent` prompts
 
 `fab-test` exercises the actual analyzers against the artifacts it finds under your working directory. Each analyzer has its own tool requirements.
 
@@ -106,6 +118,7 @@ fab-test pbir --dry-run
 fab-test a11y --dry-run
 fab-test rdl --dry-run
 fab-test pql-test --dry-run
+fab-test data-agent --dry-run
 ```
 
 ### Run a single analyzer
@@ -116,6 +129,7 @@ fab-test pbir --inspector-path "/path/to/PBIRInspectorCLI"
 fab-test a11y                            # requires Node.js >= 18 + npm the first time (built from source, then cached)
 fab-test rdl                             # active rules for paginated (.rdl) reports -- no external tool; --verbose lists each finding
 fab-test pql-test --env DEV
+fab-test data-agent --workspace Dev      # tests NAME.DataAgent/promptfooconfig.yaml against the deployed agent
 ```
 
 ### Isolate one artifact
@@ -123,9 +137,12 @@ fab-test pql-test --env DEV
 ```bash
 fab-test bpa SampleModel-PQLAssert
 fab-test pql-test SampleModel-PQLAssert --env DEV
+fab-test data-agent --artifact "Sales Agent.DataAgent"
 ```
 
-`--artifact SampleModel-PQLAssert` still works as a deprecated alias.
+`--artifact SampleModel-PQLAssert` still works as a deprecated alias, and
+`fab-test data-agent init "Sales Agent"` scaffolds a new
+`Sales Agent.DataAgent/promptfooconfig.yaml`.
 
 ### Print only the result: `-q`
 
@@ -188,6 +205,10 @@ Before running any analyzer, ask whether its tool or credentials are actually in
 fab-test doctor
 fab-test doctor --analyzer bpa --format json
 ```
+
+For the full CLI reference — flags, credentials, `.DataAgent` conventions, and
+the 5-agent workspace threshold — see
+[`../.github/skills/fab-test/SKILL.md`](../.github/skills/fab-test/SKILL.md).
 
 ## Coverage and complexity
 

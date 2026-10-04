@@ -71,7 +71,7 @@ def test_only_service_capable_analyzers_accept_a_workspace():
     accepting = {name for name, scopes in ANALYZER_SCOPES.items() if "workspace" in scopes}
 
     assert accepting == {
-        "bpa", "pbir", "a11y", "rdl", "pql_test", "playwright", "playwright-impact", "dependencies"
+        "bpa", "pbir", "a11y", "rdl", "pql_test", "playwright", "playwright-impact", "dependencies", "data_agent"
     }
 
 
@@ -124,6 +124,14 @@ def test_desktop_target_is_accepted_by_file_reading_analyzers():
 def test_desktop_target_is_refused_by_playwright():
     """Playwright drives a rendered report in the service; Desktop is not that."""
     assert unsupported_scope_error("playwright", parse_target("local/Sales")) is not None
+
+
+@pytest.mark.fab_test
+def test_desktop_target_is_refused_by_data_agent():
+    """Data Agent evaluation is always a service test; local/NAME is never allowed."""
+    message = unsupported_scope_error("data_agent", parse_target("local/Sales"))
+    assert message is not None
+    assert "data_agent" in message
 
 
 # --------------------------------------------------------------------------- #

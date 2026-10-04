@@ -35,6 +35,9 @@ def _mask_timestamp(text: str) -> str:
 @pytest.mark.fab_test
 def test_subcommand_alias_mapping():
     """Hyphen/underscore aliases resolve to their canonical analyzer name."""
+    assert _SUBCOMMAND_ALIASES["data-agent"] == "data_agent"
+    assert _SUBCOMMAND_ALIASES["data_agent"] == "data_agent"
+    assert _SUBCOMMAND_ALIASES["agent"] == "data_agent"
     assert _SUBCOMMAND_ALIASES["pql-test"] == "pql_test"
     assert _SUBCOMMAND_ALIASES["pql-lint"] == "pql_lint"
     assert _SUBCOMMAND_ALIASES["playwright_impact"] == "playwright-impact"
@@ -115,6 +118,7 @@ def test_help_displays_hyphenated_form_as_canonical():
         check=False,
     )
     assert result.returncode == 0, result.stderr
+    assert "data-agent (agent, data_agent)" in result.stdout
     assert "pql-test (pql_test)" in result.stdout
     # playwright-impact stands in for pql-lint here, which is now hidden
     # from the listing; the point is that an aliased subcommand shows its
@@ -147,6 +151,9 @@ def test_list_reports_canonical_name_and_aliases():
     )
     assert result.returncode == 0, result.stderr
     summary = json.loads(result.stdout)
+
+    data_agent_row = next(r for r in summary["analyzers"] if r["analyzer"] == "data-agent")
+    assert data_agent_row["aliases"] == ["agent", "data_agent"]
 
     pql_test_row = next(r for r in summary["analyzers"] if r["analyzer"] == "pql-test")
     assert pql_test_row["aliases"] == ["pql_test"]
@@ -182,5 +189,4 @@ def test_result_directory_name_unchanged_when_invoked_via_canonical_form(tmp_pat
     # The dry-run banner uses the internal registry key, unaffected by which
     # spelling the user typed — proving result-directory naming is unchanged.
     assert "fab-test pql_test" in result.stdout
-
 

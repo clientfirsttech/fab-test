@@ -36,7 +36,9 @@ SERVICE_ITEM_TYPES: dict[str, str] = {
     "a11y": "Report",
     "rdl": "PaginatedReport",
     "pql_test": "SemanticModel",
+    "data_agent": "DataAgent",
 }
+_EXPORTED_SERVICE_ANALYZERS = frozenset({"bpa", "pbir", "a11y", "rdl", "pql_test"})
 
 _DEFINITION_FORMATS = {"SemanticModel": "TMDL", "Report": "PBIR"}
 ENUMERATION_LIMIT = 50
@@ -70,7 +72,7 @@ def is_service_run(name: str, args: argparse.Namespace) -> bool:
     its `--workspace-id` keeps meaning "run the repository's models over
     XMLA", and a typed workspace target keeps its XMLA path, as before.
     """
-    if getattr(args, "mode", "repo") != "service" or name not in SERVICE_ITEM_TYPES:
+    if getattr(args, "mode", "repo") != "service" or name not in _EXPORTED_SERVICE_ANALYZERS:
         return False
     return (
         name != "pql_test"
@@ -82,6 +84,17 @@ def is_service_run(name: str, args: argparse.Namespace) -> bool:
 def service_target_refusal(name: str, args: argparse.Namespace) -> str | None:
     """Refuse a path TARGET combined with a service-mode export."""
     target = getattr(args, "resolved_target", None)
+    if (
+        name == "data_agent"
+        and getattr(args, "mode", "repo") == "service"
+        and target is not None
+        and target.path is not None
+    ):
+        return (
+            f"'{target.raw.strip()}' is a path but --workspace asks for the service; "
+            "name the Data Agent (Sales Agent or WORKSPACE.Workspace/Sales Agent.DataAgent) "
+            "or drop --workspace"
+        )
     if is_service_run(name, args) and target is not None and target.path is not None:
         return (
             f"'{target.raw.strip()}' is a path but --workspace asks for the service; "
@@ -107,7 +120,8 @@ def interactive_refusal(args: argparse.Namespace) -> str | None:
 
 def service_readiness(args: argparse.Namespace) -> str:
     """One `doctor` line on service-mode readiness; never acquires a token."""
-    status = probe_credentials(getattr(args, "playwright_env_file", None))
+    env_file = getattr(args, "data_agent_env_file", None) or getattr(args, "playwright_env_file", None)
+    status = probe_credentials(env_file)
     detail = redact_secrets(status.detail or "")
     if status.verified:
         return f"service mode: {detail} (unverified until a run; see `fab-test auth status`)"
@@ -147,7 +161,7 @@ def build_service_client(args: argparse.Namespace) -> Any:
     )
     from .playwright_validation.resolver import ServiceResolutionError
 
-    env_file = getattr(args, "playwright_env_file", None)
+    env_file = getattr(args, "data_agent_env_file", None) or getattr(args, "playwright_env_file", None)
     try:
         client = build_fabric_service_client(env_file=env_file)
     except (ServiceResolutionError, FabricServiceClientError) as exc:

@@ -34,6 +34,7 @@ _USER_AGENT = "fab-test/1.0"
 # just tsc over a small source tree and finishes in seconds once deps exist.
 _NPM_INSTALL_TIMEOUT_SECONDS = 300
 _NPM_BUILD_TIMEOUT_SECONDS = 120
+_NPM_PACKAGE_TIMEOUT_SECONDS = 300
 
 
 class UnsupportedPlatformError(RuntimeError):
@@ -310,16 +311,27 @@ def _probe_pending_install(
                 "version": None,
             }
         action = f"build version {pinned_version} from source at" if pinned_version else "build from source at"
+    elif archive_type == "npm_package":
+        package = tool_install.get("package_name", "")
+        action = (
+            f"install npm package {package}@{pinned_version}" if package and pinned_version
+            else f"install npm package {package}" if package
+            else "install npm package"
+        )
     else:
         action = f"download version {pinned_version} from" if pinned_version else "download from"
     remediation = f"Would {action} {install_url} on first run."
     env_var = tool_install.get("env_var")
-    if archive_type == "npm_build" and env_var:
+    if archive_type in {"npm_build", "npm_package"} and env_var:
         remediation += f" Or set {env_var}=<path> to a manually built executable to skip this."
     return {
         "ready": False,
         "resolved_path": None,
-        "reason": "not yet built" if archive_type == "npm_build" else "not yet downloaded",
+        "reason": (
+            "not yet built" if archive_type == "npm_build"
+            else "not yet installed" if archive_type == "npm_package"
+            else "not yet downloaded"
+        ),
         "remediation": remediation,
         "version": None,
     }
@@ -489,7 +501,7 @@ def probe_executable(
     install_url = _env(install_url_env_var, "") if install_url_env_var else ""
     if not install_url:
         install_url = committed_install_url or ""
-    if install_url:
+    if install_url or tool_install.get("archive_type", "").lower() == "npm_package":
         return _probe_pending_install(tool_install, install_url, pinned_version)
 
     return {
@@ -557,6 +569,8 @@ def resolve_executable(
         return _download_and_cache(analyzer_name, tool_install, install_url, cache_dir, platform)
     if install_url and archive_type.lower() == "npm_build":
         return _download_build_and_cache(analyzer_name, tool_install, install_url, cache_dir)
+    if archive_type.lower() == "npm_package":
+        return _install_npm_package(analyzer_name, tool_install, cache_dir)
 
     raise RuntimeError(
         _unresolved_message(analyzer_name, tool_install, explicit_path, platform)
@@ -725,6 +739,46 @@ def _download_build_and_cache(
     _write_marker(cache_dir, entrypoint)
     _notice(f"{analyzer_name}: built entry point at {entrypoint}")
     return entrypoint
+
+
+def _install_npm_package(
+    analyzer_name: str,
+    tool_install: dict[str, Any],
+    cache_dir: Path,
+) -> Path:
+    """Install an npm package into the analyzer cache and return its entry point."""
+    npm = shutil.which("npm")
+    if npm is None:
+        raise RuntimeError(
+            f"{analyzer_name}: npm not found on PATH. Install Node.js "
+            "(https://nodejs.org, >= 18) and npm, or set the tool's env var "
+            "to a manually installed executable."
+        )
+    package = tool_install.get("package_name", "")
+    version = tool_install.get("version", "")
+    package_spec = f"{package}@{version}" if version else package
+    entrypoint = tool_install.get("package_entrypoint", "")
+    install_root = cache_dir / "package"
+    shutil.rmtree(install_root, ignore_errors=True)
+    install_root.mkdir(parents=True, exist_ok=True)
+    _notice(f"{analyzer_name}: executable not found; installing npm package {package_spec}")
+    _run_build_step(
+        analyzer_name,
+        f"npm install {package_spec}",
+        [npm, "install", "--no-save", package_spec],
+        install_root,
+        _NPM_PACKAGE_TIMEOUT_SECONDS,
+    )
+    executable = _find_executable(install_root, entrypoint)
+    if executable is None:
+        raise RuntimeError(
+            f"Could not locate installed entry point for {analyzer_name} inside "
+            f"{install_root} (expected: {entrypoint!r})."
+        )
+    executable = executable.resolve()
+    _write_marker(cache_dir, executable)
+    _notice(f"{analyzer_name}: installed entry point at {executable}")
+    return executable
 
 
 def _unresolved_message(

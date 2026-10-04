@@ -36,8 +36,10 @@ TEST_HARD = 900
 # test_complexity_budget.py.
 EXEMPTIONS: dict[str, tuple[int, str]] = {
     "src/fab_test/scripts/fab_test_parser.py": (
-        1119,
+        1125,
         (
+            "2026-10-04: +6 lines for `fab-test data-agent` parser wiring after splitting the subparser "
+            "into _data_agent_parser.py; the remaining growth is the import and registration hook. "
             "2026-10-03: +2 lines giving pql-test the same --workspace and service flags (mode parity). "
             "2026-10-03: +5 lines attaching the shared service flags from _service_flags.py "
             "to the bpa/pbir/a11y/rdl/all/explain subparsers (Service Targeting epic). "
@@ -146,8 +148,11 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
         ),
     ),
     "src/fab_test/scripts/fab_test_registry.py": (
-        1031,
+        1049,
         (
+            "2026-10-04: +18 lines for `data-agent` registry entries after splitting the command builder "
+            "and readiness combiner into _data_agent_registry.py; the remaining growth is the registry "
+            "declarations and one specialized branch. "
             "2026-10-03: +3 lines adding the workspace scope to bpa/pbir/a11y/rdl and "
             "accepting PaginatedReport for rdl (Service Targeting epic). "
             "2026-10-02: +2 lines letting a per-report type from --from-workspace win over the "
@@ -300,6 +305,15 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
             "run (seen_stderr, State Each Result Once), then +5 to collapse only "
             "failures the findings cannot explain, after review found identical "
             "result lines from two artifacts were being swallowed."
+        ),
+    ),
+    "src/fab_test/scripts/_analyzer_tool_bootstrap.py": (
+        845,
+        (
+            "2026-10-04: promptfoo added npm-package bootstrap/readiness alongside the existing zip and "
+            "npm-build paths. The npm-specific logic is still cohesive with tool resolution itself "
+            "(_probe_pending_install, resolve_executable, and the shared cache/marker flow), so this "
+            "commit records the size while the new path proves out instead of forcing a speculative split."
         ),
     ),
 }

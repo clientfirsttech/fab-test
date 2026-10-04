@@ -213,6 +213,18 @@ def _check_pypi(name: str, tool_install: dict[str, Any]) -> dict[str, Any]:
     return _result(name, tool_install, available=available, url=url, current=current)
 
 
+def _check_npm(name: str, tool_install: dict[str, Any]) -> dict[str, Any]:
+    """Check a tool installed as a pinned npm package."""
+    release_source = tool_install["release_source"]
+    package = release_source["package"]
+    data = _get_json(f"https://registry.npmjs.org/{package}")
+    if not isinstance(data, dict):
+        return _result(name, tool_install, available=None, url=None, status=STATUS_UNKNOWN)
+    available = ((data.get("dist-tags") or {}).get("latest"))
+    url = f"https://www.npmjs.com/package/{package}/v/{available}" if available else None
+    return _result(name, tool_install, available=available, url=url)
+
+
 def _result(
     name: str,
     tool_install: dict[str, Any],
@@ -245,6 +257,7 @@ _CHECKERS = {
     "github_release": _check_github_release,
     "url_template": _check_url_template,
     "pypi": _check_pypi,
+    "npm": _check_npm,
 }
 
 

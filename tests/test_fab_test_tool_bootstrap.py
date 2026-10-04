@@ -19,6 +19,7 @@ import pytest
 from fab_test.scripts._analyzer_tool_bootstrap import (
     UnsupportedPlatformError,
     _verify_checksum,
+    probe_executable,
     resolve_executable,
 )
 
@@ -336,6 +337,42 @@ def test_verify_checksum_match_leaves_file_in_place(tmp_path):
     _verify_checksum(archive, expected, "pbir_inspector")
 
     assert archive.exists()
+
+
+@pytest.mark.fab_test
+def test_probe_executable_reports_pending_npm_package_install(tmp_path, monkeypatch):
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    metadata = repo_root / ".github" / "metadata" / "analyzers.json"
+    metadata.parent.mkdir(parents=True)
+    metadata.write_text(
+        json.dumps(
+            {
+                "analyzer_registry": {
+                    "data_agent": {
+                        "tool_install": {
+                            "env_var": "PROMPTFOO_PATH",
+                            "archive_type": "npm_package",
+                            "package_name": "promptfoo",
+                            "version": "0.96.0",
+                            "requires_runtime": {"name": "node", "min_major": 18},
+                        }
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        "fab_test.scripts._analyzer_tool_bootstrap._installed_node_major", lambda: 18
+    )
+
+    result = probe_executable("data_agent", metadata, repo_root)
+
+    assert result["ready"] is False
+    assert result["reason"] == "not yet installed"
+    assert "promptfoo@0.96.0" in result["remediation"]
 
 
 def _write_zip_with_executable(zip_path: Path, exe_path: Path, arcname: str) -> None:

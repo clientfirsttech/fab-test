@@ -166,6 +166,31 @@ emits `::warning::` on stderr, and exits 0, so a closed Desktop session does not
 turn CI red. `native.json` keeps `pql-test`'s own unmodified numbers. One genuine
 assertion failure among connection errors still fails the run.
 
+### data-agent
+
+Promptfoo-based checks for deployed Fabric Data Agents. The authored test cases
+live in `NAME.DataAgent/promptfooconfig.yaml`; `fab-test data-agent init NAME`
+scaffolds that folder plus `.env.example`.
+
+| Flag | Env var | Description |
+|------|---------|-------------|
+| `--workspace NAME_OR_ID` | `FABRIC_WORKSPACE_ID` | Workspace that hosts the deployed Data Agent. Display name or GUID; `--workspace-id` remains an accepted alias |
+| `--env-file PATH` | — | Load service-principal variables from this file before running the packaged promptfoo provider |
+| `--promptfoo-path PATH` | `PROMPTFOO_PATH` | Explicit promptfoo executable; otherwise resolve from PATH or the cached npm package |
+| `--all` | — | Proceed when `--workspace` enumeration matches more than 5 deployed Data Agents |
+
+```bash
+fab-test data-agent init Sales Agent
+fab-test data-agent --artifact "Sales Agent.DataAgent"
+fab-test data-agent --workspace Dev
+fab-test data-agent --workspace Dev --all
+```
+
+`data-agent` accepts the canonical name plus the aliases `agent` and
+`data_agent`. It does **not** accept `local/` and does **not** offer
+`--interactive`: this analyzer always talks to the deployed Data Agent API with
+`FABRIC_TENANT_ID`, `FABRIC_CLIENT_ID`, and `FABRIC_CLIENT_SECRET`.
+
 ### playwright
 
 Playwright validation can run in three modes: static `.env` mode, service-resolved mode, or impact-manifest mode.

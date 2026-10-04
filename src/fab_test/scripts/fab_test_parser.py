@@ -13,6 +13,7 @@ import re
 from fab_test import __version__ as _FAB_TEST_VERSION
 
 from ._config import CONFIG_FILENAME
+from ._data_agent_parser import add_data_agent_subparser
 from ._fab_test_context import (
     _DEFAULT_SUBPROCESS_TIMEOUT,
     _PYPROJECT_CONFIG,
@@ -195,6 +196,9 @@ def _add_common_flags(
 
 
 _SUBCOMMAND_ALIASES = {
+    "data-agent": "data_agent",
+    "data_agent": "data_agent",
+    "agent": "data_agent",
     "pql-test": "pql_test",
     "pql_test": "pql_test",
     "pql-lint": "pql_lint",
@@ -206,6 +210,7 @@ _SUBCOMMAND_ALIASES = {
 # for the handful where they diverge. Result directories (fab-test-results/
 # <key>/...) stay on the registry key so historical results remain readable.
 _CANONICAL_TO_REGISTRY_KEY = {
+    "data-agent": "data_agent",
     "pql-test": "pql_test",
     "pql-lint": "pql_lint",
 }
@@ -1038,6 +1043,7 @@ _SUBPARSER_BUILDERS = (
     _add_a11y_subparser,
     _add_pql_test_subparser,
     _add_pql_lint_subparser,
+    lambda subs: add_data_agent_subparser(subs, _add_common_flags, add_workspace_flag),
     _add_rdl_subparser,
     _add_playwright_subparser,
     _add_playwright_impact_subparser,
