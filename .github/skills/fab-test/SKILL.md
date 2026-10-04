@@ -1,6 +1,6 @@
 ---
 name: fab-test
-description: fab-test CLI reference for running Fabric artifact analyzers locally (fab-test 1.11.0.dev1). Covers all subcommands, flags, artifact isolation, result locations, and how fab-test differs from pytest. Use when invoking, troubleshooting, or extending local artifact validation.
+description: fab-test CLI reference for running Fabric artifact analyzers locally (fab-test 1.12.0.dev1). Covers all subcommands, flags, artifact isolation, result locations, and how fab-test differs from pytest. Use when invoking, troubleshooting, or extending local artifact validation.
 ---
 
 # fab-test
@@ -26,6 +26,8 @@ Discovery matches on folder suffix (`*.SemanticModel`, `*.Report`), never on con
 | `fab-test pbir` | Do my reports pass PBIR Inspector rules? (requires PBIR Inspector binary) |
 | `pytest -m pql_test` | Is the pql-test wrapper code correct? (mocked, always green) |
 | `fab-test pql-test` | Do my semantic model DAX tests pass? (requires Power BI Desktop open) |
+| `pytest -m data_agent` | Is the packaged promptfoo provider/wrapper contract correct? (mocked token + API responses, always green) |
+| `fab-test data-agent` | Do my deployed Data Agents answer the authored promptfoo cases in each `.DataAgent/promptfooconfig.yaml`? (requires Fabric service-principal credentials) |
 | `pytest -m playwright` | Is the Playwright wrapper code correct? (mocked contract tests) |
 | `fab-test playwright` | Do my Power BI reports render without visual-load errors? (requires service-principal credentials) |
 | `pytest -m rdl` | Is the rdl rule engine correct? (always green, no external tool — pure Python) |
@@ -317,6 +319,7 @@ The case a pipeline meets most is a `detail` populated on an aborted run: `fab-t
  fab-test a11y             — pbir-a11y accessibility checks (Report artifacts) — opt-in, not run by `fab-test all`
  fab-test rdl              — RDL static analysis: the active rules for paginated reports (.rdl files) — no external tool
  fab-test pql-test         — pql-test DAX/PQL test runner (SemanticModel artifacts) [alias: pql_test]
+ fab-test data-agent       — promptfoo-based validation of deployed Fabric Data Agents (.DataAgent artifacts) [aliases: agent, data_agent]
  fab-test playwright       — Playwright visual/error validation (Report artifacts)
  fab-test playwright-impact — Build impacted-report manifest from changed artifacts [alias: playwright_impact]
  fab-test dependencies     — Discover reports that depend on a deployed semantic model
@@ -346,6 +349,6 @@ use the original underscore names regardless of which spelling you invoke.
 | [references/credentials.md](references/credentials.md) | You need to know how `fab-test` resolves an identity, or what `auth status`/`auth login` do |
 | [references/reports.md](references/reports.md) | You're generating or debugging the HTML `--report` output, the per-run index, or its search/sort/filter behavior |
 | [references/configuration.md](references/configuration.md) | You're touching `fab-test.yml`, precedence, telemetry, rule overlays, or metadata-file resolution |
-| [references/flags.md](references/flags.md) | You need the full global flag table or a specific subcommand's flags (`bpa`, `pbir`, `a11y`, `rdl`, `pql-test`, `playwright`, `playwright-impact`, `dependencies`, `all`, `local`) |
+| [references/flags.md](references/flags.md) | You need the full global flag table or a specific subcommand's flags (`bpa`, `pbir`, `a11y`, `rdl`, `pql-test`, `data-agent`, `playwright`, `playwright-impact`, `dependencies`, `all`, `local`) |
 | [references/operations.md](references/operations.md) | You need `--dry-run`/verbosity behavior, the on-disk result layout, tool-resolution order, or pre-flight checks |
 | [references/source-files.md](references/source-files.md) | You're navigating or modifying the `fab-test` implementation itself |

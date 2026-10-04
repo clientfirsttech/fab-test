@@ -9,6 +9,7 @@ override.
 
     pytest -m fab_test
 """
+
 import argparse
 import json
 import subprocess
@@ -23,6 +24,7 @@ from fab_test.scripts.fab_test_registry import (
     _DEFAULT_RDL_RULES,
     build_a11y_command,
     build_bpa_command,
+    build_data_agent_command,
     build_pbir_command,
     build_pql_test_command,
     build_rdl_command,
@@ -269,6 +271,26 @@ def test_build_rdl_command_writes_resolved_rules_when_overlay_configured(tmp_pat
 
 
 @pytest.mark.fab_test
+def test_build_data_agent_command_passes_workspace_artifact_name_and_promptfoo_path(tmp_path):
+    artifact = tmp_path / "Sales Agent.DataAgent"
+    artifact.mkdir()
+    args = argparse.Namespace(
+        workspace_id="00000000-0000-0000-0000-000000000001",
+        promptfoo_path="/tools/promptfoo.js",
+        data_agent_env_file=str(tmp_path / ".env"),
+    )
+
+    cmd = build_data_agent_command(artifact, args, tmp_path / "results")
+
+    assert any("invoke_data_agent" in part for part in cmd)
+    assert "--artifact-path" in cmd
+    assert cmd[cmd.index("--artifact-path") + 1] == str(artifact)
+    assert cmd[cmd.index("--artifact-name") + 1] == "Sales Agent"
+    assert cmd[cmd.index("--workspace-id") + 1] == "00000000-0000-0000-0000-000000000001"
+    assert cmd[cmd.index("--promptfoo-path") + 1] == "/tools/promptfoo.js"
+
+
+@pytest.mark.fab_test
 def test_build_rdl_command_ignores_overlay_when_rdl_rules_path_passed_explicitly(tmp_path):
     """--rules-path explicit override wins verbatim, even with an overlay configured."""
     artifact = tmp_path / "Sales.rdl"
@@ -361,5 +383,3 @@ def test_all_help_exits_zero():
         check=False,
     )
     assert result.returncode == 0, result.stderr
-
-

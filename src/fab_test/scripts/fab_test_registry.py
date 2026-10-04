@@ -23,6 +23,11 @@ from ._analyzer_tool_bootstrap import (
 )
 from ._artifact_types import load_artifact_map
 from ._credentials import configured_workspace, probe_credentials
+from ._data_agent_registry import (
+    build_data_agent_command,
+    data_agent_explicit_path,
+    data_agent_readiness,
+)
 from ._desktop import (
     DesktopMatchError,
     desktop_ports,
@@ -83,6 +88,7 @@ ANALYZER_REGISTRY: dict[str, tuple[str, str]] = {
     "playwright-impact": ("", "Playwright impact manifest builder"),
     "dependencies": ("", "Report dependency discovery"),
     "rdl": ("*.rdl", "RDL (paginated report) static analysis"),
+    "data_agent": ("*.DataAgent", "Promptfoo Data Agent evaluation"),
 }
 
 # Analyzers kept out of the advertised surface: absent from `--help`,
@@ -122,6 +128,7 @@ ANALYZER_SCOPES: dict[str, frozenset[str]] = {
     "playwright": frozenset({"path", "workspace"}),
     "playwright-impact": frozenset({"path", "workspace"}),
     "dependencies": frozenset({"path", "workspace"}),
+    "data_agent": frozenset({"path", "workspace"}),
 }
 
 _SCOPE_HINTS = {
@@ -193,14 +200,14 @@ def unsupported_type_error(name: str, target: ResolvedTarget | None) -> str | No
 
 
 # Analyzers that depend on an external binary/tool.
-_BOOTSTRAPPED_ANALYZERS = {"bpa", "pbir", "a11y"}
+_BOOTSTRAPPED_ANALYZERS = {"bpa", "pbir", "a11y", "data_agent"}
 
 # Analyzers that resolve no external binary but still cannot run on a bare
 # checkout: they need a Fabric workspace plus credentials, or -- pql_test
 # only -- a running Power BI Desktop instance to bind to. Without this set,
 # check_readiness reported them ready on the strength of having no tool to
 # find, a green light `doctor` could not honor.
-_CLOUD_ANALYZERS = {"pql_test", "playwright", "playwright-impact", "dependencies"}
+_CLOUD_ANALYZERS = {"pql_test", "playwright", "playwright-impact", "dependencies", "data_agent"}
 
 # The subset that can bind to a running Desktop instance instead of a
 # workspace. Only pql_test does today; see build_pql_test_command.
@@ -217,6 +224,7 @@ _BOOTSTRAP_REGISTRY_NAME = {
     "bpa": "tabular_editor_bpa",
     "pbir": "pbir_inspector",
     "a11y": "pbir_a11y",
+    "data_agent": "data_agent",
 }
 
 
@@ -806,6 +814,7 @@ _COMMAND_BUILDERS: dict[str, Any] = {
     "playwright-impact": build_playwright_impact_command,
     "dependencies": build_dependencies_command,
     "rdl": build_rdl_command,
+    "data_agent": build_data_agent_command,
 }
 
 
@@ -835,6 +844,8 @@ def resolve_tool(name: str, args: argparse.Namespace) -> Path | None:
         explicit = getattr(args, "inspector_path", None)
     elif name == "a11y":
         explicit = getattr(args, "a11y_path", None)
+    elif name == "data_agent":
+        explicit = data_agent_explicit_path(args)
 
     resolved = resolve_executable(
         _BOOTSTRAP_REGISTRY_NAME.get(name, name),
@@ -850,6 +861,7 @@ _TOOL_FLAG_HINTS = {
     "bpa": "--tabular-editor-path",
     "pbir": "--inspector-path",
     "a11y": "--a11y-path",
+    "data_agent": "--promptfoo-path",
 }
 
 
@@ -890,18 +902,20 @@ def _cloud_readiness(name: str, args: argparse.Namespace | None) -> dict[str, An
     workspace_id = configured_workspace(args, playwright=name != "pql_test")
 
     if workspace_id:
-        status = probe_credentials()
+        env_file = getattr(args, "data_agent_env_file", None) if args is not None else None
+        env_file = env_file or (getattr(args, "playwright_env_file", None) if args is not None else None)
+        status = probe_credentials(env_file)
         # Playwright always calls MSAL with a service-principal secret to
         # generate an embed token -- unlike pql_test, an ambient credential
         # (az login, managed identity) cannot stand in. Reporting ready off
         # `status.resolved` alone would be the false green task 1 exists to
         # remove: green from `doctor`, then an MSAL error on the one
         # command that cannot use an ambient sign-in.
-        if name == "playwright" and not status.verified:
+        if name in {"playwright", "data_agent"} and not status.verified:
             return {
                 "ready": False,
                 "resolved_path": None,
-                "reason": f"workspace configured; playwright needs a full service principal ({status.detail})",
+                "reason": f"workspace configured; {name} needs a full service principal ({status.detail})",
                 "remediation": status.remediation
                 or (
                     "set FABRIC_TENANT_ID, FABRIC_CLIENT_ID (or "
@@ -975,6 +989,8 @@ def check_readiness(name: str, args: argparse.Namespace | None) -> dict[str, Any
 
 
 def _readiness_without_version(name: str, args: argparse.Namespace | None) -> dict[str, Any]:
+    if name == "data_agent":
+        return data_agent_readiness(args, ANALYZERS_JSON, REPO_ROOT, _cloud_readiness)
     if name in _CLOUD_ANALYZERS:
         return _cloud_readiness(name, args)
 
@@ -994,6 +1010,8 @@ def _readiness_without_version(name: str, args: argparse.Namespace | None) -> di
             explicit = getattr(args, "inspector_path", None)
         elif name == "a11y":
             explicit = getattr(args, "a11y_path", None)
+        elif name == "data_agent":
+            explicit = data_agent_explicit_path(args)
 
     return probe_executable(
         _BOOTSTRAP_REGISTRY_NAME.get(name, name),

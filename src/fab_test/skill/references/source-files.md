@@ -7,6 +7,11 @@
 | `scripts/invoke_tabular_editor_bpa.py` | BPA subprocess wrapper |
 | `scripts/invoke_pbir_inspector.py` | PBIR Inspector subprocess wrapper |
 | `scripts/invoke_pql_test.py` | pql-test subprocess wrapper (venv-aware lookup, native JSON parsing) |
+| `scripts/invoke_data_agent.py` | data-agent wrapper — promptfoo effective-config generation, preflight, native JSON mapping, shared envelope output |
+| `scripts/fabric_data_agent_provider.py` | Packaged promptfoo Python provider for the deployed Data Agent API |
+| `scripts/_data_agent_resolution.py` | Resolve a deployed Data Agent item and build its live assistant endpoint URL |
+| `scripts/_data_agent_init.py` | Scaffold `NAME.DataAgent/` with `promptfooconfig.yaml`, `.env.example`, and starter context |
+| `scripts/_data_agent_discovery.py` | Pair local `*.DataAgent` promptfoo tests with deployed Data Agents in a workspace |
 | `scripts/invoke_pqlint.py` | pqlint subprocess wrapper |
 | `scripts/invoke_rdl_lint.py` | `rdl` CLI wrapper — envelope, `attach_report`, malformed-file handling; the pure rule logic lives in `_rdl_lint.py` |
 | `scripts/_rdl_lint.py` | `rdl`'s rule engine — namespace-agnostic XML parsing, the catalog loader and its validation, the `CHECKS` dispatch table, `run_checks`, the `test_results` builder |

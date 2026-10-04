@@ -292,3 +292,64 @@ def test_init_dry_run_reports_existing_files_without_listing_them_as_would_creat
     already_existed_names = {p.split("/")[-1].split("\\")[-1] for p in data["already_existed"]}
     assert "fab-test.yml" not in would_create_names
     assert "fab-test.yml" in already_existed_names
+
+
+@pytest.mark.fab_test
+def test_data_agent_init_creates_a_starter_folder_and_env_example(tmp_path):
+    result = subprocess.run(
+        ["fab-test", "data-agent", "init", "Sales Agent"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        cwd=tmp_path,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    promptfoo = tmp_path / "Sales Agent.DataAgent" / "promptfooconfig.yaml"
+    assert promptfoo.exists()
+    assert (tmp_path / "Sales Agent.DataAgent" / ".env.example").exists()
+    text = promptfoo.read_text(encoding="utf-8")
+    assert "conversation" in text
+    assert "regex" in text
+    assert "Tell me a joke" in text
+
+
+@pytest.mark.fab_test
+def test_data_agent_init_refuses_to_overwrite_without_force(tmp_path):
+    target = tmp_path / "Sales Agent.DataAgent"
+    target.mkdir()
+    promptfoo = target / "promptfooconfig.yaml"
+    promptfoo.write_text("keep me\n", encoding="utf-8")
+
+    result = subprocess.run(
+        ["fab-test", "data-agent", "init", "Sales Agent"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        cwd=tmp_path,
+        check=False,
+    )
+
+    assert result.returncode == 1
+    assert promptfoo.read_text(encoding="utf-8") == "keep me\n"
+
+
+@pytest.mark.fab_test
+def test_data_agent_init_force_overwrites_existing_scaffold(tmp_path):
+    target = tmp_path / "Sales Agent.DataAgent"
+    target.mkdir()
+    promptfoo = target / "promptfooconfig.yaml"
+    promptfoo.write_text("old\n", encoding="utf-8")
+
+    result = subprocess.run(
+        ["fab-test", "data-agent", "init", "Sales Agent", "--force"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        cwd=tmp_path,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert promptfoo.read_text(encoding="utf-8") != "old\n"

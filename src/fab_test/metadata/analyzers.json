@@ -3,7 +3,8 @@
     "bpa",
     "pbir",
     "pql_test",
-    "rdl"
+    "rdl",
+    "data_agent"
   ],
   "analyzer_registry": {
     "rdl": {
@@ -129,6 +130,32 @@
         }
       }
     },
+    "data_agent": {
+      "type": "dynamic",
+      "implementation": "python",
+      "command": "python",
+      "args": ["scripts/invoke_data_agent.py", "--artifact-path", "{artifact_path}", "--artifact-name", "{artifact_name}", "--workspace-id", "{workspace_id}", "--output-path", "{output_path}"],
+      "description": "Promptfoo evaluation of deployed Fabric Data Agents from authored .DataAgent suites.",
+      "exit_code_success": 0,
+      "native_output": {"extension": "json", "format": "JSON"},
+      "reference": "https://www.promptfoo.dev/",
+      "tool_install": {
+        "env_var": "PROMPTFOO_PATH",
+        "default_path": "",
+        "archive_type": "npm_package",
+        "package_name": "promptfoo",
+        "package_entrypoint": "node_modules/promptfoo/dist/src/cli.js",
+        "version": "0.96.0",
+        "release_source": {
+          "type": "npm",
+          "package": "promptfoo"
+        },
+        "requires_runtime": {
+          "name": "node",
+          "min_major": 18
+        }
+      }
+    },
     "playwright": {
       "type": "dynamic",
       "implementation": "python",
@@ -203,6 +230,12 @@
       ],
       "dynamic": [
         "prompt_eval"
+      ]
+    },
+    "DataAgent": {
+      "static": [],
+      "dynamic": [
+        "data_agent"
       ]
     },
     "Notebook": {

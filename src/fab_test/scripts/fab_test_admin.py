@@ -17,6 +17,7 @@ from typing import Any
 from ._cli_utils import narrate
 from ._config import CONFIG_FILENAME, resolve_setting, verbosity_level
 from ._credentials import probe_credentials
+from ._data_agent_init import scaffold_data_agent
 from ._desktop import bridge_cli_path, detect_desktop_instances
 from ._fab_test_context import (
     _DEFAULT_SUBPROCESS_TIMEOUT,
@@ -392,6 +393,20 @@ def _init(args: argparse.Namespace) -> int:
     return 0
 
 
+def _data_agent_init(args: argparse.Namespace) -> int:
+    """Scaffold a starter ``.DataAgent`` folder in the current directory."""
+    created, target = scaffold_data_agent(args.name, Path.cwd(), force=getattr(args, "force", False))
+    if not created and not getattr(args, "force", False):
+        print(
+            f"  ✗ fab-test data-agent init: {target / 'promptfooconfig.yaml'} already exists "
+            "(pass --force to overwrite)",
+            file=sys.stderr,
+        )
+        return 1
+    print(f"  ✓ fab-test data-agent init: scaffolded {target}")
+    return 0
+
+
 def _doctor_local(args: argparse.Namespace) -> int:
     """Check prerequisites for the local Desktop workflow (`fab-test local`).
 
@@ -480,6 +495,7 @@ _TOOL_DISPLAY_NAMES = {
     "bpa": "Tabular Editor",
     "pbir": "PBIR Inspector",
     "a11y": "pbir-a11y",
+    "data_agent": "promptfoo",
 }
 
 

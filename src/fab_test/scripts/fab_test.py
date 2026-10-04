@@ -61,6 +61,7 @@ from .fab_test_admin import (
     _auth,
     _clean_tools,
     _config_show,
+    _data_agent_init,
     _doctor,
     _explain_analyzer,
     _init,
@@ -151,6 +152,18 @@ def _dispatch_admin_command(args: argparse.Namespace) -> int | None:
     Returns ``None`` when ``args.analyzer`` isn't one of these, so the
     caller knows to fall through to the analyzer-running path instead.
     """
+    if args.analyzer == "data_agent" and getattr(args, "name", None) and getattr(args, "target", None) != "init":
+        print(
+            "  ✗ fab-test data-agent: unexpected extra NAME; use `fab-test data-agent init NAME` "
+            "or pass one TARGET",
+            file=sys.stderr,
+        )
+        return 2
+    if args.analyzer == "data_agent" and getattr(args, "target", None) == "init":
+        if not getattr(args, "name", None):
+            print("  ✗ fab-test data-agent init: missing NAME", file=sys.stderr)
+            return 2
+        return _data_agent_init(args)
     handler = _ADMIN_COMMAND_HANDLERS.get(args.analyzer)
     return handler(args) if handler else None
 
@@ -329,6 +342,14 @@ def _dispatch_run(args: argparse.Namespace) -> int:
         # than refusing the whole invocation.
         runnable = []
         for name in analyzers:
+            if name == "data_agent" and not (
+                getattr(args, "workspace_id", "") or (getattr(args, "file_config", None) or {}).get("workspace", "")
+            ):
+                narrate(
+                    "  ⚠ fab-test all: skipping data_agent — configure --workspace or workspace: first",
+                    output_format=args.output_format,
+                )
+                continue
             refusal = _unsupported_scope_error(name, target) or _unsupported_type_error(
                 name, target
             )

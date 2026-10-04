@@ -43,3 +43,19 @@ The optional Azure browser backend needs two more values, separate from the Fabr
 Service-mode runs (`bpa`/`pbir`/`a11y`/`rdl` against a workspace) use the one chain above with the Fabric REST scope `https://api.fabric.microsoft.com/.default`; the identity needs read access to the item and Fabric API access. Order: environment service principal → `--env-file`/`.fab-test/.env`/`./.env` → `DefaultAzureCredential` → `--interactive`. A partial service principal is an error, never a silent fallback. Nothing resolvable exits `127` naming the variables and `fab-test auth status`.
 
 `--interactive` signs in through the browser with the token held in memory only — no device code, no cache on disk. It never prompts in CI (`CI`/`GITHUB_ACTIONS`/`TF_BUILD`; exit `2`), and `interactive_auth: off` in `fab-test.yml` or `FAB_TEST_INTERACTIVE_AUTH=0` turns it off fleet-wide (exit `2` naming the flag). `doctor` reports a per-analyzer service-readiness line without acquiring a token.
+
+## `data-agent` credentials
+
+`fab-test data-agent` is stricter than the export analyzers and stricter than
+`playwright` in one specific way: it is **service principal only**. Set
+`FABRIC_TENANT_ID`, `FABRIC_CLIENT_ID`, and `FABRIC_CLIENT_SECRET` (plus
+optional `FABRIC_SCOPE` when you need something other than
+`https://analysis.windows.net/powerbi/api/.default`). There is no
+`--interactive` escape hatch and no ambient `az login` fallback.
+
+The local `.DataAgent/.env.example` scaffold is there to name the variables,
+not to change the resolution order. At runtime the wrapper reads the effective
+environment, refuses a partial service principal with the existing incomplete-SP
+remediation, and exits `127` naming all three required variables plus
+`fab-test auth status`. The service principal also needs workspace access and
+any downstream data-source access the deployed Data Agent itself depends on.

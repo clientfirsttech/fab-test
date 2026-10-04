@@ -39,7 +39,7 @@ def _telemetry_table(analyzer: str) -> str:
     Derived, never configured: a config key would only let the file and the
     derivation disagree about where a record went.
     """
-    return "fabric_dynamic_analysis" if analyzer == "pql_test" else "fabric_static_analysis"
+    return "fabric_dynamic_analysis" if analyzer in {"pql_test", "data_agent"} else "fabric_static_analysis"
 
 
 def _telemetry_destination(decision: TelemetryDecision, analyzer: str) -> str:

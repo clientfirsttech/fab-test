@@ -26,6 +26,8 @@ from __future__ import annotations
 
 import importlib.util
 import os
+import re
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -37,6 +39,7 @@ _CLIENT_ID_VARS = ("FABRIC_SERVICE_PRINCIPAL_ID", "FABRIC_CLIENT_ID")
 _CLIENT_SECRET_VARS = ("FABRIC_SERVICE_PRINCIPAL_SECRET", "FABRIC_CLIENT_SECRET")
 
 AMBIENT_SOURCE = "ambient:DefaultAzureCredential"
+_BEARER_TOKEN = re.compile(r"(?i)\bbearer\s+[A-Za-z0-9._~+/=-]+")
 
 # Listed in the order the chain tries them, so a caller reading the
 # remediation top to bottom learns the precedence for free.
@@ -81,7 +84,7 @@ def ambient_credential_available() -> bool:
     return importlib.util.find_spec("azure.identity") is not None
 
 
-def redact_secrets(text: str) -> str:
+def redact_secrets(text: str, extra_values: Iterable[str] | None = None) -> str:
     """Replace any live credential value found in ``text`` with a marker.
 
     Value-based, unlike `_sanitize_command`'s flag-name matching: a secret
@@ -91,15 +94,16 @@ def redact_secrets(text: str) -> str:
     two-character secret would blank unrelated text and make the output
     less trustworthy, not more.
 
-    Only the client secret is redacted. A tenant or client ID names a
+    Only secret values are redacted. A tenant or client ID names a
     directory and an application; `auth status` reports the tenant on
     purpose, and blanking it would remove the answer the caller came for.
     """
-    for var in _CLIENT_SECRET_VARS:
-        value = os.environ.get(var, "")
+    values = [os.environ.get(var, "") for var in _CLIENT_SECRET_VARS]
+    values.extend(extra_values or ())
+    for value in values:
         if len(value) >= 8:
             text = text.replace(value, "<redacted>")
-    return text
+    return _BEARER_TOKEN.sub("******", text)
 
 
 def _parse_env_file(env_file: Path) -> dict[str, str]:

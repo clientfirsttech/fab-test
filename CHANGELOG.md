@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-10-04
+
+- 📦 - Version `1.12.0.dev1`.
+- ✨ - Fabric Data Agent Testing - `fab-test data-agent` is a new analyzer for deployed Fabric Data Agents. It discovers `*.DataAgent` folders, scaffolds them with `fab-test data-agent init NAME`, injects a packaged Python promptfoo provider at run time, resolves the live Data Agent API URL from the workspace item, and maps promptfoo results into the shared envelope / report / telemetry contract. It is service-principal-only (`FABRIC_TENANT_ID`, `FABRIC_CLIENT_ID`, `FABRIC_CLIENT_SECRET`), included in `fab-test all` only when a workspace is configured, and refuses workspace enumerations over 5 agents unless `--all`. Promptfoo is now a pinned wrapped tool with bootstrap, readiness, update-check, docs, skill, workflow examples, and third-party notice coverage. Live verification remains pending a real deployed Data Agent; the mocked/provider and installed-console-script paths are covered in tests.
+
 ## 2026-10-03
 
 - ✨ - Mode parity - `fab-test pql-test` now takes `--workspace NAME_OR_ID`, `--keep-export`, `--all` and `--interactive` like bpa/pbir/a11y/rdl/all: `--workspace` exports the deployed models and runs them over XMLA, with the same stderr mode banner (silent under `-q` and `--format json`). `--workspace-id` keeps its XMLA-connection meaning; naming two different workspaces is refused. `tests/test_mode_parity.py` guards the shared flags and banner behavior across every service-capable analyzer.

@@ -21,6 +21,7 @@ _WRAPPED_TOOLS = (
     ("tabular_editor_bpa", "Tabular Editor"),
     ("pbir_inspector", "fab-inspector"),
     ("pbir_a11y", "pbir-a11y"),
+    ("data_agent", "promptfoo"),
 )
 
 # Pinned pip dependencies whose license is not a short permissive one --
