@@ -1,0 +1,11 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "PaginatedReport",
+    "displayName": "QRY-04"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "49c39878-a4de-8d78-47ac-d10fadbd9fb4"
+  }
+}
