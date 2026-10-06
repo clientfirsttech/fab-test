@@ -27,7 +27,7 @@
     <DataSource Name="DataSource1">
       <rd:SecurityType>DataBase</rd:SecurityType>
       <ConnectionProperties>
-        <DataProvider>SQL</DataProvider>
+        <DataProvider>SQLAZURE</DataProvider>
         <ConnectString>Data Source=azure-sql-db-jk.database.windows.net;Initial Catalog=escape-room</ConnectString>
         <Prompt>Specify a user name and password for data source DataSource1:</Prompt>
       </ConnectionProperties>
