@@ -19,7 +19,7 @@ import pytest
 pytestmark = [pytest.mark.rdl, pytest.mark.analyzers]
 
 _REPO = Path(__file__).resolve().parent.parent
-_FIXTURES = _REPO / "fabric-artifacts" / "rdl"
+_FIXTURES = _REPO / "fabric-artifacts"
 
 _CLEAN = (
     '<?xml version="1.0" encoding="utf-8"?>'
@@ -39,7 +39,7 @@ def _run(tmp_path: Path, *args: str, artifact: str = "DS-02", env: dict | None =
     elif artifact == "BROKEN":
         (artifacts / "BROKEN.rdl").write_text("<Report", encoding="utf-8")
     else:
-        shutil.copy(_FIXTURES / f"{artifact}.rdl", artifacts / f"{artifact}.rdl")
+        shutil.copy(_FIXTURES / f"{artifact}.PaginatedReport" / f"{artifact}.rdl", artifacts / f"{artifact}.rdl")
     full_env = {
         **{k: v for k, v in os.environ.items() if k not in ("GITHUB_ACTIONS", "CI", "ANALYZER_VERBOSITY")},
         "PYTHONPATH": str(_REPO / "src"),

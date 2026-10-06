@@ -13,9 +13,14 @@ pytestmark = [pytest.mark.rdl, pytest.mark.analyzers]
 
 _REPO = Path(__file__).resolve().parent.parent
 _CATALOG_PATH = _REPO / "src" / "fab_test" / "metadata" / "rules" / "rdl-rules.json"
-_FIXTURES = _REPO / "fabric-artifacts" / "rdl"
 _RULES = json.loads(_CATALOG_PATH.read_text(encoding="utf-8"))["rules"]
 _ACTIVE = [r for r in _RULES if r.get("status") == "active"]
+
+
+def _fixture_path(rule_id: str) -> Path:
+    """Each rule fixture is synced as a Git Integration-shaped
+    ``<ID>.PaginatedReport/<ID>.rdl`` folder."""
+    return _REPO / "fabric-artifacts" / f"{rule_id}.PaginatedReport" / f"{rule_id}.rdl"
 
 
 def _rule(rule_id: str, status: str | None = None) -> dict:
@@ -30,7 +35,7 @@ class TestEngine:
         ran = []
         CHECKS["FAKE-01"] = lambda *_: ran.append(1) or [{"object": "x", "message": "m"}]
         try:
-            root, ns = parse_rdl(_FIXTURES / "DS-02.rdl")
+            root, ns = parse_rdl(_fixture_path("DS-02"))
             findings = run_checks(root, ns, [_rule("FAKE-01", "planned")])
         finally:
             del CHECKS["FAKE-01"]
@@ -41,7 +46,7 @@ class TestEngine:
     def test_a_rule_with_no_status_is_active(self):
         CHECKS["FAKE-01"] = lambda *_: [{"object": "x", "message": "m"}]
         try:
-            root, ns = parse_rdl(_FIXTURES / "DS-02.rdl")
+            root, ns = parse_rdl(_fixture_path("DS-02"))
             findings = run_checks(root, ns, [_rule("FAKE-01")])
         finally:
             del CHECKS["FAKE-01"]
@@ -65,7 +70,7 @@ class TestPackagedCatalog:
 
     @pytest.mark.parametrize("rule", _ACTIVE, ids=lambda r: r["id"])
     def test_an_active_rule_has_a_check_and_a_fixture_that_trips_it(self, rule):
-        fixture = _FIXTURES / f"{rule['id']}.rdl"
+        fixture = _fixture_path(rule["id"])
         assert rule["id"] in CHECKS, f"{rule['id']} is active but has no check"
         assert fixture.exists(), f"{rule['id']} is active but has no real fixture {fixture.name}"
         root, ns = parse_rdl(fixture)
