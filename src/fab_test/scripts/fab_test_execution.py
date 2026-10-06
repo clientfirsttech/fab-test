@@ -549,7 +549,7 @@ def _playwright_remote_target(args: argparse.Namespace) -> Path | None:
     report (``--artifact NAME`` or ``WORKSPACE.Workspace/NAME.Type``) and an
     environment has stated an intent to resolve it live via ``resolve_report``,
     which a paginated (RDL) report especially needs: this repo's
-    ``.fabric/artifacts/`` tree only ever holds PBIR-format interactive
+    ``fabric-artifacts/`` tree only ever holds PBIR-format interactive
     reports, so an RDL report can never have a local folder to be found by at
     all. A real filesystem path (``./src/Sales.Report``) is left alone --
     naming a specific location and finding nothing there is a real miss, not

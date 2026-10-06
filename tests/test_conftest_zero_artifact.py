@@ -13,12 +13,12 @@ TESTS_DIR = REPO_ROOT / "tests"
 
 @pytest.mark.integration
 @pytest.mark.skipif(
-    not (REPO_ROOT / ".fabric" / "artifacts").exists(),
-    reason="Requires .fabric/artifacts directory to exist",
+    not (REPO_ROOT / "fabric-artifacts").exists(),
+    reason="Requires fabric-artifacts directory to exist",
 )
 def test_zero_semantic_model_artifacts_fails_bpa(tmp_path: Path, monkeypatch):
     """Given no *.SemanticModel artifacts, pytest -m bpa must exit non-zero."""
-    artifacts_dir = REPO_ROOT / ".fabric" / "artifacts"
+    artifacts_dir = REPO_ROOT / "fabric-artifacts"
     backups: list[tuple[Path, Path]] = []
 
     # Temporarily move all .SemanticModel artifacts out of the repo.

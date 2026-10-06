@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""fab-test: Run Fabric artifact analyzers against .fabric/artifacts locally.
+"""fab-test: Run Fabric artifact analyzers against fabric-artifacts locally.
 
-fab-test runs analyzers against your actual .fabric artifacts.
+fab-test runs analyzers against your actual Fabric artifacts.
 It is NOT pytest. Use pytest to test the framework; use fab-test to test your artifacts.
 
 Usage:

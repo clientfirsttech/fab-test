@@ -382,13 +382,13 @@ def test_print_completion_completes_common_flags(shell):
 @pytest.mark.fab_test
 @pytest.mark.parametrize("shell", ["bash", "zsh"])
 def test_print_completion_completes_artifact_stems_dynamically(shell):
-    """Both scripts look up artifact stems from .fabric/artifacts at completion time."""
+    """Both scripts look up artifact stems from fabric-artifacts at completion time."""
     result = subprocess.run(
         ["fab-test", "--print-completion", shell],
         capture_output=True,
         text=True,
         check=False,
     )
-    assert ".fabric/artifacts" in result.stdout
+    assert "fabric-artifacts" in result.stdout
 
 

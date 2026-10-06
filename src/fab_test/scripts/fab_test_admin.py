@@ -248,7 +248,7 @@ _FAB_TEST_YML_TEMPLATE = """\
 # this file > packaged default. Run `fab-test config --show` to see the
 # effective value and origin of each setting right now.
 
-# artifact_dir: .fabric/artifacts   # root to discover artifacts (repo root for `fab-test local`)
+# artifact_dir: fabric-artifacts   # root to discover artifacts (repo root for `fab-test local`)
 # output_dir: fab-test-results      # root for result envelopes and the run manifest
 # jobs: 1                          # artifacts to run in parallel for the same analyzer
 # format: text                     # text | json

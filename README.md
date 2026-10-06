@@ -144,10 +144,12 @@ $ fab-test pbir
       --artifact-dir C:\Users\jkers\Git\fab-test
 ```
 
-**If you already have a `.fabric/artifacts/` layout, nothing you do needs to
+**If you already have a `fabric-artifacts/` layout, nothing you do needs to
 change.** That directory sits inside your working directory, so everything
 found before is still found. `--artifact-dir` still narrows the search when
-you pass it, and still exits `2` if the path you name does not exist.
+you pass it, and still exits `2` if the path you name does not exist. (Named
+`fabric-artifacts`, not `.fabric/artifacts` — a dot-prefixed folder can't
+sync through Fabric Git Integration.)
 
 Every analyzer is built on that assumption:
 
@@ -169,7 +171,7 @@ Discovery matches on folder suffix (`*.SemanticModel`, `*.Report`), not on folde
 
 ### Local Desktop workflow (no cloud required)
 
-The fastest path to real findings: a `.pbip` open in Power BI Desktop, no `.fabric/artifacts` layout, no Fabric workspace, no service principal. The project has to be saved in TMDL and PBIR; see [Assumed project format](#assumed-project-format).
+The fastest path to real findings: a `.pbip` open in Power BI Desktop, no `fabric-artifacts` layout, no Fabric workspace, no service principal. The project has to be saved in TMDL and PBIR; see [Assumed project format](#assumed-project-format).
 
 ```bash
 fab-test doctor --local     # what's ready, and what fab-test local will run

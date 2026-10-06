@@ -7,7 +7,7 @@
   "properties": {
     "artifact_dir": {
       "type": "string",
-      "description": "Root directory to discover artifacts (default: .fabric/artifacts, or the repository root for `fab-test local`)."
+      "description": "Root directory to discover artifacts (default: fabric-artifacts, or the repository root for `fab-test local`)."
     },
     "output_dir": {
       "type": "string",

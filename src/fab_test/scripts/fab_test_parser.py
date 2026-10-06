@@ -248,7 +248,7 @@ def _completion_subcommands() -> str:
 def _generate_completion_script(shell: str) -> str:
     """Return a shell completion script that also completes artifact stems.
 
-    Artifact stems are looked up from ``.fabric/artifacts`` at *completion
+    Artifact stems are looked up from ``fabric-artifacts`` at *completion
     time* in the user's shell (not baked in here), so the list always
     reflects whatever directory they are tab-completing from.
     """
@@ -267,7 +267,7 @@ _fab_test_completions() {{
     fi
 
     if [[ "${{prev}}" == "--artifact" ]]; then
-        local dir=".fabric/artifacts"
+        local dir="fabric-artifacts"
         if [[ -d "${{dir}}" ]]; then
             local stems
             stems=$(for f in "${{dir}}"/*; do basename "$f" | sed 's/\\.[^.]*$//'; done | sort -u)
@@ -296,7 +296,7 @@ _fab_test() {{
     fi
 
     if [[ "${{words[CURRENT-1]}}" == "--artifact" ]]; then
-        local dir=".fabric/artifacts"
+        local dir="fabric-artifacts"
         if [[ -d "${{dir}}" ]]; then
             local -a stems
             stems=($(for f in "${{dir}}"/*(N); do basename "$f" | sed 's/\\.[^.]*$//'; done | sort -u))
@@ -1061,9 +1061,9 @@ def build_parser() -> argparse.ArgumentParser:
         prog="fab-test",
         description=(
             "Run Fabric artifact analyzers locally.\n\n"
-            "fab-test tests your .fabric artifacts — it is NOT pytest.\n"
+            "fab-test tests your Fabric artifacts — it is NOT pytest.\n"
             "  pytest -m bpa      tests the BPA wrapper (always green)\n"
-            "  fab-test bpa       runs BPA against your actual .fabric artifacts"
+            "  fab-test bpa       runs BPA against your actual Fabric artifacts"
         ),
         epilog=(
             "Exit codes:\n"

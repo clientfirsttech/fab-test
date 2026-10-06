@@ -13,7 +13,7 @@ rather than locating a file the tool wrote itself.
 
 Usage:
     python invoke_pbir_a11y.py \
-        --artifact-path ".fabric/artifacts/SalesReport.Report" \
+        --artifact-path "fabric-artifacts/SalesReport.Report" \
         --a11y-path "./pbir-a11y/dist/cli.js" \
         --output-path "./a11y-results.json"
 """

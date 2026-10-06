@@ -32,7 +32,7 @@ class TestValidateEnvironmentsYaml:
         path = _write_yaml(
             tmp_path,
             {
-                "defaults": {"repository_directory": ".fabric/artifacts"},
+                "defaults": {"repository_directory": "fabric-artifacts"},
                 "environments": {
                     "dev": {
                         "description": "Dev",

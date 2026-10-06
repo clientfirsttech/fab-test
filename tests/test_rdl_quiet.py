@@ -19,7 +19,7 @@ import pytest
 pytestmark = [pytest.mark.rdl, pytest.mark.analyzers]
 
 _REPO = Path(__file__).resolve().parent.parent
-_FIXTURES = _REPO / ".fabric" / "artifacts" / "rdl"
+_FIXTURES = _REPO / "fabric-artifacts" / "rdl"
 
 _CLEAN = (
     '<?xml version="1.0" encoding="utf-8"?>'

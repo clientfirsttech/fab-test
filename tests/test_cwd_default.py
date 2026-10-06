@@ -10,7 +10,7 @@ found things — two answers to one question.
 
 The backward-compatibility line is asserted here, not assumed: every
 artifact found under the old default is still found under the new one,
-because `.fabric/artifacts` sits inside the working directory.
+because `fabric-artifacts` sits inside the working directory.
 
 Always passes on any machine.
 """
@@ -109,7 +109,7 @@ def test_explain_resolves_an_artifact_from_the_working_directory(project):
 
 @pytest.mark.fab_test
 def test_the_existing_fabric_layout_is_still_found():
-    """The backward-compatibility line. `.fabric/artifacts` is inside the
+    """The backward-compatibility line. `fabric-artifacts` is inside the
     working directory, so widening the default cannot lose it."""
     result = _run(["bpa", "--dry-run"], cwd=_ROOT)
 
@@ -173,7 +173,7 @@ def test_each_caller_is_told_discovery_starts_at_the_working_directory(doc):
 
 @pytest.mark.fab_test
 def test_the_human_is_told_an_existing_layout_still_works():
-    """The migration question a reader with `.fabric/artifacts` will ask
+    """The migration question a reader with `fabric-artifacts` will ask
     first, answered without them having to infer it."""
     text = (_ROOT / "README.md").read_text(encoding="utf-8")
 

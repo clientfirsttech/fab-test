@@ -13,7 +13,7 @@ pytestmark = [pytest.mark.rdl, pytest.mark.analyzers]
 
 _REPO = Path(__file__).resolve().parent.parent
 _CATALOG_PATH = _REPO / "src" / "fab_test" / "metadata" / "rules" / "rdl-rules.json"
-_FIXTURES = _REPO / ".fabric" / "artifacts" / "rdl"
+_FIXTURES = _REPO / "fabric-artifacts" / "rdl"
 _RULES = json.loads(_CATALOG_PATH.read_text(encoding="utf-8"))["rules"]
 _ACTIVE = [r for r in _RULES if r.get("status") == "active"]
 

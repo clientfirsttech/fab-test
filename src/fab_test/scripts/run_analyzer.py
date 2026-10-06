@@ -12,7 +12,7 @@ Usage:
     python run_analyzer.py \
         --analyzer pqlint \
         --artifact-name SalesModel \
-        --artifact-path .fabric/artifacts/SalesModel.SemanticModel \
+        --artifact-path fabric-artifacts/SalesModel.SemanticModel \
         --artifact-type SemanticModel \
         --metadata-path .github/metadata/analyzers.json \
         [--workspace-id <workspace_id>] \

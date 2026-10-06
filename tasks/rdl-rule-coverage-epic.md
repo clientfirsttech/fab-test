@@ -5,7 +5,7 @@
 
 ## Overview
 
-The RDL Static Analysis epic shipped 28 Tier A checks, but only DS-02 and QRY-01 have a fixture proving the check fires on a real Report Builder file; the other 26 are covered by synthetic XML in unit tests alone. Naming a fixture for its rule makes the gap visible, and `tests/test_rdl_fixture_rules.py` already enforces it: each `.fabric/artifacts/rdl/<RULE-ID>.rdl` must trip the rule it is named for, and a fixture whose rule has no check yet is a strict xfail that flips when the check lands. This epic closes the gaps that test and the rule set expose.
+The RDL Static Analysis epic shipped 28 Tier A checks, but only DS-02 and QRY-01 have a fixture proving the check fires on a real Report Builder file; the other 26 are covered by synthetic XML in unit tests alone. Naming a fixture for its rule makes the gap visible, and `tests/test_rdl_fixture_rules.py` already enforces it: each `fabric-artifacts/rdl/<RULE-ID>.rdl` must trip the rule it is named for, and a fixture whose rule has no check yet is a strict xfail that flips when the check lands. This epic closes the gaps that test and the rule set expose.
 
 ---
 
@@ -41,7 +41,7 @@ For each family (parameters, layout/subreports, accessibility, query/data source
 
 ## Tier A fixtures
 
-Add a real `.rdl` per rule, in `.fabric/artifacts/rdl/`, for the 20 planned Tier A rules: DS-01, QRY-03, QRY-05, QRY-06, QRY-07, PRM-01, PRM-03, PRM-04, PRM-05, LAY-01..LAY-06, SUB-01 (fires via LAY-03), SUB-02, ACC-01, ACC-02, ACC-08. Then set each to `"status": "active"`. Known risks to check against the real file when promoting: LAY-05 flags every table (the default `Details` group counts as a group), QRY-03 treats any quoted second argument as a dataset scope and misses nested parentheses, SUB-01 shares LAY-03's switches.
+Add a real `.rdl` per rule, in `fabric-artifacts/rdl/`, for the 20 planned Tier A rules: DS-01, QRY-03, QRY-05, QRY-06, QRY-07, PRM-01, PRM-03, PRM-04, PRM-05, LAY-01..LAY-06, SUB-01 (fires via LAY-03), SUB-02, ACC-01, ACC-02, ACC-08. Then set each to `"status": "active"`. Known risks to check against the real file when promoting: LAY-05 flags every table (the default `Details` group counts as a group), QRY-03 treats any quoted second argument as a dataset scope and misses nested parentheses, SUB-01 shares LAY-03's switches.
 
 **Requirements**:
 - Given each fixture, should be authored or round-tripped in Report Builder rather than hand-written XML, so it reflects a real file

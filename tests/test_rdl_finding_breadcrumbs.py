@@ -222,7 +222,7 @@ class TestQry04RealShape:
 
         from fab_test.scripts._rdl_lint import parse_rdl
 
-        fixture = Path(__file__).resolve().parent.parent / ".fabric" / "artifacts" / "rdl" / "QRY-04.rdl"
+        fixture = Path(__file__).resolve().parent.parent / "fabric-artifacts" / "rdl" / "QRY-04.rdl"
         root, ns = parse_rdl(fixture)
 
         assert _check_qry04_sort_in_query(root, ns, {})

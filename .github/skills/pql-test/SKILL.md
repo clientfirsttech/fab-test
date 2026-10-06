@@ -52,7 +52,7 @@ python -m pql_test run-tests …
 
 ```
 python scripts/invoke_pql_test.py \
-  --artifact-path .fabric/artifacts/SampleModel-PQLAssert.SemanticModel \
+  --artifact-path fabric-artifacts/SampleModel-PQLAssert.SemanticModel \
   --artifact-name SampleModel-PQLAssert \
   [--env DEV]
 ```

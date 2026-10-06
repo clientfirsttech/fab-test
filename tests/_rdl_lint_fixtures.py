@@ -7,7 +7,7 @@ rather than each re-deriving them. Pure construction only: no fixtures that
 carry state between tests, matching aidd-tdd's locality constraint.
 
 Fixture shape mirrors a real Report Builder-authored .rdl
-(.fabric/artifacts/PaginatedExample-WithFilter.rdl), confirmed live:
+(fabric-artifacts/PaginatedExample-WithFilter.rdl), confirmed live:
 DataSet/Query has direct children DataSourceName, then CommandText --
 CommandType/CommandText also appear nested inside rd:DesignerState under a
 *different* namespace, which parse_rdl's stripping collapses to the same

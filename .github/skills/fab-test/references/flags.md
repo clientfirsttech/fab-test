@@ -34,7 +34,7 @@ The older spelling still works: `fab-test bpa --artifact SampleModel-PQLAssert`.
 
 ### local
 
-Runs BPA, PBIR Inspector, and Desktop-bound `pql-test` against every `.pbip` project discovered under `--artifact-dir` — no `.fabric/artifacts` layout required, no Fabric workspace, no service principal. Its subparser doesn't expose `--workspace-id` or `--env` at all, so the remote XMLA path is unreachable from `local`.
+Runs BPA, PBIR Inspector, and Desktop-bound `pql-test` against every `.pbip` project discovered under `--artifact-dir` — no `fabric-artifacts` layout required, no Fabric workspace, no service principal. Its subparser doesn't expose `--workspace-id` or `--env` at all, so the remote XMLA path is unreachable from `local`.
 
 | Flag | Default | Description |
 |------|---------|-------------|

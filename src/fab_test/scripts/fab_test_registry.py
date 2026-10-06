@@ -810,12 +810,12 @@ _COMMAND_BUILDERS: dict[str, Any] = {
 
 
 # Analyzers that operate on a repository-level artifact path rather than a
-# .fabric artifact directory.
+# Fabric artifact directory.
 _REPOSITORY_SCOPED_ANALYZERS = {"playwright-impact", "dependencies"}
 
 
 def is_repository_scoped(name: str) -> bool:
-    """Return True when the analyzer does not target a .fabric artifact."""
+    """Return True when the analyzer does not target a Fabric artifact."""
     return name in _REPOSITORY_SCOPED_ANALYZERS
 
 

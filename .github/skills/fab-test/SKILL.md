@@ -1,6 +1,6 @@
 ---
 name: fab-test
-description: fab-test CLI reference for running Fabric artifact analyzers locally (fab-test 1.11.0.dev1). Covers all subcommands, flags, artifact isolation, result locations, and how fab-test differs from pytest. Use when invoking, troubleshooting, or extending local artifact validation.
+description: fab-test CLI reference for running Fabric artifact analyzers locally (fab-test 1.12.0.dev1). Covers all subcommands, flags, artifact isolation, result locations, and how fab-test differs from pytest. Use when invoking, troubleshooting, or extending local artifact validation.
 ---
 
 # fab-test
@@ -21,7 +21,7 @@ Discovery matches on folder suffix (`*.SemanticModel`, `*.Report`), never on con
 | Command | What it tests |
 |---------|---------------|
 | `pytest -m bpa` | Is the BPA wrapper code correct? (always green, no tools needed) |
-| `fab-test bpa` | Do my `.fabric` artifacts pass BPA rules? (requires Tabular Editor) |
+| `fab-test bpa` | Do my Fabric artifacts pass BPA rules? (requires Tabular Editor) |
 | `pytest -m pbir` | Is the PBIR wrapper code correct? (always green, no binary needed) |
 | `fab-test pbir` | Do my reports pass PBIR Inspector rules? (requires PBIR Inspector binary) |
 | `pytest -m pql_test` | Is the pql-test wrapper code correct? (mocked, always green) |

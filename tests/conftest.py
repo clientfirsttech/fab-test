@@ -71,7 +71,7 @@ def pytest_sessionfinish(session, exitstatus):
     # Fail loudly when a specific marker was targeted but no artifacts exist.
     if not markexpr:
         return
-    artifact_root = Path(__file__).resolve().parents[1] / ".fabric" / "artifacts"
+    artifact_root = Path(__file__).resolve().parents[1] / "fabric-artifacts"
     for marker in _ANALYZER_MARKERS:
         if marker not in markexpr:
             continue

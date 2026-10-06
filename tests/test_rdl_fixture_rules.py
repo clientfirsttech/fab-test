@@ -1,4 +1,4 @@
-"""Every .fabric/artifacts/rdl/<RULE-ID>.rdl must trip the rule it is named for.
+"""Every fabric-artifacts/rdl/<RULE-ID>.rdl must trip the rule it is named for.
 
 The fixture's file name is the contract: DS-02.rdl exists to violate DS-02.
 A fixture whose rule has no check yet is a known gap, not a failure -- it is
@@ -15,7 +15,7 @@ from fab_test.scripts._rdl_lint import CHECKS, load_rule_catalog, parse_rdl, run
 pytestmark = [pytest.mark.rdl, pytest.mark.analyzers]
 
 _REPO = Path(__file__).resolve().parent.parent
-_FIXTURES = sorted((_REPO / ".fabric" / "artifacts" / "rdl").glob("*.rdl"))
+_FIXTURES = sorted((_REPO / "fabric-artifacts" / "rdl").glob("*.rdl"))
 _CATALOG = load_rule_catalog(_REPO / "src" / "fab_test" / "metadata" / "rules" / "rdl-rules.json")
 
 

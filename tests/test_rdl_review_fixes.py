@@ -295,7 +295,7 @@ class TestSecondReview:
         known = _RELATIONAL_PROVIDERS | {"PBIDATASET", "PQO", ""}
         repo = Path(__file__).resolve().parent.parent
         seen = set()
-        for rdl in (repo / ".fabric" / "artifacts").rglob("*.rdl"):
+        for rdl in (repo / "fabric-artifacts").rglob("*.rdl"):
             root, _ = parse_rdl(rdl)
             seen |= {(p.text or "").strip().upper() for p in root.iter("DataProvider")}
 

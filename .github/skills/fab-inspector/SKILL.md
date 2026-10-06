@@ -50,7 +50,7 @@ PBIRInspectorCLI [options]
 ```bash
 # Local report — JSON + HTML output with all rules shown
 PBIRInspectorCLI \
-  -fabricitem ".fabric/artifacts/SalesReport.Report" \
+  -fabricitem "fabric-artifacts/SalesReport.Report" \
   -rules ".github/metadata/rules/pbi-inspector-custom-rules.json" \
   -output "./fab-test-results/pbir/SalesReport/native.json" \
   -formats JSON,HTML \

@@ -89,7 +89,7 @@ Discovery walks down from where you run the command and treats a folder as an
 artifact when its name ends in a Fabric type suffix — at any depth, with or
 without a `.pbip` beside it. Nested git checkouts, `.venv`, `node_modules`,
 `__pycache__`, `dist`, `build`, and the run's own `--output-dir` are skipped.
-An existing `.fabric/artifacts/` layout is found exactly as before, since it
+An existing `fabric-artifacts/` layout is found exactly as before, since it
 sits inside the working directory.
 
 If you run it one directory too high — in the folder that *holds* your
@@ -367,7 +367,7 @@ A copy-pasteable step whose log holds one line per artifact. Failures still prin
 
 ```yaml
 - name: Run local analyzers
-  run: fab-test local -q --artifact-dir .fabric/artifacts
+  run: fab-test local -q --artifact-dir fabric-artifacts
 
 # or pin it once for every step and every contributor, in fab-test.yml:
 #   verbosity: summary
@@ -384,7 +384,7 @@ A copy-pasteable step for a CI job — gate on readiness, run with `--format jso
   run: fab-test doctor --format json
 
 - name: Run bpa
-  run: fab-test bpa --format json --artifact-dir .fabric/artifacts
+  run: fab-test bpa --format json --artifact-dir fabric-artifacts
 
 - name: Upload run manifest
   uses: actions/upload-artifact@v4
@@ -419,7 +419,7 @@ This is the case where uploading `run.json` alone still tells you what to fix. I
 
 ```yaml
 - name: Run rdl static analysis
-  run: fab-test rdl --format json --artifact-dir .fabric/artifacts
+  run: fab-test rdl --format json --artifact-dir fabric-artifacts
 
 - name: Upload run manifest
   uses: actions/upload-artifact@v4
@@ -447,7 +447,7 @@ from source on first use rather than downloading a pre-built binary:
   run: fab-test doctor --analyzer a11y --format json
 
 - name: Run pbir-a11y accessibility checks
-  run: fab-test a11y --format json --artifact-dir .fabric/artifacts
+  run: fab-test a11y --format json --artifact-dir fabric-artifacts
 
 - name: Upload run manifest
   uses: actions/upload-artifact@v4
@@ -487,7 +487,7 @@ analyzers already use, and commit the address in `fab-test.yml`.
     # Optional: override the committed fab-test.yml address per environment.
     EVENTHOUSE_URI: ${{ vars.EVENTHOUSE_URI }}
     EVENTHOUSE_DATABASE: ${{ vars.EVENTHOUSE_DATABASE }}
-  run: fab-test all --format json --artifact-dir .fabric/artifacts
+  run: fab-test all --format json --artifact-dir fabric-artifacts
 
 - name: Upload run manifest
   uses: actions/upload-artifact@v4
@@ -582,7 +582,7 @@ telemetry:
     # Optional: override the committed fab-test.yml address per environment.
     LAKEHOUSE_WORKSPACE: ${{ vars.LAKEHOUSE_WORKSPACE }}
     LAKEHOUSE_NAME: ${{ vars.LAKEHOUSE_NAME }}
-  run: fab-test all --format json --artifact-dir .fabric/artifacts
+  run: fab-test all --format json --artifact-dir fabric-artifacts
 ```
 
 Records land as one JSONL file per table per run under

@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-10-06
+
+- 🔄 - **Behavior change** - Fabric Artifacts Rename - This repository's fixture convention moves from `.fabric/artifacts` to `fabric-artifacts`: a dot-prefixed `.fabric` folder can't sync through Fabric Git Integration. `detect_changes.py`'s changed-file grouping now finds the artifact root by folder-suffix match rather than a fixed path depth — the old `parts[:3]`/`parts[2]` indexing would have silently mis-grouped every file once the root dropped a path segment — and `fab-test --print-completion`'s bash/zsh scripts look up artifact stems under the new name. The `init`-scaffolded example config, the JSON schema's `artifact_dir` description, `.fab-test/metadata/environments.yml`'s retired `repository_directory` default, `MANIFEST.in`'s sdist prune rule, and `check_wheel_contents.py`'s forbidden-path guard all point at `fabric-artifacts` too, so a new user is never pointed at a path Fabric Git Integration rejects and the packaging guards keep protecting against the renamed directory. No CLI contract changes: `--artifact-dir` already defaults to the working directory, not a hardcoded path (Discover From CWD), so this is a repository-convention rename, not a backward-compatibility break.
+- 📦 - Version `1.12.0.dev1`.
+
 ## 2026-10-03
 
 - ✨ - Mode parity - `fab-test pql-test` now takes `--workspace NAME_OR_ID`, `--keep-export`, `--all` and `--interactive` like bpa/pbir/a11y/rdl/all: `--workspace` exports the deployed models and runs them over XMLA, with the same stderr mode banner (silent under `-q` and `--format json`). `--workspace-id` keeps its XMLA-connection meaning; naming two different workspaces is refused. `tests/test_mode_parity.py` guards the shared flags and banner behavior across every service-capable analyzer.

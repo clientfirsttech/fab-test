@@ -1,6 +1,6 @@
 # Quickstart: local Desktop workflow
 
-The fastest way to get real findings from `fab-test`: a `.pbip` open in Power BI Desktop, no `.fabric/artifacts` layout, no Fabric workspace, no service principal.
+The fastest way to get real findings from `fab-test`: a `.pbip` open in Power BI Desktop, no `fabric-artifacts` layout, no Fabric workspace, no service principal.
 
 The project must be saved in PBIP format with the semantic model in **TMDL** and the report in **PBIR** — that is what BPA and PBIR Inspector read. See [Assumed project format](../README.md#assumed-project-format) for the layout and how to turn both on in Power BI Desktop.
 

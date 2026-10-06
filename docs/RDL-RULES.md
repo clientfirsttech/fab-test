@@ -4,7 +4,7 @@
 
 `fab-test rdl` checks paginated (`.rdl`) reports against the **active** rules
 below. A rule is active once it trips a real Report Builder file named for it
-(`.fabric/artifacts/rdl/<RULE-ID>.rdl`); until then it is planned and does not
+(`fabric-artifacts/rdl/<RULE-ID>.rdl`); until then it is planned and does not
 run or appear in your results. Each rule links to the guidance it comes from,
 and the same links ship in the JSON envelope as `source_urls` on every finding
 and `test_results` row.
@@ -87,7 +87,7 @@ A finding names where the problem is and what was found:
 
 ## Testing the rules
 
-Real fixtures live in `.fabric/artifacts/rdl/`, one file per rule named for it
+Real fixtures live in `fabric-artifacts/rdl/`, one file per rule named for it
 (`DS-02.rdl` exists to violate DS-02). `tests/test_rdl_rule_status.py` requires
 every active rule to have a check and a fixture that trips it, so a rule cannot
 become active without one, and `tests/test_rdl_fixture_rules.py` checks each

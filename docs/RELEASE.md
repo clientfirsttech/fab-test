@@ -215,7 +215,7 @@ resolvable:
   run: fab-test doctor --format json
 
 - name: Run analyzers
-  run: fab-test all --format json --artifact-dir .fabric/artifacts
+  run: fab-test all --format json --artifact-dir fabric-artifacts
 
 - name: Upload run manifest
   uses: actions/upload-artifact@v4

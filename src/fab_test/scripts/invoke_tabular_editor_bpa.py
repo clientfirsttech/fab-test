@@ -8,7 +8,7 @@ Python-only per the project vision.
 
 Usage:
     python invoke_tabular_editor_bpa.py \
-        --tmdl-path ".fabric/artifacts/SalesModel.SemanticModel" \
+        --tmdl-path "fabric-artifacts/SalesModel.SemanticModel" \
         --bpa-rules-path ".github/metadata/rules/BPARules.json" \
         --tabular-editor-path "./TabularEditor/TabularEditor.exe" \
         --output-path "./fab-test-results/bpa/SalesModel/envelope.json" \

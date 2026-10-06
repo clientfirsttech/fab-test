@@ -7,7 +7,7 @@ Aligns with the project vision of Python-only analyzer invocation.
 
 Usage:
     python invoke_pbir_inspector.py \
-        --artifact-path ".fabric/artifacts/SalesReport.Report" \
+        --artifact-path "fabric-artifacts/SalesReport.Report" \
         --rules-path ".github/metadata/rules/pbi-inspector-custom-rules.json" \
         --inspector-path "./PBIR-Inspector/PBIRInspectorCLI" \
         --output-path "./pbir-results.json"
