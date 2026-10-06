@@ -439,6 +439,8 @@ def test_a_nested_checkout_does_not_multiply_this_repository():
     found = discover_artifacts(root, "*.SemanticModel", None, output_dir=RESULTS_ROOT)
 
     assert [p.name for p in found] == [
+        "Not Working Visuals.SemanticModel",
         "Report with Bookmarks - Broken Visuals.SemanticModel",
         "SampleModel-PQLAssert.SemanticModel",
+        "ThinReport.SemanticModel",
     ]
