@@ -1,0 +1,10 @@
+backend: azure
+workers: 8
+connection:
+  os: linux
+  timeout_ms: 30000
+  expose_network: "<loopback>"
+context:
+  viewport:
+    width: 1280
+    height: 720

@@ -41,6 +41,12 @@ from ._target import target_from_args
 REPORT_WORKSPACES_ATTR = "playwright_report_workspaces"
 REPORT_NAMES_ATTR = "playwright_report_names"
 REPORT_DATASETS_ATTR = "playwright_report_datasets"
+# stem -> "report" | "paginated", set only by workspace-wide discovery,
+# which already knows each item's Fabric type and so need not make the
+# subprocess guess.
+REPORT_TYPES_ATTR = "playwright_report_types"
+
+_WORKSPACE_REPORT_TYPES = (("Report", "report"), ("PaginatedReport", "paginated"))
 
 
 class DatasetTargetExit(Exception):
@@ -87,6 +93,90 @@ def _resolve_target_workspace(args: argparse.Namespace) -> str:
         return resolve_environment(environment).workspace_id
     except ServiceResolutionError:
         return ""
+
+
+def workspace_reports_requested(args: argparse.Namespace) -> bool:
+    """True when a bare `--workspace`/`--workspace-id`/`--from-workspace`
+    (one shared target, name or GUID) asks for every report in the workspace.
+
+    A named report keeps its own resolution (`--artifact` already resolves
+    remotely); an explicit `--artifact-dir` keeps the repository as the
+    denominator instead; and `--dataset-id`/`--dataset-workspace-id` keep
+    their own narrower selection -- so the flag only applies when none of
+    those name what to run.
+    """
+    return bool(
+        getattr(args, "workspace_id", "")
+        and not getattr(args, "artifact_dir_explicit", False)
+        and not getattr(args, "dataset_id", "")
+        and not getattr(args, "dataset_workspace_id", "")
+        and target_from_args(args) is None
+    )
+
+
+def resolve_workspace_reports(args: argparse.Namespace) -> list[Path]:
+    """Return one synthetic ``NAME.Report`` target per Report and
+    PaginatedReport item in the workspace, listed from Fabric.
+
+    Playwright reads nothing from a local report folder, so a run needs the
+    workspace and not a checkout. Each target's workspace, real display name,
+    and Fabric type ride on ``args`` keyed by stem, the same way a
+    dataset-targeted run carries them.
+
+    Raises:
+        DatasetTargetExit: 2 when no workspace names where to look, 1 when
+            the listing fails.
+    """
+    output_format = getattr(args, "output_format", "text")
+    workspace_id = _resolve_target_workspace(args)
+    if not workspace_id:
+        print(
+            "  ✗ fab-test playwright: --workspace names no workspace to list reports from. "
+            "Pass --workspace (name or GUID), FABRIC_WORKSPACE_ID, or --env (resolved via "
+            "environments.yml).",
+            file=sys.stderr,
+        )
+        raise DatasetTargetExit(2)
+
+    from .playwright_validation.fabric_service_client import (
+        FabricServiceClientError,
+        build_fabric_service_client,
+    )
+    from .playwright_validation.resolver import ServiceResolutionError, resolve_workspace_id
+
+    try:
+        client = build_fabric_service_client(env_file=getattr(args, "playwright_env_file", None))
+        workspace_id = resolve_workspace_id(client, workspace_id)
+        listed = [
+            (item, kind)
+            for item_type, kind in _WORKSPACE_REPORT_TYPES
+            for item in client.list_items(workspace_id, item_type)
+        ]
+    except (FabricServiceClientError, ServiceResolutionError) as exc:
+        print(
+            f"  ✗ fab-test playwright: could not list reports in workspace {workspace_id}: {exc}",
+            file=sys.stderr,
+        )
+        raise DatasetTargetExit(1) from exc
+
+    if not listed:
+        narrate(
+            f"  ⚠ fab-test playwright: no reports found in workspace {workspace_id}",
+            output_format=output_format,
+        )
+        return []
+
+    reports = {item["id"]: (item.get("displayName") or item["id"], workspace_id) for item, _kind in listed}
+    report_workspaces, report_names = _disambiguate_stems(reports)
+    stems = list(report_workspaces)
+    setattr(args, REPORT_WORKSPACES_ATTR, report_workspaces)
+    setattr(args, REPORT_NAMES_ATTR, report_names)
+    setattr(args, REPORT_TYPES_ATTR, dict(zip(stems, (kind for _item, kind in listed), strict=True)))
+    narrate(
+        f"  fab-test playwright: {len(stems)} report(s) in workspace {workspace_id}: " + ", ".join(stems),
+        output_format=output_format,
+    )
+    return [Path(f"{stem}.Report") for stem in stems]
 
 
 def dataset_workspace_only_requested(args: argparse.Namespace) -> bool:

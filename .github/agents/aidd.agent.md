@@ -102,6 +102,15 @@ Brief task description
 **Requirements**:
 - Given [situation], should [outcome]
 - Given [situation], should [outcome]
+
+---
+
+## Quality gates
+
+Always the last task of every epic -- nothing is planned after it.
+
+**Requirements**:
+- Given the finished epic, should pass `ruff check .` over the whole repo, the complexity and module-budget ratchets, and the coverage floor on the full suite, run as CI runs them (vision.md, Definition of Done)
 ```
 
 ## Core Principles

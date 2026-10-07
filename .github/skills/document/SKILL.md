@@ -80,7 +80,7 @@ Update only the **"Test your Fabric artifacts locally (fab-test)"** section. Do 
 Update only the **"Run analyzers locally before pushing"** section. Do not touch CI/CD workflow sections or quick test scenarios. The section should:
 
 - Keep pytest marker reference (pytest is the framework contract layer)
-- Add a `fab-test` subsection below pytest that shows how to run analyzers against real `.fabric` artifacts
+- Add a `fab-test` subsection below pytest that shows how to run analyzers against real Fabric artifacts
 - Include `--env DEV` example for pql_test
 - Include `--artifact` isolation example
 - Reference `.github/skills/fab-test/SKILL.md` for full CLI reference

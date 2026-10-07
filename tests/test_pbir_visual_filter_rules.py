@@ -17,8 +17,7 @@ _RULES_PATH = (
 )
 _THIN_REPORT_VISUALS = (
     Path(__file__).parents[1]
-    / ".fabric"
-    / "artifacts"
+    / "fabric-artifacts"
     / "ThinReport.Report"
     / "definition"
     / "pages"

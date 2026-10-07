@@ -62,5 +62,5 @@ fab-test-results/
 **/cache.abf
 
 # Power BI Desktop local state (machine-bound signature, model data cache)
-**/.pbi/localSettings.json
+**/localSettings.json
 **/.pbi/cache.abf

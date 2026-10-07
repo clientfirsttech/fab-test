@@ -1,0 +1,381 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/dataAgent/definition/dataSource/1.0.0/schema.json",
+  "artifactId": "6605505c-893a-4736-bf82-d080bce9e7e2",
+  "workspaceId": "00000000-0000-0000-0000-000000000000",
+  "dataSourceInstructions": null,
+  "displayName": "SampleModel-PQLAssert",
+  "type": "semantic_model",
+  "userDescription": null,
+  "metadata": null,
+  "elements": [
+    {
+      "id": "743cae73-8a6b-4e03-af99-d194d47d16af",
+      "is_selected": true,
+      "display_name": "MarvelFact",
+      "type": "semantic_model.table",
+      "description": null,
+      "children": [
+        {
+          "id": "b7ff624e-3f51-4955-89fb-6129a2da0110",
+          "is_selected": true,
+          "display_name": "ID",
+          "type": "semantic_model.column",
+          "data_type": "Int64",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "babc8e7f-21c5-43d2-b7f3-f871a5275156",
+          "is_selected": true,
+          "display_name": "Name",
+          "type": "semantic_model.column",
+          "data_type": "String",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "1eaca556-a316-4132-bec0-1e10537e8c5a",
+          "is_selected": true,
+          "display_name": "Appearances",
+          "type": "semantic_model.column",
+          "data_type": "Int64",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "5a5e1b5e-96a3-43c5-bfa1-dbf397dbe6dc",
+          "is_selected": true,
+          "display_name": "DateID",
+          "type": "semantic_model.column",
+          "data_type": "Int64",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "e91d9d2a-fc21-45d6-b9a4-562098b146d3",
+          "is_selected": true,
+          "display_name": "EyeID",
+          "type": "semantic_model.column",
+          "data_type": "Int64",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "6cdf4368-853c-471f-8092-72f8e6ef6b29",
+          "is_selected": true,
+          "display_name": "AlignmentID",
+          "type": "semantic_model.column",
+          "data_type": "Int64",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "48b215f3-6230-4672-ae9f-8133298d5615",
+          "is_selected": true,
+          "display_name": "Test Change",
+          "type": "semantic_model.column",
+          "data_type": "DateTime",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "df54ac01-57f7-4a28-a338-2609c59c6503",
+          "is_selected": true,
+          "display_name": "Number of Characters",
+          "type": "semantic_model.measure",
+          "data_type": "Int64",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "69d792e2-4fcc-4491-9f87-3ddb00d7bbbc",
+          "is_selected": true,
+          "display_name": "Number of Characters Title By Date",
+          "type": "semantic_model.measure",
+          "data_type": "String",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "714f1b79-a4f3-4a84-a723-7b62d9467ba9",
+          "is_selected": true,
+          "display_name": "Rank of Appearances",
+          "type": "semantic_model.measure",
+          "data_type": "Int64",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "7fb56eb7-be01-4955-92db-9dab09d95a7a",
+          "is_selected": true,
+          "display_name": "Running Total of Character Appearances",
+          "type": "semantic_model.measure",
+          "data_type": "Int64",
+          "description": null,
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "864aaed1-9b52-4c91-a679-eee5e9ce61ea",
+      "is_selected": true,
+      "display_name": "DateDim",
+      "type": "semantic_model.table",
+      "description": null,
+      "children": [
+        {
+          "id": "f04165d7-a964-463a-9fe1-11c45e755a75",
+          "is_selected": true,
+          "display_name": "DateID",
+          "type": "semantic_model.column",
+          "data_type": "Int64",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "1f5eadd5-60fa-4976-a5ef-a7abd80457b5",
+          "is_selected": true,
+          "display_name": "Date",
+          "type": "semantic_model.column",
+          "data_type": "DateTime",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "99cbf526-ec1a-4670-b1ef-873cddd7efaa",
+          "is_selected": true,
+          "display_name": "DateKey",
+          "type": "semantic_model.column",
+          "data_type": "String",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "d0061923-ebd6-4cfd-be33-d910d8d0714f",
+          "is_selected": true,
+          "display_name": "MonthYearSort",
+          "type": "semantic_model.column",
+          "data_type": "Int64",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "022b9561-6f1d-432a-927a-b431bbcc5cff",
+          "is_selected": true,
+          "display_name": "Month Year",
+          "type": "semantic_model.column",
+          "data_type": "String",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "526e727b-b599-42fa-9aba-ff2c64b6c7df",
+          "is_selected": true,
+          "display_name": "Year",
+          "type": "semantic_model.column",
+          "data_type": "Int64",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "4a102139-aa1e-4805-8ff3-8f26cc11ca77",
+          "is_selected": true,
+          "display_name": "Date Filter",
+          "type": "semantic_model.measure",
+          "data_type": "String",
+          "description": null,
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "037f7bba-4826-403f-b77b-fb781709cca3",
+      "is_selected": true,
+      "display_name": "EyeColorDim",
+      "type": "semantic_model.table",
+      "description": null,
+      "children": [
+        {
+          "id": "997fc90c-3966-4e04-9b0a-4890e6bb2aa2",
+          "is_selected": true,
+          "display_name": "EyeID",
+          "type": "semantic_model.column",
+          "data_type": "Int64",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "55a30476-3ae6-4781-999b-ef1816fb31d9",
+          "is_selected": true,
+          "display_name": "EyeKey",
+          "type": "semantic_model.column",
+          "data_type": "String",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "ebbc7a88-ab18-435c-9c89-435151873c5c",
+          "is_selected": true,
+          "display_name": "Eye Color",
+          "type": "semantic_model.column",
+          "data_type": "String",
+          "description": null,
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "bfdfe08d-e2c6-4102-a232-3c7c68b03669",
+      "is_selected": true,
+      "display_name": "AlignmentDim",
+      "type": "semantic_model.table",
+      "description": null,
+      "children": [
+        {
+          "id": "5fe32fbe-cb3d-4291-909d-05db95b3f299",
+          "is_selected": true,
+          "display_name": "AlignmentID",
+          "type": "semantic_model.column",
+          "data_type": "Int64",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "0911cc1e-86b5-4fd7-b8ad-ff20a910f842",
+          "is_selected": true,
+          "display_name": "Alignment",
+          "type": "semantic_model.column",
+          "data_type": "String",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "d3157c54-4773-49c6-b33b-6c8583855468",
+          "is_selected": true,
+          "display_name": "AlignmentKey",
+          "type": "semantic_model.column",
+          "data_type": "String",
+          "description": null,
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "7f69575d-04de-4b21-8397-70fa031cdead",
+      "is_selected": false,
+      "display_name": "DataTypes",
+      "type": "semantic_model.table",
+      "description": null,
+      "children": [
+        {
+          "id": "0f9bab8a-c892-4ff5-8ff3-95d4387d1e8a",
+          "is_selected": true,
+          "display_name": "Whole Number",
+          "type": "semantic_model.column",
+          "data_type": "Int64",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "7536a752-6b53-484c-9f5a-3ffec4e7cad0",
+          "is_selected": true,
+          "display_name": "Decimal Number",
+          "type": "semantic_model.column",
+          "data_type": "Double",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "0a6241d6-eba0-43c1-b18b-164075811fac",
+          "is_selected": true,
+          "display_name": "Boolean",
+          "type": "semantic_model.column",
+          "data_type": "Boolean",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "9c5b6fcd-85af-4efd-97c5-2a6039698a4b",
+          "is_selected": true,
+          "display_name": "Text",
+          "type": "semantic_model.column",
+          "data_type": "String",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "9b5893c4-1bae-41ea-9259-9c71aa2fa810",
+          "is_selected": true,
+          "display_name": "Date",
+          "type": "semantic_model.column",
+          "data_type": "DateTime",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "8de8e7c5-4c39-4bf7-b725-059c868868da",
+          "is_selected": true,
+          "display_name": "Currency",
+          "type": "semantic_model.column",
+          "data_type": "Decimal",
+          "description": null,
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "f2da0dee-02de-4066-8c5a-b7c5a433c6b8",
+      "is_selected": true,
+      "display_name": "_Measures",
+      "type": "semantic_model.table",
+      "description": "Table for organizing measures that don't belong to a specific data table",
+      "children": [
+        {
+          "id": "ad8ce6d7-f16c-4545-9ce5-29bda29e305e",
+          "is_selected": true,
+          "display_name": "Current Date Time",
+          "type": "semantic_model.measure",
+          "data_type": "DateTime",
+          "description": "Returns the current date and time adjusted for the selected timezone",
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "51ec0b03-633a-4b4c-a99b-a44a795a78d3",
+      "is_selected": true,
+      "display_name": "Timezone",
+      "type": "semantic_model.table",
+      "description": "Table containing timezone information for time calculations",
+      "children": [
+        {
+          "id": "5ff59e6a-9f74-4325-9290-0415426a7c7e",
+          "is_selected": true,
+          "display_name": "Timezone",
+          "type": "semantic_model.column",
+          "data_type": "String",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "89def695-d0b4-42a2-ab7f-719058428b27",
+          "is_selected": true,
+          "display_name": "UTC_Offset_Hours",
+          "type": "semantic_model.column",
+          "data_type": "Double",
+          "description": null,
+          "children": []
+        },
+        {
+          "id": "e05115d2-5a75-4e1a-a205-e8a1a99e9fad",
+          "is_selected": true,
+          "display_name": "Display_Name",
+          "type": "semantic_model.column",
+          "data_type": "String",
+          "description": null,
+          "children": []
+        }
+      ]
+    }
+  ]
+}

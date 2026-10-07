@@ -18,7 +18,7 @@ Source: rule set by John K, 2026-09-24. 44 rules checkable against a `.rdl` file
 
 | ID | Rule | Check in the XML | Sev | Tier | Source |
 |---|---|---|---|---|---|
-| DS-01 | Use shared data sources | `DataSource` has `DataSourceReference`, not embedded `ConnectionProperties/ConnectString`. Also flag credentials in the connect string. | Medium | A | MSSQLTips #3659 r2 |
+| DS-01 | No credentials in the connection string | Flag a password in `ConnectionProperties/ConnectString`. The original "use shared data sources" check was dropped: Power BI paginated reports don't support SSRS-style shared data sources (.rds/.rsd), so an embedded connection is normal there. | Medium | A | MSSQLTips #3659 r2 |
 | DS-02 | No unused datasets | Every `DataSet/@Name` appears in some `DataSetName`, `DataSetReference/DataSetName`, or expression. All datasets run even when unbound. | High | A | MS Learn: Data retrieval; MSSQLTips #3659 r3 |
 | DS-03 | No datasets for fixed parameter lists | `ValidValues`/`DefaultValue` `DataSetReference` returning static values → use `ParameterValues`. | Medium | B | MSSQLTips #3659 r3 |
 | DS-04 | Share one dataset across data regions | Near-identical `CommandText` feeding different regions. | Medium | B | MSSQLTips #3659 r3 |

@@ -222,3 +222,14 @@ def test_report_parameters_are_absent_when_the_rdl_declares_none(
     cmd = build_playwright_command(rdl, _args(), tmp_path)
 
     assert "--report-parameters" not in cmd
+
+
+def test_user_name_is_forwarded_to_invoke_playwright(tmp_path: Path) -> None:
+    """--user-name reaches the wrapper so it can outrank env and fab-test.yml."""
+    cmd = build_playwright_command(Path("ThinReport"), _args(user_name="a@b.com"), tmp_path)
+
+    assert cmd[cmd.index("--user-name") + 1] == "a@b.com"
+
+
+def test_unset_user_name_is_not_forwarded(tmp_path: Path) -> None:
+    assert "--user-name" not in build_playwright_command(Path("ThinReport"), _args(), tmp_path)

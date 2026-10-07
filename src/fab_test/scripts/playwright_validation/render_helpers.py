@@ -21,6 +21,7 @@ from typing import Any
 
 import pytest
 
+from .execution_runtime import redact_execution_text, write_execution_text
 from .test_cases import sanitize_case_id
 
 
@@ -84,13 +85,9 @@ def _write_evidence(
     with contextlib.suppress(Exception):
         page.screenshot(path=str(screenshot_path), full_page=True)
     if console_logs:
-        (result_dir / "console.json").write_text(
-            json.dumps(console_logs, indent=2, default=str), encoding="utf-8"
-        )
+        write_execution_text(result_dir / "console.json", json.dumps(console_logs, indent=2, default=str))
     if failed_requests:
-        (result_dir / "network.json").write_text(
-            json.dumps(failed_requests, indent=2, default=str), encoding="utf-8"
-        )
+        write_execution_text(result_dir / "network.json", json.dumps(failed_requests, indent=2, default=str))
 
 
 def _capture_embed_error_details(page: Any, result_dir: Path) -> str:
@@ -115,9 +112,7 @@ def _capture_embed_error_details(page: Any, result_dir: Path) -> str:
             text = frame.locator("body").inner_text(timeout=1000)
         if "Something went wrong" in text:
             with contextlib.suppress(Exception):
-                (result_dir / "embed_error_details.txt").write_text(
-                    text.strip(), encoding="utf-8"
-                )
+                write_execution_text(result_dir / "embed_error_details.txt", text.strip())
             return text.strip()
     return ""
 
@@ -163,7 +158,7 @@ def _resolve_case_config(case: dict[str, str]) -> dict[str, Any]:
     except _NoEmbedConfigForRole as exc:
         error = f"{exc} (case {case.get('test_case')})"
         _write_result(_case_result_dir(case), "error", error)
-        pytest.fail(error)
+        pytest.fail(redact_execution_text(error))
     if base_config is None:
         pytest.skip("PLAYWRIGHT_EMBED_CONFIG not set; run via invoke_playwright.py")
 
@@ -190,9 +185,7 @@ def _write_result(result_dir: Path, status: str, error: str = "") -> None:
     PBIR wrappers already normalize their own test_results to.
     """
     result_dir.mkdir(parents=True, exist_ok=True)
-    (result_dir / "result.json").write_text(
-        json.dumps({"status": status, "error": error}), encoding="utf-8"
-    )
+    write_execution_text(result_dir / "result.json", json.dumps({"status": status, "error": error}))
 
 
 def _embed_interactive_report(
@@ -299,14 +292,14 @@ def _embed_interactive_report(
         _write_evidence(page, result_dir, console_logs, failed_requests)
         error = f"Failed to evaluate Power BI embed script: {exc}"
         _write_result(result_dir, "error", error)
-        pytest.fail(error)
+        pytest.fail(redact_execution_text(error))
 
     embed_error = page.evaluate("() => window.__pbiEmbedError")
     if embed_error:
         _write_evidence(page, result_dir, console_logs, failed_requests)
         error = f"Power BI embed failed: {embed_error}"
         _write_result(result_dir, "error", error)
-        pytest.fail(error)
+        pytest.fail(redact_execution_text(error))
 
 
 def _finish_interactive_case(
@@ -332,9 +325,7 @@ def _finish_interactive_case(
     with contextlib.suppress(Exception):
         event_log = page.evaluate("() => window.__pbiEventLog")
         if event_log:
-            (result_dir / "event_log.json").write_text(
-                json.dumps(event_log, indent=2), encoding="utf-8"
-            )
+            write_execution_text(result_dir / "event_log.json", json.dumps(event_log, indent=2))
 
     if not headless:
         # Give a local user a moment to inspect the rendered report.
@@ -346,12 +337,12 @@ def _finish_interactive_case(
         if details:
             error += f"; embed error panel: {details}"
         _write_result(result_dir, "error", error)
-        pytest.fail(error)
+        pytest.fail(redact_execution_text(error))
 
     if isinstance(result, str) and result.startswith("error:"):
         error = f"Power BI error event fired: {result[len('error:'):]}"
         _write_result(result_dir, "error", error)
-        pytest.fail(error)
+        pytest.fail(redact_execution_text(error))
 
     _write_result(result_dir, "pass")
 
@@ -418,7 +409,7 @@ def _test_paginated_report(page: Any, case: dict[str, str]) -> None:
     except _NoEmbedConfigForRole as exc:
         error = f"{exc} (case {case.get('test_case')})"
         _write_result(_case_result_dir(case), "error", error)
-        pytest.fail(error)
+        pytest.fail(redact_execution_text(error))
     if base_config is None:
         pytest.skip("PLAYWRIGHT_EMBED_CONFIG not set; run via invoke_playwright.py")
 
@@ -471,7 +462,7 @@ def _test_paginated_report(page: Any, case: dict[str, str]) -> None:
         _write_evidence(page, result_dir, console_logs, failed_requests)
         error = f"Failed to evaluate RDL embed script: {exc}"
         _write_result(result_dir, "error", error)
-        pytest.fail(error)
+        pytest.fail(redact_execution_text(error))
 
     page.wait_for_timeout(rdl_wait_seconds * 1000)
 
@@ -491,6 +482,6 @@ def _test_paginated_report(page: Any, case: dict[str, str]) -> None:
     if error_found:
         error = "RDL error modal detected"
         _write_result(result_dir, "error", error)
-        pytest.fail(error)
+        pytest.fail(redact_execution_text(error))
 
     _write_result(result_dir, "pass")

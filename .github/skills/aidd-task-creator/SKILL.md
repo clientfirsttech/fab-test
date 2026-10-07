@@ -53,6 +53,7 @@ planTask() {
   1. Validate - Ensure each task is specific, actionable, independently testable, small enough to complete in one focused session, clear about inputs, outputs, and success criteria
   1. Sequence - Arrange tasks so each builds on the previous one
   1. Checkpoint Plan approval gates between major phases
+  1. Close with quality gates - the LAST task of every epic is always "Quality gates": `ruff check .` over the whole repo, the complexity and module-budget ratchets, and the coverage floor on the full suite, run as CI runs them (see Definition of Done in vision.md). Never plan a task after it; if later work appears, the gates move to the end again
 }
 
 ## Task Execution Protocol

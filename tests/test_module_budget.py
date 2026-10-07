@@ -36,8 +36,35 @@ TEST_HARD = 900
 # test_complexity_budget.py.
 EXEMPTIONS: dict[str, tuple[int, str]] = {
     "src/fab_test/scripts/fab_test_parser.py": (
-        1067,
+        1131,
         (
+            "2026-10-06: +10 lines for the playwright --user-name flag. "
+            "2026-10-06: +2 lines registering the feature-flag stubs and keeping them out of typo "
+            "suggestions (Feature Flags epic; the stub logic itself lives in _feature_flags.py). "
+            "2026-10-03: +2 lines giving pql-test the same --workspace and service flags (mode parity). "
+            "2026-10-03: +5 lines attaching the shared service flags from _service_flags.py "
+            "to the bpa/pbir/a11y/rdl/all/explain subparsers (Service Targeting epic). "
+            "2026-10-02: +15 lines replacing GUID-only --workspace-id and the "
+            "Boolean --from-workspace prototype with one shared, name-or-GUID "
+            "`--workspace`/`--workspace-id`/`--from-workspace` alias group on the "
+            "playwright subparser, plus _ArtifactDirAction and the opt-in "
+            "track_artifact_dir_explicit flag on _add_common_flags so playwright "
+            "alone can tell an explicit --artifact-dir from its default "
+            "(Playwright Workspace Discovery epic). "
+            "2026-09-30: merge of main into feat/rdl-static-analysis -- main's -q/verbosity additions "
+            "plus this branch's rdl additions both landed here, so the ceiling is the sum of the two. "
+            "2026-09-27: +16 lines adding _add_rdl_subparser -- one more "
+            "subcommand builder, same shape as every other one already here "
+            "(_add_pql_lint_subparser is its closest model: no external-tool "
+            "path flag, just --rules-path like _add_pbir_subparser's). "
+            "+13 lines adding --rdl-rules-path to _add_all_subparser, "
+            "dest=rdl_rules_path -- found live that reusing pbir's own "
+            "--rules-path/rules_path name here made `fab-test all` hand rdl "
+            "pbir's resolved rules path instead of its own, since that name "
+            "already defaults to _DEFAULT_PBIR_RULES on the `all` subparser; "
+            "this mirrors --bpa-rules-path/bpa_rules_path, bpa's own "
+            "dedicated flag for the same reason "
+            "(RDL Static Analysis epic). "
             "2026-08-31: +11 lines adding a `name` positional and --list to "
             "the skill subparser, so `fab-test skill` can list known skills "
             "and print one by name (fab-test Skill Listing). "
@@ -82,8 +109,12 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
         ),
     ),
     "src/fab_test/scripts/fab_test_summary.py": (
-        948,
+        956,
         (
+            "2026-10-03: +2 lines printing the per-analyzer service-readiness line in doctor "
+            "(Service Targeting epic). "
+            "2026-10-01: +6 lines (_WRAPPER_PRINTS_FINDINGS) so the verbose summary does not repeat "
+            "the findings table the rdl wrapper already printed (RDL review). "
             "2026-09-01: +5 net lines teaching the summary that an analyzer can "
             "exit 0 and still be warning us -- _artifact_status now reads a "
             "`warning` envelope as a warning instead of falling through to "
@@ -118,8 +149,28 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
         ),
     ),
     "src/fab_test/scripts/fab_test_registry.py": (
-        977,
+        1035,
         (
+            "2026-10-06: +3 lines forwarding --user-name to invoke_playwright. "
+            "2026-10-06: +1 line importing the feature-flag gates (Feature Flags epic; the gates "
+            "themselves replace existing conditions in place). "
+            "2026-10-03: +3 lines adding the workspace scope to bpa/pbir/a11y/rdl and "
+            "accepting PaginatedReport for rdl (Service Targeting epic). "
+            "2026-10-02: +2 lines letting a per-report type from --from-workspace win over the "
+            "local suffix in _report_type_for_command (Playwright Workspace Reports). "
+            "2026-09-30: merge of main into feat/rdl-static-analysis -- main's -q/verbosity additions "
+            "plus this branch's rdl additions both landed here, so the ceiling is the sum of the two. "
+            "2026-09-27: +40 lines registering the rdl analyzer -- "
+            "ANALYZER_REGISTRY/ANALYZER_SCOPES entries, _resolve_rdl_rules_path "
+            "(mirrors _resolve_pbir_rules_path), build_rdl_command, and its "
+            "_COMMAND_BUILDERS entry. Smaller than a11y's own registration "
+            "(PBIR Accessibility Integration epic) because rdl wraps no "
+            "external tool: no _BOOTSTRAPPED_ANALYZERS/_BOOTSTRAP_REGISTRY_NAME/"
+            "_TOOL_FLAG_HINTS entry, and no explicit-path branch in "
+            "resolve_tool/_readiness_without_version -- those already fall "
+            "through to \"no external tool required\" for any analyzer absent "
+            "from _BOOTSTRAPPED_ANALYZERS and _CLOUD_ANALYZERS (RDL Static "
+            "Analysis epic). "
             "2026-08-31: +28 lines adding _report_parameters_for_command, "
             "which derives --report-parameters from a discovered .rdl "
             "file's own <ReportParameters> block when not given explicitly "
@@ -173,8 +224,9 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
         ),
     ),
     "src/fab_test/scripts/invoke_playwright.py": (
-        1003,
+        1014,
         (
+            "2026-10-06: +11 lines for --user-name, which outranks the env/config user. "
             "2026-09-26: +9 lines replacing the `_SPEC_PATH = Path(\"tests\") / "
             "\"test_playwright_visual.py\"` constant with `_spec_path()`, resolved "
             "from the installed `render_spec` module's own file -- a `pip install "
@@ -226,8 +278,14 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
         ),
     ),
     "src/fab_test/scripts/fab_test_execution.py": (
-        845,
+        891,
         (
+            "2026-10-06: +7 lines so --workspace NAME (stored in workspace_id) is resolved "
+            "to an ID in _resolve_workspace_target. "
+            "2026-10-03: +35 lines for the service-export hook in _discover_for, "
+            "ServiceExportError handling, and _stamp_mode (Service Targeting epic). "
+            "2026-10-02: +4 lines importing and calling the --from-workspace resolver ahead of the "
+            "dataset modes in _playwright_service_resolved_target (Playwright Workspace Reports). "
             "2026-09-26: born over the hard budget adding "
             "_playwright_service_resolved_target (collapses _discover_for's "
             "impact-manifest/dataset-id/dataset-workspace-only early returns "

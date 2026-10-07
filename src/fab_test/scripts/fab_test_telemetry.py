@@ -24,6 +24,14 @@ from ._telemetry import TelemetryDecision, telemetry_decision
 from .eventhouse_logger import EventhouseSink, publish_analyzer_telemetry
 from .lakehouse_logger import LakehouseSink
 
+# artifact_type is derived from the artifact's own path suffix, which for a
+# folder artifact already equals its Fabric type name by construction
+# (Sales.SemanticModel -> "SemanticModel"). A flat file's real extension
+# doesn't: a paginated report is Sales.rdl on disk but "PaginatedReport" as
+# a Fabric type, so its one exception is named here rather than every
+# consumer of this field re-deriving the same override.
+_FLAT_FILE_ARTIFACT_TYPES = {"rdl": "PaginatedReport"}
+
 
 def _telemetry_table(analyzer: str) -> str:
     """Return the Eventhouse table an analyzer's records land in.
@@ -408,14 +416,21 @@ def _build_telemetry_payload(
     artifact: Path,
     envelope: dict[str, Any],
     environment: str,
+    mode: str = "",
 ) -> dict[str, Any]:
-    """Build a telemetry payload for an analyzer/artifact run."""
+    """Build a telemetry payload for an analyzer/artifact run.
+
+    ``mode`` (repo|desktop|service) is a dimension; the workspace name and
+    connection details are deliberately never recorded.
+    """
     errors, warnings = severity_counts(envelope.get("findings", []))
     ctx = _git_context()
     payload = {
         "timestamp": datetime.now(UTC).isoformat(),
         "artifact_name": artifact.stem,
-        "artifact_type": artifact.suffix.lstrip("."),
+        "artifact_type": _FLAT_FILE_ARTIFACT_TYPES.get(
+            artifact.suffix.lstrip("."), artifact.suffix.lstrip(".")
+        ),
         "commit_sha": ctx.get("commit", ""),
         "workflow_run_id": ctx.get("workflow_run_id", ""),
         "repository": ctx.get("repository", ""),
@@ -429,6 +444,7 @@ def _build_telemetry_payload(
         "origin": _detect_origin(),
         "environment": environment,
         "analyzer": analyzer,
+        **({"mode": mode} if mode else {}),
         "status": envelope.get("status", "unknown"),
         "error_count": errors,
         "warning_count": warnings,
@@ -499,6 +515,7 @@ def _send_telemetry(
         artifact,
         envelope,
         getattr(args, "environment", "") or os.getenv("FABRIC_ENVIRONMENT", ""),
+        getattr(args, "mode", ""),
     )
     validated = _validate_telemetry_payload(payload, output_format)
     if validated is None:

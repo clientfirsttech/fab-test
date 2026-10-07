@@ -301,6 +301,35 @@ def test_build_telemetry_payload_includes_origin(monkeypatch):
     assert payload["origin"] == "circleci"
 
 
+@pytest.mark.fab_test
+def test_build_telemetry_payload_reports_paginated_report_for_rdl():
+    """A .rdl artifact's real file extension isn't its Fabric type -- the
+    payload should say "PaginatedReport", matching what a workspace item's
+    telemetry record for the same report would say, not the literal "rdl"
+    suffix _build_telemetry_payload derives artifact_type from."""
+    payload = _build_telemetry_payload(
+        "rdl",
+        Path("Sales.rdl"),
+        {"status": "passed", "findings": []},
+        "DEV",
+    )
+    assert payload["artifact_type"] == "PaginatedReport"
+
+
+@pytest.mark.fab_test
+def test_build_telemetry_payload_still_reports_the_folder_suffix_for_others():
+    """The rdl-specific override must not change any other analyzer's
+    artifact_type -- re-verified directly per the RDL Static Analysis
+    epic's own blast-radius requirement for this shared function."""
+    payload = _build_telemetry_payload(
+        "bpa",
+        Path("SampleModel.SemanticModel"),
+        {"status": "passed", "findings": []},
+        "DEV",
+    )
+    assert payload["artifact_type"] == "SemanticModel"
+
+
 # --------------------------------------------------------------------------- #
 # Capture machine context
 # --------------------------------------------------------------------------- #

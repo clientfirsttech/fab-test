@@ -21,6 +21,7 @@ import yaml
 
 _ROOT = Path(__file__).resolve().parent.parent
 _DEMO = _ROOT / ".github" / "workflows" / "playwright-demo.yml"
+_LIVE_CI = _ROOT / ".github" / "workflows" / "live-ci.yml"
 _EXAMPLE = _ROOT / "docs" / "examples" / "github-actions" / "playwright-live.yml"
 _GUIDE = _ROOT / "docs" / "PLAYWRIGHT-CI.md"
 
@@ -124,3 +125,60 @@ def test_the_demo_workflow_names_a_protected_environment() -> None:
     ((_job_id, job),) = data["jobs"].items()
 
     assert job.get("environment"), "playwright-demo.yml's job names no environment"
+
+
+@pytest.mark.fab_test
+@pytest.mark.parametrize("platform", ["github-actions", "azure-devops"])
+def test_azure_examples_keep_python_and_publish_after_failure(platform):
+    path = _ROOT / "docs" / "examples" / platform / "playwright-azure.yml"
+    data = _load(path)
+    text = path.read_text(encoding="utf-8")
+    assert "fab-test playwright" in text
+    assert "--playwright-config" in text
+    assert "npm" not in text and "playwright install" not in text
+    assert "set -euo pipefail" in text
+    assert "continue-on-error" not in text and "continueOnError" not in text
+    assert "PLAYWRIGHT_SERVICE_ACCESS_TOKEN" in _GUIDE.read_text(encoding="utf-8")
+    if platform == "github-actions":
+        assert set(_triggers(data)) == {"workflow_dispatch"}
+        job = data["jobs"]["validate"]
+        assert job["environment"] == "fabric-demo"
+        assert job["env"]["PLAYWRIGHT_SERVICE_ACCESS_TOKEN"] == "${{ secrets.PLAYWRIGHT_SERVICE_ACCESS_TOKEN }}"
+        upload = next(step for step in job["steps"] if "upload-artifact" in step.get("uses", ""))
+        assert upload["if"] == "always()"
+        assert upload["with"]["path"] == "fab-test-results/"
+    else:
+        assert data["trigger"] == data["pr"] == "none"
+        assert data["variables"] == [{"group": "fabric-demo"}]
+        run = next(step for step in data["steps"] if "bash" in step)
+        assert run["env"]["PLAYWRIGHT_SERVICE_ACCESS_TOKEN"] == "$(PLAYWRIGHT_SERVICE_ACCESS_TOKEN)"
+        publishers = [step for step in data["steps"] if step.get("task", "").startswith("Publish")]
+        assert len(publishers) == 2
+        assert all(step["condition"] == "always()" for step in publishers)
+
+
+@pytest.mark.fab_test
+def test_live_ci_runs_on_prs_behind_the_environment_and_skips_forks() -> None:
+    """Live CI is the one self-starting workflow with credentials: it must
+    stay in the protected Environment and never run for a fork PR."""
+    data = _load(_LIVE_CI)
+    job = data["jobs"]["live"]
+
+    assert {"pull_request", "push", "workflow_dispatch"} <= set(_triggers(data))
+    assert "pull_request_target" not in _triggers(data)
+    assert job["environment"] == "fabric-demo"
+    assert "head.repo.full_name == github.repository" in job["if"]
+    for var in _CREDENTIAL_VARS:
+        assert var in job["env"], var
+
+
+@pytest.mark.fab_test
+def test_live_ci_runs_the_live_tests_and_uploads_results_after_failure() -> None:
+    text = _LIVE_CI.read_text(encoding="utf-8")
+    steps = _load(_LIVE_CI)["jobs"]["live"]["steps"]
+    upload = next(step for step in steps if "upload-artifact" in step.get("uses", ""))
+
+    assert "test_playwright_result_parity_live.py" in text
+    assert "test_playwright_generation_parity_live.py" in text
+    assert "fab-test rdl --workspace" in text
+    assert upload["if"] == "always()"

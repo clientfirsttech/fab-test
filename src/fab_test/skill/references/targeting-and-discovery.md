@@ -21,18 +21,34 @@ Run `fab-test list` for this table at any time — it has a Scopes column.
 
 | Analyzer | path / name | `local/` | `WORKSPACE.Workspace/` |
 |----------|-------------|----------|------------------------|
-| `bpa`, `pbir`, `a11y` | yes | yes | **no** |
+| `bpa`, `pbir`, `a11y`, `rdl` | yes | yes | yes — exports the deployed definition read-only |
 | `pql-test` | yes | yes | yes |
 | `playwright`, `playwright-impact`, `dependencies` | yes | **no** | yes |
 
-The file-reading analyzers accept `local/` because the artifact is on disk either way — only `pql-test` actually *binds* to the running instance. They refuse a workspace target because reading a deployed item would mean exporting its definition first, which belongs to `fabric-cicd-deployment`, not here. Asking for one exits `2` and names the forms that work:
+The file-reading analyzers accept `local/` because the artifact is on disk either way — only `pql-test` actually *binds* to the running instance. They accept a workspace target by exporting the deployed item's definition through Fabric `getDefinition` (TMDL for a semantic model, PBIR for a report, the `.rdl` for a paginated report) into the run's output directory and analyzing that, so a service run reports through the same envelope, exit codes, HTML report and telemetry as a repo run. The export is **read-only and ephemeral**: it is deleted after the run unless `--keep-export` is passed (kept files are redacted for connection-string secrets). Exporting a deployed item *for testing* is in scope; deploying remains out of scope. Targets that no analyzer can honor — `pql-lint` with a workspace target — still exit `2` and name the forms that work:
 
 ```
-$ fab-test bpa "Sales Dev.Workspace/Sales.SemanticModel"
-  ✗ fab-test: bpa reads artifact files on disk and cannot fetch a deployed item.
+$ fab-test pql_lint "Sales Dev.Workspace/Sales.SemanticModel"
+  ✗ fab-test: pql_lint reads artifact files on disk and cannot fetch a deployed item.
     Use local/NAME for a running Power BI Desktop instance; a path
     (./src/Sales.SemanticModel) or a name (Sales.SemanticModel)
 ```
+
+## Modes: repo, desktop, service
+
+**The TARGET (or its default) decides the mode. Flags and env vars supply defaults; they never silently change the mode.** Every run (except under `--format json` or `-q`, where stderr stays silent) prints `mode=<repo|desktop|service> workspace=<name or —> source=<target|flag|env|config|default>` on stderr first, and the envelope carries additive `mode` and `source` fields.
+
+| Invocation | Mode |
+|------------|------|
+| `fab-test bpa`, `bpa Sales.SemanticModel`, `bpa ./src/Sales.SemanticModel` | `repo` |
+| `fab-test pql-test local/Sales` | `desktop` (an ambient `FABRIC_WORKSPACE_ID` never turns it remote) |
+| `fab-test bpa "Dev.Workspace/Sales.SemanticModel"` | `service` — typed target |
+| `fab-test bpa "Dev.Workspace/Sales"` | `service` — untyped, resolved by the analyzer's own type |
+| `fab-test bpa --workspace Dev` | `service` — every deployed item of the analyzer's type; local folders are ignored unless `--artifact-dir` is passed |
+| `fab-test all --workspace Dev` | `service` — every service-capable analyzer, including `pql-test` per model and `rdl` over paginated reports |
+| `--workspace X` with a target naming workspace Y, or `local/NAME` with `--workspace` | exit `2` |
+
+`workspace:` in `fab-test.yml` and `FABRIC_WORKSPACE_ID` supply a default workspace; they never flip a bare invocation to service. A workspace enumeration over **50** items stops with exit `2` naming `--all` (never a prompt); `--all` forces it. `--dry-run` lists the items; a typed target needs no token. A `getDefinition` 404 (item not in enhanced/Git-integration format) or 403 exits `1` with a named remediation; missing credentials exit `127`.
 
 `fab-test all` **skips** an analyzer that cannot honor the target and says so, rather than failing the batch — so `fab-test all local/Sales` still runs everything that reads files.
 
@@ -62,10 +78,23 @@ alongside `Report` for the Paginated Report Testing epic, so
 `WORKSPACE.Workspace/NAME.PaginatedReport` parses). The packaged copy is the
 fallback so an install from PyPI or a run outside a checkout behaves
 identically; a malformed map takes the same path as a missing one and warns.
-A local paginated report is the one type here with no corresponding folder
-convention: it is a flat `NAME.rdl` file, discovered by `playwright`
-specifically (see [Flags](flags.md)) rather than through this suffix map.
-Adding a type means editing the map, not the code.
+Adding a folder type means editing the map, not the code.
+
+**Flat-file artifacts.** A paginated report has no corresponding folder
+convention — it is a flat `NAME.rdl` file, never a `NAME.PaginatedReport/`
+folder in practice. `discover_artifacts` decides the shape from the
+analyzer's own glob: a suffix declared in `artifact-map.json` is a folder,
+scanned the directory-suffix way described above; anything else (`*.rdl`)
+is a file, found by walking for a matching filename instead. Both shapes
+share the same target/path/type narrowing — `Sales.rdl` and
+`Sales.SemanticModel` both resolve as a typed target, a path target checks
+`is_file()` or `is_dir()` to match the right shape, and the run's own
+result folder is pruned from discovery either way. `rdl` (see [Flags](flags.md))
+is the one analyzer that reads `.rdl` files today; `playwright` also
+discovers them, for the deployed report's local `.rdl` when one exists
+(dataset auto-resolution — see the `playwright` section in
+[Flags](flags.md)), and resolves everything else about a paginated report
+live regardless.
 
 **What is pruned, and why it is load-bearing.** Nested git checkouts
 (worktrees, vendored clones), `.venv`, `venv`, `env`, `node_modules`,
@@ -104,13 +133,16 @@ nothing was pruned, so `skipped_checkouts: []` with an empty `artifacts`
 means the root genuinely holds no artifacts — that is the distinction the
 key exists to make.
 
-**Unhandled types.** All ten types parse, so a target can name one no
-analyzer reads. `fab-test bpa Sales.Notebook` exits `2` with
-`bpa reads SemanticModel artifacts; 'Sales.Notebook' is a Notebook, which no
-fab-test analyzer reads`; where another analyzer does read that type it is
-named instead. Under `all`, the analyzer is skipped with the same message
-rather than failing the batch. `fab-test list`'s Glob column shows which
-suffix each analyzer handles.
+**Unhandled types.** All ten `artifact-map.json` types parse, so a target
+can name one no analyzer reads. `fab-test bpa Sales.Notebook` exits `2`
+with `bpa reads SemanticModel artifacts; 'Sales.Notebook' is a Notebook,
+which no fab-test analyzer reads`; where another analyzer does read that
+type it is named instead. Under `all`, the analyzer is skipped with the
+same message rather than failing the batch. `fab-test list`'s Glob column
+shows which suffix each analyzer handles. `rdl` (a file suffix, not a
+Fabric item type) parses the same way from a separate, small vocabulary
+just for flat-file analyzers — `Sales.rdl` is a valid typed target even
+though "rdl" is not in the ten-type list above.
 
 **In CI, keep passing `--artifact-dir` explicitly.** A default that follows
 the working directory is right at a prompt and wrong in a build: pinning the

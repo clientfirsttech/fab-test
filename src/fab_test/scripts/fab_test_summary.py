@@ -207,6 +207,8 @@ def _print_doctor(rows: list[dict[str, Any]], output_format: str = "text") -> in
         colour = {True: "green", False: "red", None: "yellow"}[r["ready"]]
         reason = _paint(r["reason"], colour, enabled=paint)
         print(f"{icon} {r['analyzer']}: {reason}{location}")
+        if r.get("service"):
+            print(f"   {r['service']}")
         if r["ready"] is not True and r["remediation"]:
             # Yellow, not red: this is the actionable half, and colouring it
             # the same as the failure would flatten the distinction.
@@ -438,6 +440,12 @@ def _artifact_summary_line(data: dict[str, Any]) -> str:
     if findings:
         return f"{len(findings)} finding(s) {sev_summary}"
     return "no findings"
+
+
+# The rdl wrapper already prints its wrapped findings table at -v; repeating
+# it here, truncated, is the duplicate the RDL review found. pbir and bpa
+# predate the shared table and still repeat theirs.
+_WRAPPER_PRINTS_FINDINGS = frozenset({"rdl"})
 
 
 def _print_findings_for_artifact(name: str, stem: str, output_dir: Path) -> None:
@@ -865,7 +873,7 @@ def _print_summary(
         if report:
             reports.append(report)
         print(f"  {_artifact_summary_prefix(code, status)}  {stem}{summary}")
-        if code != 0 and verbose and output_dir is not None:
+        if code != 0 and verbose and output_dir is not None and name not in _WRAPPER_PRINTS_FINDINGS:
             _print_findings_for_artifact(name, stem, output_dir)
 
     # A report that is written but never named reads as a flag that did

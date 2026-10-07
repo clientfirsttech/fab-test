@@ -170,3 +170,62 @@ def test_workspace_config_key_must_be_a_string():
     """A GUID typed without quotes should fail loudly, not resolve strangely."""
     with pytest.raises(ConfigError):
         validate_config({"workspace": 12345})
+
+
+# --------------------------------------------------------------------------- #
+# --workspace <name> reaches the analyzers as an ID
+# --------------------------------------------------------------------------- #
+
+
+def _patch_fabric_client(monkeypatch, client):
+    monkeypatch.setattr(
+        "fab_test.scripts.playwright_validation.fabric_service_client.build_fabric_service_client",
+        lambda **_kwargs: client,
+    )
+
+
+@pytest.mark.fab_test
+def test_workspace_flag_name_is_translated_to_an_id(monkeypatch):
+    """`--workspace NAME` lands in args.workspace_id; it must become a GUID."""
+    import argparse
+
+    from fab_test.scripts.fab_test_execution import _resolve_workspace_target
+
+    client = _FakeClient([{"id": _GUID, "displayName": "visual-error-testing"}])
+    _patch_fabric_client(monkeypatch, client)
+    args = argparse.Namespace(workspace_id="visual-error-testing", interactive=False)
+
+    assert _resolve_workspace_target(args) is None
+    assert args.workspace_id == _GUID
+
+
+@pytest.mark.fab_test
+def test_workspace_flag_guid_needs_no_client(monkeypatch):
+    import argparse
+
+    from fab_test.scripts.fab_test_execution import _resolve_workspace_target
+
+    def _boom(**_kwargs):
+        raise AssertionError("a GUID must not build a client")
+
+    monkeypatch.setattr(
+        "fab_test.scripts.playwright_validation.fabric_service_client.build_fabric_service_client",
+        _boom,
+    )
+    args = argparse.Namespace(workspace_id=_GUID, interactive=False)
+
+    assert _resolve_workspace_target(args) is None
+    assert args.workspace_id == _GUID
+
+
+@pytest.mark.fab_test
+def test_workspace_flag_unknown_name_exits_with_visible_workspaces(monkeypatch, capsys):
+    import argparse
+
+    from fab_test.scripts.fab_test_execution import _resolve_workspace_target
+
+    _patch_fabric_client(monkeypatch, _FakeClient([{"id": _GUID, "displayName": "Finance"}]))
+    args = argparse.Namespace(workspace_id="nope", interactive=False)
+
+    assert _resolve_workspace_target(args) == 1
+    assert "Finance" in capsys.readouterr().err

@@ -1,7 +1,7 @@
 """Contract tests for .pbip project discovery (Local Desktop First Run §1).
 
 Finds *.pbip files wherever they live in a repository — not only under the
-fixed .fabric/artifacts layout — and resolves each project's paired
+fixed fabric-artifacts layout — and resolves each project's paired
 .Report and .SemanticModel folders. Always passes on any machine — no
 external tool or real Power BI project required.
 
@@ -156,19 +156,19 @@ def test_discover_skips_projects_inside_a_nested_git_checkout(tmp_path):
     """A .pbip inside a separate git checkout (e.g. a worktree under
     .claude/worktrees/<branch>) is not discovered -- a broad repo-root walk
     shouldn't double-count the same fixture living in two checkouts. A
-    dot-prefixed directory that ISN'T a separate checkout (like .fabric,
-    this project's own artifacts root) is still searched.
+    dot-prefixed directory that ISN'T a separate checkout (like .config,
+    an arbitrary dot-prefixed directory) is still searched.
     """
     nested_checkout = tmp_path / ".claude" / "worktrees" / "some-branch"
     nested_checkout.mkdir(parents=True)
     (nested_checkout / ".git").write_text("gitdir: ../../../.git/worktrees/some-branch\n", encoding="utf-8")
-    inside_checkout = nested_checkout / ".fabric" / "artifacts"
+    inside_checkout = nested_checkout / ".config" / "artifacts"
     inside_checkout.mkdir(parents=True)
     _write_pbip(inside_checkout, "Hidden", "Hidden.Report")
     _write_report(inside_checkout, "Hidden", "../Hidden.SemanticModel")
     _write_semantic_model(inside_checkout, "Hidden")
 
-    visible = tmp_path / ".fabric" / "artifacts"
+    visible = tmp_path / ".config" / "artifacts"
     visible.mkdir(parents=True)
     _write_pbip(visible, "Visible", "Visible.Report")
     _write_report(visible, "Visible", "../Visible.SemanticModel")

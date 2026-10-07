@@ -7,7 +7,7 @@ local `NAME.Report` folder under `--artifact-dir` to exist -- the folder was
 never read for playwright (it validates the *deployed* report, never local
 file content), but discovery still needed one to find before dispatching a
 subprocess. That made a purely-remote report -- any paginated (RDL) report,
-since this project's `.fabric/artifacts/` tree only ever holds PBIR-format
+since this project's `fabric-artifacts/` tree only ever holds PBIR-format
 interactive reports -- undiscoverable through the real CLI, previously
 working only by coincidence when a same-named local folder happened to exist
 (Paginated Report Testing epic, live-verification fix).

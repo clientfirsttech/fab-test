@@ -7,7 +7,7 @@ Aligns with the project vision of Python-only analyzer invocation.
 
 Usage:
     python invoke_pbir_inspector.py \
-        --artifact-path ".fabric/artifacts/SalesReport.Report" \
+        --artifact-path "fabric-artifacts/SalesReport.Report" \
         --rules-path ".github/metadata/rules/pbi-inspector-custom-rules.json" \
         --inspector-path "./PBIR-Inspector/PBIRInspectorCLI" \
         --output-path "./pbir-results.json"
@@ -23,8 +23,6 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from tabulate import tabulate
-
 from ._analyzer_envelope import (
     EnvelopeIdentity,
     Timer,
@@ -35,6 +33,7 @@ from ._analyzer_envelope import (
     write_envelope,
 )
 from ._pbir_report_fixups import fix_favicon_link, fix_log_type_filter, fix_screenshot_images
+from ._table_style import findings_table
 
 _VERBOSITY_LEVELS = {"summary": 0, "default": 1, "verbose": 2, "debug": 3}
 
@@ -228,13 +227,6 @@ def _object_name(finding: dict[str, Any]) -> str:
     return finding.get("ParentDisplayName") or ""
 
 
-def _truncate(text: str, width: int) -> str:
-    text = str(text).replace("\n", " ").replace("\r", "")
-    if len(text) <= width:
-        return text
-    return text[: width - 3] + "..." if width > 3 else text[:width]
-
-
 def _pbir_severity_label(finding: dict[str, Any]) -> str:
     """Return a severity label string for a PBIR finding."""
     return "Error" if _is_error_finding(finding) else "Warning"
@@ -295,7 +287,7 @@ def _pbir_test_results(raw_findings: list[dict[str, Any]]) -> list[dict[str, Any
 
 
 def _print_findings_table(findings: list[dict[str, Any]]) -> None:
-    """Print normalized PBIR findings as a tabulate table aligned with BPA format."""
+    """Print normalized PBIR findings as the shared findings table."""
     if not findings:
         return
 
@@ -304,34 +296,7 @@ def _print_findings_table(findings: list[dict[str, Any]]) -> None:
     except OSError:
         tw = 120
 
-    severity_rank = {"error": 3, "warning": 2}
-    sorted_findings = sorted(
-        findings,
-        key=lambda f: (
-            -severity_rank.get(f.get("severity"), 0),
-            str(f.get("rule") or "").lower(),
-            str(f.get("object") or "").lower(),
-        ),
-    )
-
-    rows = [
-        (
-            _truncate(f.get("rule") or "", 25),
-            _truncate((f.get("severity") or "").capitalize(), 10),
-            _truncate(f.get("object") or "", 20),
-            _truncate(f.get("message") or "", max(20, tw - 55)),
-        )
-        for f in sorted_findings
-    ]
-
-    log(
-        tabulate(
-            rows,
-            headers=("Rule", "Severity", "Object", "Message"),
-            tablefmt="simple",
-            stralign="left",
-        )
-    )
+    log(findings_table(findings, tw))
 
 
 def _log_run_header(

@@ -1,5 +1,5 @@
 prune .github
-prune .fabric
+prune fabric-artifacts
 prune docs
 prune tests
 prune TabularEditor

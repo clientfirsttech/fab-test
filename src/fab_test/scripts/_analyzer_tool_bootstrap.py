@@ -16,6 +16,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import platform
 import re
 import shutil
 import subprocess
@@ -27,13 +28,11 @@ from typing import Any
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
+from ._npm_toolchain import find_build_root, install_npm_package, run_npm_build
+
 _READER_CHUNK_SIZE = 8192
 _USER_AGENT = "fab-test/1.0"
 
-# npm install can fetch a nontrivial dependency tree on a cold cache; build is
-# just tsc over a small source tree and finishes in seconds once deps exist.
-_NPM_INSTALL_TIMEOUT_SECONDS = 300
-_NPM_BUILD_TIMEOUT_SECONDS = 120
 
 
 class UnsupportedPlatformError(RuntimeError):
@@ -194,6 +193,38 @@ def _current_platform() -> str:
     return plat
 
 
+_ARCH_ALIASES = {"amd64": "x64", "x86_64": "x64", "arm64": "arm64", "aarch64": "arm64"}
+
+
+def _current_platform_key() -> str:
+    """Return ``<platform>-<arch>`` (e.g. ``win32-arm64``), the key
+    ``tool_install.platform_limitations`` is looked up by."""
+    machine = platform.machine().lower()
+    return f"{_current_platform()}-{_ARCH_ALIASES.get(machine, machine)}"
+
+
+def _platform_limitation(tool_install: dict[str, Any]) -> str | None:
+    """Return the declared reason the pinned install cannot work here, if any.
+
+    Unlike ``requires_platform`` (the tool does not exist for this OS), a
+    limitation belongs to the automatic install only: it is checked after the
+    local candidates, so a user-provided executable still runs.
+    """
+    limitation = (tool_install.get("platform_limitations") or {}).get(_current_platform_key())
+    if not limitation:
+        return None
+    env_var = tool_install.get("env_var", "")
+    escape = f" Or set {env_var}=<path> to a working install." if env_var else ""
+    return f"{limitation}{escape}"
+
+
+def _npm_package_spec(tool_install: dict[str, Any]) -> str:
+    """``<package>@<version>``, unless the install-URL override names a tarball."""
+    install_url_env_var = tool_install.get("install_url_env_var", "")
+    override = _env(install_url_env_var, "").strip() if install_url_env_var else ""
+    return override or f"{tool_install['package']}@{tool_install['version']}"
+
+
 def _platform_specific(
     tool_install: dict[str, Any], key: str, platform: str
 ) -> str | None:
@@ -280,6 +311,9 @@ def _shadow_note(source: str, tool_install: dict[str, Any]) -> tuple[str, str | 
     return "", None
 
 
+_NPM_ARCHIVE_TYPES = frozenset({"npm_build", "npm_package"})
+
+
 def _probe_pending_install(
     tool_install: dict[str, Any], install_url: str, pinned_version: str | None
 ) -> dict[str, Any]:
@@ -290,8 +324,17 @@ def _probe_pending_install(
     (Node/npm each reported as a distinct missing prerequisite) would
     otherwise push it over.
     """
+    limitation = _platform_limitation(tool_install)
+    if limitation:
+        return {
+            "ready": False,
+            "resolved_path": None,
+            "reason": f"not supported on {_current_platform_key()}",
+            "remediation": limitation,
+            "version": None,
+        }
     archive_type = tool_install.get("archive_type", "zip").lower()
-    if archive_type == "npm_build":
+    if archive_type in _NPM_ARCHIVE_TYPES:
         if shutil.which("node") is None:
             return {
                 "ready": False,
@@ -307,6 +350,14 @@ def _probe_pending_install(
                 "reason": "npm not found on PATH",
                 "remediation": "Node.js is present but npm is missing; reinstall Node.js "
                 "(https://nodejs.org, >= 18) with npm included.",
+                "version": None,
+            }
+        if archive_type == "npm_package":
+            return {
+                "ready": False,
+                "resolved_path": None,
+                "reason": "not yet installed",
+                "remediation": f"Would npm install {install_url} on first run.",
                 "version": None,
             }
         action = f"build version {pinned_version} from source at" if pinned_version else "build from source at"
@@ -489,6 +540,8 @@ def probe_executable(
     install_url = _env(install_url_env_var, "") if install_url_env_var else ""
     if not install_url:
         install_url = committed_install_url or ""
+    if tool_install.get("archive_type") == "npm_package":
+        install_url = _npm_package_spec(tool_install)
     if install_url:
         return _probe_pending_install(tool_install, install_url, pinned_version)
 
@@ -552,6 +605,14 @@ def resolve_executable(
     if cached:
         return cached.resolve()
 
+    limitation = _platform_limitation(tool_install)
+    if limitation:
+        raise UnsupportedPlatformError(
+            f"Analyzer '{analyzer_name}' cannot install on {_current_platform_key()}: {limitation}"
+        )
+    if archive_type.lower() == "npm_package":
+        return _install_and_cache(analyzer_name, tool_install, cache_dir)
+
     install_url = _resolve_install_url(tool_install, platform)
     if install_url and archive_type.lower() == "zip":
         return _download_and_cache(analyzer_name, tool_install, install_url, cache_dir, platform)
@@ -609,74 +670,14 @@ def _download_and_cache(
         return executable
 
 
-def _find_build_root(extract_dir: Path) -> Path:
-    """Return the directory holding ``package.json`` inside an extracted archive.
-
-    GitHub's tag-archive zip nests everything under a single
-    ``<repo>-<ref>/`` folder whose exact name isn't known in advance.
-    """
-    package_json = next(extract_dir.rglob("package.json"), None)
-    if package_json is None:
-        raise RuntimeError(f"No package.json found inside {extract_dir}")
-    return package_json.parent
-
-
-def _run_build_step(
-    analyzer_name: str, step_name: str, command: list[str], cwd: Path, timeout: int
-) -> None:
-    """Run one build step, raising a ``RuntimeError`` naming the step on failure."""
-    try:
-        subprocess.run(
-            command, cwd=cwd, capture_output=True, text=True, timeout=timeout, check=True
-        )
-    except FileNotFoundError as exc:
-        raise RuntimeError(
-            f"{analyzer_name}: '{step_name}' failed -- {command[0]} not found on PATH. "
-            "Install Node.js (https://nodejs.org, >= 18) and npm, "
-            "or set the tool's env var to a manually built executable."
-        ) from exc
-    except subprocess.TimeoutExpired as exc:
-        raise RuntimeError(
-            f"{analyzer_name}: '{step_name}' timed out after {timeout}s."
-        ) from exc
-    except subprocess.CalledProcessError as exc:
-        detail = (exc.stderr or exc.stdout or "").strip()
-        raise RuntimeError(
-            f"{analyzer_name}: '{step_name}' failed (exit {exc.returncode}). {detail}"
-        ) from exc
-
-
-def _run_npm_build(analyzer_name: str, build_root: Path, tool_install: dict[str, Any]) -> None:
-    """Run ``npm install`` (plus any declared extra dependency) and ``npm run build``.
-
-    Each step is named in its own failure message, per the requirement that a
-    build failure says which step broke rather than surfacing a bare
-    traceback -- npm absence included, since ``subprocess.run`` raises
-    ``FileNotFoundError`` for a missing executable the same way it would for
-    a missing tool binary elsewhere in this module.
-    """
-    npm = shutil.which("npm")
-    if npm is None:
-        raise RuntimeError(
-            f"{analyzer_name}: npm not found on PATH. Install Node.js "
-            "(https://nodejs.org, >= 18) and npm, or set the tool's env var "
-            "to a manually built executable."
-        )
-    _run_build_step(
-        analyzer_name, "npm install", [npm, "install"], build_root, _NPM_INSTALL_TIMEOUT_SECONDS
-    )
-    extra_dependencies = tool_install.get("build_extra_dependencies") or []
-    if extra_dependencies:
-        _run_build_step(
-            analyzer_name,
-            f"npm install {' '.join(extra_dependencies)}",
-            [npm, "install", *extra_dependencies],
-            build_root,
-            _NPM_INSTALL_TIMEOUT_SECONDS,
-        )
-    _run_build_step(
-        analyzer_name, "npm run build", [npm, "run", "build"], build_root, _NPM_BUILD_TIMEOUT_SECONDS
-    )
+def _install_and_cache(analyzer_name: str, tool_install: dict[str, Any], cache_dir: Path) -> Path:
+    """``npm install`` the pinned package into the versioned cache and record its entry point."""
+    spec = _npm_package_spec(tool_install)
+    _notice(f"{analyzer_name}: executable not found; installing {spec} with npm")
+    entrypoint = install_npm_package(analyzer_name, tool_install, spec, cache_dir / "extracted")
+    _write_marker(cache_dir, entrypoint)
+    _notice(f"{analyzer_name}: installed entry point at {entrypoint}")
+    return entrypoint
 
 
 def _raise_entrypoint_not_found(analyzer_name: str, extract_dir: Path, build_entrypoint: str) -> None:
@@ -713,8 +714,8 @@ def _download_build_and_cache(
             if expected_sha256:
                 _verify_checksum(archive_path, expected_sha256, analyzer_name)
             _extract_zip(archive_path, extract_dir)
-            build_root = _find_build_root(extract_dir)
-            _run_npm_build(analyzer_name, build_root, tool_install)
+            build_root = find_build_root(extract_dir)
+            run_npm_build(analyzer_name, build_root, tool_install)
             entrypoint = _find_executable(extract_dir, build_entrypoint)
             if entrypoint is None:
                 _raise_entrypoint_not_found(analyzer_name, extract_dir, build_entrypoint)

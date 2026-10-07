@@ -34,7 +34,7 @@ The older spelling still works: `fab-test bpa --artifact SampleModel-PQLAssert`.
 
 ### local
 
-Runs BPA, PBIR Inspector, and Desktop-bound `pql-test` against every `.pbip` project discovered under `--artifact-dir` — no `.fabric/artifacts` layout required, no Fabric workspace, no service principal. Its subparser doesn't expose `--workspace-id` or `--env` at all, so the remote XMLA path is unreachable from `local`.
+Runs BPA, PBIR Inspector, and Desktop-bound `pql-test` against every `.pbip` project discovered under `--artifact-dir` — no `fabric-artifacts` layout required, no Fabric workspace, no service principal. Its subparser doesn't expose `--workspace-id` or `--env` at all, so the remote XMLA path is unreachable from `local`.
 
 | Flag | Default | Description |
 |------|---------|-------------|
@@ -100,6 +100,25 @@ Every other bootstrapped analyzer (`bpa`, `pbir`) downloads a pre-built binary a
 
 If `npm` or `node` is missing before the first build, `doctor` says which one distinctly (Node absent vs. npm absent are different remediations) rather than a generic "tool not found." `doctor` also checks for Node.js >= 18 on every run, not only the first — a cache copied from elsewhere, or Node uninstalled after the fact, is reported as not-ready by `doctor` itself rather than only surfacing once `fab-test a11y` is actually run. If it somehow still runs without Node present, the wrapper reports a clear envelope error rather than a traceback, the same way a missing binary is handled for every other analyzer.
 
+### rdl
+
+Static analysis for paginated (`.rdl`) reports: the active rules (Tier A rules are enabled once a real fixture verifies each; `status` in the catalog, listed in `docs/RDL-RULES.md`) covering structure/schema, data sources, query pushdown, parameters, layout/subreports, and accessibility — see [plan/rdl-rule-set.md](../../../../plan/rdl-rule-set.md) for what each rule ID checks. Pure Python on the standard library; **no external tool, no install step** — `doctor` always reports it ready. Every finding and `test_results` row carries `source_urls`, the guidance links for its rule (`docs/RDL-RULES.md` lists them all). A finding's `object` is a path (`Dataset › Field`, `Tablix › Textbox`) and its `message` quotes the offending query or expression, so the message alone identifies the offender; a rule that fires on several elements has one `test_results` row per hit. `--verbose` prints a Rule/Severity/Object/Message findings table.
+
+| Flag | Default |
+|------|---------|
+| `--rules-path PATH` | resolved via the metadata layers (`.fab-test/metadata/rules/rdl-rules.json` > `.github/metadata/...` > packaged) |
+
+```bash
+fab-test rdl                     # every discovered .rdl file
+fab-test rdl Sales                # one artifact by name (a flat .rdl file, not a folder)
+fab-test rdl Sales.rdl            # name and type, explicit
+fab-test rdl --format json
+```
+
+A `.rdl` file is discovered the same way a folder artifact is — by suffix, recursively under `--artifact-dir` — except the suffix is a file extension, not a folder name, so `discover_artifacts` matches it with `find_files_by_suffix` instead of the directory-suffix scan every other analyzer uses (see [Discovery](targeting-and-discovery.md#discovery)). Every finding carries `rule`/`severity`/`object`/`message`; `test_results` (in the same rule shape as `pbir`, see [Reports](reports.md)) covers every active rule, passed or fired (one row per hit) — `status` is `pass`, `skip` (disabled in the overlay), `warning`, or `error` per row; planned rules never appear. Tune a rule with a `rules.rdl` overlay in `fab-test.yml` — see [Rule Overlays](configuration.md#rule-overlays).
+
+`LAY-03` and `SUB-01` both name "a Subreport nested in a Tablix" — the same check produces one finding tagged `"LAY-03/SUB-01"` rather than two separate findings for the same gap; both catalog rows in `test_results` show that one finding.
+
 ### pql-test
 
 | Flag | Env var | Description |
@@ -156,15 +175,47 @@ Playwright validation can run in three modes: static `.env` mode, service-resolv
 | `--env-file PATH` | Path to `.env` file with service-principal credentials and optional behavior settings |
 | `--artifact NAME` | Resolve the deployed report from this artifact name and the target environment |
 | `--env ENV` | Target environment label (e.g. `dev`, `test`, `prod`) [env: `FABRIC_ENVIRONMENT`] |
-| `--workspace-id ID` | Explicit workspace ID override [env: `FABRIC_WORKSPACE_ID`] |
+| `--workspace NAME_OR_ID` | Explicit workspace override, a name or a GUID. `--workspace-id` and `--from-workspace` are accepted aliases for the same value; prefer `--workspace` [env: `FABRIC_WORKSPACE_ID`] |
 | `--dataset-id ID` | Dataset / semantic-model ID. With `--artifact`, overrides that report's binding; with no report named, tests every report built on this dataset (see below) |
 | `--dataset-workspace-id ID` | Workspace ID the dataset lives in, when different from the report's own workspace [env: `PLAYWRIGHT_DATASET_WORKSPACE_ID`] |
 | `--report-type {report,paginated}` | Force the report type instead of auto-detecting it [env: `PLAYWRIGHT_REPORT_TYPE`] |
 | `--impact-manifest PATH` | Validate every report listed in the impacted-report manifest once, regardless of local `.Report` artifacts |
 | `--pages {auto,none}` | Discover every report page and its own bookmarks (default: `auto`); `none` tests only the default page |
 | `--roles {auto,none}` | Discover RLS/OLS roles from the semantic model and test the page matrix under each one whenever RLS is in play — `PLAYWRIGHT_USE_RLS`, **or** an effective-identity user being configured at all (default: `auto`); `none` tests only `PLAYWRIGHT_ROLE` |
+| `--user-name UPN` | Effective-identity user for RLS embed tokens. Outranks `PLAYWRIGHT_USER_NAME`, which outranks `playwright_user_name` in `fab-test.yml` |
 | `--plan-only` | Discover the matrix, write `test-cases.csv`/`.json`, and stop — no embed token, no browser. Unlike `--dry-run`, which only lists matching artifacts, this resolves each one |
 | `--workers N` | Max `pytest-xdist` workers for running generated cases concurrently (default: `4`) [env: `PLAYWRIGHT_XDIST_WORKERS`] |
+| `--playwright-config PATH` | Optional validated local/Azure browser YAML [env: `PLAYWRIGHT_CONFIG_PATH`; config: `playwright_config`]. Not the global `--config` flag |
+| `--headed` | Show the local browser windows; off by default. Overrides `launch.headless` in the YAML and `PLAYWRIGHT_HEADLESS`. Ignored with a warning on Azure-hosted browsers |
+| `--slow-mo MS` | Pause MS milliseconds between browser actions (nonnegative; local browsers only; overrides `launch.slow_mo`). A negative value exits `2` |
+
+The execution selector resolves flag > process environment > fab-test config >
+local default. Flag/environment paths are relative to the invocation directory;
+`playwright_config` paths are relative to their owning YAML or pyproject file.
+`config --show` reports the selection and origin; dry-run makes no browser
+connection. Worker limits resolve `--workers` > `PLAYWRIGHT_XDIST_WORKERS` >
+execution YAML > `4` and are bounded by the current report's case count.
+
+Execution YAML permits only `backend` (`local`/`azure`), positive `workers`,
+`launch` (`headless`, string-list `args`, nonnegative `slow_mo`), `context`
+(`viewport` width/height, `locale`, `timezone_id`, `color_scheme`,
+`ignore_https_errors`), and Azure `connection` (`os` linux/windows,
+positive `timeout_ms`, `expose_network`). Defaults are Linux, 30000 ms,
+and `<loopback>`. Report-render timeout remains `PLAYWRIGHT_TIMEOUT_SECONDS`.
+
+Browser visibility resolves `--headed` > YAML `launch.headless` > `PLAYWRIGHT_HEADLESS=false` > headless
+(default). `PLAYWRIGHT_HEADLESS=false` applies to local browsers only and is ignored with a warning on Azure.
+No custom tests, plugins, reporters, or executable config are accepted.
+
+Azure requires `PLAYWRIGHT_SERVICE_URL` and `PLAYWRIGHT_SERVICE_ACCESS_TOKEN`
+in process environment or the selected env file; process values win. Fabric
+credentials remain separate. Never put tokens or credential-bearing URLs in
+YAML. Invalid YAML exits `2`; missing service prerequisites exit `127`;
+connection failure writes an `error` envelope with `playwright_execution_error`,
+not a visual finding, and never falls back locally. Plan-only needs no Azure
+token. For selected YAML, native pytest HTML/JUnit are under each report's
+`report/` directory alongside the unchanged facade envelope and case evidence.
+See `docs/PLAYWRIGHT-CI.md` for authentication and Python-only CI examples.
 
 **By default, `playwright` tests every page, every page's own bookmarks, and every
 RLS role — not just the default tab.** `--pages none`/`--roles none` (or `PLAYWRIGHT_PAGE_IDS`/
@@ -260,8 +311,8 @@ writes an error envelope, emits `::error::` to stderr, and returns `1` — and i
 `--impact-manifest` run, one report's failure does not stop the others.
 
 **`environments.yml` is optional once a workspace is already resolved.** When
-`--workspace-id`, `FABRIC_WORKSPACE_ID`, or `workspace:` in `fab-test.yml` already
-supplies a workspace, `environments.yml` is never opened — a missing file or an
+`--workspace` (or its `--workspace-id`/`--from-workspace` aliases), `FABRIC_WORKSPACE_ID`,
+or `workspace:` in `fab-test.yml` already supplies a workspace, `environments.yml` is never opened — a missing file or an
 absent `dev:` entry no longer fails a run whose workspace was never in question. It
 is read exactly as before only when no workspace resolves from any of those sources;
 a repository that already pins its workspace there is unaffected. `workspace:` is
@@ -406,6 +457,33 @@ in a `.env` never switches this on -- only the flag does.
 ```bash
 fab-test playwright --dataset-id 11111111-2222-3333-4444-555555555555 \
   --dataset-workspace-id aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee
+```
+
+**A bare `--workspace` (no `--artifact`/target, no explicit `--artifact-dir`, and
+no dataset selector) tests every deployed Report and PaginatedReport in that
+workspace, listed live from Fabric instead of scanned from the repository --
+so the run needs no checkout at all.** `--workspace-id` and `--from-workspace`
+trigger the identical behavior; they are the same flag under three names, not
+three separate modes. A workspace *name* resolves the same way a
+`WORKSPACE.Workspace/NAME.Type` target's workspace half does -- a GUID is used
+directly, a name is looked up and must be unambiguous. Naming a report
+(`--artifact`/a target), passing an explicit `--artifact-dir` (even `.`), or
+giving `--dataset-id`/`--dataset-workspace-id` all keep their own narrower
+selection instead -- a bare `--workspace` only applies when nothing else
+names what to run. An ambient `FABRIC_WORKSPACE_ID` or a `workspace:` in
+`fab-test.yml`, with no `--workspace` on the command line, is unaffected and
+keeps today's repository discovery -- only the explicit flag switches the
+denominator.
+
+```bash
+# Every Report/PaginatedReport deployed in this workspace -- no checkout needed
+fab-test playwright --workspace "Sales Dev"
+
+# Equivalent -- same shared flag
+fab-test playwright --workspace-id c4698d28-b05c-40bc-926c-707563ac85e7
+
+# A real --artifact-dir keeps the repository as the denominator instead
+fab-test playwright --workspace "Sales Dev" --artifact-dir .
 ```
 
 **`--dataset-workspace-id` alone -- no `--dataset-id`, `--artifact`, target, or
@@ -577,13 +655,13 @@ Current default list:
 
 ```json
 {
-  "fab_test_all": ["bpa", "pbir", "pql_test"]
+  "fab_test_all": ["bpa", "pbir", "pql_test", "rdl"]
 }
 ```
 
-`playwright` is excluded from `fab-test all` by default but remains available as a direct subcommand.
+`playwright` and `a11y` are excluded from `fab-test all` by default but remain available as direct subcommands.
 
-Accepts the union of flags from `bpa`, `pbir`, and `pql-test`, plus `--playwright-env-file` for Playwright support.
+Accepts the union of flags from `bpa`, `pbir`, `pql-test`, and `rdl`, plus `--playwright-env-file` for Playwright support.
 
 ```bash
 fab-test all \
@@ -593,3 +671,12 @@ fab-test all \
 ```
 
 After all analyzers finish, `fab-test all` prints an aggregate summary table showing analyzer, artifact, status, errors, warnings, and output path, plus total errors and warnings across the run.
+
+## Service-mode flags (`bpa`, `pbir`, `a11y`, `rdl`, `all`)
+
+| Flag | Meaning |
+|------|---------|
+| `--workspace NAME_OR_ID` (aliases `--workspace-id`, `--from-workspace`) | With no TARGET, pure service mode over every deployed item of the analyzer's type |
+| `--keep-export` | Keep exported definitions under `fab-test-results/<analyzer>/<workspace>/<item>/export/` (redacted); default is delete after the run |
+| `--all` | Proceed when a workspace enumeration matches more than 50 items |
+| `--interactive` | Browser sign-in, in memory only; never in CI; gated by the `interactive_auth` flag |

@@ -16,7 +16,7 @@ every command in this README are unchanged.
 
 ### From PyPI (beta)
 
-The current release is the beta `1.9.0b2`. pip skips pre-releases unless you
+The current release is the beta `1.9.0b3`. pip skips pre-releases unless you
 pass `--pre` or name the version, so a bare `pip install cft-fab-test` finds
 nothing until the first final release.
 
@@ -24,13 +24,18 @@ nothing until the first final release.
 python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
 
-pip install --pre cft-fab-test          # or pin it: "cft-fab-test==1.9.0b2"
+pip install --pre cft-fab-test          # or pin it: "cft-fab-test==1.9.0b3"
 
 fab-test --version
 ```
 
 In a pipeline, pin the exact version rather than `--pre`: `--pre` also lets
 pre-releases of *dependencies* in, not only this package.
+
+New here? [docs/GETTING-STARTED.md](https://github.com/clientfirsttech/fab-test/blob/main/docs/GETTING-STARTED.md)
+walks from a fresh install through `fab-test init`, a service principal created
+with the Azure CLI (API permissions, client secret saved to `.fab-test/.env`,
+workspace roles), to a first `fab-test playwright` run from the console.
 
 ### From source in editable mode (developers)
 
@@ -139,10 +144,12 @@ $ fab-test pbir
       --artifact-dir C:\Users\jkers\Git\fab-test
 ```
 
-**If you already have a `.fabric/artifacts/` layout, nothing you do needs to
+**If you already have a `fabric-artifacts/` layout, nothing you do needs to
 change.** That directory sits inside your working directory, so everything
 found before is still found. `--artifact-dir` still narrows the search when
-you pass it, and still exits `2` if the path you name does not exist.
+you pass it, and still exits `2` if the path you name does not exist. (Named
+`fabric-artifacts`, not `.fabric/artifacts` — a dot-prefixed folder can't
+sync through Fabric Git Integration.)
 
 Every analyzer is built on that assumption:
 
@@ -164,7 +171,7 @@ Discovery matches on folder suffix (`*.SemanticModel`, `*.Report`), not on folde
 
 ### Local Desktop workflow (no cloud required)
 
-The fastest path to real findings: a `.pbip` open in Power BI Desktop, no `.fabric/artifacts` layout, no Fabric workspace, no service principal. The project has to be saved in TMDL and PBIR; see [Assumed project format](#assumed-project-format).
+The fastest path to real findings: a `.pbip` open in Power BI Desktop, no `fabric-artifacts` layout, no Fabric workspace, no service principal. The project has to be saved in TMDL and PBIR; see [Assumed project format](#assumed-project-format).
 
 ```bash
 fab-test doctor --local     # what's ready, and what fab-test local will run
@@ -217,6 +224,13 @@ fab-test pbir --inspector-path "/path/to/PBIRInspectorCLI"
 # by default -- add "a11y" to fab_test_all in analyzers.json to opt in.
 fab-test a11y
 
+# Run the active (fixture-verified) rules against paginated (.rdl) reports -- pure Python,
+# no external tool, always ready. Included in `fab-test all` by default.
+# Every rule and its source links: docs/RDL-RULES.md
+# --verbose adds a findings table; each finding names its path (Dataset › Field)
+# and quotes the query or expression that broke the rule.
+fab-test rdl
+
 # Run pql-test DAX tests
 fab-test pql-test --env DEV
 
@@ -225,7 +239,7 @@ fab-test pql-test --env DEV
 fab-test playwright --artifact "Not Working Visuals" --env dev --env-file .env
 
 # Test only the reports built on one dataset (looked up live in the
-# dataset's workspace and, if set, the --workspace-id workspace)
+# dataset's workspace and, if set, the --workspace workspace)
 fab-test playwright --dataset-id <DATASET_GUID> --dataset-workspace-id <WORKSPACE_GUID>
 
 # Discover reports that depend on a deployed semantic model
@@ -240,6 +254,8 @@ A default run explains itself for a person: a banner, a result line, and a summa
 $ fab-test bpa -q
 bpa warning e=0 w=25 fab-test-results/bpa/Report with Bookmarks - Broken Visuals/envelope.json
 bpa warning e=0 w=103 fab-test-results/bpa/SampleModel-PQLAssert/envelope.json
+$ fab-test rdl -q
+rdl failed e=3 w=3 fab-test-results/rdl/QRY-02/envelope.json
 ```
 
 One line per artifact: `<analyzer> <status> e=<errors> w=<warnings> <where>`, where `<where>` is the envelope with the findings. Exit codes and every file under `fab-test-results/` are unchanged, and a failure still says why: a missing credential, a timeout, or a crash prints its message above the lines.
@@ -273,13 +289,26 @@ rather than authenticating partway and failing on the embed-token call.
 shows a false green for a developer who is only signed in with `az login`.
 
 With a service principal set, a workspace resolves without `environments.yml`
-from any of -- in this order -- `--workspace-id`, `FABRIC_WORKSPACE_ID`, or
-`workspace:` in `fab-test.yml`. No `fab-test.yml` is required at all:
+from any of -- in this order -- `--workspace` (preferred; `--workspace-id` and
+`--from-workspace` are accepted aliases for the same name-or-GUID value),
+`FABRIC_WORKSPACE_ID`, or `workspace:` in `fab-test.yml`. No `fab-test.yml` is
+required at all:
 
 ```bash
-fab-test playwright --artifact "Not Working Visuals" --workspace-id "Sales Dev"
+fab-test playwright --artifact "Not Working Visuals" --workspace "Sales Dev"
 # or
 FABRIC_WORKSPACE_ID="Sales Dev" fab-test playwright --artifact "Not Working Visuals"
+```
+
+A bare `--workspace` with no `--artifact`/target and no explicit
+`--artifact-dir` tests every deployed Report and PaginatedReport in that
+workspace instead of scanning the repository -- so the run needs no checkout
+at all. `--workspace-id`/`--from-workspace` trigger the identical behavior;
+an ambient `FABRIC_WORKSPACE_ID` alone (no `--workspace` on the command line)
+keeps today's repository discovery:
+
+```bash
+fab-test playwright --workspace "Sales Dev"
 ```
 
 A repository that already pins its workspace in committed config can rely on
@@ -296,7 +325,8 @@ fab-test playwright --artifact "Not Working Visuals"
 ```
 
 `environments.yml` is only consulted when no workspace resolves from
-`--workspace-id`, `FABRIC_WORKSPACE_ID`, or `workspace:` in `fab-test.yml` --
+`--workspace` (or its `--workspace-id`/`--from-workspace` aliases),
+`FABRIC_WORKSPACE_ID`, or `workspace:` in `fab-test.yml` --
 a repository that already pins its workspace there keeps working unchanged.
 
 A run with 5 report x page x bookmark cases and 1 real failure now says so:
@@ -324,6 +354,35 @@ GitHub Environment/secrets a workflow reads. See
 for the full walkthrough and
 [docs/examples/github-actions/playwright-live.yml](https://github.com/clientfirsttech/fab-test/blob/main/docs/examples/github-actions/playwright-live.yml)
 for a copy-ready workflow.
+
+**Showing the browser for a demonstration.** Browsers are hidden by default. Add
+`--headed` to watch the local windows, and `--slow-mo 500` to pause 500 ms between
+actions so an audience can follow. Use one worker so windows open one at a time:
+
+```bash
+fab-test playwright --artifact "Not Working Visuals" --env DEV --headed --slow-mo 500 --workers 1
+```
+
+The same settings live in [docs/examples/playwright/headed.yml](https://github.com/clientfirsttech/fab-test/blob/main/docs/examples/playwright/headed.yml)
+for `--playwright-config`. Setting `PLAYWRIGHT_HEADLESS=false` (environment or `.env`) also shows the
+window; a YAML `launch.headless` or `--headed` takes precedence. These apply to local browsers only; on Azure-hosted
+browsers there is no local window, so they are ignored with a warning.
+
+**Optional Azure-hosted browsers** keep Python Playwright and pytest on the
+invoking machine while moving browsers to Azure. Select a credential-free
+YAML file with `--playwright-config`; omitting it keeps local execution:
+
+```bash
+fab-test playwright --artifact "Not Working Visuals" --env DEV \
+  --playwright-config docs/examples/playwright/azure.yml --workers 8 --report
+```
+
+Store `PLAYWRIGHT_SERVICE_URL` and `PLAYWRIGHT_SERVICE_ACCESS_TOKEN` in the
+gitignored `.fab-test/.env` or the process environment, separately from Fabric
+embedding credentials. See [Azure browser setup](https://github.com/clientfirsttech/fab-test/blob/main/docs/PLAYWRIGHT-CI.md#azure-hosted-browsers)
+for supported settings, token authentication, and Python-only GitHub Actions
+and Azure DevOps examples. More workers parallelize cases within one report,
+not reports; service limits still apply.
 
 ### Playwright tests every page, bookmark, and role by default
 
@@ -417,7 +476,7 @@ fab-test pql-test "Sales Dev.Workspace/Sales.SemanticModel"   # a deployed model
 fab-test all local/Sales                                  # everything that can run locally
 ```
 
-Not every analyzer accepts every form: `bpa` reads files on disk and cannot fetch a deployed item. Run `fab-test list` for the Scopes column, and see the [targeting reference](https://github.com/clientfirsttech/fab-test/blob/main/.github/skills/fab-test/references/targeting-and-discovery.md#targeting) for the rules. `--artifact STEM` still works as a deprecated alias.
+Not every analyzer accepts every form. Run `fab-test list` for the Scopes column, and see the [targeting reference](https://github.com/clientfirsttech/fab-test/blob/main/.github/skills/fab-test/references/targeting-and-discovery.md#targeting) for the rules. `--artifact STEM` still works as a deprecated alias.
 
 ### Credentials
 

@@ -272,6 +272,47 @@ def test_pypi_reports_current_when_the_pin_matches_latest(tmp_path, monkeypatch)
 
 
 # --------------------------------------------------------------------------- #
+# npm: promptfoo is pinned in analyzers.json and published to the npm registry
+# --------------------------------------------------------------------------- #
+
+
+_PROMPTFOO_TOOL_INSTALL = {
+    "version": "0.124.0",
+    "release_source": {"type": "npm", "package": "promptfoo"},
+}
+
+
+def test_npm_compares_the_pin_against_the_registry_s_latest_tag(monkeypatch):
+    seen: list[str] = []
+
+    def _fake_get_json(url, timeout=c._TIMEOUT):
+        seen.append(url)
+        return {"version": "0.125.1"}
+
+    monkeypatch.setattr(c, "_get_json", _fake_get_json)
+
+    result = c._check_npm("data_agent", _PROMPTFOO_TOOL_INSTALL)
+
+    assert seen == ["https://registry.npmjs.org/promptfoo/latest"]
+    assert result["current"] == "0.124.0"
+    assert result["available"] == "0.125.1"
+    assert result["status"] == c.STATUS_UPDATE_AVAILABLE
+    assert result["url"] == "https://www.npmjs.com/package/promptfoo/v/0.125.1"
+
+
+def test_npm_reports_current_when_the_pin_matches_latest(monkeypatch):
+    monkeypatch.setattr(c, "_get_json", lambda url, timeout=c._TIMEOUT: {"version": "0.124.0"})
+
+    assert c._check_npm("data_agent", _PROMPTFOO_TOOL_INSTALL)["status"] == c.STATUS_CURRENT
+
+
+def test_npm_reports_unknown_on_an_unexpected_response_shape(monkeypatch):
+    monkeypatch.setattr(c, "_get_json", lambda url, timeout=c._TIMEOUT: [])
+
+    assert c._check_npm("data_agent", _PROMPTFOO_TOOL_INSTALL)["status"] == c.STATUS_UNKNOWN
+
+
+# --------------------------------------------------------------------------- #
 # A flaky upstream never fails the build
 # --------------------------------------------------------------------------- #
 

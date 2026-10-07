@@ -21,6 +21,7 @@ from ._analyzer_tool_bootstrap import (
     probe_executable,
     resolve_executable,
 )
+from ._artifact_types import load_artifact_map
 from ._credentials import configured_workspace, probe_credentials
 from ._desktop import (
     DesktopMatchError,
@@ -28,12 +29,15 @@ from ._desktop import (
     detect_desktop_instances,
     match_instance_to_artifact,
 )
-from ._metadata import ANALYZERS, BPA_RULES, PBIR_RULES, default_repo_root, metadata_path
+from ._feature_flags import disabled_analyzers, is_enabled
+from ._metadata import ANALYZERS, BPA_RULES, PBIR_RULES, RDL_RULES, default_repo_root, metadata_path
 from ._pbip_discovery import discover_pbip_projects
 from ._report_html import resolve_report
-from ._rule_overlay import apply_overlay, apply_pbir_overlay
-from ._scan import find_artifact_dirs
+from ._rule_overlay import apply_overlay, apply_pbir_overlay, apply_rdl_overlay
+from ._scan import find_artifact_dirs, find_files_by_suffix
 from ._target import ResolvedTarget
+from .playwright_validation.execution_config import forward_execution_flags
+from .playwright_validation.execution_runtime import execution_readiness
 from .playwright_validation.rdl_datasource import (
     parse_rdl_power_bi_datasource,
     parse_rdl_report_parameters,
@@ -65,6 +69,7 @@ _DEFAULT_BPA_RULES = str(metadata_path(BPA_RULES, REPO_ROOT))
 _DEFAULT_INSPECTOR_PATH = str(REPO_ROOT / "PBIR-Inspector" / "PBIRInspectorCLI")
 _DEFAULT_A11Y_PATH = str(REPO_ROOT / "pbir-a11y" / "dist" / "cli.js")
 _DEFAULT_PBIR_RULES = str(metadata_path(PBIR_RULES, REPO_ROOT))
+_DEFAULT_RDL_RULES = str(metadata_path(RDL_RULES, REPO_ROOT))
 
 ANALYZERS_JSON = metadata_path(ANALYZERS, REPO_ROOT)
 
@@ -78,6 +83,7 @@ ANALYZER_REGISTRY: dict[str, tuple[str, str]] = {
     "playwright": ("*.Report", "Playwright visual/error validation"),
     "playwright-impact": ("", "Playwright impact manifest builder"),
     "dependencies": ("", "Report dependency discovery"),
+    "rdl": ("*.rdl", "RDL (paginated report) static analysis"),
 }
 
 # Analyzers kept out of the advertised surface: absent from `--help`,
@@ -92,7 +98,7 @@ HIDDEN_ANALYZERS: frozenset[str] = frozenset({"pql_lint"})
 
 def visible_analyzers() -> tuple[str, ...]:
     """Return the analyzer names that belong on the advertised surface."""
-    return tuple(name for name in ANALYZER_REGISTRY if name not in HIDDEN_ANALYZERS)
+    return tuple(name for name in ANALYZER_REGISTRY if name not in HIDDEN_ANALYZERS | disabled_analyzers())
 
 
 # Which target scopes each analyzer can actually honor, declared once so the
@@ -103,14 +109,16 @@ def visible_analyzers() -> tuple[str, ...]:
 # Only pql_test truly *binds* to a running instance, which is why the
 # running-instance preflight keys off _DESKTOP_CAPABLE_ANALYZERS instead.
 #
-# None of them accept `workspace` except the ones that call the Fabric API.
-# Making bpa read a deployed item would mean exporting its definition
-# first, which is fabric-cicd-deployment's job and a stated non-goal.
+# bpa, pbir, a11y and rdl accept `workspace` too (Service Targeting epic):
+# a deployed item is exported read-only through Fabric getDefinition into
+# the on-disk shape they already read (see `_service_export`). Deploying
+# remains fabric-cicd-deployment's job; only test-input export is in scope.
 ANALYZER_SCOPES: dict[str, frozenset[str]] = {
-    "bpa": frozenset({"path", "desktop"}),
-    "pbir": frozenset({"path", "desktop"}),
-    "a11y": frozenset({"path", "desktop"}),
+    "bpa": frozenset({"path", "desktop", "workspace"}),
+    "pbir": frozenset({"path", "desktop", "workspace"}),
+    "a11y": frozenset({"path", "desktop", "workspace"}),
     "pql_lint": frozenset({"path", "desktop"}),
+    "rdl": frozenset({"path", "desktop", "workspace"}),
     "pql_test": frozenset({"path", "desktop", "workspace"}),
     "playwright": frozenset({"path", "workspace"}),
     "playwright-impact": frozenset({"path", "workspace"}),
@@ -173,6 +181,8 @@ def unsupported_type_error(name: str, target: ResolvedTarget | None) -> str | No
     handled = glob.removeprefix("*.")
     if target.type == handled:
         return None
+    if name == "rdl" and target.scope == "workspace" and target.type == "PaginatedReport":
+        return None
 
     others = tuple(
         analyzer for analyzer in _suffix_to_analyzers().get(f".{target.type}", ()) if analyzer not in HIDDEN_ANALYZERS
@@ -183,8 +193,8 @@ def unsupported_type_error(name: str, target: ResolvedTarget | None) -> str | No
     return f"{opening}. Analyzers that read {target.type}: {', '.join(others)}"
 
 
-# Analyzers that depend on an external binary/tool.
-_BOOTSTRAPPED_ANALYZERS = {"bpa", "pbir", "a11y"}
+# Analyzers that depend on an external binary/tool (data_agent's is promptfoo).
+_BOOTSTRAPPED_ANALYZERS = {"bpa", "pbir", "a11y", "data_agent"}
 
 # Analyzers that resolve no external binary but still cannot run on a bare
 # checkout: they need a Fabric workspace plus credentials, or -- pql_test
@@ -229,7 +239,7 @@ def _suffix_to_analyzers() -> dict[str, tuple[str, ...]]:
     """
     grouped: dict[str, list[str]] = {}
     for name, (glob, _description) in ANALYZER_REGISTRY.items():
-        if not glob:
+        if not glob or not is_enabled(name):
             continue
         grouped.setdefault(glob.removeprefix("*"), []).append(name)
     return {suffix: tuple(names) for suffix, names in grouped.items()}
@@ -281,18 +291,30 @@ def discover_artifacts(
     wrong. Every other scope narrows the scan by name, and by type when
     the target carries one — which is how ``Sales.SemanticModel`` stops
     selecting ``Sales.Report``.
+
+    A glob can name either a Fabric folder type (``*.SemanticModel``) or a
+    flat-file suffix (``*.rdl`` — a paginated report is a single file, not
+    a folder with a Fabric type suffix). Which shape it is comes from
+    ``artifact-map.json``: a suffix declared there is a folder; anything
+    else is a file. Both paths share the rest of this function's
+    filtering, so a flat-file analyzer gets the same target/path/type
+    narrowing a folder one already has.
     """
+    suffix = glob.lstrip("*")
+    is_folder_suffix = suffix in load_artifact_map(REPO_ROOT)
+
     if target is not None and target.path is not None:
         resolved = target.path.resolve()
-        return [resolved] if resolved.is_dir() and resolved.name.endswith(glob.lstrip("*")) else []
+        matches_shape = resolved.is_dir() if is_folder_suffix else resolved.is_file()
+        return [resolved] if matches_shape and resolved.name.endswith(suffix) else []
 
     if not artifact_dir.exists():
         return []
-    suffix = glob.lstrip("*")
-    artifacts = find_artifact_dirs(
-        artifact_dir,
-        (suffix,),
-        excluded_paths=[output_dir] if output_dir is not None else (),
+    excluded_paths = [output_dir] if output_dir is not None else ()
+    artifacts = (
+        find_artifact_dirs(artifact_dir, (suffix,), excluded_paths=excluded_paths)
+        if is_folder_suffix
+        else find_files_by_suffix(artifact_dir, suffix, excluded_paths=excluded_paths)
     )
     if target is None:
         return artifacts
@@ -341,6 +363,48 @@ def _resolve_pbir_rules_path(args: argparse.Namespace, output_dir: Path) -> Path
         return Path(_DEFAULT_PBIR_RULES)
     resolved = apply_pbir_overlay(Path(_DEFAULT_PBIR_RULES), overlay)
     return _write_resolved_rules(resolved, output_dir, "pbir")
+
+
+def _resolve_rdl_rules_path(args: argparse.Namespace, output_dir: Path) -> Path:
+    """Resolve the RDL rules file: overlay-applied unless --rules-path was
+    passed explicitly, in which case it's used verbatim.
+    """
+    explicit = getattr(args, "rdl_rules_path", _DEFAULT_RDL_RULES)
+    if explicit != _DEFAULT_RDL_RULES:
+        return Path(explicit)
+    overlay = getattr(args, "file_config", {}).get("rules", {}).get("rdl", {})
+    if not overlay:
+        return Path(_DEFAULT_RDL_RULES)
+    resolved = apply_rdl_overlay(Path(_DEFAULT_RDL_RULES), overlay)
+    return _write_resolved_rules(resolved, output_dir, "rdl")
+
+
+def build_rdl_command(
+    artifact: Path,
+    args: argparse.Namespace,
+    output_dir: Path,
+) -> list[str]:
+    """Build fab-test's own RDL static-analysis command for ``artifact``.
+
+    No external tool to resolve -- pure Python on the standard library, so
+    there is no ``--tool-path`` flag and nothing for ``resolve_tool`` to do.
+    ``--report``/``--open-report`` need no flag either: the wrapper's
+    ``attach_report`` reads ``ANALYZER_REPORT``, the same env var every
+    other in-process report already goes through.
+    """
+    rules_path = _resolve_rdl_rules_path(args, output_dir)
+    output = output_dir / "rdl" / artifact.stem / "envelope.json"
+    return [
+        sys.executable,
+        "-m",
+        _script_module("invoke_rdl_lint"),
+        "--artifact-path",
+        str(artifact),
+        "--rules-path",
+        str(rules_path),
+        "--output-path",
+        str(output),
+    ]
 
 
 def build_bpa_command(
@@ -559,7 +623,9 @@ def _report_type_for_command(artifact: Path, args: argparse.Namespace) -> str:
     is left for the subprocess to auto-detect, exactly like a bare
     ``--artifact NAME`` always has.
     """
-    explicit = getattr(args, "report_type", "") or ""
+    explicit = getattr(args, "report_type", "") or (getattr(args, "playwright_report_types", None) or {}).get(
+        artifact.stem, ""
+    )
     if explicit:
         return explicit
     return _LOCAL_SUFFIX_TO_REPORT_TYPE.get(artifact.suffix, "")
@@ -670,9 +736,10 @@ def build_playwright_command(
     roles = getattr(args, "roles", "auto")
     if roles != "auto":
         cmd += ["--roles", roles]
-    workers = getattr(args, "workers", None)
-    if workers is not None:
-        cmd += ["--workers", str(workers)]
+    user_name = getattr(args, "user_name", "")
+    if user_name:
+        cmd += ["--user-name", user_name]
+    forward_execution_flags(cmd, args)
     return cmd
 
 
@@ -742,16 +809,17 @@ _COMMAND_BUILDERS: dict[str, Any] = {
     "playwright": build_playwright_command,
     "playwright-impact": build_playwright_impact_command,
     "dependencies": build_dependencies_command,
+    "rdl": build_rdl_command,
 }
 
 
 # Analyzers that operate on a repository-level artifact path rather than a
-# .fabric artifact directory.
+# Fabric artifact directory.
 _REPOSITORY_SCOPED_ANALYZERS = {"playwright-impact", "dependencies"}
 
 
 def is_repository_scoped(name: str) -> bool:
-    """Return True when the analyzer does not target a .fabric artifact."""
+    """Return True when the analyzer does not target a Fabric artifact."""
     return name in _REPOSITORY_SCOPED_ANALYZERS
 
 
@@ -761,7 +829,7 @@ def resolve_tool(name: str, args: argparse.Namespace) -> Path | None:
     Returns the resolved Path, or None for analyzers without a declared tool.
     Raises RuntimeError with a helpful message if the tool cannot be resolved.
     """
-    if name not in _BOOTSTRAPPED_ANALYZERS:
+    if name not in _BOOTSTRAPPED_ANALYZERS or not is_enabled(name):
         return None
 
     explicit = None
@@ -797,7 +865,7 @@ def preflight_error(name: str, args: argparse.Namespace) -> tuple[str, int] | No
     exit code 127 ("command not found") covers any other resolution failure,
     distinguishing an unconfigured machine from a real rule violation (1).
     """
-    if name not in _BOOTSTRAPPED_ANALYZERS:
+    if name not in _BOOTSTRAPPED_ANALYZERS or not is_enabled(name):
         return None
     try:
         resolve_tool(name, args)
@@ -905,7 +973,7 @@ def check_readiness(name: str, args: argparse.Namespace | None) -> dict[str, Any
     `_cloud_readiness`'s five return statements for a field that never
     applies to them.
     """
-    result = _readiness_without_version(name, args)
+    result = execution_readiness(_readiness_without_version(name, args), name, args)
     result.setdefault("version", None)
     return result
 
@@ -914,7 +982,7 @@ def _readiness_without_version(name: str, args: argparse.Namespace | None) -> di
     if name in _CLOUD_ANALYZERS:
         return _cloud_readiness(name, args)
 
-    if name not in _BOOTSTRAPPED_ANALYZERS:
+    if name not in _BOOTSTRAPPED_ANALYZERS or not is_enabled(name):
         return {
             "ready": True,
             "resolved_path": None,
@@ -964,4 +1032,4 @@ def load_fab_test_all_analyzers(metadata_path: Path) -> tuple[str, ...]:
     configured = data.get("fab_test_all")
     if not isinstance(configured, list):
         return ("bpa", "pbir", "pql_test", "pql_lint")
-    return tuple(str(name) for name in configured if isinstance(name, str))
+    return tuple(str(name) for name in configured if isinstance(name, str) and is_enabled(name))

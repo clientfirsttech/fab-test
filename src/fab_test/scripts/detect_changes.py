@@ -3,7 +3,7 @@
 Fabric Artifact Change Detection
 
 Detects changed artifacts by analyzing git diff output against
-.fabric/artifacts directory and artifact-map.json metadata.
+fabric-artifacts directory and artifact-map.json metadata.
 
 Outputs changed-artifacts.json containing:
 - List of changed artifact paths
@@ -89,32 +89,34 @@ def detect_artifact_type(artifact_path: str, artifact_map: dict[str, str]) -> st
 
 
 def group_changes_by_artifact(changed_files: list[str], artifact_map: dict[str, str]) -> dict:
-    """Group changed files by their parent artifact."""
-    artifacts_dir = Path(".fabric/artifacts")
+    """Group changed files by their parent artifact.
+
+    The artifact root is the first path segment whose name resolves to a
+    known type (e.g. ``SalesModel.SemanticModel``), not a fixed path depth
+    -- a fixed depth silently mis-grouped every file the day the fixture
+    directory dropped a segment (`.fabric/artifacts` -> `fabric-artifacts`).
+    """
     changed_artifacts = {}
 
     for file_path in changed_files:
-        # Check if file is under .fabric/artifacts
         posix_path = file_path.replace("\\", "/")
-        if not posix_path.startswith(str(artifacts_dir).replace("\\", "/")):
+        parts = posix_path.split("/")
+
+        artifact_index = next(
+            (i for i, part in enumerate(parts) if detect_artifact_type(part, artifact_map) != "Unknown"),
+            None,
+        )
+        if artifact_index is None:
             continue
 
-        # Extract artifact root path
-        # Example: .fabric/artifacts/SalesModel.SemanticModel/definition/model.tmdl
-        # -> .fabric/artifacts/SalesModel.SemanticModel
-        parts = tuple(posix_path.split("/"))
-        if len(parts) < 3:
-            continue
-
-        artifact_path = "/".join(parts[:3])
-        artifact_name = parts[2]
+        artifact_path = "/".join(parts[: artifact_index + 1])
+        artifact_name = parts[artifact_index]
 
         if artifact_path not in changed_artifacts:
-            artifact_type = detect_artifact_type(artifact_name, artifact_map)
             changed_artifacts[artifact_path] = {
                 "path": artifact_path,
                 "name": artifact_name,
-                "type": artifact_type,
+                "type": detect_artifact_type(artifact_name, artifact_map),
                 "changed_files": []
             }
 

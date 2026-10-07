@@ -6,6 +6,7 @@ progress narration all stay exactly as they were.
 """
 
 import argparse
+import contextlib
 import json
 import os
 import subprocess
@@ -35,6 +36,8 @@ from ._playwright_dataset_target import (
     resolve_dataset_targets,
     resolve_dataset_workspace_artifact,
     resolve_dataset_workspace_targets,
+    resolve_workspace_reports,
+    workspace_reports_requested,
 )
 from ._playwright_timeout_scaling import (
     Narration as PlaywrightNarration,
@@ -44,6 +47,12 @@ from ._report_html import resolve_report
 from ._run_manifest import RunManifest
 from ._scan import find_rdl_files as _find_rdl_files
 from ._scan import find_skipped_checkouts as _find_skipped_checkouts
+from ._service_export import (
+    ServiceExportError,
+    build_service_client,
+    export_for_analyzer,
+    is_service_run,
+)
 from ._target import target_from_args
 from .fab_test_registry import (
     ANALYZER_REGISTRY as _ANALYZER_REGISTRY,
@@ -369,6 +378,21 @@ def _load_artifact_envelope(
     }, True
 
 
+def _stamp_mode(
+    envelope: dict[str, Any], args: argparse.Namespace, output_dir: Path, name: str, artifact: Path
+) -> None:
+    """Add the additive ``mode``/``source`` fields, in memory and in the envelope file."""
+    resolved = getattr(args, "resolved_mode", None)
+    if resolved is None:
+        return
+    envelope["mode"] = resolved.mode
+    envelope["source"] = resolved.source
+    path = output_dir / name / artifact.stem / "envelope.json"
+    if path.exists():
+        with contextlib.suppress(OSError):
+            path.write_text(json.dumps(envelope, indent=2), encoding="utf-8")
+
+
 def _finalize_artifact_run(
     name: str,
     artifact: Path,
@@ -381,6 +405,7 @@ def _finalize_artifact_run(
 ) -> int:
     """Apply the error/warning threshold, send telemetry, and record the manifest."""
     artifact_code = _artifact_exit_code(proc.returncode, envelope)
+    _stamp_mode(envelope, args, output_dir, name, artifact)
 
     errors, warnings = severity_counts(envelope.get("findings", []))
     if ctx.in_ci:
@@ -475,20 +500,34 @@ def _resolve_workspace_target(args: argparse.Namespace) -> int | None:
     elif not getattr(args, "workspace_id", ""):
         name = (getattr(args, "file_config", None) or {}).get("workspace", "")
     else:
-        name = ""
+        # --workspace stores its value in workspace_id, which may be a display name.
+        name = args.workspace_id
     if not name:
         return None
 
+    from .playwright_validation.resolver import _GUID_PATTERN
+    if _GUID_PATTERN.match(name.strip()):
+        # Already an ID: skip building a client for nothing.
+        args.workspace_id = name.strip()
+        return None
+    return _lookup_workspace_id(args, name)
+
+
+def _lookup_workspace_id(args: argparse.Namespace, name: str) -> int | None:
+    """Resolve a display name into args.workspace_id; an exit code on failure, else None."""
     from .playwright_validation.fabric_service_client import build_fabric_service_client
-    from .playwright_validation.resolver import (
-        AmbiguousWorkspaceError,
-        ServiceResolutionError,
-        WorkspaceNotFoundError,
-    )
+    from .playwright_validation.resolver import AmbiguousWorkspaceError, ServiceResolutionError, WorkspaceNotFoundError
 
     try:
-        client = build_fabric_service_client(env_file=getattr(args, "playwright_env_file", None))
+        if getattr(args, "interactive", False):
+            client = build_service_client(args)
+        else:
+            client = build_fabric_service_client(env_file=getattr(args, "playwright_env_file", None))
+            args._service_client = client
         args.workspace_id = resolve_workspace_id(client, name)
+    except ServiceExportError as exc:
+        print(f"  ✗ fab-test: {exc}", file=sys.stderr)
+        return exc.code
     except AmbiguousWorkspaceError as exc:
         print(f"  ✗ fab-test: {exc}", file=sys.stderr)
         return 2
@@ -517,7 +556,7 @@ def _playwright_remote_target(args: argparse.Namespace) -> Path | None:
     report (``--artifact NAME`` or ``WORKSPACE.Workspace/NAME.Type``) and an
     environment has stated an intent to resolve it live via ``resolve_report``,
     which a paginated (RDL) report especially needs: this repo's
-    ``.fabric/artifacts/`` tree only ever holds PBIR-format interactive
+    ``fabric-artifacts/`` tree only ever holds PBIR-format interactive
     reports, so an RDL report can never have a local folder to be found by at
     all. A real filesystem path (``./src/Sales.Report``) is left alone --
     naming a specific location and finding nothing there is a real miss, not
@@ -565,6 +604,8 @@ def _playwright_service_resolved_target(args: argparse.Namespace) -> list[Path] 
     """
     if getattr(args, "impact_manifest", None):
         return [Path(".")]
+    if workspace_reports_requested(args):
+        return resolve_workspace_reports(args)
     if dataset_target_requested(args):
         return resolve_dataset_targets(args)
     if dataset_workspace_only_requested(args):
@@ -581,6 +622,8 @@ def _discover_for(name: str, args: argparse.Namespace, glob: str) -> list[Path]:
     """
     if _is_repository_scoped(name):
         return [Path(".")]
+    if is_service_run(name, args):
+        return export_for_analyzer(name, args, Path(getattr(args, "output_dir", RESULTS_ROOT)))
     if name == "playwright":
         resolved = _playwright_service_resolved_target(args)
         if resolved is not None:
@@ -797,6 +840,9 @@ def _run_analyzer(
     try:
         artifacts = _discover_for(name, args, glob)
     except DatasetTargetExit as exc:
+        return exc.code
+    except ServiceExportError as exc:
+        narrate(f"  ✗ fab-test {name}: {exc}", output_format=output_format)
         return exc.code
     if not artifacts:
         return _report_no_artifacts(name, glob, args, emit_own_json=emit_own_json)

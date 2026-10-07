@@ -23,6 +23,11 @@ and gated behind a protected `fabric-demo` GitHub Environment, so the fork-PR
 problem above cannot recur; `tests/test_playwright_workflows_drift.py`
 guards both properties.
 
+`live-ci.yml` (Live CI) is the second: it runs the credential-gated live
+contract tests against the `visual-error-testing` workspace on same-repository
+pull requests and pushes, behind the same `fabric-demo` Environment, and skips
+fork and dependabot PRs; `tests/test_playwright_workflows_drift.py` guards that.
+
 What is left is what a package repository needs: build, publish, rehearse,
 the setup GitHub Copilot's agent reads, and that one narrow demo.
 
@@ -46,6 +51,7 @@ _EXPECTED_WORKFLOWS = {
     "copilot-setup-steps.yml",
     "check-tool-updates.yml",
     "playwright-demo.yml",
+    "live-ci.yml",
 }
 
 _SELF_STARTING_TRIGGERS = ("push", "pull_request", "pull_request_target", "schedule")

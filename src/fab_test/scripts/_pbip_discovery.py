@@ -1,7 +1,7 @@
 """Discover .pbip projects wherever they live (Local Desktop First Run §1).
 
 A .pbip project is a Power BI project file paired with a `.Report` folder
-and a `.SemanticModel` folder. Unlike `.fabric/artifacts` discovery, this
+and a `.SemanticModel` folder. Unlike `fabric-artifacts` discovery, this
 walks an arbitrary root recursively so a developer's `.pbip` is found no
 matter where it lives in the repository.
 """

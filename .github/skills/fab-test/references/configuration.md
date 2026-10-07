@@ -36,6 +36,7 @@ If both `fab-test.yml` and `[tool.fab-test]` are present, `fab-test.yml` wins pe
 | `report` | boolean | `ANALYZER_REPORT` | `false` — see [Reports](reports.md) |
 | `open_report` | boolean | `ANALYZER_OPEN_REPORT` | `false` — implies `report`; no-op under CI — see [Open Report](reports.md#open-report) |
 | `playwright_user_name` | string | `PLAYWRIGHT_USER_NAME` | (none) — effective-identity UPN for RLS embed tokens; only reaches cases that carry a discovered role |
+| `playwright_config` | string | `PLAYWRIGHT_CONFIG_PATH` | (none) - optional local/Azure execution YAML; relative to the owning config file; `--playwright-config` wins |
 | `rules` | object | — | (none) — see Rule Overlays below |
 | `telemetry` | object | — | (none) — see Telemetry below |
 
@@ -112,7 +113,7 @@ A destination that cannot be reached or built is a **failed** flush, never a del
 
 **What a record identifies.** `Data.actor` carries the identity as given — `GITHUB_ACTOR` in CI, otherwise `git config user.email` — so a row can be grouped by who produced it. It is not hashed: the repository already stores that address in plaintext on every commit, and an opaque digest answered "was this the same person as last time" and nothing else. `Data.repository` follows the same CI-env-var-first, local-git-fallback pattern: `GITHUB_REPOSITORY` in CI, otherwise `owner/repo` parsed from the local `origin` remote (HTTPS or SSH); empty when neither resolves.
 
-Filesystem paths in the payload, including those inside the embedded `results` envelope, are rewritten **repository-relative** (`.fabric\artifacts\Sales.SemanticModel`, not `C:\Users\<name>\...`). A path outside the repository is reduced to its final component rather than a `../../..` traversal. This is deliberate and worth knowing when querying: `Data.results.artifact_path` is relative, while the same field in the envelope on disk stays absolute, because a human clicking a result wants the full path and an Eventhouse row does not.
+Filesystem paths in the payload, including those inside the embedded `results` envelope, are rewritten **repository-relative** (`fabric-artifacts\Sales.SemanticModel`, not `C:\Users\<name>\...`). A path outside the repository is reduced to its final component rather than a `../../..` traversal. This is deliberate and worth knowing when querying: `Data.results.artifact_path` is relative, while the same field in the envelope on disk stays absolute, because a human clicking a result wants the full path and an Eventhouse row does not.
 
 Prerequisites, each destination reported by its own `fab-test doctor` row:
 
@@ -146,7 +147,7 @@ Telemetry never changes a run's exit code, never writes to stdout under `--forma
 
 ## Rule Overlays
 
-Tune one Best Practice Analyzer or PBIR Inspector rule without forking the packaged rules file:
+Tune one Best Practice Analyzer, PBIR Inspector, or `rdl` rule without forking the packaged rules file:
 
 ```yaml
 rules:
@@ -157,9 +158,14 @@ rules:
   pbir:
     disable: [REMOVE_CUSTOM_VISUALS_NOT_USED]
     severity: {SOME_RULE_ID: warning}            # warning | error (PBIR Inspector has no "info" level)
+  rdl:
+    disable: [DS-02]
+    severity: {QRY-07: info}                     # info | warning | error
 ```
 
-An overlay naming a rule ID that doesn't exist upstream exits `2` listing every unmatched ID. When any overlay is configured, the resolved ruleset is written to `<output_dir>/{bpa,pbir}/_resolved-rules.json` and passed to the tool; the envelope's `rules_file` field always names whichever rules file was actually used, so a finding is traceable back to the resolved ruleset it came from. Passing `--bpa-rules-path`/`--rules-path` explicitly bypasses the overlay entirely — that file is used verbatim.
+An overlay naming a rule ID that doesn't exist upstream exits `2` listing every unmatched ID. When any overlay is configured, the resolved ruleset is written to `<output_dir>/{bpa,pbir,rdl}/_resolved-rules.json` and passed to the tool; the envelope's `rules_file` field always names whichever rules file was actually used, so a finding is traceable back to the resolved ruleset it came from. Passing `--bpa-rules-path`/`--rules-path` explicitly bypasses the overlay entirely — that file is used verbatim; for `rdl` the equivalent explicit override is `--rdl-rules-path` specifically, not `--rules-path` — `rdl` needed its own flag name because `fab-test all` already dedicates `--rules-path` to `pbir` (the same reason `bpa` has its own `--bpa-rules-path`).
+
+Two of `rdl`'s rules read a threshold from their own catalog entry instead of a fixed constant — `QRY-07.max_lines` (default `50`, long `CommandText`) and `SUB-02.max_subreports` (default `49`, so `50` fails per the rule's own name). Neither `disable`/`severity`/`extend` can change one (`extend` only appends new rule objects, it never replaces an existing ID's fields) — to change a threshold, pass `--rdl-rules-path` at a fully custom copy of the catalog with that one field edited; there's no config-file way to override just the threshold today.
 
 The full schema ships with the package at `schemas/fab-test.schema.json` (draft 2020-12) for editor completion.
 
@@ -177,6 +183,7 @@ Five files drive the CLI. Each resolves through the same three layers, first mat
 |------|-------------------|
 | `rules/BPARules.json` | Yes |
 | `rules/pbi-inspector-custom-rules.json` | Yes |
+| `rules/rdl-rules.json` | Yes |
 | `analyzers.json` | Yes |
 | `artifact-map.json` | Yes |
 | `environments.yml` | **No** |

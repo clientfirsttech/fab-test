@@ -48,7 +48,7 @@ REQUIRED = [
 # in a distribution, and some of it (.env) must never leave this machine.
 FORBIDDEN = (
     ".github/",
-    ".fabric/",
+    "fabric-artifacts/",
     "docs/",
     "tests/",
     "TabularEditor/",

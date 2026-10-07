@@ -9,7 +9,7 @@ No external tools required. Always passes on any machine.
     pytest -m bpa        # all wrapper contract tests
     pytest -m analyzers  # all analyzer contract tests
 
-Real execution (running BPA against your actual .fabric artifacts)
+Real execution (running BPA against your actual Fabric artifacts)
 is done via ``fab-test bpa`` — a separate command that is not
 pytest, just as running your code is not the same as testing it.
 """
@@ -24,7 +24,7 @@ import pytest
 pytestmark = [pytest.mark.bpa, pytest.mark.analyzers]
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-ARTIFACT_ROOT = REPO_ROOT / ".fabric" / "artifacts"
+ARTIFACT_ROOT = REPO_ROOT / "fabric-artifacts"
 BPA_WRAPPER = "tabular-editor-bpa"
 
 SEMANTIC_MODELS = sorted(ARTIFACT_ROOT.glob("*.SemanticModel"))
@@ -61,7 +61,7 @@ def _bpa_rules_path() -> Path:
 
 @pytest.mark.bpa
 def test_semantic_models_discovered():
-    """At least one .fabric SemanticModel must exist to analyze."""
+    """At least one Fabric SemanticModel must exist to analyze."""
     assert SEMANTIC_MODELS, f"No *.SemanticModel found under {ARTIFACT_ROOT}"
 
 

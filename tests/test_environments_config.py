@@ -20,7 +20,7 @@ promotion_chain:
   - dev
   - test
 defaults:
-  repository_directory: ".fabric/artifacts"
+  repository_directory: "fabric-artifacts"
   item_type_in_scope:
     - "*"
 environments:

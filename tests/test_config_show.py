@@ -26,13 +26,14 @@ _EXPECTED_KEYS = {
     "environment",
     "workspace",
     "playwright_user_name",
+    "playwright_config",
 }
 
 # Resolved by metadata layer rather than by flag/env/config, so their origins
 # name a directory (`.fab-test/metadata`, `.github/metadata`, `packaged`)
 # instead of the flag/env vocabulary. Listed separately so the exact-equality
 # assertion below stays a real guard against an accidental extra row.
-_EXPECTED_RULESET_KEYS = {"rules.bpa", "rules.pbir"}
+_EXPECTED_RULESET_KEYS = {"rules.bpa", "rules.pbir", "rules.rdl"}
 
 
 @pytest.mark.fab_test

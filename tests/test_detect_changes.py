@@ -72,11 +72,11 @@ class TestGroupChangesByArtifact:
     """Tests for group_changes_by_artifact."""
 
     def test_groups_files_under_artifacts(self):
-        """Changed files under .fabric/artifacts are grouped by artifact root."""
+        """Changed files under fabric-artifacts are grouped by artifact root."""
         changed = [
-            ".fabric/artifacts/SalesModel.SemanticModel/definition/model.tmdl",
-            ".fabric/artifacts/SalesModel.SemanticModel/definition/tables.tmdl",
-            ".fabric/artifacts/SalesReport.Report/definition/report.json",
+            "fabric-artifacts/SalesModel.SemanticModel/definition/model.tmdl",
+            "fabric-artifacts/SalesModel.SemanticModel/definition/tables.tmdl",
+            "fabric-artifacts/SalesReport.Report/definition/report.json",
         ]
         artifact_map = {
             ".SemanticModel": "SemanticModel",
@@ -85,12 +85,31 @@ class TestGroupChangesByArtifact:
         result = group_changes_by_artifact(changed, artifact_map)
 
         assert len(result) == 2
-        assert result[".fabric/artifacts/SalesModel.SemanticModel"]["type"] == "SemanticModel"
-        assert len(result[".fabric/artifacts/SalesModel.SemanticModel"]["changed_files"]) == 2
-        assert result[".fabric/artifacts/SalesReport.Report"]["type"] == "Report"
+        assert result["fabric-artifacts/SalesModel.SemanticModel"]["type"] == "SemanticModel"
+        assert len(result["fabric-artifacts/SalesModel.SemanticModel"]["changed_files"]) == 2
+        assert result["fabric-artifacts/SalesReport.Report"]["type"] == "Report"
+
+    def test_groups_files_regardless_of_root_depth(self):
+        """The artifact root is found by suffix, not a fixed path depth.
+
+        A fixed-depth implementation (keying off ``parts[2]``) silently
+        mis-grouped every file the day the fixture root dropped a segment
+        (``.fabric/artifacts`` -> ``fabric-artifacts``). This pins the fix:
+        a one-segment root and a deeply nested one both resolve correctly.
+        """
+        artifact_map = {".SemanticModel": "SemanticModel"}
+        shallow = group_changes_by_artifact(
+            ["fabric-artifacts/SalesModel.SemanticModel/definition/model.tmdl"], artifact_map
+        )
+        deep = group_changes_by_artifact(
+            ["some/deeply/nested/root/SalesModel.SemanticModel/definition/model.tmdl"], artifact_map
+        )
+
+        assert shallow["fabric-artifacts/SalesModel.SemanticModel"]["name"] == "SalesModel.SemanticModel"
+        assert deep["some/deeply/nested/root/SalesModel.SemanticModel"]["name"] == "SalesModel.SemanticModel"
 
     def test_ignores_files_outside_artifacts(self):
-        """Files outside .fabric/artifacts are ignored."""
+        """Files with no segment resolving to a known artifact type are ignored."""
         changed = ["scripts/deploy.py", ".github/workflows/ci.yml"]
         assert group_changes_by_artifact(changed, {}) == {}
 
@@ -110,7 +129,7 @@ class TestMain:
         )
 
         changed = [
-            ".fabric/artifacts/SalesModel.SemanticModel/definition/model.tmdl"
+            "fabric-artifacts/SalesModel.SemanticModel/definition/model.tmdl"
         ]
         argv = ["detect_changes.py"]
         with (

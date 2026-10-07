@@ -406,6 +406,27 @@ class FabricRestClient:
                 dataset_ids.append(match.group(1))
         return dataset_ids
 
+    def get_item_definition(
+        self, workspace_id: str, item_id: str, *, definition_format: str = ""
+    ) -> list[dict[str, str]]:
+        """Return an item's definition parts via Fabric ``getDefinition``.
+
+        The export seam read-only test inputs are materialized from
+        (Service Targeting epic). Each part is ``{"path", "payload"}`` with a
+        base64 payload. ``definition_format`` selects ``TMDL`` for a semantic
+        model or ``PBIR`` for a report.
+        """
+        data = self._request(
+            "POST",
+            f"/v1/workspaces/{workspace_id}/items/{item_id}/getDefinition",
+            api_root=_fabric_api_root_for(self._token.cloud),
+            params={"format": definition_format} if definition_format else None,
+        )
+        return [
+            {"path": part.get("path", ""), "payload": part.get("payload", "")}
+            for part in data.get("definition", {}).get("parts", [])
+        ]
+
     def get_paginated_report_definition(self, workspace_id: str, report_id: str) -> str:
         """Return a deployed paginated report's ``.rdl`` text, or ``""``.
 

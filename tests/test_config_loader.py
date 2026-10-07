@@ -41,7 +41,7 @@ _SCHEMA_PATH = (
 def test_discover_config_path_finds_fab_test_yml_at_repo_root(tmp_path):
     """A fab-test.yml at the repository root is discovered."""
     config_file = tmp_path / CONFIG_FILENAME
-    config_file.write_text("artifact_dir: .fabric/artifacts\n", encoding="utf-8")
+    config_file.write_text("artifact_dir: fabric-artifacts\n", encoding="utf-8")
 
     assert discover_config_path(tmp_path) == config_file
 
@@ -66,12 +66,12 @@ def test_discover_config_path_prefers_explicit_override(tmp_path):
 def test_load_config_parses_yaml_into_a_plain_dict(tmp_path):
     """A valid fab-test.yml is parsed into a plain dictionary."""
     (tmp_path / CONFIG_FILENAME).write_text(
-        "artifact_dir: .fabric/artifacts\njobs: 4\n", encoding="utf-8"
+        "artifact_dir: fabric-artifacts\njobs: 4\n", encoding="utf-8"
     )
 
     config = load_config(tmp_path)
 
-    assert config == {"artifact_dir": ".fabric/artifacts", "jobs": 4}
+    assert config == {"artifact_dir": "fabric-artifacts", "jobs": 4}
 
 
 @pytest.mark.fab_test
@@ -253,7 +253,7 @@ def test_main_narrates_duplicate_config_source_warning(tmp_path):
     """A real invocation with both sources present narrates the warning once."""
     _write_pyproject_table(tmp_path, jobs=4)
     (tmp_path / CONFIG_FILENAME).write_text("jobs: 8\n", encoding="utf-8")
-    (tmp_path / ".fabric" / "artifacts").mkdir(parents=True)
+    (tmp_path / "fabric-artifacts").mkdir(parents=True)
 
     result = subprocess.run(
         ["fab-test", "bpa", "--dry-run"],
@@ -489,8 +489,20 @@ def test_validate_config_accepts_a_full_valid_rules_overlay():
         "rules": {
             "bpa": {"disable": ["RULE_A"], "severity": {"RULE_B": "warning"}, "extend": "extra.json"},
             "pbir": {"disable": ["RULE_C"]},
+            "rdl": {"disable": ["DS-02"], "severity": {"QRY-07": "info"}},
         }
     })  # must not raise
+
+
+@pytest.mark.fab_test
+def test_schema_rules_analyzers_match_the_overlay_allowlist():
+    """The schema's rules.<analyzer> keys and _RULE_OVERLAY_ANALYZERS can't drift --
+    an analyzer added to one without the other either rejects a valid config
+    (schema) or accepts one the loader then rejects anyway (validator)."""
+    schema = json.loads(_SCHEMA_PATH.read_text(encoding="utf-8"))
+    from fab_test.scripts._config import _RULE_OVERLAY_ANALYZERS
+
+    assert set(schema["properties"]["rules"]["properties"].keys()) == set(_RULE_OVERLAY_ANALYZERS)
 
 
 @pytest.mark.fab_test

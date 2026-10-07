@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""fab-test: Run Fabric artifact analyzers against .fabric/artifacts locally.
+"""fab-test: Run Fabric artifact analyzers against fabric-artifacts locally.
 
-fab-test runs analyzers against your actual .fabric artifacts.
+fab-test runs analyzers against your actual Fabric artifacts.
 It is NOT pytest. Use pytest to test the framework; use fab-test to test your artifacts.
 
 Usage:
@@ -42,8 +42,16 @@ from ._fab_test_context import (
     REPO_ROOT,
     RESULTS_ROOT,  # noqa: F401 -- re-exported: tests import this directly from `fab_test`
 )
+from ._mode import ModeError, resolve_mode
 from ._report_html import open_report_conflict
 from ._run_manifest import RunManifest
+from ._service_export import (
+    finalize_exports,
+    interactive_refusal,
+    is_service_run,
+    service_item_type,
+    service_target_refusal,
+)
 from ._target import TargetError, select_target, workspace_conflict
 
 # Re-exported: `_dispatch_admin_command`'s handler table and `_prepare_target`
@@ -111,6 +119,7 @@ from .fab_test_telemetry import (  # noqa: F401
     _telemetry_readiness,
     _validate_telemetry_payload,
 )
+from .playwright_validation.execution_config import prepare_execution
 
 # Ensure UTF-8 output on Windows where the default pipe encoding is cp1252.
 if hasattr(sys.stdout, "reconfigure"):
@@ -191,6 +200,20 @@ def _prepare_report_flags(args: argparse.Namespace) -> int | None:
     return None
 
 
+def _pql_workspace_conflict(args: argparse.Namespace) -> str | None:
+    """pql-test's --workspace (mode) and --workspace-id (XMLA) must agree."""
+    if args.analyzer != "pql_test":
+        return None
+    service_ws = (getattr(args, "service_workspace", "") or "").strip()
+    xmla_ws = (getattr(args, "workspace_id", "") or "").strip()
+    if service_ws and xmla_ws and service_ws != xmla_ws:
+        return (
+            f"--workspace '{service_ws}' and --workspace-id '{xmla_ws}' "
+            "name different workspaces; pass one or the other"
+        )
+    return None
+
+
 def _prepare_target(args: argparse.Namespace) -> int | None:
     """Resolve and validate the target onto ``args``, or return an exit code.
 
@@ -203,25 +226,56 @@ def _prepare_target(args: argparse.Namespace) -> int | None:
     """
     try:
         args.resolved_target = select_target(
-            getattr(args, "target", None), getattr(args, "artifact", None)
+            getattr(args, "target", None),
+            getattr(args, "artifact", None),
+            default_type=service_item_type(args.analyzer),
         )
     except TargetError as exc:
         print(f"  ✗ fab-test: {exc}", file=sys.stderr)
         return 2
 
     conflict = workspace_conflict(args.resolved_target, getattr(args, "workspace_id", ""))
+    conflict = conflict or _pql_workspace_conflict(args)
     if conflict:
         print(f"  ✗ fab-test: {conflict}", file=sys.stderr)
         return 2
 
-    if args.analyzer not in ("all", "local"):
-        refusal = _unsupported_scope_error(
-            args.analyzer, args.resolved_target
-        ) or _unsupported_type_error(args.analyzer, args.resolved_target)
-        if refusal:
-            print(f"  ✗ fab-test: {refusal}", file=sys.stderr)
-            return 2
+    try:
+        # pql-test's --workspace-id is an XMLA connection setting, not a mode;
+        # its mode flag is --workspace (service_workspace), like the others'.
+        workspace_flag = (
+            getattr(args, "service_workspace", "")
+            if args.analyzer == "pql_test"
+            else getattr(args, "workspace_id", "")
+        )
+        args.resolved_mode = resolve_mode(
+            args.resolved_target,
+            workspace_flag=workspace_flag,
+            artifact_dir_explicit=getattr(args, "artifact_dir_explicit", False),
+        )
+    except ModeError as exc:
+        print(f"  ✗ fab-test: {exc}", file=sys.stderr)
+        return 2
+    args.mode = args.resolved_mode.mode
 
+    refusal = None
+    if args.analyzer not in ("all", "local"):
+        refusal = (
+            _unsupported_scope_error(args.analyzer, args.resolved_target)
+            or _unsupported_type_error(args.analyzer, args.resolved_target)
+            or service_target_refusal(args.analyzer, args)
+        )
+    refusal = refusal or (args.mode == "service" and interactive_refusal(args)) or None
+    if refusal:
+        print(f"  ✗ fab-test: {refusal}", file=sys.stderr)
+        return 2
+
+    # Under --format json or -q stderr stays silent; the mode is in the envelope.
+    if getattr(args, "output_format", "text") != "json" and not getattr(args, "quiet", False):
+        print(args.resolved_mode.banner(), file=sys.stderr)
+    if getattr(args, "dry_run", False) and is_service_run(args.analyzer, args) and args.resolved_target:
+        # A typed target is listed from its name alone: no token, no API call.
+        return None
     return _resolve_workspace_target(args)
 
 
@@ -244,6 +298,7 @@ def _prepare_paths(args: argparse.Namespace) -> int | None:
 # because the environment default feeds them.
 _PREPARE_STEPS: tuple[Callable[[argparse.Namespace], int | None], ...] = (
     _prepare_config,
+    lambda args: prepare_execution(args, REPO_ROOT),
     _prepare_verbosity,
     _prepare_report_flags,
     _dispatch_admin_command,
@@ -334,7 +389,11 @@ def main() -> int:
         if exit_code is not None:
             return exit_code
 
-    return _dispatch_run(args)
+    try:
+        return _dispatch_run(args)
+    finally:
+        # Exports are test inputs, not results: gone on every exit path.
+        finalize_exports(args)
 
 
 if __name__ == "__main__":

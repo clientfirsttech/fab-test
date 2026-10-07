@@ -39,6 +39,10 @@ _VALID_KEYS: dict[str, type] = {
     # workspace (Artifact Targeting and Auth §3). A display name or a GUID;
     # a positional WORKSPACE.Workspace/... target overrides it.
     "workspace": str,
+    # Feature flag for `--interactive` browser sign-in in service mode
+    # (Service Targeting epic): on|off (YAML's bare on/off arrive as bools).
+    # Checked below rather than by type, since both spellings are valid.
+    "interactive_auth": object,
     # Generate a readable HTML report beside each envelope (Human-Readable
     # Reports §5). Opt-in: false unless asked for.
     "report": bool,
@@ -51,6 +55,7 @@ _VALID_KEYS: dict[str, type] = {
     # a caller that no longer supplies the variable per run declares the
     # UPN once here instead.
     "playwright_user_name": str,
+    "playwright_config": str,
     # Rule overlays (Config Consolidation §6-7): {"bpa": {...}, "pbir": {...}}.
     # Nested disable/severity/extend keys are validated by _rule_overlay.py
     # itself at use time, not here.
@@ -107,6 +112,12 @@ def merged_file_config(
     """
     pyproject_config = load_pyproject_config(pyproject_path)
     yaml_config = load_config(repo_root, explicit_path)
+    for config, owner in (
+        (pyproject_config, pyproject_path),
+        (yaml_config, discover_config_path(repo_root, explicit_path)),
+    ):
+        if owner and isinstance(config.get("playwright_config"), str) and config["playwright_config"]:
+            config["playwright_config"] = str((owner.parent / config["playwright_config"]).resolve())
     warnings = []
     if pyproject_config and yaml_config:
         warnings.append(
@@ -116,7 +127,7 @@ def merged_file_config(
     return {**pyproject_config, **yaml_config}, warnings
 
 
-_RULE_OVERLAY_ANALYZERS = ("bpa", "pbir")
+_RULE_OVERLAY_ANALYZERS = ("bpa", "pbir", "rdl")
 _RULE_OVERLAY_KEYS: dict[str, type] = {"disable": list, "severity": dict, "extend": str}
 
 
@@ -228,6 +239,12 @@ def validate_config(config: dict[str, Any]) -> None:
 
     if "verbosity" in config:
         _validate_verbosity(config["verbosity"])
+
+    flag = config.get("interactive_auth")
+    if "interactive_auth" in config and not (
+        isinstance(flag, bool) or str(flag).strip().lower() in ("on", "off")
+    ):
+        raise ConfigError("config key 'interactive_auth' must be on or off")
 
     if "telemetry" in config:
         _validate_telemetry(config["telemetry"])

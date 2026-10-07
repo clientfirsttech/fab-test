@@ -195,7 +195,8 @@ ignore = [
 ]
 
 # The info glyph is deliberate in CLI output, not a typo for the letter i.
-allowed-confusables = ["ℹ"]
+# The finding-path separator (Dataset › Field) is deliberate, not a typo for ">".
+allowed-confusables = ["ℹ", "›"]
 
 # Thresholds for the non-gating complexity report (see the lint workflow).
 # Raising either of these is a decision, not a formality — say why in the commit.
@@ -211,6 +212,9 @@ max-args = 8
 # orchestrator, not a scanner, and the exemption meant each new blind except
 # landed unexamined. Its three are now justified individually.
 "src/fab_test/scripts/invoke_tabular_editor_bpa.py" = ["S314"]
+# .rdl is the local artifact fab-test was asked to analyze -- same trust
+# boundary as a .pbip/.tmdl file, not untrusted network input.
+"src/fab_test/scripts/_rdl_lint.py" = ["S314"]
 # Tests: asserts are the point, stub callables ignore their arguments, fake
 # credentials are not secrets, and sys.path setup runs before imports.
 "tests/**" = [
@@ -218,6 +222,7 @@ max-args = 8
     "S105",   # hardcoded password string
     "S106",   # hardcoded password argument
     "S314",   # xml parsing of fixture data
+    "S608",   # literal SQL text in .rdl CommandText fixtures, never executed
     "ARG001", # stub function arguments
     "ARG002", # stub method arguments
     "ARG005", # stub lambda arguments

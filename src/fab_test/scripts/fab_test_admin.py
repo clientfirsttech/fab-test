@@ -24,15 +24,19 @@ from ._fab_test_context import (
     REPO_ROOT,
     RESULTS_ROOT,
 )
+from ._feature_flags import is_enabled, not_enabled_message
 from ._metadata import (
     ANALYZERS,
     BPA_RULES,
     PBIR_RULES,
+    RDL_RULES,
     metadata_path,
     resolve_metadata,
 )
+from ._mode import ModeError, ResolvedMode, resolve_mode
 from ._scan import find_skipped_checkouts as _find_skipped_checkouts
-from ._target import TargetError
+from ._service_export import service_item_type, service_readiness
+from ._target import TargetError, select_target
 from ._telemetry import eventhouse_rows, lakehouse_rows
 from .fab_test_execution import _manifest_target, _target_of
 from .fab_test_local import _LOCAL_ANALYZERS, _local_readiness
@@ -40,6 +44,7 @@ from .fab_test_parser import _aliases_for, _canonical_name
 from .fab_test_registry import (
     _DEFAULT_BPA_RULES,
     _DEFAULT_PBIR_RULES,
+    _DEFAULT_RDL_RULES,
 )
 from .fab_test_registry import (
     ANALYZER_REGISTRY as _ANALYZER_REGISTRY,
@@ -161,6 +166,7 @@ _SETTING_SPECS: list[tuple[str, str | None, Any, type | None]] = [
     ("environment", "FABRIC_ENVIRONMENT", "", None),
     ("workspace", "FABRIC_WORKSPACE_ID", "", None),
     ("playwright_user_name", "PLAYWRIGHT_USER_NAME", "", None),
+    ("playwright_config", "PLAYWRIGHT_CONFIG_PATH", "", None),
 ]
 
 _SECRET_KEY_MARKERS = ("secret", "password", "token", "api_key")
@@ -196,7 +202,7 @@ def _ruleset_rows() -> list[dict[str, Any]]:
     needs to know which ruleset produced it.
     """
     rows = []
-    for key, relative in (("rules.bpa", BPA_RULES), ("rules.pbir", PBIR_RULES)):
+    for key, relative in (("rules.bpa", BPA_RULES), ("rules.pbir", PBIR_RULES), ("rules.rdl", RDL_RULES)):
         resolved, origin = resolve_metadata(relative, REPO_ROOT)
         rows.append({"key": key, "value": str(resolved), "origin": origin})
     return rows
@@ -243,7 +249,7 @@ _FAB_TEST_YML_TEMPLATE = """\
 # this file > packaged default. Run `fab-test config --show` to see the
 # effective value and origin of each setting right now.
 
-# artifact_dir: .fabric/artifacts   # root to discover artifacts (repo root for `fab-test local`)
+# artifact_dir: fabric-artifacts   # root to discover artifacts (repo root for `fab-test local`)
 # output_dir: fab-test-results      # root for result envelopes and the run manifest
 # jobs: 1                          # artifacts to run in parallel for the same analyzer
 # format: text                     # text | json
@@ -258,6 +264,8 @@ _FAB_TEST_YML_TEMPLATE = """\
 #                                  # effective-identity UPN for RLS embed tokens
 #                                  # [env: PLAYWRIGHT_USER_NAME]; only used for
 #                                  # cases that carry a discovered role
+# playwright_config: .fab-test/playwright.yml
+#                                  # optional local/Azure YAML [env: PLAYWRIGHT_CONFIG_PATH]
 
 # Rule overlays: deltas applied to a packaged ruleset instead of forking it.
 # rules:
@@ -268,6 +276,9 @@ _FAB_TEST_YML_TEMPLATE = """\
 #   pbir:
 #     disable: [RULE_ID]
 #     severity: {RULE_ID: warning}        # warning | error (PBIR Inspector has no "info" level)
+#   rdl:
+#     disable: [DS-02]
+#     severity: {QRY-07: info}            # info | warning | error
 
 # Ship analyzer telemetry to a Fabric Eventhouse and/or a Fabric Lakehouse.
 # A configured destination is the enablement -- there is no separate on/off
@@ -302,6 +313,20 @@ PLAYWRIGHT_WORKSPACE_ID=
 PLAYWRIGHT_REPORT_ID=
 PLAYWRIGHT_REPORT_NAME=
 PLAYWRIGHT_DATASET_ID=
+
+# Effective-identity user (UPN) for models secured with row-level security.
+# Required to test RLS: without it fab-test never discovers the model's roles
+# or attaches an identity, and Power BI rejects the embed token with
+# "requires effective identity". Harmless for models without RLS -- only cases
+# that carry a discovered role use it. Can also be set as playwright_user_name
+# in fab-test.yml.
+# PLAYWRIGHT_USER_NAME=analyst@contoso.com
+
+# Optional Azure browsers: enable access-token authentication in the workspace.
+# Selected only by --playwright-config / PLAYWRIGHT_CONFIG_PATH / playwright_config.
+# Keep the access token here or in protected CI secrets, never in execution YAML.
+PLAYWRIGHT_SERVICE_URL=
+PLAYWRIGHT_SERVICE_ACCESS_TOKEN=
 
 # A paginated (RDL) report is validated with a different check than an
 # interactive one -- skips page/bookmark/role discovery and checks for an
@@ -436,6 +461,9 @@ def _doctor(args: argparse.Namespace) -> int:
 
     output_format = getattr(args, "output_format", "text")
     only = getattr(args, "analyzer_filter", None)
+    if only and not is_enabled(only):
+        print(f"  ✗ fab-test doctor: {not_enabled_message(only)}", file=sys.stderr)
+        return 2
     if only and only not in _ANALYZER_REGISTRY:
         print(
             f"  ✗ fab-test doctor: unknown analyzer '{only}'. "
@@ -448,6 +476,9 @@ def _doctor(args: argparse.Namespace) -> int:
     # the menu should not refuse to answer a direct question about it.
     names = [only] if only else list(_visible_analyzers())
     rows = [{"analyzer": name, **_check_readiness(name, args)} for name in names]
+    for row in rows:
+        if service_item_type(row["analyzer"]) and row["analyzer"] != "pql_test":
+            row["service"] = service_readiness(args)
     if not only:
         # Reported alongside the analyzers because it fails the same ways --
         # a missing tool, a missing credential -- but never counted toward
@@ -501,6 +532,34 @@ def _list_analyzers(args: argparse.Namespace) -> int:
     return _print_list(rows, output_format, skipped_checkouts=checkouts)
 
 
+def _explain_mode(args: argparse.Namespace, name: str) -> ResolvedMode | int:
+    """Resolve the target and mode for `explain`, or return the exit code to stop on."""
+    try:
+        args.resolved_target = select_target(
+            getattr(args, "target", None),
+            getattr(args, "artifact", None),
+            default_type=service_item_type(name),
+        )
+    except TargetError as exc:
+        print(f"  ✗ fab-test explain: {exc}", file=sys.stderr)
+        return 2
+    refusal = _unsupported_scope_error(name, args.resolved_target) or _unsupported_type_error(
+        name, args.resolved_target
+    )
+    if refusal:
+        print(f"  ✗ fab-test explain: {refusal}", file=sys.stderr)
+        return 2
+    try:
+        resolved_mode = resolve_mode(
+            args.resolved_target, workspace_flag=getattr(args, "workspace_id", "")
+        )
+    except ModeError as exc:
+        print(f"  ✗ fab-test explain: {exc}", file=sys.stderr)
+        return 2
+    args.mode = resolved_mode.mode
+    return resolved_mode
+
+
 def _explain_analyzer(args: argparse.Namespace) -> int:
     """Show the resolved command for one analyzer without running it."""
     name = args.analyzer_name
@@ -517,20 +576,18 @@ def _explain_analyzer(args: argparse.Namespace) -> int:
     artifact_dir = Path(getattr(args, "artifact_dir", str(ARTIFACT_ROOT)))
     glob, _description = _ANALYZER_REGISTRY[name]
 
-    try:
-        args.resolved_target = _target_of(args)
-    except TargetError as exc:
-        print(f"  ✗ fab-test explain: {exc}", file=sys.stderr)
-        return 2
-    refusal = _unsupported_scope_error(name, args.resolved_target) or _unsupported_type_error(
-        name, args.resolved_target
-    )
-    if refusal:
-        print(f"  ✗ fab-test explain: {refusal}", file=sys.stderr)
-        return 2
+    resolved_mode = _explain_mode(args, name)
+    if isinstance(resolved_mode, int):
+        return resolved_mode
+    item_type = service_item_type(name)
 
     if _is_repository_scoped(name):
         artifact = Path(".")
+    elif resolved_mode.mode == "service" and item_type:
+        # Nothing is exported to explain a run: show the item that would be.
+        target = args.resolved_target
+        item = f"{target.name}.{item_type}" if target else f"<every {item_type}>"
+        artifact = Path(resolved_mode.workspace or "") / item
     else:
         matches = _discover(artifact_dir, glob, _target_of(args), output_dir=output_dir)
         # No real artifact to point at; show an illustrative command shape.
@@ -538,9 +595,14 @@ def _explain_analyzer(args: argparse.Namespace) -> int:
 
     command = _build_command(name, artifact, args, output_dir)
     readiness = _check_readiness(name, args)
-    default_rules_path = {"bpa": _DEFAULT_BPA_RULES, "pbir": _DEFAULT_PBIR_RULES}.get(name)
+    default_rules_path = {
+        "bpa": _DEFAULT_BPA_RULES,
+        "pbir": _DEFAULT_PBIR_RULES,
+        "rdl": _DEFAULT_RDL_RULES,
+    }.get(name)
     rules_path = (
         getattr(args, "bpa_rules_path", None)
+        or getattr(args, "rdl_rules_path", None)
         or getattr(args, "rules_path", None)
         or default_rules_path
     )
@@ -548,6 +610,8 @@ def _explain_analyzer(args: argparse.Namespace) -> int:
         "analyzer": name,
         "artifact": str(artifact),
         "target": _manifest_target(args),
+        "mode": resolved_mode.mode,
+        "source": resolved_mode.source,
         "command": command,
         "tool_path": readiness.get("resolved_path"),
         "rules_path": rules_path,
@@ -559,6 +623,7 @@ def _explain_analyzer(args: argparse.Namespace) -> int:
         return 0
 
     print(f"fab-test explain {name}")
+    print(f"  Mode:     {resolved_mode.banner()}")
     target = payload["target"]
     if target:
         located = target["workspace_id"] or target["workspace"] or target["path"] or "-"

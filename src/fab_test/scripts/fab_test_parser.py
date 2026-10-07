@@ -20,11 +20,14 @@ from ._fab_test_context import (
     REPO_ROOT,
     RESULTS_ROOT,
 )
+from ._feature_flags import add_disabled_stubs
+from ._service_flags import add_service_flags, add_workspace_flag
 from .fab_test_registry import (
     _DEFAULT_A11Y_PATH,
     _DEFAULT_BPA_RULES,
     _DEFAULT_INSPECTOR_PATH,
     _DEFAULT_PBIR_RULES,
+    _DEFAULT_RDL_RULES,
     _DEFAULT_TE_PATH,
 )
 from .fab_test_registry import (
@@ -33,6 +36,7 @@ from .fab_test_registry import (
 from .fab_test_registry import (
     HIDDEN_ANALYZERS as _HIDDEN_ANALYZERS,
 )
+from .playwright_validation.execution_config import add_execution_flags
 
 _GUID_RE = re.compile(
     r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
@@ -49,15 +53,35 @@ def _guid_type(value: str) -> str:
     return value
 
 
+class _ArtifactDirAction(argparse.Action):
+    """Records that --artifact-dir was passed on the CLI, not defaulted.
+
+    Playwright's workspace-wide discovery needs to tell "the caller typed
+    the default path" from "nothing was passed" -- comparing the resolved
+    value against the default string cannot do that (the default path is a
+    perfectly valid explicit choice too).
+    """
+
+    def __call__(self, parser, namespace, values, option_string=None):  # noqa: ARG002 - argparse Action signature
+        setattr(namespace, self.dest, values)
+        namespace.artifact_dir_explicit = True
+
+
 def _add_common_flags(
-    parser: argparse.ArgumentParser, *, artifact_dir_default=ARTIFACT_ROOT
+    parser: argparse.ArgumentParser,
+    *,
+    artifact_dir_default=ARTIFACT_ROOT,
+    track_artifact_dir_explicit: bool = False,
 ) -> None:
     parser.add_argument(
         "--artifact-dir",
         default=str(_PYPROJECT_CONFIG.get("artifact_dir", artifact_dir_default)),
         metavar="DIR",
+        action=_ArtifactDirAction if track_artifact_dir_explicit else "store",
         help="Root to discover artifacts under, recursively (default: the working directory)",
     )
+    if track_artifact_dir_explicit:
+        parser.set_defaults(artifact_dir_explicit=False)
     parser.add_argument(
         "--output-dir",
         default=str(_PYPROJECT_CONFIG.get("output_dir", RESULTS_ROOT)),
@@ -225,7 +249,7 @@ def _completion_subcommands() -> str:
 def _generate_completion_script(shell: str) -> str:
     """Return a shell completion script that also completes artifact stems.
 
-    Artifact stems are looked up from ``.fabric/artifacts`` at *completion
+    Artifact stems are looked up from ``fabric-artifacts`` at *completion
     time* in the user's shell (not baked in here), so the list always
     reflects whatever directory they are tab-completing from.
     """
@@ -244,7 +268,7 @@ _fab_test_completions() {{
     fi
 
     if [[ "${{prev}}" == "--artifact" ]]; then
-        local dir=".fabric/artifacts"
+        local dir="fabric-artifacts"
         if [[ -d "${{dir}}" ]]; then
             local stems
             stems=$(for f in "${{dir}}"/*; do basename "$f" | sed 's/\\.[^.]*$//'; done | sort -u)
@@ -273,7 +297,7 @@ _fab_test() {{
     fi
 
     if [[ "${{words[CURRENT-1]}}" == "--artifact" ]]; then
-        local dir=".fabric/artifacts"
+        local dir="fabric-artifacts"
         if [[ -d "${{dir}}" ]]; then
             local -a stems
             stems=($(for f in "${{dir}}"/*(N); do basename "$f" | sed 's/\\.[^.]*$//'; done | sort -u))
@@ -337,7 +361,9 @@ def _add_bpa_subparser(subs: argparse._SubParsersAction) -> None:
         "bpa",
         help="Tabular Editor Best Practice Analyzer (SemanticModel artifacts)",
     )
-    _add_common_flags(bpa_p)
+    _add_common_flags(bpa_p, track_artifact_dir_explicit=True)
+    add_workspace_flag(bpa_p)
+    add_service_flags(bpa_p)
     bpa_p.add_argument(
         "--tabular-editor-path",
         default=None,
@@ -361,7 +387,9 @@ def _add_pbir_subparser(subs: argparse._SubParsersAction) -> None:
         "pbir",
         help="PBIR Inspector — static report analysis (Report artifacts)",
     )
-    _add_common_flags(pbir_p)
+    _add_common_flags(pbir_p, track_artifact_dir_explicit=True)
+    add_workspace_flag(pbir_p)
+    add_service_flags(pbir_p)
     pbir_p.add_argument(
         "--inspector-path",
         default=None,
@@ -385,7 +413,9 @@ def _add_a11y_subparser(subs: argparse._SubParsersAction) -> None:
         "a11y",
         help="pbir-a11y — accessibility checks (Report artifacts)",
     )
-    _add_common_flags(a11y_p)
+    _add_common_flags(a11y_p, track_artifact_dir_explicit=True)
+    add_workspace_flag(a11y_p)
+    add_service_flags(a11y_p)
     a11y_p.add_argument(
         "--a11y-path",
         default=None,
@@ -412,6 +442,8 @@ def _add_pql_test_subparser(subs: argparse._SubParsersAction) -> None:
         help="pql-test DAX/PQL test runner (SemanticModel artifacts)",
     )
     _add_common_flags(pql_test_p)
+    add_workspace_flag(pql_test_p, aliases=False, dest="service_workspace")
+    add_service_flags(pql_test_p)
     pql_test_p.add_argument(
         "--workspace-id",
         default="",
@@ -441,12 +473,36 @@ def _add_pql_lint_subparser(subs: argparse._SubParsersAction) -> None:
     _add_common_flags(pql_lint_p)
 
 
+def _add_rdl_subparser(subs: argparse._SubParsersAction) -> None:
+    rdl_p = subs.add_parser(
+        "rdl",
+        help="RDL static analysis — performance/correctness/a11y rules (.rdl files)",
+    )
+    _add_common_flags(rdl_p, track_artifact_dir_explicit=True)
+    add_workspace_flag(rdl_p)
+    add_service_flags(rdl_p)
+    # dest is rdl_rules_path, not the more obvious rules_path: the `all`
+    # subparser already defines a top-level --rules-path/rules_path
+    # dedicated to pbir (mirrors --bpa-rules-path/bpa_rules_path for bpa).
+    # Reusing that name here would make `fab-test all` silently hand rdl
+    # pbir's own resolved rules path instead of its own -- found live via
+    # `fab-test all --report`, whose rdl report showed PBIR Inspector's
+    # rule catalog (RULE_TEMPLATE, ENSURE_ALTTEXT, ...) instead of rdl's.
+    rdl_p.add_argument(
+        "--rules-path",
+        default=_DEFAULT_RDL_RULES,
+        dest="rdl_rules_path",
+        metavar="PATH",
+        help=f"RDL rules JSON [default: {_DEFAULT_RDL_RULES}]",
+    )
+
+
 def _add_playwright_subparser(subs: argparse._SubParsersAction) -> None:
     playwright_p = subs.add_parser(
         "playwright",
         help="Playwright visual/error validation (Report artifacts)",
     )
-    _add_common_flags(playwright_p)
+    _add_common_flags(playwright_p, track_artifact_dir_explicit=True)
     playwright_p.add_argument(
         "--env-file",
         default=None,
@@ -462,12 +518,18 @@ def _add_playwright_subparser(subs: argparse._SubParsersAction) -> None:
         help="Path to impacted-report manifest JSON",
     )
     playwright_p.add_argument(
+        "--workspace",
         "--workspace-id",
+        "--from-workspace",
         default="",
         dest="workspace_id",
-        metavar="ID",
-        type=_guid_type,
-        help="Fabric workspace ID [env: FABRIC_WORKSPACE_ID]",
+        metavar="NAME_OR_ID",
+        help=(
+            "Workspace name or GUID [env: FABRIC_WORKSPACE_ID]; --workspace-id and "
+            "--from-workspace are accepted as aliases, prefer --workspace. Standalone, "
+            "with no --artifact and no explicit --artifact-dir, tests every Report and "
+            "PaginatedReport deployed in the workspace instead of scanning the repository"
+        ),
     )
     playwright_p.add_argument(
         "--env",
@@ -554,18 +616,16 @@ def _add_playwright_subparser(subs: argparse._SubParsersAction) -> None:
         ),
     )
     playwright_p.add_argument(
-        "--workers",
-        type=int,
-        default=None,
-        dest="workers",
-        metavar="N",
+        "--user-name",
+        default="",
+        dest="user_name",
+        metavar="UPN",
         help=(
-            "Max pytest-xdist workers for running generated cases "
-            "concurrently [env: PLAYWRIGHT_XDIST_WORKERS, default: 4]. "
-            "Raise this on a machine that can safely run more concurrent "
-            "browser instances (e.g. a beefier VM)."
+            "Effective-identity user (UPN) for RLS embed tokens. Overrides "
+            "PLAYWRIGHT_USER_NAME and playwright_user_name in fab-test.yml"
         ),
     )
+    add_execution_flags(playwright_p)
 
 def _add_playwright_impact_subparser(subs: argparse._SubParsersAction) -> None:
     impact_p = subs.add_parser(
@@ -656,7 +716,7 @@ def _add_dependencies_subparser(subs: argparse._SubParsersAction) -> None:
 
 def _add_all_subparser(subs: argparse._SubParsersAction) -> None:
     all_p = subs.add_parser("all", help="Run all analyzers in sequence")
-    _add_common_flags(all_p)
+    _add_common_flags(all_p, track_artifact_dir_explicit=True)
     all_p.add_argument(
         "--tabular-editor-path",
         default=None,
@@ -682,12 +742,13 @@ def _add_all_subparser(subs: argparse._SubParsersAction) -> None:
         metavar="PATH",
     )
     all_p.add_argument(
-        "--workspace-id",
-        default="",
-        dest="workspace_id",
-        metavar="ID",
-        type=_guid_type,
+        "--rdl-rules-path",
+        default=_DEFAULT_RDL_RULES,
+        dest="rdl_rules_path",
+        metavar="PATH",
     )
+    add_workspace_flag(all_p)
+    add_service_flags(all_p)
     all_p.add_argument(
         "--env",
         default="",
@@ -940,6 +1001,7 @@ def _add_explain_subparser(subs: argparse._SubParsersAction) -> None:
         metavar="TARGET",
         help="Optional target to resolve and explain (e.g. local/Sales)",
     )
+    add_workspace_flag(explain_p)
     explain_p.add_argument(
         "--artifact-dir",
         default=str(_PYPROJECT_CONFIG.get("artifact_dir", ARTIFACT_ROOT)),
@@ -987,6 +1049,7 @@ _SUBPARSER_BUILDERS = (
     _add_a11y_subparser,
     _add_pql_test_subparser,
     _add_pql_lint_subparser,
+    _add_rdl_subparser,
     _add_playwright_subparser,
     _add_playwright_impact_subparser,
     _add_dependencies_subparser,
@@ -1009,9 +1072,9 @@ def build_parser() -> argparse.ArgumentParser:
         prog="fab-test",
         description=(
             "Run Fabric artifact analyzers locally.\n\n"
-            "fab-test tests your .fabric artifacts — it is NOT pytest.\n"
+            "fab-test tests your Fabric artifacts — it is NOT pytest.\n"
             "  pytest -m bpa      tests the BPA wrapper (always green)\n"
-            "  fab-test bpa       runs BPA against your actual .fabric artifacts"
+            "  fab-test bpa       runs BPA against your actual Fabric artifacts"
         ),
         epilog=(
             "Exit codes:\n"
@@ -1050,11 +1113,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     for add_subparser in _SUBPARSER_BUILDERS:
         add_subparser(subs)
+    stubs = add_disabled_stubs(subs)
 
     # Read back from the subparser table rather than maintained by hand, so
     # a new subcommand cannot be added without the error message learning
-    # about it.
-    accepted = tuple(subs.choices)
+    # about it. Feature-flag stubs are never suggested.
+    accepted = tuple(name for name in subs.choices if name not in stubs)
     parser.accepted_subcommands = accepted
     parser.advertised_subcommands = tuple(
         dict.fromkeys(

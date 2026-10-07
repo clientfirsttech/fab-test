@@ -209,13 +209,13 @@ resolvable:
     pip install \
       --index-url https://test.pypi.org/simple/ \
       --extra-index-url https://pypi.org/simple \
-      "cft-fab-test==1.9.0b2"
+      "cft-fab-test==1.9.0b3"
 
 - name: Check readiness
   run: fab-test doctor --format json
 
 - name: Run analyzers
-  run: fab-test all --format json --artifact-dir .fabric/artifacts
+  run: fab-test all --format json --artifact-dir fabric-artifacts
 
 - name: Upload run manifest
   uses: actions/upload-artifact@v4

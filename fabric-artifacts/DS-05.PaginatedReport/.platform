@@ -1,0 +1,11 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "PaginatedReport",
+    "displayName": "DS-05"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "595f9867-4e77-8714-4eaa-95554e875328"
+  }
+}

@@ -89,7 +89,7 @@ Discovery walks down from where you run the command and treats a folder as an
 artifact when its name ends in a Fabric type suffix — at any depth, with or
 without a `.pbip` beside it. Nested git checkouts, `.venv`, `node_modules`,
 `__pycache__`, `dist`, `build`, and the run's own `--output-dir` are skipped.
-An existing `.fabric/artifacts/` layout is found exactly as before, since it
+An existing `fabric-artifacts/` layout is found exactly as before, since it
 sits inside the working directory.
 
 If you run it one directory too high — in the folder that *holds* your
@@ -104,6 +104,7 @@ The warning says how many checkouts it skipped and gives you the
 fab-test bpa --dry-run
 fab-test pbir --dry-run
 fab-test a11y --dry-run
+fab-test rdl --dry-run
 fab-test pql-test --dry-run
 ```
 
@@ -113,6 +114,7 @@ fab-test pql-test --dry-run
 fab-test bpa --tabular-editor-path "/path/to/TabularEditor.exe"
 fab-test pbir --inspector-path "/path/to/PBIRInspectorCLI"
 fab-test a11y                            # requires Node.js >= 18 + npm the first time (built from source, then cached)
+fab-test rdl                             # active rules for paginated (.rdl) reports -- no external tool; --verbose lists each finding
 fab-test pql-test --env DEV
 ```
 
@@ -129,6 +131,7 @@ fab-test pql-test SampleModel-PQLAssert --env DEV
 
 ```bash
 fab-test bpa -q
+fab-test rdl -q
 fab-test local -q
 ```
 
@@ -289,6 +292,20 @@ results, and a per-case step-summary table), see
 is the working reference for what a real dispatch looks like, both green and
 red.
 
+For optional Azure-hosted browsers, set `PLAYWRIGHT_SERVICE_URL` and the secret
+`PLAYWRIGHT_SERVICE_ACCESS_TOKEN`, then select a YAML file:
+
+```bash
+fab-test playwright --artifact ThinReport --env PROD --report \
+  --playwright-config docs/examples/playwright/azure.yml --workers 8
+```
+
+Python pytest/xdist stays on the runner; only browsers move to Azure. No Node
+runner or local Chromium download is needed for this backend. Local execution
+remains the default. See [Azure setup](PLAYWRIGHT-CI.md#azure-hosted-browsers),
+the [GitHub Actions example](examples/github-actions/playwright-azure.yml), and
+the [Azure DevOps example](examples/azure-devops/playwright-azure.yml).
+
 ### Pipeline snippet: a reviewable report as the build artifact
 
 `run.json` is what a pipeline *parses*; `index.html` is what a person *opens* when the build goes red. Reports are opt-in, so a job that wants one asks for it:
@@ -350,7 +367,7 @@ A copy-pasteable step whose log holds one line per artifact. Failures still prin
 
 ```yaml
 - name: Run local analyzers
-  run: fab-test local -q --artifact-dir .fabric/artifacts
+  run: fab-test local -q --artifact-dir fabric-artifacts
 
 # or pin it once for every step and every contributor, in fab-test.yml:
 #   verbosity: summary
@@ -367,7 +384,7 @@ A copy-pasteable step for a CI job — gate on readiness, run with `--format jso
   run: fab-test doctor --format json
 
 - name: Run bpa
-  run: fab-test bpa --format json --artifact-dir .fabric/artifacts
+  run: fab-test bpa --format json --artifact-dir fabric-artifacts
 
 - name: Upload run manifest
   uses: actions/upload-artifact@v4
@@ -396,6 +413,24 @@ fails loudly instead of quietly analyzing nothing.
 
 This is the case where uploading `run.json` alone still tells you what to fix. It stays `null` when the analyzer *did* write an envelope — then `envelope_path` points at the findings, and those are the reason. Credential values are redacted out of `detail` on the way in, as they are from `command`.
 
+### Pipeline snippet: rdl static analysis (no runtime, fails only on High findings)
+
+`rdl` needs no external tool or runtime setup at all — no `doctor` gate, no `setup-node`/`setup-dotnet` step, nothing to cache. High-severity rules map to `error` and fail the build; Medium/Low map to `warning` and only annotate:
+
+```yaml
+- name: Run rdl static analysis
+  run: fab-test rdl --format json --artifact-dir fabric-artifacts
+
+- name: Upload run manifest
+  uses: actions/upload-artifact@v4
+  if: always()
+  with:
+    name: fab-test-rdl-manifest
+    path: fab-test-results/run.json
+```
+
+To tune which rules gate the build, add a `rules.rdl` overlay in the committed `fab-test.yml` (`disable`/`severity` — see [Rule Overlays](../.github/skills/fab-test/references/configuration.md#rule-overlays)) rather than a CLI flag; there's no `--fail-on`-style flag here, since `rdl`'s severities are already the rule set's own High/Medium/Low, not a single runtime threshold.
+
 ### Pipeline snippet: pbir-a11y accessibility checks (needs Node)
 
 Every other analyzer's CI job is just `fab-test <name>`; `a11y` is the one
@@ -412,7 +447,7 @@ from source on first use rather than downloading a pre-built binary:
   run: fab-test doctor --analyzer a11y --format json
 
 - name: Run pbir-a11y accessibility checks
-  run: fab-test a11y --format json --artifact-dir .fabric/artifacts
+  run: fab-test a11y --format json --artifact-dir fabric-artifacts
 
 - name: Upload run manifest
   uses: actions/upload-artifact@v4
@@ -452,7 +487,7 @@ analyzers already use, and commit the address in `fab-test.yml`.
     # Optional: override the committed fab-test.yml address per environment.
     EVENTHOUSE_URI: ${{ vars.EVENTHOUSE_URI }}
     EVENTHOUSE_DATABASE: ${{ vars.EVENTHOUSE_DATABASE }}
-  run: fab-test all --format json --artifact-dir .fabric/artifacts
+  run: fab-test all --format json --artifact-dir fabric-artifacts
 
 - name: Upload run manifest
   uses: actions/upload-artifact@v4
@@ -547,7 +582,7 @@ telemetry:
     # Optional: override the committed fab-test.yml address per environment.
     LAKEHOUSE_WORKSPACE: ${{ vars.LAKEHOUSE_WORKSPACE }}
     LAKEHOUSE_NAME: ${{ vars.LAKEHOUSE_NAME }}
-  run: fab-test all --format json --artifact-dir .fabric/artifacts
+  run: fab-test all --format json --artifact-dir fabric-artifacts
 ```
 
 Records land as one JSONL file per table per run under
@@ -614,3 +649,23 @@ Remove-Item -Recurse -Force .venv-test, dist
 
 - [`fab-test` CLI reference](../.github/skills/fab-test/SKILL.md)
 - [`pytest.ini`](../pytest.ini) for test markers and configuration
+
+
+## Testing deployed items (service mode)
+
+```bash
+fab-test bpa "Dev.Workspace/Sales.SemanticModel"   # typed target -> mode=service
+fab-test bpa "Dev.Workspace/Sales"                 # untyped, resolved by the analyzer's type
+fab-test bpa --workspace Dev                       # every semantic model in the workspace
+fab-test all --workspace Dev --keep-export         # every service-capable analyzer; keep redacted exports
+fab-test all --workspace Dev --all                 # proceed past the 50-item limit
+fab-test bpa --workspace Dev --dry-run             # list what would be exported
+```
+
+| Mode | Credential | Failure |
+|------|-----------|---------|
+| `repo` | none | - |
+| `desktop` | none | exit `127` if no instance has the artifact |
+| `service` | env service principal, then `.env`, then `DefaultAzureCredential`, then `--interactive` | exit `127` naming the variables and `fab-test auth status` |
+
+`--workspace` with no target ignores local folders unless `--artifact-dir` is passed. `local/NAME` with `--workspace` exits `2`.

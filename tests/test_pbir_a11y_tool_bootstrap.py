@@ -20,10 +20,10 @@ import pytest
 
 from fab_test.scripts._analyzer_tool_bootstrap import (
     _current_platform,
-    _run_npm_build,
     probe_executable,
     resolve_executable,
 )
+from fab_test.scripts._npm_toolchain import run_npm_build
 
 
 def _write_npm_build_zip(zip_path: Path, nested_dir_name: str, build_script: str) -> None:
@@ -128,7 +128,7 @@ def test_npm_build_reuses_cache_without_rebuilding(tmp_path, monkeypatch):
         "fab_test.scripts._analyzer_tool_bootstrap._download", _fail_if_called
     )
     monkeypatch.setattr(
-        "fab_test.scripts._analyzer_tool_bootstrap._run_npm_build", _fail_if_called
+        "fab_test.scripts._analyzer_tool_bootstrap.run_npm_build", _fail_if_called
     )
 
     second = resolve_executable(analyzer_name, metadata, repo_root)
@@ -245,7 +245,7 @@ def test_npm_build_installs_declared_extra_dependencies(tmp_path):
         "fab_test.scripts._analyzer_tool_bootstrap.shutil.which",
         lambda name: f"/usr/bin/{name}",
     ):
-        _run_npm_build("pbir_a11y", build_root, {"build_extra_dependencies": ["docx@^9.6.1"]})
+        run_npm_build("pbir_a11y", build_root, {"build_extra_dependencies": ["docx@^9.6.1"]})
 
     assert calls[0][1:] == ["install"]
     assert calls[1][1:] == ["install", "docx@^9.6.1"]

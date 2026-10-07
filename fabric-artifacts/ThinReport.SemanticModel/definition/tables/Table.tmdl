@@ -1,0 +1,22 @@
+table Table
+	lineageTag: 4a1c7e2d-9b3f-4a6e-8c1d-2f5b9e7a3c04
+
+	measure 'Measure' = COUNTROWS('Table')
+		formatString: 0
+		lineageTag: 9e2d4f6a-1b8c-4d3e-a7f1-6c8b2e4d9a15
+
+	column 'Value'
+		dataType: string
+		lineageTag: 2c6b8e1a-4d7f-4a2c-9e3b-8f1a5d6c7b26
+		summarizeBy: none
+		sourceColumn: Value
+
+		annotation SummarizationSetBy = Automatic
+
+	partition Table = m
+		mode: import
+		source =
+				let
+				    Source = #table({"Value"}, {{"Sample"}})
+				in
+				    Source
