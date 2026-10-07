@@ -209,7 +209,7 @@ resolvable:
     pip install \
       --index-url https://test.pypi.org/simple/ \
       --extra-index-url https://pypi.org/simple \
-      "cft-fab-test==1.9.0b3"
+      "cft-fab-test==1.9.0b4"
 
 - name: Check readiness
   run: fab-test doctor --format json

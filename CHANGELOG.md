@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-10-07
+
+- ✨ - `cft-fab-test[playwright]` Extra - `pip install "cft-fab-test[playwright]"` installs the pytest packages `fab-test playwright` launches (`pytest`, `pytest-playwright`, `pytest-html`, `pytest-xdist`). Without them a run now stops before minting any embed token, with an error naming the missing packages and that install command, instead of a child process's `ModuleNotFoundError: No module named 'pytest'`. `--plan-only` needs neither. The fab-test skill, GETTING-STARTED, PLAYWRIGHT-CI and the `playwright-live.yml` example document the install path.
+- 📦 - Version `1.9.0b4`. Install docs and the skill pin the new version.
+
 ## 2026-10-06
 
 - 🐛 - `--workspace NAME` Resolved Only From A Typed Target - A workspace *display name* given to `--workspace`, `FABRIC_WORKSPACE_ID` or `PLAYWRIGHT_WORKSPACE_ID` was sent to Fabric as if it were an ID (HTTP 400 on `/v1/workspaces/<name>/items`). `fab-test` and `fab-test playwright` now resolve a name to its ID, case-insensitively, and pass a GUID through with no lookup; an unknown name lists the workspaces the identity can see.

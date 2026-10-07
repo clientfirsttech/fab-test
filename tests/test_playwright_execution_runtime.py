@@ -1,5 +1,7 @@
 """Remote connection and worker semantics for generated Python report tests."""
 
+import tomllib
+from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
@@ -9,6 +11,7 @@ from fab_test.scripts.playwright_validation.execution_config import ExecutionCon
 from fab_test.scripts.playwright_validation.execution_runtime import (
     browser_connection_options,
     execution_failure,
+    missing_runner_message,
     resolve_workers,
     service_environment,
 )
@@ -203,3 +206,42 @@ def test_native_report_root_follows_envelope_not_custom_case_directory(tmp_path)
     configure_pytest_execution(command, environment)
     assert f"--html={report_root / 'index.html'}" in command
     assert f"--junitxml={report_root / 'results.xml'}" in command
+
+
+def test_playwright_extra_installs_every_runner_package():
+    from fab_test.scripts.playwright_validation import execution_runtime
+
+    pyproject = tomllib.loads((Path(__file__).resolve().parent.parent / "pyproject.toml").read_text(encoding="utf-8"))
+    assert set(pyproject["project"]["optional-dependencies"]["playwright"]) == set(execution_runtime._RUNNER_MODULES)
+
+
+def test_missing_runner_packages_are_named_with_the_install_command(monkeypatch):
+    import importlib.util
+
+    real = importlib.util.find_spec
+    monkeypatch.setattr(importlib.util, "find_spec", lambda name: None if name in ("pytest", "xdist") else real(name))
+    message = missing_runner_message()
+    assert "pytest, pytest-xdist" in message
+    assert 'pip install "cft-fab-test[playwright]"' in message
+
+
+def test_installed_runner_packages_need_no_message():
+    assert missing_runner_message() is None
+
+
+def test_missing_runner_aborts_before_minting_a_token(tmp_path, monkeypatch):
+    from fab_test.scripts import invoke_playwright
+    from fab_test.scripts.playwright_validation.config import PlaywrightValidationConfig
+
+    config = PlaywrightValidationConfig(
+        workspace_id="ws-1", report_id="rpt-1", report_name="Report", dataset_id="ds-1",
+        page_ids=[], bookmark_ids=[], user_name="", role="", use_rls=False, cloud="public",
+        client_id="c", client_secret="s", tenant_id="t", timeout_seconds=60, headless=True,
+    )
+    monkeypatch.setattr(invoke_playwright, "load_config", lambda *a, **k: config)
+    monkeypatch.setattr(invoke_playwright, "resolve_discovery", lambda *a: (None, None))
+    monkeypatch.setattr(invoke_playwright, "missing_runner_message", lambda: "need pytest")
+    monkeypatch.setattr(invoke_playwright, "acquire_embed_configs", lambda *a: pytest.fail("token minted"))
+    output = tmp_path / "envelope.json"
+    assert invoke_playwright.main(["--env-file", ".env", "--output-path", str(output)]) == 1
+    assert "need pytest" in output.read_text(encoding="utf-8")

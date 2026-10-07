@@ -71,18 +71,11 @@ jobs:
         run: |
           # Pin the exact version: the package is cft-fab-test (the
           # command is fab-test), and the current release is a beta.
-          pip install "cft-fab-test==1.9.0b3"
+          # The [playwright] extra brings the pytest plugins a run launches.
+          pip install "cft-fab-test[playwright]==1.9.0b4"
 
-      # Separate from the pip install above -- pytest, pytest-playwright,
-      # and pytest-html are dev-only dependencies of fab-test itself, and
-      # pytest-xdist is needed the moment more than one case runs (the
-      # default for any report with more than one page). Skipping this step
-      # fails with a raw `unrecognized arguments: --html=...` pytest error,
-      # not a fab-test remediation message -- see docs/PLAYWRIGHT-CI.md.
-      - name: Install the browser and its pytest plugins
-        run: |
-          pip install pytest pytest-playwright pytest-html pytest-xdist
-          playwright install --with-deps chromium
+      - name: Install the browser
+        run: playwright install --with-deps chromium
 
       # Fails fast (exit 127) naming every missing value, before any
       # browser or network call -- the whole reason this step exists ahead

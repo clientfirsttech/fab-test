@@ -607,11 +607,11 @@ fab-test playwright-impact --changed-artifacts changed-artifacts.json --env dev 
 fab-test playwright --impact-manifest fab-test-results/playwright/impact-manifest.json --env dev --env-file .env
 ```
 
-Browser setup -- `pytest`, `pytest-playwright`, and `pytest-html` are dev-only dependencies of this project, so a `pip install cft-fab-test` consumer needs all three installed separately (plus `pytest-xdist`, needed the moment more than one case runs, which is the default for any report with more than one page):
+Browser setup -- the pytest packages a run launches (`pytest`, `pytest-playwright`, `pytest-html`, `pytest-xdist`) are the `playwright` extra, not base dependencies. A run without them aborts before any embed token is minted, with an error naming the missing packages and the install command:
 
 ```bash
+pip install "cft-fab-test[playwright]"
 playwright install chromium
-pip install pytest pytest-playwright pytest-html pytest-xdist
 ```
 
 ### playwright-impact
