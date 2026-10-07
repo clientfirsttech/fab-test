@@ -29,6 +29,7 @@ from ._desktop import (
     detect_desktop_instances,
     match_instance_to_artifact,
 )
+from ._feature_flags import disabled_analyzers, is_enabled
 from ._metadata import ANALYZERS, BPA_RULES, PBIR_RULES, RDL_RULES, default_repo_root, metadata_path
 from ._pbip_discovery import discover_pbip_projects
 from ._report_html import resolve_report
@@ -97,7 +98,7 @@ HIDDEN_ANALYZERS: frozenset[str] = frozenset({"pql_lint"})
 
 def visible_analyzers() -> tuple[str, ...]:
     """Return the analyzer names that belong on the advertised surface."""
-    return tuple(name for name in ANALYZER_REGISTRY if name not in HIDDEN_ANALYZERS)
+    return tuple(name for name in ANALYZER_REGISTRY if name not in HIDDEN_ANALYZERS | disabled_analyzers())
 
 
 # Which target scopes each analyzer can actually honor, declared once so the
@@ -238,7 +239,7 @@ def _suffix_to_analyzers() -> dict[str, tuple[str, ...]]:
     """
     grouped: dict[str, list[str]] = {}
     for name, (glob, _description) in ANALYZER_REGISTRY.items():
-        if not glob:
+        if not glob or not is_enabled(name):
             continue
         grouped.setdefault(glob.removeprefix("*"), []).append(name)
     return {suffix: tuple(names) for suffix, names in grouped.items()}
@@ -735,6 +736,9 @@ def build_playwright_command(
     roles = getattr(args, "roles", "auto")
     if roles != "auto":
         cmd += ["--roles", roles]
+    user_name = getattr(args, "user_name", "")
+    if user_name:
+        cmd += ["--user-name", user_name]
     forward_execution_flags(cmd, args)
     return cmd
 
@@ -825,7 +829,7 @@ def resolve_tool(name: str, args: argparse.Namespace) -> Path | None:
     Returns the resolved Path, or None for analyzers without a declared tool.
     Raises RuntimeError with a helpful message if the tool cannot be resolved.
     """
-    if name not in _BOOTSTRAPPED_ANALYZERS:
+    if name not in _BOOTSTRAPPED_ANALYZERS or not is_enabled(name):
         return None
 
     explicit = None
@@ -861,7 +865,7 @@ def preflight_error(name: str, args: argparse.Namespace) -> tuple[str, int] | No
     exit code 127 ("command not found") covers any other resolution failure,
     distinguishing an unconfigured machine from a real rule violation (1).
     """
-    if name not in _BOOTSTRAPPED_ANALYZERS:
+    if name not in _BOOTSTRAPPED_ANALYZERS or not is_enabled(name):
         return None
     try:
         resolve_tool(name, args)
@@ -978,7 +982,7 @@ def _readiness_without_version(name: str, args: argparse.Namespace | None) -> di
     if name in _CLOUD_ANALYZERS:
         return _cloud_readiness(name, args)
 
-    if name not in _BOOTSTRAPPED_ANALYZERS:
+    if name not in _BOOTSTRAPPED_ANALYZERS or not is_enabled(name):
         return {
             "ready": True,
             "resolved_path": None,
@@ -1028,4 +1032,4 @@ def load_fab_test_all_analyzers(metadata_path: Path) -> tuple[str, ...]:
     configured = data.get("fab_test_all")
     if not isinstance(configured, list):
         return ("bpa", "pbir", "pql_test", "pql_lint")
-    return tuple(str(name) for name in configured if isinstance(name, str))
+    return tuple(str(name) for name in configured if isinstance(name, str) and is_enabled(name))

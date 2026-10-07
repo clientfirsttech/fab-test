@@ -2,6 +2,11 @@
 
 ## 2026-10-06
 
+- 🐛 - `--workspace NAME` Resolved Only From A Typed Target - A workspace *display name* given to `--workspace`, `FABRIC_WORKSPACE_ID` or `PLAYWRIGHT_WORKSPACE_ID` was sent to Fabric as if it were an ID (HTTP 400 on `/v1/workspaces/<name>/items`). `fab-test` and `fab-test playwright` now resolve a name to its ID, case-insensitively, and pass a GUID through with no lookup; an unknown name lists the workspaces the identity can see.
+- ✨ - `fab-test playwright --user-name UPN` - Sets the effective-identity user for RLS embed tokens. Precedence: `--user-name` > `PLAYWRIGHT_USER_NAME` > `playwright_user_name` in `fab-test.yml`.
+- ✨ - Clearer RLS Embed-Token Error - A Power BI "requires effective identity" rejection with no identity sent now names `PLAYWRIGHT_USER_NAME` / `--user-name` and `PLAYWRIGHT_ROLE`. `fab-test init`'s `.env.example` now documents `PLAYWRIGHT_USER_NAME`.
+- 📦 - Version `1.9.0b3`. The fab-test skill (packaged and `.github/skills` copies) pins it and documents `--user-name`.
+
 - 🔄 - **Behavior change** - Fabric Artifacts Rename - This repository's fixture convention moves from `.fabric/artifacts` to `fabric-artifacts`: a dot-prefixed `.fabric` folder can't sync through Fabric Git Integration. `detect_changes.py`'s changed-file grouping now finds the artifact root by folder-suffix match rather than a fixed path depth — the old `parts[:3]`/`parts[2]` indexing would have silently mis-grouped every file once the root dropped a path segment — and `fab-test --print-completion`'s bash/zsh scripts look up artifact stems under the new name. The `init`-scaffolded example config, the JSON schema's `artifact_dir` description, `.fab-test/metadata/environments.yml`'s retired `repository_directory` default, `MANIFEST.in`'s sdist prune rule, and `check_wheel_contents.py`'s forbidden-path guard all point at `fabric-artifacts` too, so a new user is never pointed at a path Fabric Git Integration rejects and the packaging guards keep protecting against the renamed directory. No CLI contract changes: `--artifact-dir` already defaults to the working directory, not a hardcoded path (Discover From CWD), so this is a repository-convention rename, not a backward-compatibility break.
 - 📦 - Version `1.12.0.dev1`.
 

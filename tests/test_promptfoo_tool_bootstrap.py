@@ -278,6 +278,7 @@ def test_promptfoo_declares_node_and_the_arm64_limitation():
 @pytest.mark.fab_test
 def test_data_agent_readiness_probes_promptfoo(monkeypatch):
     """`doctor`'s engine resolves `data-agent` to the promptfoo tool, not "no tool required"."""
+    monkeypatch.setenv("FAB_TEST_ENABLE_DATA_AGENT", "1")  # off by default (Feature Flags epic)
     calls: list[str] = []
 
     def _fake_probe(analyzer_name, *_a, **_k):
@@ -293,6 +294,7 @@ def test_data_agent_readiness_probes_promptfoo(monkeypatch):
 
 @pytest.mark.fab_test
 def test_data_agent_preflight_exits_127_naming_node_when_npm_is_missing(tmp_path, monkeypatch):
+    monkeypatch.setenv("FAB_TEST_ENABLE_DATA_AGENT", "1")
     monkeypatch.setattr(registry, "REPO_ROOT", tmp_path)
     monkeypatch.delenv("PROMPTFOO_PATH", raising=False)
     monkeypatch.delenv("PROMPTFOO_INSTALL_URL", raising=False)

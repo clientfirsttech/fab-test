@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 import dataclasses
 import subprocess
 import tomllib
@@ -763,6 +764,8 @@ def test_complete_service_principal_behaves_as_before(config) -> None:
         environment="DEV",
     )
 
+    # A real workspace ID is a GUID; a non-GUID is a name and is looked up.
+    config = dataclasses.replace(config, workspace_id="33333333-3333-3333-3333-333333333333")
     with (
         patch(
             "fab_test.scripts.invoke_playwright.load_config",
@@ -880,3 +883,13 @@ def test_missing_environment_abort_writes_its_message_to_stderr(unscoped_config,
     assert "::error::" in captured.err
     assert "--env" in captured.err
     assert "::error::" not in captured.out
+
+
+@pytest.mark.parametrize(("flag", "expected"), [("flag@example.com", "flag@example.com"), ("", "env@example.com")])
+def test_user_name_flag_outranks_the_configured_user(config, flag, expected) -> None:
+    """--user-name beats PLAYWRIGHT_USER_NAME / fab-test.yml; absent, the configured user stays."""
+    configured = dataclasses.replace(config, user_name="env@example.com")
+    args = argparse.Namespace(artifact="", impact_manifest=None, env_file=".env", user_name=flag)
+
+    with patch("fab_test.scripts.invoke_playwright.load_config", return_value=configured):
+        assert _build_config_from_args(args).user_name == expected

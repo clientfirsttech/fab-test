@@ -182,6 +182,7 @@ Playwright validation can run in three modes: static `.env` mode, service-resolv
 | `--impact-manifest PATH` | Validate every report listed in the impacted-report manifest once, regardless of local `.Report` artifacts |
 | `--pages {auto,none}` | Discover every report page and its own bookmarks (default: `auto`); `none` tests only the default page |
 | `--roles {auto,none}` | Discover RLS/OLS roles from the semantic model and test the page matrix under each one whenever RLS is in play — `PLAYWRIGHT_USE_RLS`, **or** an effective-identity user being configured at all (default: `auto`); `none` tests only `PLAYWRIGHT_ROLE` |
+| `--user-name UPN` | Effective-identity user for RLS embed tokens. Outranks `PLAYWRIGHT_USER_NAME`, which outranks `playwright_user_name` in `fab-test.yml` |
 | `--plan-only` | Discover the matrix, write `test-cases.csv`/`.json`, and stop — no embed token, no browser. Unlike `--dry-run`, which only lists matching artifacts, this resolves each one |
 | `--workers N` | Max `pytest-xdist` workers for running generated cases concurrently (default: `4`) [env: `PLAYWRIGHT_XDIST_WORKERS`] |
 | `--playwright-config PATH` | Optional validated local/Azure browser YAML [env: `PLAYWRIGHT_CONFIG_PATH`; config: `playwright_config`]. Not the global `--config` flag |

@@ -1,6 +1,6 @@
 # Feature Flags Epic
 
-**Status**: 📋 PLANNED
+**Status**: ✅ IMPLEMENTED 2026-10-06 (`_feature_flags.py`, `tests/test_feature_flags.py`)
 **Goal**: Unreleased analyzers (`data-agent`, `sqldb-test`) can merge to `dev` switched off, so Playwright and RDL changes ship from `dev` to `main` without exposing half-built commands.
 
 ## Overview
@@ -13,7 +13,7 @@ WHY: `dev` now carries work for two epics that are not ready to release: the [Da
 
 1. ✅ Flags are read from **environment variables only**: `FAB_TEST_ENABLE_<NAME>=1` (e.g. `FAB_TEST_ENABLE_DATA_AGENT`, `FAB_TEST_ENABLE_SQLDB_TEST`). Not `fab-test.yml`: the parser is built before the config file loads, and an env var is easy to set in CI and on a dev machine.
 2. ✅ A disabled analyzer is registered as a **stub subcommand** that exits `2` with `<name> is not enabled in this release` plus a hint naming the env var. The stub accepts and ignores any arguments, runs nothing, resolves no tool, and is hidden from the advertised surface the way `pql_lint` is, so `--help` stays byte-identical to `main`. A clear message is better than an unknown-command error or a "did you mean" pointing at a different analyzer.
-3. ✅ Flags are **default off, listed in one table**, and each is **deleted** once its feature ships (flip the default to `True` first, then delete the entry). A flag never outlives its epic.
+3. ✅ Flags are **default off, listed in one table**, and each is **deleted** when its feature ships. Deleting the entry is what enables it, because names without a flag are always enabled, so there is no separate "flip to `True`" step. A flag never outlives its epic, and a test fails if any default is `True`.
 4. ✅ Names not in the flag table are always enabled, so every existing analyzer is unaffected.
 
 ---
@@ -45,13 +45,13 @@ Every surface that enumerates analyzers filters through `disabled_analyzers()`, 
 
 | Surface | Location | Change |
 |---|---|---|
-| Subcommand | `fab_test_parser.py` `_SUBPARSER_BUILDERS` loop | For a disabled feature, register `_add_disabled_stub(subs, name, aliases)` instead of the real builder: no flags, `argparse.REMAINDER` swallows arguments, and the handler prints the message and returns `2` |
-| Advertised list | `fab_test_parser.py` `advertised_subcommands` | Exclude stubs, as `HIDDEN_ANALYZERS` names are excluded, so they never appear in `--help` or "did you mean" suggestions |
-| Dispatch | `fab_test.py` main dispatch | Check for the stub before config load, target resolution, credentials, or telemetry, so a disabled command has no side effects |
+| Subcommand | `fab_test_parser.py` `build_parser`, after the `_SUBPARSER_BUILDERS` loop | `add_disabled_stubs(subs)` registers each disabled feature's spellings with no `help` (hidden like pql-lint). `argparse.REMAINDER` cannot swallow option-shaped arguments, so the stub is a parser subclass whose `parse_known_args` exits `2` with the message |
+| Advertised list | `fab_test_parser.py` `accepted_subcommands` / `advertised_subcommands` | Exclude stub spellings, so they never appear in `--help` or "did you mean" suggestions |
+| Dispatch | none needed | The stub exits during argument parsing, before config load, target resolution, credentials, or telemetry, and that also covers `fab-test help <name>` |
 | Registry | `ANALYZER_REGISTRY`, `visible_analyzers()`, `_suffix_to_analyzers()` | Exclude disabled analyzers |
 | Tool bootstrap | `resolve_tool`, readiness, and the other `_BOOTSTRAPPED_ANALYZERS` checks | Treat a disabled analyzer as having no tool: promptfoo is never resolved or installed |
-| Bundles | `fab_test_all` in `analyzers.json`, `_LOCAL_ANALYZERS` in `fab_test_local.py` | Filter at load time |
-| Admin | `doctor`, `list`, `explain`, `clean-tools` (`fab_test_admin.py`) | Inherit the filter via `visible_analyzers()`; `doctor --analyzer data_agent` reports "not enabled" plus the hint, not an error |
+| Bundles | `load_fab_test_all_analyzers` (`fab_test_all` in `analyzers.json`) | Filter at load time. `_LOCAL_ANALYZERS` is a fixed tuple with no flagged names; data-agent and sqldb-test never join `local` (their epics' decision 8) |
+| Admin | `doctor`, `list`, `explain` (`fab_test_admin.py`) | Inherit the filter via `visible_analyzers()`; `doctor --analyzer data_agent` exits `2` with the not-enabled message |
 | Skill content | `src/fab_test/skill/` | Must not advertise a disabled command |
 
 Out of scope: `tools/check_tool_updates.py` is dev-only and keeps tracking promptfoo's version. The promptfoo row in THIRD-PARTY.md stays, since listing a notice for a tool that is never installed does no harm.
@@ -74,7 +74,7 @@ Out of scope: `tools/check_tool_updates.py` is dev-only and keeps tracking promp
 - Given `tests/test_feature_flags.py`, should parametrize over `_FEATURES` and assert, with the default and with the env var set (`monkeypatch.setenv`), every row of the surface table above
 - Given the existing tests that assume `data_agent` is bootstrapped (`test_check_tool_updates.py`, `test_pbir_a11y_tool_bootstrap.py`), should set the flag on explicitly
 - Given all flags at their defaults, should produce `fab-test --help` output byte-identical to `main`, so the release diff shows only Playwright and RDL changes
-- Given a flag whose feature has shipped, should fail a test if the entry still exists with default `True`, which forces the cleanup in decision 3
+- Given any flag whose default is `True`, should fail a test, since a released feature's entry is deleted instead (decision 3)
 
 ---
 
@@ -83,7 +83,7 @@ Out of scope: `tools/check_tool_updates.py` is dev-only and keeps tracking promp
 1. Land the flag module, the gating, and the tests on `dev`.
 2. Commit the data-agent promptfoo seam (flag off) **separately** from the Playwright workspace-name changes (`fab_test_execution.py`, `invoke_playwright.py`, `test_target_workspace.py`), so each can be reviewed and reverted on its own.
 3. Release Playwright and RDL from `dev` to `main`.
-4. When an epic is ready, flip its default to `True` in one commit, release it, then delete the entry.
+4. When an epic is ready, delete its rows from `_FEATURES` and `FEATURE_SPELLINGS` in the release commit.
 
 ---
 

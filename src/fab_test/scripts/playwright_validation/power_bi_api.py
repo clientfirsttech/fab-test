@@ -235,9 +235,22 @@ def generate_embed_token(
     )
 
     if response.status_code != 200:
+        hint = ""
+        if (
+            response.status_code == 400
+            and "requires effective identity" in response.text
+            and not (user_name and role)
+        ):
+            hint = (
+                " This dataset uses row-level security, so the token needs an "
+                "effective identity. Set PLAYWRIGHT_USER_NAME (or "
+                "playwright_user_name in fab-test.yml) so its roles are "
+                "discovered, and PLAYWRIGHT_ROLE to pin one if discovery "
+                "cannot read them."
+            )
         raise PowerBiApiError(
             f"Failed to generate embed token "
-            f"(HTTP {response.status_code}): {response.text}",
+            f"(HTTP {response.status_code}): {response.text}{hint}",
             status_code=response.status_code,
             body=response.text,
         )

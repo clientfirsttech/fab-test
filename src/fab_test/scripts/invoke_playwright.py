@@ -444,6 +444,10 @@ def _build_config_from_args(
     """Load base config and overlay service-resolved report identity."""
     service_resolved = bool(args.artifact or args.impact_manifest)
     config = load_config(args.env_file, required=not service_resolved)
+    # --user-name outranks PLAYWRIGHT_USER_NAME and fab-test.yml.
+    user_name_flag = getattr(args, "user_name", "")
+    if user_name_flag:
+        config = dataclasses.replace(config, user_name=user_name_flag)
     _require_service_principal(config)
 
     if not args.artifact and not args.impact_manifest:
@@ -633,6 +637,16 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
             "Discover RLS/OLS roles from the semantic model and test the "
             "page matrix under each one when RLS is enabled. Pass 'none' to "
             "test only the configured PLAYWRIGHT_ROLE (default: auto)."
+        ),
+    )
+    parser.add_argument(
+        "--user-name",
+        default="",
+        dest="user_name",
+        metavar="UPN",
+        help=(
+            "Effective-identity user (UPN) for RLS embed tokens. Overrides "
+            "PLAYWRIGHT_USER_NAME and playwright_user_name in fab-test.yml."
         ),
     )
     parser.add_argument(

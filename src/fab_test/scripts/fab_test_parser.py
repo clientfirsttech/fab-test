@@ -20,6 +20,7 @@ from ._fab_test_context import (
     REPO_ROOT,
     RESULTS_ROOT,
 )
+from ._feature_flags import add_disabled_stubs
 from ._service_flags import add_service_flags, add_workspace_flag
 from .fab_test_registry import (
     _DEFAULT_A11Y_PATH,
@@ -614,6 +615,16 @@ def _add_playwright_subparser(subs: argparse._SubParsersAction) -> None:
             "(default: auto)"
         ),
     )
+    playwright_p.add_argument(
+        "--user-name",
+        default="",
+        dest="user_name",
+        metavar="UPN",
+        help=(
+            "Effective-identity user (UPN) for RLS embed tokens. Overrides "
+            "PLAYWRIGHT_USER_NAME and playwright_user_name in fab-test.yml"
+        ),
+    )
     add_execution_flags(playwright_p)
 
 def _add_playwright_impact_subparser(subs: argparse._SubParsersAction) -> None:
@@ -1102,11 +1113,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     for add_subparser in _SUBPARSER_BUILDERS:
         add_subparser(subs)
+    stubs = add_disabled_stubs(subs)
 
     # Read back from the subparser table rather than maintained by hand, so
     # a new subcommand cannot be added without the error message learning
-    # about it.
-    accepted = tuple(subs.choices)
+    # about it. Feature-flag stubs are never suggested.
+    accepted = tuple(name for name in subs.choices if name not in stubs)
     parser.accepted_subcommands = accepted
     parser.advertised_subcommands = tuple(
         dict.fromkeys(

@@ -24,6 +24,7 @@ from ._fab_test_context import (
     REPO_ROOT,
     RESULTS_ROOT,
 )
+from ._feature_flags import is_enabled, not_enabled_message
 from ._metadata import (
     ANALYZERS,
     BPA_RULES,
@@ -313,6 +314,14 @@ PLAYWRIGHT_REPORT_ID=
 PLAYWRIGHT_REPORT_NAME=
 PLAYWRIGHT_DATASET_ID=
 
+# Effective-identity user (UPN) for models secured with row-level security.
+# Required to test RLS: without it fab-test never discovers the model's roles
+# or attaches an identity, and Power BI rejects the embed token with
+# "requires effective identity". Harmless for models without RLS -- only cases
+# that carry a discovered role use it. Can also be set as playwright_user_name
+# in fab-test.yml.
+# PLAYWRIGHT_USER_NAME=analyst@contoso.com
+
 # Optional Azure browsers: enable access-token authentication in the workspace.
 # Selected only by --playwright-config / PLAYWRIGHT_CONFIG_PATH / playwright_config.
 # Keep the access token here or in protected CI secrets, never in execution YAML.
@@ -452,6 +461,9 @@ def _doctor(args: argparse.Namespace) -> int:
 
     output_format = getattr(args, "output_format", "text")
     only = getattr(args, "analyzer_filter", None)
+    if only and not is_enabled(only):
+        print(f"  ✗ fab-test doctor: {not_enabled_message(only)}", file=sys.stderr)
+        return 2
     if only and only not in _ANALYZER_REGISTRY:
         print(
             f"  ✗ fab-test doctor: unknown analyzer '{only}'. "

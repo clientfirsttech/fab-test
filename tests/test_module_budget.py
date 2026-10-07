@@ -36,8 +36,11 @@ TEST_HARD = 900
 # test_complexity_budget.py.
 EXEMPTIONS: dict[str, tuple[int, str]] = {
     "src/fab_test/scripts/fab_test_parser.py": (
-        1119,
+        1131,
         (
+            "2026-10-06: +10 lines for the playwright --user-name flag. "
+            "2026-10-06: +2 lines registering the feature-flag stubs and keeping them out of typo "
+            "suggestions (Feature Flags epic; the stub logic itself lives in _feature_flags.py). "
             "2026-10-03: +2 lines giving pql-test the same --workspace and service flags (mode parity). "
             "2026-10-03: +5 lines attaching the shared service flags from _service_flags.py "
             "to the bpa/pbir/a11y/rdl/all/explain subparsers (Service Targeting epic). "
@@ -146,8 +149,11 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
         ),
     ),
     "src/fab_test/scripts/fab_test_registry.py": (
-        1031,
+        1035,
         (
+            "2026-10-06: +3 lines forwarding --user-name to invoke_playwright. "
+            "2026-10-06: +1 line importing the feature-flag gates (Feature Flags epic; the gates "
+            "themselves replace existing conditions in place). "
             "2026-10-03: +3 lines adding the workspace scope to bpa/pbir/a11y/rdl and "
             "accepting PaginatedReport for rdl (Service Targeting epic). "
             "2026-10-02: +2 lines letting a per-report type from --from-workspace win over the "
@@ -218,8 +224,9 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
         ),
     ),
     "src/fab_test/scripts/invoke_playwright.py": (
-        1003,
+        1014,
         (
+            "2026-10-06: +11 lines for --user-name, which outranks the env/config user. "
             "2026-09-26: +9 lines replacing the `_SPEC_PATH = Path(\"tests\") / "
             "\"test_playwright_visual.py\"` constant with `_spec_path()`, resolved "
             "from the installed `render_spec` module's own file -- a `pip install "

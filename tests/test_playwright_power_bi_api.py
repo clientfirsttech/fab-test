@@ -382,3 +382,46 @@ def test_get_embed_context_returns_all_fields(
     assert context.dataset_id == "ds-1"
     assert context.embed_url == "https://app.powerbi.com/embed?rpt"
     assert context.embed_token == "embed-token"
+
+
+_IDENTITY_REQUIRED = (
+    '{"error":{"code":"InvalidRequest","message":"Creating embed token for accessing '
+    'dataset ds-1 requires effective identity to be provided"}}'
+)
+
+
+def _rejecting_response() -> MagicMock:
+    response = MagicMock()
+    response.status_code = 400
+    response.text = _IDENTITY_REQUIRED
+    return response
+
+
+def test_missing_effective_identity_error_points_at_playwright_user_name() -> None:
+    """An RLS rejection with no identity sent names the setting that fixes it."""
+    with patch(
+        "fab_test.scripts.playwright_validation.power_bi_api.requests.post",
+        return_value=_rejecting_response(),
+    ):
+        with pytest.raises(PowerBiApiError) as exc_info:
+            generate_embed_token("token", ReportIdentity("ws-1", "rpt-1", "ds-1"))
+
+    assert "PLAYWRIGHT_USER_NAME" in str(exc_info.value)
+    assert exc_info.value.status_code == 400
+
+
+def test_identity_error_gets_no_hint_when_an_identity_was_sent() -> None:
+    """With user and role present the hint would be misleading, so it is omitted."""
+    with patch(
+        "fab_test.scripts.playwright_validation.power_bi_api.requests.post",
+        return_value=_rejecting_response(),
+    ):
+        with pytest.raises(PowerBiApiError) as exc_info:
+            generate_embed_token(
+                "token",
+                ReportIdentity("ws-1", "rpt-1", "ds-1"),
+                user_name="a@b.com",
+                role="Reader",
+            )
+
+    assert "PLAYWRIGHT_USER_NAME" not in str(exc_info.value)

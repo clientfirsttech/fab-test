@@ -292,3 +292,20 @@ def test_init_dry_run_reports_existing_files_without_listing_them_as_would_creat
     already_existed_names = {p.split("/")[-1].split("\\")[-1] for p in data["already_existed"]}
     assert "fab-test.yml" not in would_create_names
     assert "fab-test.yml" in already_existed_names
+
+
+@pytest.mark.fab_test
+def test_init_env_example_documents_playwright_user_name(tmp_path):
+    """The scaffolded .env.example tells RLS users about PLAYWRIGHT_USER_NAME."""
+    result = subprocess.run(
+        ["fab-test", "init"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        cwd=tmp_path,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    env_example = (tmp_path / ".fab-test" / ".env.example").read_text(encoding="utf-8")
+    assert "PLAYWRIGHT_USER_NAME" in env_example
