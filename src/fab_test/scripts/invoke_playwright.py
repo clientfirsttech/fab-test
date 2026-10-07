@@ -52,6 +52,7 @@ from .playwright_validation.execution_runtime import (
     apply_execution_environment,
     configure_pytest_execution,
     execution_failure,
+    missing_runner_message,
     prepare_wrapper_execution,
     redact_execution_text,
 )
@@ -799,6 +800,11 @@ def _run_single_report(
         _log_run_header(report_name, output_path, cases, pages, distinct_roles)
         return _write_plan_envelope(
             output_path, report_name, cases, test_cases_dir=test_cases_dir
+        )
+
+    if missing := missing_runner_message():
+        return _write_embed_error_envelope(
+            output_path, report_name, cases, missing, test_cases_dir=test_cases_dir, cloud=config.cloud
         )
 
     if roles and not config.user_name:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import inspect
 import json
 import os
@@ -190,6 +191,32 @@ def configure_pytest_execution(command: list[str], environment: dict[str, str]) 
             if argument.startswith(prefix):
                 command[index] = f"{prefix}{path}"
     command += ["-p", _PLUGIN]
+
+
+# Distribution name -> import name for what `_run_pytest` launches. None are
+# base dependencies; the `playwright` extra installs all four.
+_RUNNER_MODULES = {
+    "pytest": "pytest",
+    "pytest-playwright": "pytest_playwright",
+    "pytest-html": "pytest_html",
+    "pytest-xdist": "xdist",
+}
+
+
+def missing_runner_message() -> str | None:
+    """Name the pytest packages a render run needs that this interpreter lacks.
+
+    Checked before any embed token is minted, so a bare `pip install
+    cft-fab-test` fails with an install command instead of a child
+    process's `ModuleNotFoundError: No module named 'pytest'`.
+    """
+    missing = [name for name, module in _RUNNER_MODULES.items() if importlib.util.find_spec(module) is None]
+    if not missing:
+        return None
+    return (
+        f"Playwright runs need {', '.join(missing)}, which this environment does not have. "
+        'Install them with: pip install "cft-fab-test[playwright]"'
+    )
 
 
 def execution_failure(returncode: int, result_dirs: list[Path]) -> str | None:

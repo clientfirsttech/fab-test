@@ -50,14 +50,14 @@ cd <your-power-bi-repo>
 python -m venv .venv
 source .venv/bin/activate            # PowerShell: .venv\Scripts\Activate.ps1
 
-pip install "cft-fab-test==1.9.0b3"  # or: pip install --pre cft-fab-test
+pip install "cft-fab-test==1.9.0b4"  # or: pip install --pre cft-fab-test
 ```
 
-Playwright needs a browser and some pytest plugins. Installing `fab-test` doesn't install them:
+Playwright needs a browser and some pytest plugins. The plugins come with the `playwright` extra; the browser is a separate download:
 
 ```bash
+pip install "cft-fab-test[playwright]"
 playwright install chromium           # Linux: playwright install --with-deps chromium
-pip install pytest pytest-playwright pytest-html pytest-xdist
 ```
 
 If you skip this, the run fails with a raw pytest error (`unrecognized arguments: --html=...`) instead of a fab-test remediation message.
@@ -348,7 +348,7 @@ If the model uses RLS, set `PLAYWRIGHT_USER_NAME` (or `playwright_user_name` in 
 
 | Symptom | Likely cause | Fix |
 |---------|--------------|-----|
-| `unrecognized arguments: --html=...` | pytest plugins aren't installed | [Step 1](#1-install-fab-test) |
+| `Playwright runs need pytest, ...` | the `playwright` extra isn't installed | [Step 1](#1-install-fab-test) |
 | `missing: FABRIC_CLIENT_ID ... FABRIC_CLIENT_SECRET` | `.fab-test/.env` is incomplete or not found | [Step 3c](#3c-create-a-client-secret-and-save-it-to-fab-testenv) |
 | `AADSTS7000215: Invalid client secret` | The secret has expired, or the secret **ID** was saved instead of its value | Run 3c again |
 | `401` / `403` in `console.json` | A tenant setting hasn't applied, or the service principal has no workspace role | [Step 4](#4-allow-service-principals-in-the-tenant), [step 5](#5-add-the-service-principal-to-your-workspaces) |

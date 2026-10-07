@@ -72,6 +72,16 @@ telemetry = [
 telemetry-lakehouse = [
     "azure-storage-file-datalake==12.26.0",
 ]
+# What `fab-test playwright` launches: it runs its render spec as a
+# `python -m pytest` child with `--html` and xdist workers. Not base
+# dependencies, so every other subcommand's install stays free of pytest.
+# The browser itself still comes from `playwright install chromium`.
+playwright = [
+    "pytest",
+    "pytest-playwright",
+    "pytest-html",
+    "pytest-xdist",
+]
 dev = [
     "pre-commit",
     "ruff>=0.15",
