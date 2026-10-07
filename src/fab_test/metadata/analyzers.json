@@ -145,6 +145,26 @@
       "description": "Prompt evals, expected response matching, grounding validation, hallucination checks",
       "exit_code_success": 0
     },
+    "data_agent": {
+      "type": "dynamic",
+      "implementation": "python",
+      "description": "Evaluates deployed Fabric Data Agents with promptfoo and a packaged Python provider",
+      "exit_code_success": 0,
+      "reference": "https://github.com/promptfoo/promptfoo",
+      "tool_install": {
+        "env_var": "PROMPTFOO_PATH",
+        "default_path": "",
+        "install_url_env_var": "PROMPTFOO_INSTALL_URL",
+        "archive_type": "npm_package",
+        "package": "promptfoo",
+        "version": "0.124.0",
+        "release_source": {"type": "npm", "package": "promptfoo"},
+        "requires_runtime": {"name": "node", "min_major": 22},
+        "platform_limitations": {
+          "win32-arm64": "promptfoo depends on @libsql/win32-arm64-msvc, which is not published for Windows on ARM64. Run fab-test under x64 Python and Node.js (emulated), or on Linux, macOS, or Windows x64."
+        }
+      }
+    },
     "tabular_editor_bpa": {
       "type": "static",
       "implementation": "python",

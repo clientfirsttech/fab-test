@@ -470,6 +470,10 @@ def _build_config_from_args(
         env_file=args.env_file,
     )
 
+    # --workspace / FABRIC_WORKSPACE_ID may hold a display name; a GUID passes through.
+    if workspace_id:
+        workspace_id = resolve_workspace_id(client, workspace_id)
+
     resolved_env = resolve_environment(
         args.environment,
         workspace_id_override=workspace_id,

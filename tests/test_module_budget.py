@@ -271,8 +271,10 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
         ),
     ),
     "src/fab_test/scripts/fab_test_execution.py": (
-        884,
+        891,
         (
+            "2026-10-06: +7 lines so --workspace NAME (stored in workspace_id) is resolved "
+            "to an ID in _resolve_workspace_target. "
             "2026-10-03: +35 lines for the service-export hook in _discover_for, "
             "ServiceExportError handling, and _stamp_mode (Service Targeting epic). "
             "2026-10-02: +4 lines importing and calling the --from-workspace resolver ahead of the "

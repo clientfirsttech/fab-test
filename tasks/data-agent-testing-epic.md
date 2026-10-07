@@ -25,10 +25,12 @@ WHY: Teams deploying Fabric Data Agents have no way to regression-test the agent
 
 ## Promptfoo Tool Seam
 
+**Status**: ✅ IMPLEMENTED 2026-10-06 (`archive_type: npm_package`, `platform_limitations`; Node floor is 22, not 18 -- promptfoo 0.124.0 declares `engines: node >= 22.22.0`).
+
 Register promptfoo as a wrapped external tool so install, readiness, and provenance behave like every other wrapped tool.
 
 **Requirements**:
-- Given `analyzers.json`, should carry a `tool_install` entry for promptfoo (npm, pinned version, `requires_runtime: node >= 18`), a THIRD-PARTY.md row, and `_WRAPPED_TOOLS` registration.
+- Given `analyzers.json`, should carry a `tool_install` entry for promptfoo (npm, pinned version, `requires_runtime: node >= 22`), a THIRD-PARTY.md row, and `_WRAPPED_TOOLS` registration.
 - Given `fab-test doctor`, should report promptfoo readiness without running an eval, and on win32-arm64 should name the `@libsql/win32-arm64-msvc` platform limitation as the remediation rather than failing opaquely.
 - Given a machine without Node, should exit `127` naming the runtime requirement, as the other Node-wrapped tools do.
 
@@ -90,6 +92,7 @@ All analyzer-contract touch points plus the Service Targeting mode rule.
 
 **Requirements**:
 - Given the analyzer contract checklist, should register in `ANALYZER_REGISTRY`, `ANALYZER_SCOPES` (repo + workspace, never desktop), `_COMMAND_BUILDERS`, the parser (with the `agent` alias), `analyzers.json`, a pytest marker, and `conftest`'s marker maps — verified against `references/checklist.md`, copying no known gap.
+- Given the [Feature Flags epic](feature-flags-epic.md), should register the real builder (and `data_agent` in every registry, bundle, and bootstrap surface) only when `is_enabled("data_agent")`; while `FAB_TEST_ENABLE_DATA_AGENT` is unset, `fab-test data-agent` / `agent` is the disabled stub (exit `2`, "not enabled in this release"), promptfoo is never resolved or installed, and `--help` is unchanged. Releasing the epic flips the flag's default to `True`, then deletes the entry.
 - Given `fab-test data-agent` (bare), should resolve mode `repo` — each `*.DataAgent` folder's tests against its deployed agent; given `"Dev.Workspace/Sales Agent"`, mode `service` for that one agent; given `--workspace Dev` with no TARGET, mode `service` enumerating every deployed Data Agent (paired with authored tests; no tests => `skipped`); given `local/NAME`, exit `2` — no desktop mode.
 - Given more than 5 enumerated agents, should warn and stop unless `--all`; in CI or `--format json`, an exit-`2` refusal naming `--all` (decision 9).
 - Given `fab-test all`, should include `data-agent` only when a workspace is configured; given `fab-test local`, never (decision 8).

@@ -500,16 +500,23 @@ def _resolve_workspace_target(args: argparse.Namespace) -> int | None:
     elif not getattr(args, "workspace_id", ""):
         name = (getattr(args, "file_config", None) or {}).get("workspace", "")
     else:
-        name = ""
+        # --workspace stores its value in workspace_id, which may be a display name.
+        name = args.workspace_id
     if not name:
         return None
 
     from .playwright_validation.fabric_service_client import build_fabric_service_client
     from .playwright_validation.resolver import (
+        _GUID_PATTERN,
         AmbiguousWorkspaceError,
         ServiceResolutionError,
         WorkspaceNotFoundError,
     )
+
+    if _GUID_PATTERN.match(name.strip()):
+        # Already an ID: skip building a client for nothing.
+        args.workspace_id = name.strip()
+        return None
 
     try:
         if getattr(args, "interactive", False):

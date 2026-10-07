@@ -104,6 +104,7 @@ Make results visible through the surfaces every analyzer already uses.
 Make the analyzer discoverable like its siblings (per `aidd-analyzer-contract` checklist).
 
 **Requirements**:
+- Given the [Feature Flags epic](feature-flags-epic.md), should register the real builder (and `sqldb_test` in every registry, bundle, and readiness surface) only when `is_enabled("sqldb_test")`; while `FAB_TEST_ENABLE_SQLDB_TEST` is unset, `fab-test sqldb-test` is the disabled stub (exit `2`, "not enabled in this release"), no connection or credential is attempted, and `--help` is unchanged. Releasing the epic flips the flag's default to `True`, then deletes the entry.
 - Given the artifact map, should add `.SQLDatabase` → `SQLDatabase` so discovery, `list`, and `explain` recognise the type.
 - Given the registry, should add `ANALYZER_REGISTRY`, `ANALYZER_SCOPES`, `_COMMAND_BUILDERS`, `_CLOUD_ANALYZERS`, readiness, and `analyzers.json` (`analyzer_registry`, `artifact_analyzers.SQLDatabase.dynamic`).
 - Given `fab_test_registry.py` and `fab_test_parser.py` sit at their module-budget ceilings, should split on their existing seams (or a new `_sqldb_target.py` / `sqldb_test/` package like `playwright_validation/`) rather than raise exemptions.

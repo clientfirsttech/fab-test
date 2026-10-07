@@ -192,8 +192,8 @@ def unsupported_type_error(name: str, target: ResolvedTarget | None) -> str | No
     return f"{opening}. Analyzers that read {target.type}: {', '.join(others)}"
 
 
-# Analyzers that depend on an external binary/tool.
-_BOOTSTRAPPED_ANALYZERS = {"bpa", "pbir", "a11y"}
+# Analyzers that depend on an external binary/tool (data_agent's is promptfoo).
+_BOOTSTRAPPED_ANALYZERS = {"bpa", "pbir", "a11y", "data_agent"}
 
 # Analyzers that resolve no external binary but still cannot run on a bare
 # checkout: they need a Fabric workspace plus credentials, or -- pql_test
