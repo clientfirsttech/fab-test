@@ -402,9 +402,8 @@ def test_missing_effective_identity_error_points_at_playwright_user_name() -> No
     with patch(
         "fab_test.scripts.playwright_validation.power_bi_api.requests.post",
         return_value=_rejecting_response(),
-    ):
-        with pytest.raises(PowerBiApiError) as exc_info:
-            generate_embed_token("token", ReportIdentity("ws-1", "rpt-1", "ds-1"))
+    ), pytest.raises(PowerBiApiError) as exc_info:
+        generate_embed_token("token", ReportIdentity("ws-1", "rpt-1", "ds-1"))
 
     assert "PLAYWRIGHT_USER_NAME" in str(exc_info.value)
     assert exc_info.value.status_code == 400
@@ -415,13 +414,12 @@ def test_identity_error_gets_no_hint_when_an_identity_was_sent() -> None:
     with patch(
         "fab_test.scripts.playwright_validation.power_bi_api.requests.post",
         return_value=_rejecting_response(),
-    ):
-        with pytest.raises(PowerBiApiError) as exc_info:
-            generate_embed_token(
-                "token",
-                ReportIdentity("ws-1", "rpt-1", "ds-1"),
-                user_name="a@b.com",
-                role="Reader",
-            )
+    ), pytest.raises(PowerBiApiError) as exc_info:
+        generate_embed_token(
+            "token",
+            ReportIdentity("ws-1", "rpt-1", "ds-1"),
+            user_name="a@b.com",
+            role="Reader",
+        )
 
     assert "PLAYWRIGHT_USER_NAME" not in str(exc_info.value)

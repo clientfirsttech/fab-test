@@ -505,18 +505,26 @@ def _resolve_workspace_target(args: argparse.Namespace) -> int | None:
     if not name:
         return None
 
-    from .playwright_validation.fabric_service_client import build_fabric_service_client
-    from .playwright_validation.resolver import (
-        _GUID_PATTERN,
-        AmbiguousWorkspaceError,
-        ServiceResolutionError,
-        WorkspaceNotFoundError,
-    )
+    from .playwright_validation.resolver import _GUID_PATTERN
 
     if _GUID_PATTERN.match(name.strip()):
         # Already an ID: skip building a client for nothing.
         args.workspace_id = name.strip()
         return None
+    return _lookup_workspace_id(args, name)
+
+
+def _lookup_workspace_id(args: argparse.Namespace, name: str) -> int | None:
+    """Resolve a workspace display name through the service into args.workspace_id.
+
+    Returns an exit code on failure, or None on success.
+    """
+    from .playwright_validation.fabric_service_client import build_fabric_service_client
+    from .playwright_validation.resolver import (
+        AmbiguousWorkspaceError,
+        ServiceResolutionError,
+        WorkspaceNotFoundError,
+    )
 
     try:
         if getattr(args, "interactive", False):
