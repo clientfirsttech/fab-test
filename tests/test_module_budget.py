@@ -224,10 +224,12 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
         ),
     ),
     "src/fab_test/scripts/invoke_playwright.py": (
-        1020,
+        1021,
         (
-            "2026-10-07: +6 lines aborting with an install command when the pytest "
-            "runner packages are missing (the check itself lives in execution_runtime.py). "
+            "2026-10-07: +7 lines aborting with an install command when the pytest "
+            "runner packages are missing (the check itself lives in execution_runtime.py), "
+            "sharing one error return with the RLS-user check, now _missing_rls_user, to stay "
+            "under PLR0911/PLR0915. "
             "2026-10-06: +11 lines for --user-name, which outranks the env/config user. "
             "2026-09-26: +9 lines replacing the `_SPEC_PATH = Path(\"tests\") / "
             "\"test_playwright_visual.py\"` constant with `_spec_path()`, resolved "
