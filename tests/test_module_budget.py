@@ -282,8 +282,10 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
         ),
     ),
     "src/fab_test/scripts/fab_test_execution.py": (
-        891,
+        892,
         (
+            "2026-10-07: +1 line importing service_skip_exit so a skipped PBIR-Legacy report "
+            "lifts the run's exit above 0; the skip logic itself lives in _service_export.py. "
             "2026-10-06: +7 lines so --workspace NAME (stored in workspace_id) is resolved "
             "to an ID in _resolve_workspace_target. "
             "2026-10-03: +35 lines for the service-export hook in _discover_for, "

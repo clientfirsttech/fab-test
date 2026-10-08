@@ -52,6 +52,7 @@ from ._service_export import (
     build_service_client,
     export_for_analyzer,
     is_service_run,
+    service_skip_exit,
 )
 from ._target import target_from_args
 from .fab_test_registry import (
@@ -877,7 +878,7 @@ def _run_analyzer(
     else:
         results = [_run(pair) for pair in indexed]
 
-    return _print_summary(
+    return max(service_skip_exit(name, args), _print_summary(  # a skipped report never passed
         name,
         results,
         output_dir=output_dir,
@@ -888,4 +889,4 @@ def _run_analyzer(
         # emit_own_json above, and for the same reason.
         show_reports=getattr(args, "analyzer", None) != "all",
         args=args,
-    )
+    ))
