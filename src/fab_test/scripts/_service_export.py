@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import base64
 import contextlib
+import json
 import os
 import re
 import shutil
@@ -23,6 +24,7 @@ import time
 from pathlib import Path, PurePosixPath
 from typing import Any
 
+from ._cli_utils import narrate
 from ._credentials import (
     IncompleteServicePrincipalError,
     probe_credentials,
@@ -40,7 +42,10 @@ SERVICE_ITEM_TYPES: dict[str, str] = {
     "pql_test": "SemanticModel",
 }
 
-_DEFINITION_FORMATS = {"SemanticModel": "TMDL", "Report": "PBIR"}
+# A report is exported in its stored format: Fabric will not convert a
+# PBIR-Legacy report to PBIR, so asking for PBIR fails the whole operation.
+_DEFINITION_FORMATS = {"SemanticModel": "TMDL"}
+_LEGACY_REASON = "stored as PBIR-Legacy, which the analyzers cannot read; convert to PBIR to test"
 ENUMERATION_LIMIT = 50
 _GUID = re.compile(r"^[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}$")
 _UNSAFE = re.compile(r"[^\w.\- ]")
@@ -183,8 +188,24 @@ def _remediation(exc: Exception, label: str) -> ServiceExportError:
             "Run `fab-test auth status`"
         )
     else:
-        text = f"cannot export {label}: Fabric getDefinition failed ({status or exc})"
+        text = f"cannot export {label}: Fabric getDefinition failed ({_fabric_error(exc) or status or exc})"
     return ServiceExportError(text, 1)
+
+
+def _fabric_error(exc: Exception) -> str:
+    """Fabric's own ``errorCode: message`` from an error body, or ``""``.
+
+    A failed long-running operation arrives as HTTP 200 with the error
+    nested under ``error``; a direct failure carries it at the top level.
+    """
+    try:
+        data = json.loads(getattr(exc, "body", "") or "")
+    except ValueError:
+        return ""
+    error = data.get("error", data) if isinstance(data, dict) else None
+    if not isinstance(error, dict) or not error.get("errorCode"):
+        return ""
+    return f"{error['errorCode']}: {error.get('message', '')}".rstrip(": ")
 
 
 def _safe(name: str) -> str:
@@ -313,21 +334,65 @@ def export_for_analyzer(name: str, args: argparse.Namespace, output_dir: Path) -
     if getattr(args, "dry_run", False):
         return [Path(_safe(mode.workspace or "")) / f"{_safe(i['displayName'])}.{item_type}" for i in items]
 
+    _announce_credential(args, client)
     rest = FabricRestClient(FabricToken(client.access_token))
-    cache: dict[tuple[str, str], Path] = args.__dict__.setdefault("_export_cache", {})
-    roots: list[Path] = args.__dict__.setdefault("_export_roots", [])
+    # None marks a PBIR-Legacy report: exported once, never analyzed.
+    cache: dict[tuple[str, str], Path | None] = args.__dict__.setdefault("_export_cache", {})
     artifacts: list[Path] = []
+    skipped: list[str] = args.__dict__.setdefault("_export_skipped", {}).setdefault(name, [])
     for item in items:
         key = (workspace_id, item["id"])
         if key not in cache:
-            parts = _fetch_definition(rest, args, workspace_id, item, item_type)
-            root = output_dir / name / _safe(mode.workspace or workspace_id) / _safe(item["displayName"])
-            if output_dir.resolve() not in root.resolve().parents:
-                raise ServiceExportError(f"refusing export path outside {output_dir}", 1)
-            roots.append(root)
-            cache[key] = _write_parts(parts, root / "export", item_type, item["displayName"])
-        artifacts.append(cache[key])
+            cache[key] = _export_item(rest, item, name, args, output_dir, workspace_id)
+        if cache[key] is None:
+            skipped.append(f"{item['displayName']}.{item_type}")
+        else:
+            artifacts.append(cache[key])
+    if skipped and not artifacts:
+        raise ServiceExportError(f"nothing to test: {', '.join(skipped)} -- {_LEGACY_REASON}", 1)
+    output_format = getattr(args, "output_format", "text")
+    for label in skipped:
+        narrate(f"  ⏭ {label} skipped -- {_LEGACY_REASON}", output_format=output_format)
     return sorted(artifacts)
+
+
+def _export_item(
+    rest: Any, item: dict[str, Any], name: str, args: argparse.Namespace, output_dir: Path, workspace_id: str
+) -> Path | None:
+    """Export one item and return its artifact path, or None for a PBIR-Legacy report."""
+    item_type = SERVICE_ITEM_TYPES[name]
+    parts = _fetch_definition(rest, args, workspace_id, item, item_type)
+    if any(part["path"] == "report.json" for part in parts):
+        return None
+    root = output_dir / name / _safe(args.resolved_mode.workspace or workspace_id) / _safe(item["displayName"])
+    if output_dir.resolve() not in root.resolve().parents:
+        raise ServiceExportError(f"refusing export path outside {output_dir}", 1)
+    args.__dict__.setdefault("_export_roots", []).append(root)
+    return _write_parts(parts, root / "export", item_type, item["displayName"])
+
+
+def service_skip_exit(name: str, args: argparse.Namespace) -> int:
+    """1 when this run skipped a report ``name`` should have tested, else 0.
+
+    A skipped report was never tested, so the run cannot claim every
+    artifact passed.
+    """
+    return 1 if getattr(args, "_export_skipped", {}).get(name) else 0
+
+
+def _announce_credential(args: argparse.Namespace, client: Any) -> None:
+    """Name the credential the run resolved, once, beside the mode banner.
+
+    The label and the env-file path only -- never a secret. Silent under
+    ``--format json`` and ``-q``, like the banner.
+    """
+    if getattr(args, "_auth_announced", False):
+        return
+    args._auth_announced = True
+    source = getattr(client, "credential_source", "unknown")
+    if source == "service-principal":
+        source += f" ({probe_credentials(getattr(args, 'playwright_env_file', None)).source})"
+    _progress(args, f"auth={source}")
 
 
 def _redact_text(text: str) -> str:

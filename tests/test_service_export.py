@@ -172,6 +172,104 @@ def test_given_getdefinition_failure_should_name_a_remediation(fake, tmp_path, m
     assert "raw body" not in str(err.value)
 
 
+def test_given_a_failed_getdefinition_operation_should_name_fabric_error_code(fake, tmp_path, monkeypatch):
+    client, _ = fake
+    client.items = [{"id": "r1", "displayName": "Rpt"}]
+    body = '{"status":"Failed","error":{"errorCode":"Some_FabricError","message":"it broke"}}'
+
+    def fail(self, *a, **k):
+        raise ServiceClientError("Long-running operation failed", status_code=200, body=body)
+
+    monkeypatch.setattr(
+        "fab_test.scripts.playwright_validation.service_client.FabricRestClient.get_item_definition", fail
+    )
+    args = _args("Dev.Workspace/Rpt.Report", workspace_id=WS, analyzer="pbir")
+    with pytest.raises(svc.ServiceExportError, match="Some_FabricError: it broke"):
+        svc.export_for_analyzer("pbir", args, tmp_path)
+
+
+def _report_parts(legacy: bool) -> list[dict[str, str]]:
+    report = "report.json" if legacy else "definition/report.json"
+    return [{"path": "definition.pbir", "payload": _b64("{}")}, {"path": report, "payload": _b64("{}")}]
+
+
+@pytest.fixture
+def reports(monkeypatch):
+    """Fake service holding one PBIR and one PBIR-Legacy report."""
+    client = FakeClient()
+    client.items = [{"id": "new", "displayName": "Modern"}, {"id": "old", "displayName": "Legacy"}]
+    formats: list[str] = []
+
+    def get_definition(self, workspace_id, item_id, *, definition_format=""):
+        formats.append(definition_format)
+        return _report_parts(legacy=item_id == "old")
+
+    monkeypatch.setattr(svc, "build_service_client", lambda args: client)
+    monkeypatch.setattr(
+        "fab_test.scripts.playwright_validation.service_client.FabricRestClient.get_item_definition",
+        get_definition,
+    )
+    return client, formats
+
+
+def test_given_a_pbir_legacy_report_should_skip_it_and_fail_the_run(reports, tmp_path, capsys):
+    _, formats = reports
+    args = _args(None, workspace_id=WS, analyzer="pbir")
+    artifacts = svc.export_for_analyzer("pbir", args, tmp_path)
+    assert [a.name for a in artifacts] == ["Modern.Report"]
+    assert formats == ["", ""]  # the report's stored format; Fabric will not convert legacy
+    assert "Legacy.Report skipped" in capsys.readouterr().out
+    assert svc.service_skip_exit("pbir", args) == 1
+
+
+def test_given_only_pbir_legacy_reports_should_exit_1_naming_them(reports, tmp_path):
+    client, _ = reports
+    client.items = [{"id": "old", "displayName": "Legacy"}]
+    args = _args(None, workspace_id=WS, analyzer="pbir")
+    with pytest.raises(svc.ServiceExportError, match=r"Legacy\.Report.*PBIR-Legacy") as err:
+        svc.export_for_analyzer("pbir", args, tmp_path)
+    assert err.value.code == 1
+
+
+def test_given_no_skipped_report_should_not_change_the_exit(reports, tmp_path):
+    client, _ = reports
+    client.items = [{"id": "new", "displayName": "Modern"}]
+    args = _args(None, workspace_id=WS, analyzer="pbir")
+    svc.export_for_analyzer("pbir", args, tmp_path)
+    assert svc.service_skip_exit("pbir", args) == 0
+
+
+@pytest.mark.parametrize(
+    "credential_source,expected",
+    [
+        ("ambient:DefaultAzureCredential", "auth=ambient:DefaultAzureCredential"),
+        ("service-principal", "auth=service-principal (.fab-test/.env)"),
+    ],
+)
+def test_given_a_service_export_should_name_the_credential_once(
+    fake, tmp_path, monkeypatch, capsys, credential_source, expected
+):
+    client, _ = fake
+    client.credential_source = credential_source
+    client.items = [{"id": "r1", "displayName": "Rpt"}]
+    monkeypatch.setattr(
+        svc, "probe_credentials", lambda env_file=None: argparse.Namespace(source=".fab-test/.env")
+    )
+    args = _args("Dev.Workspace/Rpt.Report", workspace_id=WS, analyzer="all")
+    svc.export_for_analyzer("pbir", args, tmp_path)
+    svc.export_for_analyzer("a11y", args, tmp_path)
+    assert capsys.readouterr().err.count(expected) == 1
+
+
+def test_given_json_output_should_not_print_the_credential(fake, tmp_path, capsys):
+    client, _ = fake
+    client.credential_source = "ambient:DefaultAzureCredential"
+    client.items = [{"id": "r1", "displayName": "Rpt"}]
+    args = _args("Dev.Workspace/Rpt.Report", workspace_id=WS, analyzer="pbir", output_format="json")
+    svc.export_for_analyzer("pbir", args, tmp_path)
+    assert "auth=" not in capsys.readouterr().err
+
+
 def test_given_unsafe_definition_path_should_refuse(tmp_path):
     parts = [{"path": "../evil.tmdl", "payload": _b64("x")}]
     with pytest.raises(svc.ServiceExportError, match="unsafe"):
@@ -297,7 +395,8 @@ def test_given_default_or_verbose_should_announce_each_export_with_its_duration(
     client, _ = fake
     client.items = [{"id": "m0", "displayName": "Sales"}, {"id": "m1", "displayName": "Ops"}]
     svc.export_for_analyzer("bpa", _args(None, workspace_id=WS, verbose=verbose), tmp_path)
-    lines = capsys.readouterr().err.splitlines()
+    auth, *lines = capsys.readouterr().err.splitlines()
+    assert auth.startswith("auth=")  # the credential is named before any export starts
     assert [line.split("...")[0] for line in lines] == [
         "exporting Sales.SemanticModel",
         "exporting Ops.SemanticModel",
@@ -320,7 +419,7 @@ def test_given_a_failed_export_should_close_its_progress_line(fake, tmp_path, ca
     )
     with pytest.raises(svc.ServiceExportError):
         svc.export_for_analyzer("bpa", _args(None, workspace_id=WS), tmp_path)
-    assert capsys.readouterr().err == "exporting Item0.SemanticModel... failed\n"
+    assert capsys.readouterr().err.endswith("\nexporting Item0.SemanticModel... failed\n")
 
 
 def test_given_no_target_should_skip_microsoft_usage_metrics_models(fake, tmp_path):

@@ -673,3 +673,7 @@ Each export prints `exporting <Name>.<Type>... done (<seconds>s)` on stderr (sil
 A workspace inventory skips Microsoft's generated usage-metrics models and reports; name one (`Dev.Workspace/Dashboard Usage Metrics Model.SemanticModel`) to analyze it anyway.
 
 `--workspace` with no target ignores local folders unless `--artifact-dir` is passed. `local/NAME` with `--workspace` exits `2`.
+
+A service run prints the credential it used under the mode banner, e.g. `auth=service-principal (.fab-test/.env)`; a service principal there is used ahead of `az login`.
+
+`pbir` and `a11y` test PBIR reports only. A report still stored as PBIR-Legacy (a single `report.json`) is skipped with a reason and the run exits `1` — convert it to PBIR to test it.
