@@ -1,0 +1,3 @@
+# Optional contributor tooling, never a fab-test runtime dependency.
+# Graphify-Labs/graphify 622474b8ecc061d9921c3d68a749cf78378d63f3, release v8, Apache-2.0.
+graphifyy==0.9.81

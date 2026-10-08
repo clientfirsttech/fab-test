@@ -19,6 +19,9 @@ Constraints {
   (task involves code changes) => use aidd-tdd — write tests before implementation
   (planning or executing an epic) => its last task is always "Quality gates" (whole-repo ruff, complexity and module-budget ratchets, coverage floor, CI-env run), per vision.md's Definition of Done; no task follows it
   All skills resolve to: .github/skills/<skill-name>/SKILL.md
+  (graph context explicitly requested or .graphify-local/index.json exists) => load aidd-graphify
+  (graph-assisted review) => caller/orchestrator refreshes before delegation and after review/fixes
+  Read-only reviewers never refresh; unavailable/stale optional graph => direct source inspection
   Epic files: tasks/<epic-name>-epic.md
 }
 
@@ -31,7 +34,8 @@ Constraints {
 | discover, user journey, user story, feature | `aidd-product-manager`, `aidd-please` | Interactive product discovery |
 | task, create epic, plan task | `aidd-task-creator`, `aidd-please`, `aidd-tdd`, `aidd-python` | Plan + TDD execution |
 | execute epic, run epic | `aidd-task-creator`, `aidd-please` | Execute a previously planned epic |
-| review, code review | `aidd-review`, `aidd-python`, `aidd-module-budgets`, `aidd-please` | Quality + security review |
+| review, code review | `aidd-agent-orchestrator`, `aidd-review`, `aidd-python`, `aidd-module-budgets`, `aidd-please` | Caller prepares optional graph; reviewer stays read-only |
+| graph, graphify, graph savings, graph benchmark | `aidd-graphify` | Opt-in local AST context and content-free matched-pair metrics |
 | churn, hotspots, refactoring candidates | `aidd-churn`, `aidd-please` | Hotspot ranking by LoC × churn × complexity |
 | fix bug, fix, aidd-fix | `aidd-fix`, `aidd-python`, `aidd-please` | Structured bug-fix workflow |
 | user test, test script | `aidd-user-testing`, `aidd-please` | Generate human/AI test scripts |
@@ -54,6 +58,7 @@ Constraints {
 | `aidd-python` | Python best practices, simplicity budgets, over-engineering review lens |
 | `aidd-module-budgets` | File-level size budgets, split seams for oversized modules |
 | `aidd-analyzer-contract` | Minimum requirements for a new or changed analyzer: envelope, exit codes, report, telemetry, registration touch points |
+| `aidd-graphify` | Optional isolated EXTRACTED-only contributor graph and honest savings report |
 | `document` | Sync docs: README, QUICK-VALIDATION, fab-test skill |
 | `fab-test` | fab-test CLI reference — subcommands, flags, result locations |
 

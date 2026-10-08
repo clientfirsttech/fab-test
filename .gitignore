@@ -58,6 +58,9 @@ fab-test-results/
 # Claude Code worktrees
 .claude/worktrees/
 
+# Optional contributor graph and aggregate observations are machine-local.
+/.graphify-local/
+
 # Power BI cache files (any folder level)
 **/cache.abf
 

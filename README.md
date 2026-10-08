@@ -204,6 +204,118 @@ pytest -m analyzers
 
 > **Note:** Some wrapper contract tests launch the installed console scripts (`tabular-editor-bpa`, `fab-test`, etc.) as subprocesses. Those scripts must be on `PATH`, so always activate the virtual environment before running `pytest`.
 
+### Optional local graph context for contributors
+
+Claude Code and GitHub Copilot share the authored
+[aidd-graphify skill](https://github.com/clientfirsttech/fab-test/blob/main/.github/skills/aidd-graphify/SKILL.md). Copilot discovers
+`.github/skills`; Claude discovers a small `.claude/skills/aidd-graphify`
+forwarder that reads the same canonical instructions (no symlink privileges
+required on Windows). This is **not** a shipped `fab-test` command or dependency.
+It is opt-in; missing graphs never block normal reviews, epics, or tests.
+
+On Linux, or Linux inside WSL, enable unprivileged user/network namespaces and
+install the optional pinned tool into a separate environment. Replace
+`/path/to/fab-test` with your absolute checkout path:
+
+```bash
+rtk proxy python -m venv /path/to/fab-test/.venv-graphify
+rtk proxy /path/to/fab-test/.venv-graphify/bin/python -m pip install -r /path/to/fab-test/tools/requirements-graphify.txt
+rtk proxy /path/to/fab-test/.venv-graphify/bin/python /path/to/fab-test/tools/graphify_local.py build
+rtk proxy /path/to/fab-test/.venv-graphify/bin/python /path/to/fab-test/tools/graphify_local.py status
+rtk proxy /path/to/fab-test/.venv-graphify/bin/python /path/to/fab-test/tools/graphify_local.py query "AnalyzerReporter" --budget 1500
+rtk proxy /path/to/fab-test/.venv-graphify/bin/python /path/to/fab-test/tools/graphify_local.py refresh
+```
+
+Dependency installation is a separate, explicit provisioning step that may use
+the network; indexing/query execution **always** runs in a new Linux network
+namespace with a minimal environment and isolated HOME. No API keys are passed.
+Native Windows/macOS and hosts that deny `unshare` are unsupported for graph
+execution: it fails closed, with no unrestricted fallback. Use WSL/Linux or
+ordinary source inspection. `status`, `record`, and `report` need only Python.
+Graphify-Labs/graphify release v8 (`graphifyy==0.9.81`, Apache-2.0) was inspected
+at revision `622474b8ecc061d9921c3d68a749cf78378d63f3`.
+Never install the stock `/graphify` skill, hooks, servers, or auto-upgrades.
+
+Only tracked `.py` files under `src/`, `tests/`, `tools/`, and `.github/scripts/`
+are copied into a fresh extraction directory with their relative layout intact.
+Symlinks are rejected; agents/skills, vendored code, fixtures, environment,
+personal/private/credential/secret/token/password paths, build/cache/artifact
+paths, untracked files, and non-Python assets are not indexed. Git-add intended
+new public source files before refreshing. The upstream CLI runs
+`extract <staged-inputs> --code-only --no-cluster`; validation drops inferred,
+ambiguous and hyperedge relationships and nonlocal nodes, and rejects malformed
+edge endpoints.
+Queries use upstream `query --budget 1500 --graph <absolute-staged-graph>`,
+with query logging and Google Workspace disabled. This is syntactic context,
+not a replacement for reading source or discovering runtime/dynamic callers.
+Eligible source must not contain embedded credentials.
+
+Graph JSON and aggregate JSONL observations remain in ignored `.graphify-local/`.
+Nothing is uploaded or added to the wheel; do not commit or upload this directory.
+`build`/`refresh` fingerprint HEAD plus tracked current names/content/deletions,
+including uncommitted changes, skip unchanged inputs, and replace the index only
+after validation. Failed builds preserve the last valid graph and report
+`stale`/`missing`; queries can read that stale graph but disclose its state.
+Corrupt or redirected caches are rejected; remove the invalid local index and
+rebuild. Refreshes are explicit orchestrator actions before graph-assisted
+read-only reviews, after review fixes, and after epic edits **before** final
+Quality gates. Reviews themselves never refresh.
+
+**Measure rather than assume savings.** Run independent baseline and graph
+trials on identical acceptance criteria, fingerprint, model, assistant, and
+measurement source; alternate order and reset assistant context. Record
+aggregate observations with `record` (JSON on stdin), then run `report`.
+For example, replace the fingerprint and measurements with your own:
+
+```json
+{"assistant":"copilot","mode":"baseline","benchmark":"review01","revision":"<64-character status revision>","model":"model1","source":"manual","scope":"task","elapsed_seconds":120,"tool_calls":12,"context_chars":16000,"correct":true}
+```
+
+Record the matching `mode:"graph"` trial with the same identifiers, and repeat
+with new trial ids for both `claude` and `copilot`. Only bounded noncontent
+benchmark/model ids are accepted; never put queries, responses, prompts,
+transcripts, paths, names, or credentials in observations. Optional actual
+`input_tokens`/`output_tokens` and separate `cache_read_tokens`/`cache_write_tokens`
+require explicit `"token_source":"provider_reported"` whenever any token count
+is nonnull (including zero). Copy only real provider-reported usage, even when
+`source:"manual"` describes the collection method; omit unknowns or use `null`.
+For example, add `"token_source":"provider_reported","input_tokens":1200`
+only when that trial's provider usage reports 1200 input tokens. No other token
+source is accepted. Token provenance is not a pairing key: absent tokens exclude
+only the token comparison, not an otherwise valid elapsed-time pair.
+`context_chars / 4` is explicitly estimated context tokens, **not** provider
+usage or billing. Reports give paired medians per assistant, measured-pair counts,
+and maintenance separately. Each assistant's report includes `total_trials`,
+`trial_counts` by baseline/graph, `complete_pairs` regardless of correctness,
+`pairs` with both trials correct, `incorrect_trial_counts` by mode,
+`unmatched_workloads` and `unmatched_workload_counts` by mode, and
+`correctness_regressions` (baseline correct, graph incorrect).
+Trial counts exclude maintenance. Disclose these counts alongside savings:
+unmatched, incorrect, duplicate, cross-model, cross-revision, or cross-source
+trials cannot produce a savings claim.
+
+Net elapsed savings are reported only for matched `scope:"full"` trials with a
+measured `mode:"maintenance"` observation using the same identifiers. Include all
+queries, reads, reviews, fixes, and gates in the workload measurements; exclude
+the separately measured maintenance from those times to avoid double counting.
+Sum all index/refresh costs (including failures) into that maintenance observation.
+The refresh JSON exposes `maintenance_seconds` for the extraction attempt;
+use external wall-clock timing for the complete refresh workload. No data means
+no demonstrated savings, not zero actual tokens or a promised percentage.
+
+An optional CI step (after explicit dependency provisioning and with RTK/Python
+on PATH) keeps output local and never uploads a source-derived graph. Ordinary
+CI should leave this tool off; network-namespace denial is a safe optional failure:
+
+```yaml
+- name: Optional local contributor graph
+  if: ${{ vars.GRAPHIFY_LOCAL == 'true' }}
+  continue-on-error: true
+  run: |
+    rtk proxy python "$GITHUB_WORKSPACE/tools/graphify_local.py" --root "$GITHUB_WORKSPACE" refresh
+# Do not cache/upload .graphify-local/; run normal quality gates independently.
+```
+
 ### Artifact validation with fab-test
 
 `fab-test` discovers artifacts under your working directory, in the TMDL/PBIR layout described in [Assumed project format](#assumed-project-format). It requires the corresponding external tools for each analyzer.

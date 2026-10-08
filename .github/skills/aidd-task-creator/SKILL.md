@@ -73,15 +73,24 @@ executePlan() {
   1. Complete only the current task
   1. Validate - Verify the task meets its success criteria
   1. Report - Summarize what was accomplished
+  1. Prepare optional graph - if explicitly opted in or .graphify-local/index.json exists, use aidd-graphify prepareReview() before delegating a read-only review; missing/stale/failed graph falls back to source inspection
   1. /review - check correctness before moving to next task
+  1. Refresh after review/fixes - the caller uses aidd-graphify finishEpicOrReview(), not the reviewer
   1. If $approvalRequired, awaitApproval
 
   Every 3 completed tasks:
   1. Summarize progress — what was completed, what's next
+  1. Prepare optional graph via aidd-graphify prepareReview()
   1. Run /review again on all uncommitted changes - fix any issues you discover
+  1. Caller refreshes the optional graph after all fixes
   1. Run /commit
   1. Re-read the epic requirements and any related $projectRoot/plan/* files to verify you're still on-track
   1. Continue with the next batch of tasks
+
+  Before the final Quality gates:
+  1. Finish all epic edits, reviews, and fixes
+  1. Caller refreshes the opted-in graph via aidd-graphify finishEpicOrReview(); unchanged inputs skip extraction
+  1. Run Quality gates last; optional graph failure never blocks unrelated gates and no refresh task follows them
 }
 
 ## Task Plan Template Structure

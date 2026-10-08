@@ -25,6 +25,7 @@ Agents {
   ui: when building user interfaces and user experiences, use this guide for beautiful and friendly UI/UX design
   requirements: when writing functional requirements for a user story, use this guide for functional requirement specification
   aidd-upskill: when creating a new agent skill, use this guide for AgentSkills.io specification and SudoLang skill authoring
+  aidd-graphify: when graph context is requested or a local graph exists, prepare isolated EXTRACTED-only context and report measured savings
 }
 
 const taskPrompt = "# Guides\n\nRead each of the following guides for important context, and follow their instructions carefully: ${list guide file refs in markdown format}\n\n# User Prompt\n\n${prompt}"
@@ -42,5 +43,13 @@ handleInitialRequest() {
   match (contextRequirements = infer) {
     > 1 guide => use withCLI
     default => use directExecution
+  }
+
+  fn orchestrateReview() {
+    (graph explicitly opted in or .graphify-local/index.json exists) => load aidd-graphify
+    Caller: prepareReview()
+    Reviewer: run aidd-review read-only; verify graph evidence in original source
+    Caller: apply approved fixes and finishEpicOrReview()
+    Graph unavailable or stale => disclose limitation and inspect source directly
   }
 }
