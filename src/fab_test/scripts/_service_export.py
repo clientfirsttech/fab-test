@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import base64
 import contextlib
+import errno
 import json
 import os
 import re
@@ -55,6 +56,7 @@ _SECRET_ASSIGNMENT = re.compile(
 _JSON_SECRET = re.compile(r'(?i)("(?:password|pwd|accountkey|sharedaccesskey|client_?secret)"\s*:\s*")[^"]*')
 _CI_VARIABLES = ("CI", "GITHUB_ACTIONS", "TF_BUILD")
 _FABRIC_SCOPE = "https://api.fabric.microsoft.com/.default"
+_WINDOWS_PATH_TOO_LONG = 206  # ERROR_FILENAME_EXCED_RANGE
 
 
 class ServiceExportError(Exception):
@@ -368,7 +370,22 @@ def _export_item(
     if output_dir.resolve() not in root.resolve().parents:
         raise ServiceExportError(f"refusing export path outside {output_dir}", 1)
     args.__dict__.setdefault("_export_roots", []).append(root)
-    return _write_parts(parts, root / "export", item_type, item["displayName"])
+    try:
+        return _write_parts(parts, root / "export", item_type, item["displayName"])
+    except OSError as exc:
+        raise _write_failure(exc, f"{item['displayName']}.{item_type}") from exc
+
+
+def _write_failure(exc: OSError, label: str) -> ServiceExportError:
+    """Name an export that could not be written, never a traceback.
+
+    PBIR's nested ``definition/pages/<id>/visuals/<id>/visual.json`` is what
+    crosses Windows' 260-character limit (WinError 206) under a deep output dir.
+    """
+    text = f"cannot write the export of {label} to {exc.filename}: {exc.strerror}"
+    if exc.errno == errno.ENAMETOOLONG or getattr(exc, "winerror", None) == _WINDOWS_PATH_TOO_LONG:
+        text += "; the path is too long -- pass a shorter --output-dir or enable Windows long-path support"
+    return ServiceExportError(text, 1)
 
 
 def service_skip_exit(name: str, args: argparse.Namespace) -> int:

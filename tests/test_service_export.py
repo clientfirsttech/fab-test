@@ -6,6 +6,7 @@ enumeration, caching, cleanup and refusal rules without a tenant.
 
 import argparse
 import base64
+import errno
 import re
 from pathlib import Path
 
@@ -268,6 +269,28 @@ def test_given_json_output_should_not_print_the_credential(fake, tmp_path, capsy
     args = _args("Dev.Workspace/Rpt.Report", workspace_id=WS, analyzer="pbir", output_format="json")
     svc.export_for_analyzer("pbir", args, tmp_path)
     assert "auth=" not in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    "error,hint",
+    [
+        (OSError(errno.ENAMETOOLONG, "File name too long", "deep/visual.json"), "--output-dir"),
+        (OSError(errno.EACCES, "Permission denied", "deep/visual.json"), None),
+    ],
+)
+def test_given_an_unwritable_export_should_exit_1_naming_the_path(fake, tmp_path, monkeypatch, error, hint):
+    client, _ = fake
+    client.items = [{"id": "r1", "displayName": "Rpt"}]
+
+    def fail(*a, **k):
+        raise error
+
+    monkeypatch.setattr(svc, "_write_parts", fail)
+    args = _args("Dev.Workspace/Rpt.Report", workspace_id=WS, analyzer="pbir")
+    with pytest.raises(svc.ServiceExportError, match=r"Rpt\.Report.*deep/visual\.json") as err:
+        svc.export_for_analyzer("pbir", args, tmp_path)
+    assert err.value.code == 1
+    assert (hint in str(err.value)) if hint else ("--output-dir" not in str(err.value))
 
 
 def test_given_unsafe_definition_path_should_refuse(tmp_path):
