@@ -52,6 +52,7 @@ from ._service_export import (
     build_service_client,
     export_for_analyzer,
     is_service_run,
+    service_skip_exit,
 )
 from ._target import target_from_args
 from .fab_test_registry import (
@@ -515,7 +516,7 @@ def _resolve_workspace_target(args: argparse.Namespace) -> int | None:
 
 def _lookup_workspace_id(args: argparse.Namespace, name: str) -> int | None:
     """Resolve a display name into args.workspace_id; an exit code on failure, else None."""
-    from .playwright_validation.fabric_service_client import build_fabric_service_client
+    from .playwright_validation.fabric_service_client import build_fabric_service_client, credential_failure_detail
     from .playwright_validation.resolver import AmbiguousWorkspaceError, ServiceResolutionError, WorkspaceNotFoundError
 
     try:
@@ -535,7 +536,8 @@ def _lookup_workspace_id(args: argparse.Namespace, name: str) -> int | None:
         print(f"  ✗ fab-test: {exc}", file=sys.stderr)
         return 1
     except ServiceResolutionError as exc:
-        print(f"  ✗ fab-test: could not resolve workspace '{name}': {exc}", file=sys.stderr)
+        detail = "".join(f"\n    {line}" for line in credential_failure_detail(exc, getattr(args, "verbose", 0) or 0))
+        print(f"  ✗ fab-test: could not resolve workspace '{name}': {exc}{detail}", file=sys.stderr)
         return 1
     return None
 
@@ -877,7 +879,7 @@ def _run_analyzer(
     else:
         results = [_run(pair) for pair in indexed]
 
-    return _print_summary(
+    return max(service_skip_exit(name, args), _print_summary(  # a skipped report never passed
         name,
         results,
         output_dir=output_dir,
@@ -888,4 +890,4 @@ def _run_analyzer(
         # emit_own_json above, and for the same reason.
         show_reports=getattr(args, "analyzer", None) != "all",
         args=args,
-    )
+    ))

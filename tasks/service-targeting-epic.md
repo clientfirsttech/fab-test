@@ -85,7 +85,12 @@ One shared function that decides the mode, so nine callers cannot each decide di
 Materialize a deployed item as the on-disk shape the analyzers already read.
 
 **Requirements**:
-- Given a workspace item, should export via Fabric `getDefinition` — TMDL format for semantic models, PBIR for reports, the `.rdl` payload for paginated reports — reusing/promoting `playwright_validation/service_client.py` rather than writing a second client.
+- Given a workspace item, should export via Fabric `getDefinition` — TMDL format for semantic models, the report's own stored format for reports, the `.rdl` payload for paginated reports — reusing/promoting `playwright_validation/service_client.py` rather than writing a second client.
+- Given a deployed report stored as PBIR-Legacy (a single `report.json`), should skip it with a reason naming the format and the fix (convert it to PBIR), and the run should not exit `0` — never analyze it: Fabric refuses to convert a legacy report to PBIR on export (`Report_Report_FailedToExportReport`), and the `pbir` rules silently pass a legacy layout (11 errors on the PBIR copy of a report, 0 on its legacy export). Found on the first live run (2026-10-07).
+- Given every report in the run is PBIR-Legacy, should exit `1` naming each one rather than report "no artifacts".
+- Given a `getDefinition` operation that reports `Failed`, should exit with Fabric's error code and message in the remediation, never a bare HTTP status.
+- Given an export that cannot be written to disk, should exit `1` naming the item and the path, never a traceback; given a path too long for the OS (PBIR's `definition/pages/<id>/visuals/<id>/visual.json` crosses Windows' 260-character limit under a deep `--output-dir`), should name a shorter `--output-dir` and Windows long-path support as the fix. Found on the first PBIR live run (2026-10-08).
+- Given a service-mode export that resolves a credential, should name the credential source on stderr (`auth=service-principal (.fab-test/.env)`, `auth=ambient:DefaultAzureCredential`, `auth=interactive`) — never a secret; silent under `-q` and `--format json`.
 - Given an export, should land under the run's output dir (`fab-test-results/<analyzer>/<workspace>/<item>/export/`), be cached per run so `all` exports each item once, and be deleted after the run unless `--keep-export` is passed (decision 3).
 - Given `--keep-export`, should pass kept files through the same secret-redaction rules as envelopes (TMDL connection strings).
 - Given a 404 (item not in enhanced/Git-integration format), a 403, or an unsupported item type, should exit with a named remediation, never a raw HTTP error.

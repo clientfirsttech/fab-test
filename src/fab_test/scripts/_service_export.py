@@ -15,12 +15,17 @@ from __future__ import annotations
 import argparse
 import base64
 import contextlib
+import errno
+import json
 import os
 import re
 import shutil
+import sys
+import time
 from pathlib import Path, PurePosixPath
 from typing import Any
 
+from ._cli_utils import narrate
 from ._credentials import (
     IncompleteServicePrincipalError,
     probe_credentials,
@@ -38,7 +43,10 @@ SERVICE_ITEM_TYPES: dict[str, str] = {
     "pql_test": "SemanticModel",
 }
 
-_DEFINITION_FORMATS = {"SemanticModel": "TMDL", "Report": "PBIR"}
+# A report is exported in its stored format: Fabric will not convert a
+# PBIR-Legacy report to PBIR, so asking for PBIR fails the whole operation.
+_DEFINITION_FORMATS = {"SemanticModel": "TMDL"}
+_LEGACY_REASON = "stored as PBIR-Legacy, which the analyzers cannot read; convert to PBIR to test"
 ENUMERATION_LIMIT = 50
 _GUID = re.compile(r"^[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}$")
 _UNSAFE = re.compile(r"[^\w.\- ]")
@@ -48,6 +56,7 @@ _SECRET_ASSIGNMENT = re.compile(
 _JSON_SECRET = re.compile(r'(?i)("(?:password|pwd|accountkey|sharedaccesskey|client_?secret)"\s*:\s*")[^"]*')
 _CI_VARIABLES = ("CI", "GITHUB_ACTIONS", "TF_BUILD")
 _FABRIC_SCOPE = "https://api.fabric.microsoft.com/.default"
+_WINDOWS_PATH_TOO_LONG = 206  # ERROR_FILENAME_EXCED_RANGE
 
 
 class ServiceExportError(Exception):
@@ -70,7 +79,7 @@ def is_service_run(name: str, args: argparse.Namespace) -> bool:
     its `--workspace-id` keeps meaning "run the repository's models over
     XMLA", and a typed workspace target keeps its XMLA path, as before.
     """
-    if getattr(args, "mode", "repo") != "service" or name not in SERVICE_ITEM_TYPES:
+    if getattr(args, "mode", "local") != "service" or name not in SERVICE_ITEM_TYPES:
         return False
     return (
         name != "pql_test"
@@ -181,8 +190,24 @@ def _remediation(exc: Exception, label: str) -> ServiceExportError:
             "Run `fab-test auth status`"
         )
     else:
-        text = f"cannot export {label}: Fabric getDefinition failed ({status or exc})"
+        text = f"cannot export {label}: Fabric getDefinition failed ({_fabric_error(exc) or status or exc})"
     return ServiceExportError(text, 1)
+
+
+def _fabric_error(exc: Exception) -> str:
+    """Fabric's own ``errorCode: message`` from an error body, or ``""``.
+
+    A failed long-running operation arrives as HTTP 200 with the error
+    nested under ``error``; a direct failure carries it at the top level.
+    """
+    try:
+        data = json.loads(getattr(exc, "body", "") or "")
+    except ValueError:
+        return ""
+    error = data.get("error", data) if isinstance(data, dict) else None
+    if not isinstance(error, dict) or not error.get("errorCode"):
+        return ""
+    return f"{error['errorCode']}: {error.get('message', '')}".rstrip(": ")
 
 
 def _safe(name: str) -> str:
@@ -218,14 +243,14 @@ def _write_parts(parts: list[dict[str, str]], dest: Path, item_type: str, name: 
 def _select_items(
     name: str, args: argparse.Namespace, client: Any, workspace_id: str
 ) -> list[dict[str, Any]]:
-    from .playwright_validation.resolver import ResolvedEnvironment, resolve_item
+    from .playwright_validation.resolver import ResolvedEnvironment, list_inventory, resolve_item
 
     item_type = SERVICE_ITEM_TYPES[name]
     target = getattr(args, "resolved_target", None)
     if target is not None:
         item = resolve_item(target.name, item_type, ResolvedEnvironment("service", workspace_id), client)
         return [{"id": item.item_id, "displayName": item.display_name}]
-    items = client.list_items(workspace_id, item_type)
+    items = list_inventory(client, workspace_id, item_type)
     if len(items) > ENUMERATION_LIMIT and not getattr(args, "all_items", False):
         raise ServiceExportError(
             f"{name}: {len(items)} {item_type} items in the workspace exceed the "
@@ -250,7 +275,36 @@ def _dry_run_paths(name: str, args: argparse.Namespace, mode: ResolvedMode) -> l
     if target is None:
         return None
     suffix = "rdl" if SERVICE_ITEM_TYPES[name] == "PaginatedReport" else SERVICE_ITEM_TYPES[name]
+    if name == "pql_test":
+        return [Path(f"{mode.workspace or ''}.Workspace") / f"{target.name}.{suffix}"]
     return [Path(f"{_safe(mode.workspace or '')}") / f"{_safe(target.name)}.{suffix}"]
+
+
+def _progress(args: argparse.Namespace, message: str, end: str = "\n") -> None:
+    """Narrate export progress on stderr; silent under -q and --format json, like the banner."""
+    if getattr(args, "quiet", False) or getattr(args, "output_format", "text") == "json":
+        return
+    print(message, end=end, file=sys.stderr, flush=True)
+
+
+def _fetch_definition(
+    rest: Any, args: argparse.Namespace, workspace_id: str, item: dict[str, Any], item_type: str
+) -> list[dict[str, str]]:
+    """Return one item's definition parts, announcing the export as it runs."""
+    from .playwright_validation.service_client import ServiceClientError
+
+    label = f"{item['displayName']}.{item_type}"
+    _progress(args, f"exporting {label}...", end="")
+    started = time.monotonic()
+    try:
+        parts = rest.get_item_definition(
+            workspace_id, item["id"], definition_format=_DEFINITION_FORMATS.get(item_type, "")
+        )
+    except ServiceClientError as exc:
+        _progress(args, " failed")
+        raise _remediation(exc, label) from exc
+    _progress(args, f" done ({time.monotonic() - started:.1f}s)")
+    return parts
 
 
 def export_for_analyzer(name: str, args: argparse.Namespace, output_dir: Path) -> list[Path]:
@@ -264,47 +318,135 @@ def export_for_analyzer(name: str, args: argparse.Namespace, output_dir: Path) -
         planned = _dry_run_paths(name, args, mode)
         if planned is not None:
             return planned
-    from .playwright_validation.fabric_service_client import FabricServiceClientError
-    from .playwright_validation.resolver import ServiceResolutionError
-    from .playwright_validation.service_client import FabricRestClient, FabricToken, ServiceClientError
+    from .playwright_validation.service_client import FabricRestClient, FabricToken
 
     client = build_service_client(args)
     item_type = SERVICE_ITEM_TYPES[name]
+    workspace_id, items = _list_items(name, args, client, mode)
+    args.workspace_id = workspace_id
+    if name == "pql_test":
+        return _deployed_models(args, client, workspace_id, mode, items)
+    if getattr(args, "dry_run", False):
+        return [Path(_safe(mode.workspace or "")) / f"{_safe(i['displayName'])}.{item_type}" for i in items]
+
+    _announce_credential(args, client)
+    rest = FabricRestClient(FabricToken(client.access_token))
+    # None marks a PBIR-Legacy report: exported once, never analyzed.
+    cache: dict[tuple[str, str], Path | None] = args.__dict__.setdefault("_export_cache", {})
+    artifacts: list[Path] = []
+    skipped: list[str] = args.__dict__.setdefault("_export_skipped", {}).setdefault(name, [])
+    for item in items:
+        key = (workspace_id, item["id"])
+        if key not in cache:
+            cache[key] = _export_item(rest, item, name, args, output_dir, workspace_id)
+        if cache[key] is None:
+            skipped.append(f"{item['displayName']}.{item_type}")
+        else:
+            artifacts.append(cache[key])
+    if skipped and not artifacts:
+        raise ServiceExportError(f"nothing to test: {', '.join(skipped)} -- {_LEGACY_REASON}", 1)
+    output_format = getattr(args, "output_format", "text")
+    for label in skipped:
+        narrate(f"  ⏭ {label} skipped -- {_LEGACY_REASON}", output_format=output_format)
+    return sorted(artifacts)
+
+
+def _list_items(
+    name: str, args: argparse.Namespace, client: Any, mode: ResolvedMode
+) -> tuple[str, list[dict[str, Any]]]:
+    """Resolve the workspace and the items ``name`` reads, each failure a `ServiceExportError`."""
+    from .playwright_validation.fabric_service_client import FabricServiceClientError
+    from .playwright_validation.resolver import ServiceResolutionError
+    from .playwright_validation.service_client import ServiceClientError
+
     try:
         workspace_id = _workspace_id(args, client, mode)
-        items = _select_items(name, args, client, workspace_id)
+        return workspace_id, _select_items(name, args, client, workspace_id)
     except ServiceExportError:
         raise
     except ServiceResolutionError as exc:
         raise ServiceExportError(str(exc), 1) from exc
     except (ServiceClientError, FabricServiceClientError) as exc:
-        raise _remediation(exc, f"the {item_type} list of workspace '{mode.workspace}'") from exc
+        label = f"the {SERVICE_ITEM_TYPES[name]} list of workspace '{mode.workspace}'"
+        raise _remediation(exc, label) from exc
 
-    args.workspace_id = workspace_id
-    if getattr(args, "dry_run", False):
-        return [Path(_safe(mode.workspace or "")) / f"{_safe(i['displayName'])}.{item_type}" for i in items]
 
-    rest = FabricRestClient(FabricToken(client.access_token))
-    cache: dict[tuple[str, str], Path] = args.__dict__.setdefault("_export_cache", {})
-    roots: list[Path] = args.__dict__.setdefault("_export_roots", [])
-    artifacts: list[Path] = []
-    for item in items:
-        key = (workspace_id, item["id"])
-        if key not in cache:
-            label = f"{item['displayName']}.{item_type}"
-            try:
-                parts = rest.get_item_definition(
-                    workspace_id, item["id"], definition_format=_DEFINITION_FORMATS.get(item_type, "")
-                )
-            except ServiceClientError as exc:
-                raise _remediation(exc, label) from exc
-            root = output_dir / name / _safe(mode.workspace or workspace_id) / _safe(item["displayName"])
-            if output_dir.resolve() not in root.resolve().parents:
-                raise ServiceExportError(f"refusing export path outside {output_dir}", 1)
-            roots.append(root)
-            cache[key] = _write_parts(parts, root / "export", item_type, item["displayName"])
-        artifacts.append(cache[key])
-    return sorted(artifacts)
+def _deployed_models(
+    args: argparse.Namespace, client: Any, workspace_id: str, mode: ResolvedMode, items: list[dict[str, Any]]
+) -> list[Path]:
+    """Name each deployed model the way pql-test addresses it, exporting nothing.
+
+    pql-test connects to the model over XMLA and discovers its tests there
+    (``PQL.Assert.RetrieveTestsV2``), so the definition files would be a
+    download nobody reads. ``WORKSPACE.Workspace/NAME.SemanticModel`` takes
+    display names, so a workspace given by GUID is looked up once.
+    """
+    from ._pql_identity import pql_identity_mismatch
+    from .playwright_validation.service_client import FabricRestClient, FabricToken
+
+    workspace = mode.workspace or ""
+    if not getattr(args, "dry_run", False):
+        _announce_credential(args, client)
+        mismatch = pql_identity_mismatch(client.access_token)
+        if mismatch:
+            raise ServiceExportError(mismatch, 2)
+        if not workspace or _GUID.match(workspace):
+            workspace = FabricRestClient(FabricToken(client.access_token)).get_workspace_name(workspace_id)
+    return sorted(Path(f"{workspace}.Workspace") / f"{item['displayName']}.SemanticModel" for item in items)
+
+
+def _export_item(
+    rest: Any, item: dict[str, Any], name: str, args: argparse.Namespace, output_dir: Path, workspace_id: str
+) -> Path | None:
+    """Export one item and return its artifact path, or None for a PBIR-Legacy report."""
+    item_type = SERVICE_ITEM_TYPES[name]
+    parts = _fetch_definition(rest, args, workspace_id, item, item_type)
+    if any(part["path"] == "report.json" for part in parts):
+        return None
+    root = output_dir / name / _safe(args.resolved_mode.workspace or workspace_id) / _safe(item["displayName"])
+    if output_dir.resolve() not in root.resolve().parents:
+        raise ServiceExportError(f"refusing export path outside {output_dir}", 1)
+    args.__dict__.setdefault("_export_roots", []).append(root)
+    try:
+        return _write_parts(parts, root / "export", item_type, item["displayName"])
+    except OSError as exc:
+        raise _write_failure(exc, f"{item['displayName']}.{item_type}") from exc
+
+
+def _write_failure(exc: OSError, label: str) -> ServiceExportError:
+    """Name an export that could not be written, never a traceback.
+
+    PBIR's nested ``definition/pages/<id>/visuals/<id>/visual.json`` is what
+    crosses Windows' 260-character limit (WinError 206) under a deep output dir.
+    """
+    text = f"cannot write the export of {label} to {exc.filename}: {exc.strerror}"
+    if exc.errno == errno.ENAMETOOLONG or getattr(exc, "winerror", None) == _WINDOWS_PATH_TOO_LONG:
+        text += "; the path is too long -- pass a shorter --output-dir or enable Windows long-path support"
+    return ServiceExportError(text, 1)
+
+
+def service_skip_exit(name: str, args: argparse.Namespace) -> int:
+    """1 when this run skipped a report ``name`` should have tested, else 0.
+
+    A skipped report was never tested, so the run cannot claim every
+    artifact passed.
+    """
+    return 1 if getattr(args, "_export_skipped", {}).get(name) else 0
+
+
+def _announce_credential(args: argparse.Namespace, client: Any) -> None:
+    """Name the credential the run resolved, once, beside the mode banner.
+
+    The label and the env-file path only -- never a secret. Silent under
+    ``--format json`` and ``-q``, like the banner.
+    """
+    if getattr(args, "_auth_announced", False):
+        return
+    args._auth_announced = True
+    source = getattr(client, "credential_source", "unknown")
+    if source == "service-principal":
+        source += f" ({probe_credentials(getattr(args, 'playwright_env_file', None)).source})"
+    _progress(args, f"auth={source}")
 
 
 def _redact_text(text: str) -> str:

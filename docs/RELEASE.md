@@ -137,7 +137,7 @@ retries for that reason, and a manual install may need the same patience.
 ### Why the install command looks like that
 
 - **`--extra-index-url https://pypi.org/simple`** — TestPyPI carries
-  `pql-test` 0.1.11; this project requires `pql-test==0.1.17`. Without the
+  `pql-test` 0.1.11; this project requires `pql-test==0.1.19`. Without the
   production index alongside it the install fails to resolve, which reads
   as a broken package and is not one.
 - **The exact pin** — `1.0.0.0.dev2` is a PEP 440 dev release. pip skips
@@ -209,7 +209,7 @@ resolvable:
     pip install \
       --index-url https://test.pypi.org/simple/ \
       --extra-index-url https://pypi.org/simple \
-      "cft-fab-test==1.9.0b4"
+      "cft-fab-test==1.9.0b7"
 
 - name: Check readiness
   run: fab-test doctor --format json

@@ -140,6 +140,15 @@ Always the last task of every epic -- nothing is planned after it.
    Five defects reached the CLI in one session because the caller in front of
    the change was the only one exercised. See Blast Radius in
    [vision.md](../../vision.md).
+10. **Run Local Tests Inside the Virtual Environment**: Outside a CI pipeline, run
+    tests, ruff and the `fab-test` CLI from the project's virtual environment
+    (`.venv`) — activate it, or call `.venv/Scripts/python -m pytest` (Windows) /
+    `.venv/bin/python -m pytest`, or use `uv run`. Never the system Python. CLI
+    tests spawn the `fab-test` console script, so a shell without the venv on
+    PATH fails them with `FileNotFoundError` — over a hundred false failures in
+    one run — and a global interpreter can import a different source tree than
+    the one under edit. CI pipelines provision their own environment and are
+    exempt.
 
 ## Constraints
 

@@ -6,6 +6,8 @@ enumeration, caching, cleanup and refusal rules without a tenant.
 
 import argparse
 import base64
+import errno
+import re
 from pathlib import Path
 
 import pytest
@@ -171,6 +173,126 @@ def test_given_getdefinition_failure_should_name_a_remediation(fake, tmp_path, m
     assert "raw body" not in str(err.value)
 
 
+def test_given_a_failed_getdefinition_operation_should_name_fabric_error_code(fake, tmp_path, monkeypatch):
+    client, _ = fake
+    client.items = [{"id": "r1", "displayName": "Rpt"}]
+    body = '{"status":"Failed","error":{"errorCode":"Some_FabricError","message":"it broke"}}'
+
+    def fail(self, *a, **k):
+        raise ServiceClientError("Long-running operation failed", status_code=200, body=body)
+
+    monkeypatch.setattr(
+        "fab_test.scripts.playwright_validation.service_client.FabricRestClient.get_item_definition", fail
+    )
+    args = _args("Dev.Workspace/Rpt.Report", workspace_id=WS, analyzer="pbir")
+    with pytest.raises(svc.ServiceExportError, match="Some_FabricError: it broke"):
+        svc.export_for_analyzer("pbir", args, tmp_path)
+
+
+def _report_parts(legacy: bool) -> list[dict[str, str]]:
+    report = "report.json" if legacy else "definition/report.json"
+    return [{"path": "definition.pbir", "payload": _b64("{}")}, {"path": report, "payload": _b64("{}")}]
+
+
+@pytest.fixture
+def reports(monkeypatch):
+    """Fake service holding one PBIR and one PBIR-Legacy report."""
+    client = FakeClient()
+    client.items = [{"id": "new", "displayName": "Modern"}, {"id": "old", "displayName": "Legacy"}]
+    formats: list[str] = []
+
+    def get_definition(self, workspace_id, item_id, *, definition_format=""):
+        formats.append(definition_format)
+        return _report_parts(legacy=item_id == "old")
+
+    monkeypatch.setattr(svc, "build_service_client", lambda args: client)
+    monkeypatch.setattr(
+        "fab_test.scripts.playwright_validation.service_client.FabricRestClient.get_item_definition",
+        get_definition,
+    )
+    return client, formats
+
+
+def test_given_a_pbir_legacy_report_should_skip_it_and_fail_the_run(reports, tmp_path, capsys):
+    _, formats = reports
+    args = _args(None, workspace_id=WS, analyzer="pbir")
+    artifacts = svc.export_for_analyzer("pbir", args, tmp_path)
+    assert [a.name for a in artifacts] == ["Modern.Report"]
+    assert formats == ["", ""]  # the report's stored format; Fabric will not convert legacy
+    assert "Legacy.Report skipped" in capsys.readouterr().out
+    assert svc.service_skip_exit("pbir", args) == 1
+
+
+def test_given_only_pbir_legacy_reports_should_exit_1_naming_them(reports, tmp_path):
+    client, _ = reports
+    client.items = [{"id": "old", "displayName": "Legacy"}]
+    args = _args(None, workspace_id=WS, analyzer="pbir")
+    with pytest.raises(svc.ServiceExportError, match=r"Legacy\.Report.*PBIR-Legacy") as err:
+        svc.export_for_analyzer("pbir", args, tmp_path)
+    assert err.value.code == 1
+
+
+def test_given_no_skipped_report_should_not_change_the_exit(reports, tmp_path):
+    client, _ = reports
+    client.items = [{"id": "new", "displayName": "Modern"}]
+    args = _args(None, workspace_id=WS, analyzer="pbir")
+    svc.export_for_analyzer("pbir", args, tmp_path)
+    assert svc.service_skip_exit("pbir", args) == 0
+
+
+@pytest.mark.parametrize(
+    "credential_source,expected",
+    [
+        ("ambient:DefaultAzureCredential", "auth=ambient:DefaultAzureCredential"),
+        ("service-principal", "auth=service-principal (.fab-test/.env)"),
+    ],
+)
+def test_given_a_service_export_should_name_the_credential_once(
+    fake, tmp_path, monkeypatch, capsys, credential_source, expected
+):
+    client, _ = fake
+    client.credential_source = credential_source
+    client.items = [{"id": "r1", "displayName": "Rpt"}]
+    monkeypatch.setattr(
+        svc, "probe_credentials", lambda env_file=None: argparse.Namespace(source=".fab-test/.env")
+    )
+    args = _args("Dev.Workspace/Rpt.Report", workspace_id=WS, analyzer="all")
+    svc.export_for_analyzer("pbir", args, tmp_path)
+    svc.export_for_analyzer("a11y", args, tmp_path)
+    assert capsys.readouterr().err.count(expected) == 1
+
+
+def test_given_json_output_should_not_print_the_credential(fake, tmp_path, capsys):
+    client, _ = fake
+    client.credential_source = "ambient:DefaultAzureCredential"
+    client.items = [{"id": "r1", "displayName": "Rpt"}]
+    args = _args("Dev.Workspace/Rpt.Report", workspace_id=WS, analyzer="pbir", output_format="json")
+    svc.export_for_analyzer("pbir", args, tmp_path)
+    assert "auth=" not in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    "error,hint",
+    [
+        (OSError(errno.ENAMETOOLONG, "File name too long", "deep/visual.json"), "--output-dir"),
+        (OSError(errno.EACCES, "Permission denied", "deep/visual.json"), None),
+    ],
+)
+def test_given_an_unwritable_export_should_exit_1_naming_the_path(fake, tmp_path, monkeypatch, error, hint):
+    client, _ = fake
+    client.items = [{"id": "r1", "displayName": "Rpt"}]
+
+    def fail(*a, **k):
+        raise error
+
+    monkeypatch.setattr(svc, "_write_parts", fail)
+    args = _args("Dev.Workspace/Rpt.Report", workspace_id=WS, analyzer="pbir")
+    with pytest.raises(svc.ServiceExportError, match=r"Rpt\.Report.*deep/visual\.json") as err:
+        svc.export_for_analyzer("pbir", args, tmp_path)
+    assert err.value.code == 1
+    assert (hint in str(err.value)) if hint else ("--output-dir" not in str(err.value))
+
+
 def test_given_unsafe_definition_path_should_refuse(tmp_path):
     parts = [{"path": "../evil.tmdl", "payload": _b64("x")}]
     with pytest.raises(svc.ServiceExportError, match="unsafe"):
@@ -211,6 +333,42 @@ def test_given_pql_test_should_only_export_under_all():
     assert not svc.is_service_run("bpa", args)
 
 
+def test_given_pql_test_should_name_deployed_models_without_exporting(fake, tmp_path, capsys):
+    """pql-test reads its tests from the live model, so nothing is downloaded."""
+    client, calls = fake
+    client.items = [{"id": "m1", "displayName": "Sales"}, {"id": "m2", "displayName": "Finance"}]
+    # As fab-test leaves it: --workspace Dev, already resolved to its ID.
+    args = _args(None, workspace_id=WS, analyzer="pql_test")
+    args.resolved_mode = resolve_mode(None, workspace_flag="Dev")
+    paths = svc.export_for_analyzer("pql_test", args, tmp_path)
+    assert [p.as_posix() for p in paths] == [
+        "Dev.Workspace/Finance.SemanticModel",
+        "Dev.Workspace/Sales.SemanticModel",
+    ]
+    assert calls == []
+    assert not any(tmp_path.iterdir())
+    assert "exporting" not in capsys.readouterr().err
+
+
+def test_given_pql_test_with_a_workspace_guid_should_look_up_its_name(fake, tmp_path, monkeypatch):
+    client, _ = fake
+    client.items = [{"id": "m1", "displayName": "Sales"}]
+    monkeypatch.setattr(
+        "fab_test.scripts.playwright_validation.service_client.FabricRestClient.get_workspace_name",
+        lambda self, workspace_id: "Sales Dev" if workspace_id == WS else "",
+    )
+    args = _args(None, workspace_id=WS, analyzer="pql_test")
+    [path] = svc.export_for_analyzer("pql_test", args, tmp_path)
+    assert path.as_posix() == "Sales Dev.Workspace/Sales.SemanticModel"
+
+
+def test_given_pql_test_over_50_models_should_still_need_all(fake, tmp_path):
+    client, _ = fake
+    client.items = [{"id": f"m{i}", "displayName": f"M{i}"} for i in range(51)]
+    with pytest.raises(svc.ServiceExportError, match="--all"):
+        svc.export_for_analyzer("pql_test", _args(None, workspace_id=WS, analyzer="pql_test"), tmp_path)
+
+
 def test_given_a_path_target_with_workspace_should_refuse():
     args = argparse.Namespace(
         mode="service", analyzer="bpa", resolved_target=parse_target("./src/Sales.SemanticModel")
@@ -240,7 +398,7 @@ def _cli(*argv, env=None, cwd=None):
 
 def test_given_any_run_should_print_the_mode_banner_first(tmp_path):
     result = _cli("bpa", "--dry-run", "--artifact-dir", str(tmp_path))
-    assert result.stderr.splitlines()[0] == "mode=repo workspace=— source=default"
+    assert result.stderr.splitlines()[0] == f"mode=local path={tmp_path} source=default"
 
 
 def test_given_desktop_target_with_workspace_flag_should_exit_2(tmp_path):
@@ -289,3 +447,54 @@ def test_given_json_secrets_should_be_redacted_in_kept_exports(fake, tmp_path):
     (artifact / "x.dat").write_text('{"password": "hunter2"}')
     svc.finalize_exports(args)
     assert "hunter2" not in (artifact / "x.dat").read_text()
+
+
+@pytest.mark.parametrize("verbose", [0, 1])
+def test_given_default_or_verbose_should_announce_each_export_with_its_duration(fake, tmp_path, capsys, verbose):
+    client, _ = fake
+    client.items = [{"id": "m0", "displayName": "Sales"}, {"id": "m1", "displayName": "Ops"}]
+    svc.export_for_analyzer("bpa", _args(None, workspace_id=WS, verbose=verbose), tmp_path)
+    auth, *lines = capsys.readouterr().err.splitlines()
+    assert auth.startswith("auth=")  # the credential is named before any export starts
+    assert [line.split("...")[0] for line in lines] == [
+        "exporting Sales.SemanticModel",
+        "exporting Ops.SemanticModel",
+    ]
+    assert all(re.search(r"\.\.\. done \(\d+\.\ds\)$", line) for line in lines)
+
+
+@pytest.mark.parametrize("extra", [{"quiet": True}, {"output_format": "json"}])
+def test_given_quiet_or_json_should_export_silently(fake, tmp_path, capsys, extra):
+    svc.export_for_analyzer("bpa", _args(None, workspace_id=WS, **extra), tmp_path)
+    assert capsys.readouterr().err == ""
+
+
+def test_given_a_failed_export_should_close_its_progress_line(fake, tmp_path, capsys, monkeypatch):
+    def fail(self, *a, **k):
+        raise ServiceClientError("HTTP", status_code=404)
+
+    monkeypatch.setattr(
+        "fab_test.scripts.playwright_validation.service_client.FabricRestClient.get_item_definition", fail
+    )
+    with pytest.raises(svc.ServiceExportError):
+        svc.export_for_analyzer("bpa", _args(None, workspace_id=WS), tmp_path)
+    assert capsys.readouterr().err.endswith("\nexporting Item0.SemanticModel... failed\n")
+
+
+def test_given_no_target_should_skip_microsoft_usage_metrics_models(fake, tmp_path):
+    client, calls = fake
+    client.items = [
+        {"id": "m1", "displayName": "Sales"},
+        {"id": "um", "displayName": "Dashboard Usage Metrics Model"},
+    ]
+    [artifact] = svc.export_for_analyzer("bpa", _args(None, workspace_id=WS), tmp_path)
+    assert artifact.name == "Sales.SemanticModel"
+    assert calls == ["m1"]
+
+
+def test_given_a_usage_metrics_model_named_as_target_should_still_export_it(fake, tmp_path):
+    client, calls = fake
+    client.items = [{"id": "um", "displayName": "Dashboard Usage Metrics Model"}]
+    args = _args("Dev.Workspace/Dashboard Usage Metrics Model.SemanticModel", workspace_id=WS)
+    assert svc.export_for_analyzer("bpa", args, tmp_path)[0].name == "Dashboard Usage Metrics Model.SemanticModel"
+    assert calls == ["um"]

@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-10-08
+
+- 📦 - Version `1.9.0b7`. Install docs and the skill pin the new version.
+- 🔄 - **Behavior change** - Modes Are `local` And `service` - `repo` read as "a Git repository", but it only ever meant artifact files in a folder, and `desktop` was the same machine. Both are now `local`: the banner prints `mode=local path=. source=default` (or `path=local/NAME` for a model open in Power BI Desktop) instead of `mode=repo workspace=—`, and `mode=service workspace=NAME` is unchanged. The envelope's `mode` field and the telemetry `mode` dimension carry the new value: a saved query filtering on `repo` or `desktop` must use `local`.
+- ✨ - One-Line "Not Signed In" Error - With no service principal set and no Azure sign-in, `fab-test --workspace NAME` printed the Azure SDK's nine-credential report followed by our own list of every place it looked. It now prints one line: `not signed in to Fabric. Run `az login`, or set FABRIC_TENANT_ID, FABRIC_SERVICE_PRINCIPAL_ID and FABRIC_SERVICE_PRINCIPAL_SECRET (or put them in .fab-test/.env).` `-v` adds where it looked; `-vv` adds the SDK's report. `fab-test auth status` gives the same advice.
+- ⚡ - `pql-test` No Longer Exports In Service Mode - `fab-test pql_test --workspace NAME` (and `all --workspace`) downloaded every semantic model's definition before running, though pql-test discovers and runs its tests over XMLA against the live model. Each model is now passed to pql-test as `WORKSPACE.Workspace/NAME.SemanticModel`, so nothing is exported; the item list and its `--all` limit are unchanged. A workspace given by ID is looked up once for its display name.
+- 🛡️ - `pql-test` Identity Guard - fab-test lists a workspace's models as its own account, but pql-test connects to them as its own `pql-test auth login`; an `az login` cannot be handed over. When the two accounts differ, a service-mode `pql_test` run now stops before running (exit `2`) naming both and the `pql-test auth login` to run, instead of reporting "No tests found" for a model full of tests. Skipped for a service principal, which fab-test already passes to pql-test, and when `PQL_*` credentials are set.
+- 🐛 - pql-test "No Tests Found" On A Failed Connection - When pql-test could not connect to a deployed model, fab-test reported it as a model with no tests. It now reports `could not connect to the model` with pql-test's reason.
+- 📦 - Version `1.9.0b6`.
+- 📦 - `pql-test` Pin `0.1.19` - Up from `0.1.17`; same dependencies and Python range. Tabular Editor stays on `2.29.0`, still the newest 2.x release.
+- 📦 - Version `1.9.0b5`. Install docs and the skill pin the new version.
+
 ## 2026-10-07
 
 - ✨ - `cft-fab-test[playwright]` Extra - `pip install "cft-fab-test[playwright]"` installs the pytest packages `fab-test playwright` launches (`pytest`, `pytest-playwright`, `pytest-html`, `pytest-xdist`). Without them a run now stops before minting any embed token, with an error naming the missing packages and that install command, instead of a child process's `ModuleNotFoundError: No module named 'pytest'`. `--plan-only` needs neither. The fab-test skill, GETTING-STARTED, PLAYWRIGHT-CI and the `playwright-live.yml` example document the install path.

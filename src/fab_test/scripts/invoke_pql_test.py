@@ -59,6 +59,19 @@ def validate_path(path_str: str, description: str, must_exist: bool = True) -> P
     return path
 
 
+def deployed_model(raw: str) -> str | None:
+    """Return ``raw`` as pql-test's ``WORKSPACE.Workspace/NAME.SemanticModel`` form, or None for a path.
+
+    Service mode names a deployed model this way instead of exporting it:
+    pql-test reads its tests from the live model. Either separator is
+    accepted because the name arrives through a Windows ``Path``.
+    """
+    parts = raw.replace("\\", "/").split("/")
+    if len(parts) == 2 and parts[0].endswith(".Workspace") and parts[1].endswith(".SemanticModel"):
+        return "/".join(parts)
+    return None
+
+
 def build_command(
     artifact_path: Path,
     output_path: Path,
@@ -66,10 +79,12 @@ def build_command(
     workspace_id: str = "",
 ) -> list[str]:
     """Build the pql-test run-tests command."""
-    command = ["pql-test", "run-tests", str(artifact_path)]
+    remote = deployed_model(str(artifact_path))
+    command = ["pql-test", "run-tests", remote or str(artifact_path)]
     if env:
         command.extend(["--env", env])
-    if workspace_id:
+    # A deployed model's path already names its workspace.
+    if workspace_id and remote is None:
         command.extend(["--workspace-id", workspace_id])
     command.extend(["--output", str(output_path)])
     return command
@@ -255,10 +270,41 @@ def _is_connection_skip(findings: list[dict[str, Any]]) -> bool:
 _NOTHING_RAN = {"passed": 0, "failed": 0, "skipped": 0, "total": 0}
 
 
+_DISCOVERY_FAILED_MARKER = "live test discovery failed against "
+
+
+def _discovery_connection_error(output: str) -> str:
+    """pql-test's reason when live discovery could not connect to a deployed model, else "".
+
+    Live discovery is the only way pql-test finds tests in a deployed model,
+    and when the connection fails it prints a warning and reports "No tests
+    found." -- which reads as an empty model. Only a connection failure is
+    returned: a model reached without PQL.Assert installed really has no tests.
+    """
+    for line in output.splitlines():
+        _, marker, rest = line.partition(_DISCOVERY_FAILED_MARKER)
+        if marker and "AdomdConnectionException" in rest:
+            return rest.split(": ", 1)[-1].strip()
+    return ""
+
+
+def _nothing_ran_message(returncode: int, connection_error: str) -> str:
+    """Say why a run with no tests and no findings ran nothing."""
+    if connection_error:
+        return (
+            f"pql-test ran no tests: could not connect to the model ({connection_error}). "
+            "pql-test connects as its own sign-in; check `pql-test auth status`"
+        )
+    if returncode == 0:
+        return "pql-test found no tests to run in this model"
+    return "pql-test ran no tests"
+
+
 def _pql_status(
     test_summary: "dict[str, int] | None",
     findings: list[dict[str, Any]],
     returncode: int,
+    connection_error: str = "",
 ) -> tuple[str, str]:
     """Classify the run and build its message.
 
@@ -295,9 +341,7 @@ def _pql_status(
     # is not a pass, and a green check is how a developer comes to believe
     # tests ran when none did.
     if total == 0 and not findings:
-        if returncode == 0:
-            return "warning", "pql-test found no tests to run in this model"
-        return "warning", "pql-test ran no tests"
+        return "warning", _nothing_ran_message(returncode, connection_error)
     if returncode == 0 and not findings:
         return "passed", f"pql-test passed: {counter_msg}"
     all_skipped = (
@@ -320,7 +364,7 @@ def _narrate_header(
     log("================================")
     log(f"pql-test -> {artifact_name}")
     log("================================")
-    log(f"📋 Artifact: {artifact_path}")
+    log(f"📋 Artifact: {deployed_model(str(artifact_path)) or artifact_path}")
     log(f"📊 Envelope: {output_path}")
     log(f"📄 Native:   {nat_out}")
     log("")
@@ -358,7 +402,10 @@ def _narrate_outcome(
 
 def run_pql_test(args: argparse.Namespace) -> int:
     """Run pql-test and return an exit code."""
-    artifact_path = validate_path(args.artifact_path, "Artifact path")
+    if deployed_model(args.artifact_path):
+        artifact_path = Path(args.artifact_path)
+    else:
+        artifact_path = validate_path(args.artifact_path, "Artifact path")
     artifact_name = args.artifact_name or artifact_path.stem
 
     desktop_port_arg = getattr(args, "desktop_port", "")
@@ -424,7 +471,8 @@ def run_pql_test(args: argparse.Namespace) -> int:
     # Reconstruct counters from the result list when the native file does not
     # include a summary block (older pql-test versions or mocked stdout).
     test_summary = test_summary or _summarize_results(test_results)
-    status, message = _pql_status(test_summary, findings, proc.returncode)
+    connection_error = _discovery_connection_error(f"{proc.stdout or ''}\n{proc.stderr or ''}")
+    status, message = _pql_status(test_summary, findings, proc.returncode, connection_error)
 
     # pql-test's counts describe tests it discovered from the TMDL, not tests
     # it ran. When none of them executed, reporting any count overstates what

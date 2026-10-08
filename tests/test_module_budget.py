@@ -224,10 +224,12 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
         ),
     ),
     "src/fab_test/scripts/invoke_playwright.py": (
-        1020,
+        1021,
         (
-            "2026-10-07: +6 lines aborting with an install command when the pytest "
-            "runner packages are missing (the check itself lives in execution_runtime.py). "
+            "2026-10-07: +7 lines aborting with an install command when the pytest "
+            "runner packages are missing (the check itself lives in execution_runtime.py), "
+            "sharing one error return with the RLS-user check, now _missing_rls_user, to stay "
+            "under PLR0911/PLR0915. "
             "2026-10-06: +11 lines for --user-name, which outranks the env/config user. "
             "2026-09-26: +9 lines replacing the `_SPEC_PATH = Path(\"tests\") / "
             "\"test_playwright_visual.py\"` constant with `_spec_path()`, resolved "
@@ -280,8 +282,13 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
         ),
     ),
     "src/fab_test/scripts/fab_test_execution.py": (
-        891,
+        893,
         (
+            "2026-10-08: +1 line appending credential_failure_detail (-v/-vv sign-in detail) "
+            "to the could-not-resolve-workspace error; the detail itself lives in "
+            "fabric_service_client.py. "
+            "2026-10-07: +1 line importing service_skip_exit so a skipped PBIR-Legacy report "
+            "lifts the run's exit above 0; the skip logic itself lives in _service_export.py. "
             "2026-10-06: +7 lines so --workspace NAME (stored in workspace_id) is resolved "
             "to an ID in _resolve_workspace_target. "
             "2026-10-03: +35 lines for the service-export hook in _discover_for, "

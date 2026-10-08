@@ -252,6 +252,7 @@ def _prepare_target(args: argparse.Namespace) -> int | None:
             args.resolved_target,
             workspace_flag=workspace_flag,
             artifact_dir_explicit=getattr(args, "artifact_dir_explicit", False),
+            artifact_dir=str(getattr(args, "artifact_dir", ".")),
         )
     except ModeError as exc:
         print(f"  ✗ fab-test: {exc}", file=sys.stderr)

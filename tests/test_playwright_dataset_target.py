@@ -423,3 +423,19 @@ def test_resolve_target_workspace_empty_when_env_resolution_fails(local_reports,
     )
 
     assert _resolve_target_workspace(args) == ""
+
+
+def test_dataset_workspace_alone_skips_microsoft_usage_metrics_models(local_reports) -> None:
+    args = _args(local_reports, dataset_id="")
+    client = _client_with_models(
+        {DATASET_WS: [_model("m1", "Sales Model"), _model("um", "Report Usage Metrics Model")]},
+        {
+            (DATASET_WS, "m1"): [_dep("r1", "Sales", DATASET_WS)],
+            (DATASET_WS, "um"): [_dep("r2", "Report Usage Metrics Report", DATASET_WS)],
+        },
+    )
+
+    with patch(_CLIENT, return_value=client):
+        artifacts = _discover_for("playwright", args, "*.Report")
+
+    assert {a.name for a in artifacts} == {"Sales.Report"}

@@ -14,6 +14,7 @@ from fab_test.scripts.playwright_validation.fabric_service_client import (
     _authenticate_ambient,
     _authenticate_service_principal,
     build_fabric_service_client,
+    credential_failure_detail,
 )
 from fab_test.scripts.playwright_validation.resolver import ServiceResolutionError
 
@@ -76,9 +77,42 @@ def test_build_client_fails_without_credentials(monkeypatch, tmp_path) -> None:
             client_id="",
             client_secret="",
         )
-    assert "No Fabric credentials found" in str(exc_info.value)
-    assert "DefaultAzureCredential" in str(exc_info.value)
-    assert "az login" in str(exc_info.value)
+    message = str(exc_info.value)
+    assert message.startswith("not signed in to Fabric. Run `az login`")
+    assert "FABRIC_TENANT_ID" in message
+    # The search order is -v detail, not part of the one-line error.
+    assert "Tried" not in message
+    assert "DefaultAzureCredential" not in message
+
+
+def _ambient_failure() -> ServiceResolutionError:
+    """The error build_fabric_service_client raises after a failed ambient sign-in."""
+    sdk = RuntimeError("DefaultAzureCredential failed to retrieve a token.\nAzureCliCredential: run az login")
+    wrapped = FabricServiceClientError("no ambient credential")
+    wrapped.__cause__ = sdk
+    error = ServiceResolutionError("not signed in to Fabric.")
+    error.__cause__ = wrapped
+    return error
+
+
+def test_credential_failure_detail_is_empty_at_default_verbosity() -> None:
+    assert credential_failure_detail(_ambient_failure(), 0) == []
+
+
+def test_credential_failure_detail_names_the_search_at_v() -> None:
+    lines = credential_failure_detail(_ambient_failure(), 1)
+    assert len(lines) == 1
+    assert lines[0].startswith("tried: FABRIC_*")
+
+
+def test_credential_failure_detail_adds_the_sdk_report_at_vv() -> None:
+    lines = credential_failure_detail(_ambient_failure(), 2)
+    assert "AzureCliCredential: run az login" in lines
+
+
+def test_credential_failure_detail_ignores_other_resolution_errors() -> None:
+    """A partial service principal is not an ambient failure; no search detail."""
+    assert credential_failure_detail(ServiceResolutionError("Missing ..."), 2) == []
 
 
 def test_build_client_reads_env_file(tmp_path: Path) -> None:
@@ -359,6 +393,32 @@ def test_authenticate_ambient_wraps_client_authentication_error() -> None:
         FabricServiceClientError
     ):
         _authenticate_ambient()
+
+
+def test_authenticate_ambient_silences_the_sdk_warning_and_restores_the_level() -> None:
+    """The chain's nine-credential WARNING must not reach stderr; the level is put back after."""
+    import logging
+
+    from azure.core.exceptions import ClientAuthenticationError
+
+    identity_logger = logging.getLogger("azure.identity")
+    seen: list[int] = []
+
+    def _fail(*_args, **_kwargs):
+        seen.append(logging.getLogger("azure.identity._credentials.chained").getEffectiveLevel())
+        raise ClientAuthenticationError("no credential available")
+
+    mock_credential = MagicMock()
+    mock_credential.get_token.side_effect = _fail
+    before = identity_logger.level
+
+    with patch("azure.identity.DefaultAzureCredential", return_value=mock_credential), pytest.raises(
+        FabricServiceClientError
+    ):
+        _authenticate_ambient()
+
+    assert seen == [logging.ERROR]
+    assert identity_logger.level == before
 
 
 def test_build_client_falls_back_to_ambient_when_no_service_principal_vars(monkeypatch) -> None:

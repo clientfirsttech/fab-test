@@ -252,3 +252,13 @@ def test_dataset_selectors_take_precedence_over_a_bare_workspace_target(tmp_path
     args = _args(tmp_path, **overrides)
 
     assert workspace_reports_requested(args) is False
+
+
+def test_microsoft_usage_metrics_reports_are_not_targets(tmp_path) -> None:
+    args = _args(tmp_path)
+    client = _client([_item("r1", "Sales"), _item("um", "Dashboard Usage Metrics Report")], [])
+
+    with patch(_CLIENT, return_value=client):
+        artifacts = _discover_for("playwright", args, "*.Report")
+
+    assert artifacts == [Path("Sales.Report")]

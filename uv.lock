@@ -232,6 +232,12 @@ dev = [
     { name = "pytest-xdist" },
     { name = "ruff" },
 ]
+playwright = [
+    { name = "pytest" },
+    { name = "pytest-html" },
+    { name = "pytest-playwright" },
+    { name = "pytest-xdist" },
+]
 telemetry = [
     { name = "azure-kusto-data" },
     { name = "azure-kusto-ingest" },
@@ -247,18 +253,22 @@ requires-dist = [
     { name = "azure-kusto-ingest", marker = "extra == 'telemetry'" },
     { name = "azure-storage-file-datalake", marker = "extra == 'telemetry-lakehouse'", specifier = "==12.25.0" },
     { name = "playwright" },
-    { name = "pql-test", specifier = "==0.1.17" },
+    { name = "pql-test", specifier = "==0.1.19" },
     { name = "pre-commit", marker = "extra == 'dev'" },
     { name = "pytest", marker = "extra == 'dev'" },
+    { name = "pytest", marker = "extra == 'playwright'" },
     { name = "pytest-cov", marker = "extra == 'dev'" },
     { name = "pytest-html", marker = "extra == 'dev'" },
+    { name = "pytest-html", marker = "extra == 'playwright'" },
     { name = "pytest-playwright", marker = "extra == 'dev'" },
+    { name = "pytest-playwright", marker = "extra == 'playwright'" },
     { name = "pytest-xdist", marker = "extra == 'dev'" },
+    { name = "pytest-xdist", marker = "extra == 'playwright'" },
     { name = "pyyaml" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.15" },
     { name = "tabulate" },
 ]
-provides-extras = ["telemetry", "telemetry-lakehouse", "dev"]
+provides-extras = ["telemetry", "telemetry-lakehouse", "playwright", "dev"]
 
 [[package]]
 name = "charset-normalizer"
@@ -1045,7 +1055,7 @@ wheels = [
 
 [[package]]
 name = "pql-test"
-version = "0.1.17"
+version = "0.1.19"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "azure-identity" },
@@ -1056,9 +1066,9 @@ dependencies = [
     { name = "pyadomd" },
     { name = "python-dotenv" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/f7/41/1e34fd2453dda9c6f6107b360f99ecc33bcd3473e79dd49d9b492cca6b2c/pql_test-0.1.17.tar.gz", hash = "sha256:cf340a4fbcc274c783d227981dfdd77294b18ccd6f03f8ff63fe8bea9e945bcf", size = 159530, upload-time = "2026-09-08T18:06:12.512Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/e1/a1/0ed5c05290e19e7b637d1bd9b64b4210d6ba3782725d379c0261becf486f/pql_test-0.1.19.tar.gz", hash = "sha256:ebb32baffb19f111ef1c983c5e2bccf4ec64cc74aff1cc117e867e33f0ea8fa0", size = 199324, upload-time = "2026-10-05T17:45:47.183Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/2b/26/2b3611f81e73737fbf2fa2d15f04a69960a31d154c34a13d396a1f31c758/pql_test-0.1.17-py3-none-any.whl", hash = "sha256:baee27b0f3c0297f715f27137f8fd3d6e32926b4631f726f4db52eef2f136eab", size = 90315, upload-time = "2026-09-08T18:06:10.708Z" },
+    { url = "https://files.pythonhosted.org/packages/2a/5f/4d98b86db0e8578e4a2be765dacfb7a6078269b2dc112a3689cdb826e0f4/pql_test-0.1.19-py3-none-any.whl", hash = "sha256:e67080cae20594657cfdd89adaf88a7642d7544195d984dc1d9c7445b957392e", size = 110642, upload-time = "2026-10-05T17:45:45.402Z" },
 ]
 
 [[package]]

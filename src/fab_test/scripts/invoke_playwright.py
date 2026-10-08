@@ -769,6 +769,19 @@ def _log_run_header(
     log("")
 
 
+def _missing_rls_user(roles: list[str] | None, config: PlaywrightValidationConfig) -> str | None:
+    """`generate_embed_token` silently drops the `identities` entry when
+    `user_name` is empty, so a run would otherwise pass while every "role"
+    case actually embedded with no RLS identity at all."""
+    if not roles or config.user_name:
+        return None
+    return (
+        f"Discovered RLS roles ({', '.join(roles)}) but no effective-identity user is set; "
+        "set PLAYWRIGHT_USER_NAME or playwright_user_name in fab-test.yml "
+        "before any embed token is minted, or pass --roles none."
+    )
+
+
 def _run_single_report(
     config: PlaywrightValidationConfig,
     args: argparse.Namespace,
@@ -802,21 +815,9 @@ def _run_single_report(
             output_path, report_name, cases, test_cases_dir=test_cases_dir
         )
 
-    if missing := missing_runner_message():
-        return _write_embed_error_envelope(
-            output_path, report_name, cases, missing, test_cases_dir=test_cases_dir, cloud=config.cloud
-        )
-
-    if roles and not config.user_name:
-        # `generate_embed_token` silently drops the `identities` entry when
-        # `user_name` is empty, so a run would otherwise pass while every
-        # "role" case actually embedded with no RLS identity at all.
-        message = (
-            "Discovered RLS roles "
-            f"({', '.join(roles)}) but no effective-identity user is set; "
-            "set PLAYWRIGHT_USER_NAME or playwright_user_name in fab-test.yml "
-            "before any embed token is minted, or pass --roles none."
-        )
+    # Both abort before any embed token is minted.
+    message = missing_runner_message() or _missing_rls_user(roles, config)
+    if message:
         return _write_embed_error_envelope(
             output_path,
             report_name,

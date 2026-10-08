@@ -16,7 +16,7 @@ from typing import Any
 
 from ._cli_utils import narrate
 from ._config import CONFIG_FILENAME, resolve_setting, verbosity_level
-from ._credentials import probe_credentials
+from ._credentials import SIGN_IN_REMEDIATION, probe_credentials
 from ._desktop import bridge_cli_path, detect_desktop_instances
 from ._fab_test_context import (
     _DEFAULT_SUBPROCESS_TIMEOUT,
@@ -551,7 +551,9 @@ def _explain_mode(args: argparse.Namespace, name: str) -> ResolvedMode | int:
         return 2
     try:
         resolved_mode = resolve_mode(
-            args.resolved_target, workspace_flag=getattr(args, "workspace_id", "")
+            args.resolved_target,
+            workspace_flag=getattr(args, "workspace_id", ""),
+            artifact_dir=str(getattr(args, "artifact_dir", ".")),
         )
     except ModeError as exc:
         print(f"  ✗ fab-test explain: {exc}", file=sys.stderr)
@@ -707,7 +709,7 @@ def _auth_status(args: argparse.Namespace) -> int:
                     },
                     "workspace": None,
                     "detail": str(exc),
-                    "remediation": "Sign in with `az login`, or set a service principal",
+                    "remediation": SIGN_IN_REMEDIATION,
                 },
                 output_format,
                 exit_code=127,
