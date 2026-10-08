@@ -1,6 +1,6 @@
 ---
 name: fab-test
-description: fab-test CLI reference for running Fabric artifact analyzers locally (fab-test 1.9.0b4). Covers all subcommands, flags, artifact isolation, result locations, and how fab-test differs from pytest. Use when invoking, troubleshooting, or extending local artifact validation.
+description: fab-test CLI reference for running Fabric artifact analyzers locally (fab-test 1.9.0b5). Covers all subcommands, flags, artifact isolation, result locations, and how fab-test differs from pytest. Use when invoking, troubleshooting, or extending local artifact validation.
 ---
 
 # fab-test
@@ -44,7 +44,7 @@ From PyPI — the package is **`cft-fab-test`** (the command is still
 pre-releases unless you pass `--pre` or name the version exactly:
 
 ```bash
-pip install "cft-fab-test==1.9.0b4"     # or: pip install --pre cft-fab-test
+pip install "cft-fab-test==1.9.0b5"     # or: pip install --pre cft-fab-test
 ```
 
 `fab-test playwright` has its own install path. It runs its render spec as a

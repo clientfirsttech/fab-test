@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-10-08
+
+- 📦 - `pql-test` Pin `0.1.19` - Up from `0.1.17`; same dependencies and Python range. Tabular Editor stays on `2.29.0`, still the newest 2.x release.
+- 📦 - Version `1.9.0b5`. Install docs and the skill pin the new version.
+
 ## 2026-10-07
 
 - ✨ - `cft-fab-test[playwright]` Extra - `pip install "cft-fab-test[playwright]"` installs the pytest packages `fab-test playwright` launches (`pytest`, `pytest-playwright`, `pytest-html`, `pytest-xdist`). Without them a run now stops before minting any embed token, with an error naming the missing packages and that install command, instead of a child process's `ModuleNotFoundError: No module named 'pytest'`. `--plan-only` needs neither. The fab-test skill, GETTING-STARTED, PLAYWRIGHT-CI and the `playwright-live.yml` example document the install path.
