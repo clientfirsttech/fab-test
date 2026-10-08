@@ -333,6 +333,42 @@ def test_given_pql_test_should_only_export_under_all():
     assert not svc.is_service_run("bpa", args)
 
 
+def test_given_pql_test_should_name_deployed_models_without_exporting(fake, tmp_path, capsys):
+    """pql-test reads its tests from the live model, so nothing is downloaded."""
+    client, calls = fake
+    client.items = [{"id": "m1", "displayName": "Sales"}, {"id": "m2", "displayName": "Finance"}]
+    # As fab-test leaves it: --workspace Dev, already resolved to its ID.
+    args = _args(None, workspace_id=WS, analyzer="pql_test")
+    args.resolved_mode = resolve_mode(None, workspace_flag="Dev")
+    paths = svc.export_for_analyzer("pql_test", args, tmp_path)
+    assert [p.as_posix() for p in paths] == [
+        "Dev.Workspace/Finance.SemanticModel",
+        "Dev.Workspace/Sales.SemanticModel",
+    ]
+    assert calls == []
+    assert not any(tmp_path.iterdir())
+    assert "exporting" not in capsys.readouterr().err
+
+
+def test_given_pql_test_with_a_workspace_guid_should_look_up_its_name(fake, tmp_path, monkeypatch):
+    client, _ = fake
+    client.items = [{"id": "m1", "displayName": "Sales"}]
+    monkeypatch.setattr(
+        "fab_test.scripts.playwright_validation.service_client.FabricRestClient.get_workspace_name",
+        lambda self, workspace_id: "Sales Dev" if workspace_id == WS else "",
+    )
+    args = _args(None, workspace_id=WS, analyzer="pql_test")
+    [path] = svc.export_for_analyzer("pql_test", args, tmp_path)
+    assert path.as_posix() == "Sales Dev.Workspace/Sales.SemanticModel"
+
+
+def test_given_pql_test_over_50_models_should_still_need_all(fake, tmp_path):
+    client, _ = fake
+    client.items = [{"id": f"m{i}", "displayName": f"M{i}"} for i in range(51)]
+    with pytest.raises(svc.ServiceExportError, match="--all"):
+        svc.export_for_analyzer("pql_test", _args(None, workspace_id=WS, analyzer="pql_test"), tmp_path)
+
+
 def test_given_a_path_target_with_workspace_should_refuse():
     args = argparse.Namespace(
         mode="service", analyzer="bpa", resolved_target=parse_target("./src/Sales.SemanticModel")

@@ -94,13 +94,45 @@ def _authenticate_ambient() -> str:
     from azure.core.exceptions import ClientAuthenticationError  # type: ignore[import-untyped]
 
     resource = "https://analysis.windows.net/powerbi/api"
+    # On failure the chain logs a WARNING listing all nine credentials it
+    # tried, and with no logging configured Python prints it to stderr above
+    # our own error. The same text stays on the chained exception, so
+    # `credential_failure_detail` can still show it at -vv.
+    identity_logger = logging.getLogger("azure.identity")
+    previous_level = identity_logger.level
+    identity_logger.setLevel(logging.ERROR)
     try:
         token = DefaultAzureCredential().get_token(f"{resource}/.default")
     except ClientAuthenticationError as exc:
         raise FabricServiceClientError(
             "DefaultAzureCredential could not find a usable ambient credential."
         ) from exc
+    finally:
+        identity_logger.setLevel(previous_level)
     return token.token
+
+
+def credential_failure_detail(exc: BaseException, verbosity: int) -> list[str]:
+    """Lines explaining a failed sign-in, for -v (where we looked) and -vv (the SDK's own report).
+
+    The one-line error says what to do; this is for whoever needs to know
+    why, typically someone debugging a managed identity or a CI runner.
+    """
+    if verbosity < 1 or not isinstance(exc.__cause__, FabricServiceClientError):
+        return []
+    lines = [
+        (
+            "tried: FABRIC_* service-principal variables (arguments, environment, "
+            ".env file), then DefaultAzureCredential (az login, managed identity, VS Code)"
+        )
+    ]
+    if verbosity >= 2:
+        cause: BaseException | None = exc
+        while cause.__cause__ is not None:
+            cause = cause.__cause__
+        if cause is not exc:
+            lines.extend(str(cause).splitlines())
+    return lines
 
 
 class FabricServiceClient(ServiceClient):
@@ -345,21 +377,16 @@ def build_fabric_service_client(
         if not value
     ]
     if not (tenant_id or client_id or client_secret):
+        from .._credentials import SIGN_IN_REMEDIATION
+
         try:
             token = _authenticate_ambient()
-        except FabricServiceClientError:
-            pass
-        else:
-            return FabricServiceClient.from_access_token(
-                token, cloud=cloud, credential_source="ambient:DefaultAzureCredential"
-            )
-        raise ServiceResolutionError(
-            "No Fabric credentials found. Tried, in order: explicit arguments, "
-            "environment variables (FABRIC_TENANT_ID/FABRIC_CLIENT_ID/FABRIC_CLIENT_SECRET "
-            "or FABRIC_SERVICE_PRINCIPAL_ID/FABRIC_SERVICE_PRINCIPAL_SECRET), --env-file, "
-            "and DefaultAzureCredential (az login, a managed identity, VS Code sign-in, "
-            "an environment credential). Provide a service principal or sign in with "
-            "`az login`."
+        except FabricServiceClientError as exc:
+            raise ServiceResolutionError(
+                f"not signed in to Fabric. {SIGN_IN_REMEDIATION}."
+            ) from exc
+        return FabricServiceClient.from_access_token(
+            token, cloud=cloud, credential_source="ambient:DefaultAzureCredential"
         )
 
     if missing:

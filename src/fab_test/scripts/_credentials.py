@@ -46,6 +46,15 @@ _ACCEPTED_SOURCES = (
     "or sign in to Azure with `az login` (also covers managed identity and VS Code)",
 )
 
+# What to do when nothing is configured and the ambient sign-in fails. One
+# sentence shared by the run-time error and `auth status`, so the two never
+# give different advice. `az login` comes first: on a developer machine it is
+# the likely fix, and a CI runner already knows it uses a service principal.
+SIGN_IN_REMEDIATION = (
+    f"Run `az login`, or set {_TENANT_VAR}, {_CLIENT_ID_VARS[0]} and "
+    f"{_CLIENT_SECRET_VARS[0]} (or put them in .fab-test/.env)"
+)
+
 
 @dataclass(frozen=True)
 class CredentialStatus:

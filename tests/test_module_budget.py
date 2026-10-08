@@ -282,8 +282,11 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
         ),
     ),
     "src/fab_test/scripts/fab_test_execution.py": (
-        892,
+        893,
         (
+            "2026-10-08: +1 line appending credential_failure_detail (-v/-vv sign-in detail) "
+            "to the could-not-resolve-workspace error; the detail itself lives in "
+            "fabric_service_client.py. "
             "2026-10-07: +1 line importing service_skip_exit so a skipped PBIR-Legacy report "
             "lifts the run's exit above 0; the skip logic itself lives in _service_export.py. "
             "2026-10-06: +7 lines so --workspace NAME (stored in workspace_id) is resolved "

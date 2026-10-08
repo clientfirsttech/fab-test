@@ -275,6 +275,8 @@ def _dry_run_paths(name: str, args: argparse.Namespace, mode: ResolvedMode) -> l
     if target is None:
         return None
     suffix = "rdl" if SERVICE_ITEM_TYPES[name] == "PaginatedReport" else SERVICE_ITEM_TYPES[name]
+    if name == "pql_test":
+        return [Path(f"{mode.workspace or ''}.Workspace") / f"{target.name}.{suffix}"]
     return [Path(f"{_safe(mode.workspace or '')}") / f"{_safe(target.name)}.{suffix}"]
 
 
@@ -316,23 +318,14 @@ def export_for_analyzer(name: str, args: argparse.Namespace, output_dir: Path) -
         planned = _dry_run_paths(name, args, mode)
         if planned is not None:
             return planned
-    from .playwright_validation.fabric_service_client import FabricServiceClientError
-    from .playwright_validation.resolver import ServiceResolutionError
-    from .playwright_validation.service_client import FabricRestClient, FabricToken, ServiceClientError
+    from .playwright_validation.service_client import FabricRestClient, FabricToken
 
     client = build_service_client(args)
     item_type = SERVICE_ITEM_TYPES[name]
-    try:
-        workspace_id = _workspace_id(args, client, mode)
-        items = _select_items(name, args, client, workspace_id)
-    except ServiceExportError:
-        raise
-    except ServiceResolutionError as exc:
-        raise ServiceExportError(str(exc), 1) from exc
-    except (ServiceClientError, FabricServiceClientError) as exc:
-        raise _remediation(exc, f"the {item_type} list of workspace '{mode.workspace}'") from exc
-
+    workspace_id, items = _list_items(name, args, client, mode)
     args.workspace_id = workspace_id
+    if name == "pql_test":
+        return _deployed_models(args, client, workspace_id, mode, items)
     if getattr(args, "dry_run", False):
         return [Path(_safe(mode.workspace or "")) / f"{_safe(i['displayName'])}.{item_type}" for i in items]
 
@@ -356,6 +349,50 @@ def export_for_analyzer(name: str, args: argparse.Namespace, output_dir: Path) -
     for label in skipped:
         narrate(f"  ⏭ {label} skipped -- {_LEGACY_REASON}", output_format=output_format)
     return sorted(artifacts)
+
+
+def _list_items(
+    name: str, args: argparse.Namespace, client: Any, mode: ResolvedMode
+) -> tuple[str, list[dict[str, Any]]]:
+    """Resolve the workspace and the items ``name`` reads, each failure a `ServiceExportError`."""
+    from .playwright_validation.fabric_service_client import FabricServiceClientError
+    from .playwright_validation.resolver import ServiceResolutionError
+    from .playwright_validation.service_client import ServiceClientError
+
+    try:
+        workspace_id = _workspace_id(args, client, mode)
+        return workspace_id, _select_items(name, args, client, workspace_id)
+    except ServiceExportError:
+        raise
+    except ServiceResolutionError as exc:
+        raise ServiceExportError(str(exc), 1) from exc
+    except (ServiceClientError, FabricServiceClientError) as exc:
+        label = f"the {SERVICE_ITEM_TYPES[name]} list of workspace '{mode.workspace}'"
+        raise _remediation(exc, label) from exc
+
+
+def _deployed_models(
+    args: argparse.Namespace, client: Any, workspace_id: str, mode: ResolvedMode, items: list[dict[str, Any]]
+) -> list[Path]:
+    """Name each deployed model the way pql-test addresses it, exporting nothing.
+
+    pql-test connects to the model over XMLA and discovers its tests there
+    (``PQL.Assert.RetrieveTestsV2``), so the definition files would be a
+    download nobody reads. ``WORKSPACE.Workspace/NAME.SemanticModel`` takes
+    display names, so a workspace given by GUID is looked up once.
+    """
+    from ._pql_identity import pql_identity_mismatch
+    from .playwright_validation.service_client import FabricRestClient, FabricToken
+
+    workspace = mode.workspace or ""
+    if not getattr(args, "dry_run", False):
+        _announce_credential(args, client)
+        mismatch = pql_identity_mismatch(client.access_token)
+        if mismatch:
+            raise ServiceExportError(mismatch, 2)
+        if not workspace or _GUID.match(workspace):
+            workspace = FabricRestClient(FabricToken(client.access_token)).get_workspace_name(workspace_id)
+    return sorted(Path(f"{workspace}.Workspace") / f"{item['displayName']}.SemanticModel" for item in items)
 
 
 def _export_item(

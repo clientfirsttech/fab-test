@@ -516,7 +516,7 @@ def _resolve_workspace_target(args: argparse.Namespace) -> int | None:
 
 def _lookup_workspace_id(args: argparse.Namespace, name: str) -> int | None:
     """Resolve a display name into args.workspace_id; an exit code on failure, else None."""
-    from .playwright_validation.fabric_service_client import build_fabric_service_client
+    from .playwright_validation.fabric_service_client import build_fabric_service_client, credential_failure_detail
     from .playwright_validation.resolver import AmbiguousWorkspaceError, ServiceResolutionError, WorkspaceNotFoundError
 
     try:
@@ -536,7 +536,8 @@ def _lookup_workspace_id(args: argparse.Namespace, name: str) -> int | None:
         print(f"  ✗ fab-test: {exc}", file=sys.stderr)
         return 1
     except ServiceResolutionError as exc:
-        print(f"  ✗ fab-test: could not resolve workspace '{name}': {exc}", file=sys.stderr)
+        detail = "".join(f"\n    {line}" for line in credential_failure_detail(exc, getattr(args, "verbose", 0) or 0))
+        print(f"  ✗ fab-test: could not resolve workspace '{name}': {exc}{detail}", file=sys.stderr)
         return 1
     return None
 

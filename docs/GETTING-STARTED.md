@@ -50,7 +50,7 @@ cd <your-power-bi-repo>
 python -m venv .venv
 source .venv/bin/activate            # PowerShell: .venv\Scripts\Activate.ps1
 
-pip install "cft-fab-test==1.9.0b5"  # or: pip install --pre cft-fab-test
+pip install "cft-fab-test==1.9.0b6"  # or: pip install --pre cft-fab-test
 ```
 
 Playwright needs a browser and some pytest plugins. The plugins come with the `playwright` extra; the browser is a separate download:

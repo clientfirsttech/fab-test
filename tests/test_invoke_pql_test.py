@@ -14,6 +14,7 @@ from fab_test.scripts._analyzer_envelope import ENVELOPE_REQUIRED_KEYS, WrapperR
 from fab_test.scripts.invoke_pql_test import (
     _parse_native_output,
     build_command,
+    deployed_model,
     log,
     main,
     parse_findings,
@@ -67,6 +68,29 @@ class TestBuildCommand:
         assert "run-tests" in command
         assert str(artifact) in command
         assert str(output) in command
+
+    def test_deployed_model_is_passed_through_with_a_forward_slash(self, tmp_path: Path):
+        """Service mode names a deployed model; pql-test reads its tests live.
+
+        The name arrives through a Windows Path, so its separator may be a
+        backslash. The workspace is in the name, so no --workspace-id.
+        """
+        model = Path("Sales Dev.Workspace") / "Sales.SemanticModel"
+        command = build_command(model, output_path=tmp_path / "out.json", workspace_id="ws-guid")
+        assert command[2] == "Sales Dev.Workspace/Sales.SemanticModel"
+        assert "--workspace-id" not in command
+
+    @pytest.mark.parametrize(
+        ("raw", "expected"),
+        [
+            ("Dev.Workspace/Sales.SemanticModel", "Dev.Workspace/Sales.SemanticModel"),
+            ("Dev.Workspace\\Sales.SemanticModel", "Dev.Workspace/Sales.SemanticModel"),
+            ("fabric-artifacts/Sales.SemanticModel", None),
+            ("C:\\repo\\Dev.Workspace\\Sales.SemanticModel", None),
+        ],
+    )
+    def test_deployed_model_recognizes_only_the_workspace_form(self, raw, expected):
+        assert deployed_model(raw) == expected
 
     def test_command_omits_credentials(self, tmp_path: Path):
         """Credentials are passed via environment, not command line."""
