@@ -142,7 +142,7 @@ def resolve_workspace_reports(args: argparse.Namespace) -> list[Path]:
         FabricServiceClientError,
         build_fabric_service_client,
     )
-    from .playwright_validation.resolver import ServiceResolutionError, resolve_workspace_id
+    from .playwright_validation.resolver import ServiceResolutionError, list_inventory, resolve_workspace_id
 
     try:
         client = build_fabric_service_client(env_file=getattr(args, "playwright_env_file", None))
@@ -150,7 +150,7 @@ def resolve_workspace_reports(args: argparse.Namespace) -> list[Path]:
         listed = [
             (item, kind)
             for item_type, kind in _WORKSPACE_REPORT_TYPES
-            for item in client.list_items(workspace_id, item_type)
+            for item in list_inventory(client, workspace_id, item_type)
         ]
     except (FabricServiceClientError, ServiceResolutionError) as exc:
         print(
@@ -225,12 +225,12 @@ def resolve_dataset_workspace_targets(args: argparse.Namespace) -> list[Path]:
         FabricServiceClientError,
         build_fabric_service_client,
     )
-    from .playwright_validation.resolver import ServiceResolutionError, resolve_workspace_id
+    from .playwright_validation.resolver import ServiceResolutionError, list_inventory, resolve_workspace_id
 
     try:
         client = build_fabric_service_client(env_file=getattr(args, "playwright_env_file", None))
         workspace_id = resolve_workspace_id(client, workspace_id)
-        models = client.list_items(workspace_id, "SemanticModel")
+        models = list_inventory(client, workspace_id, "SemanticModel")
     except (FabricServiceClientError, ServiceResolutionError) as exc:
         print(
             f"  ✗ fab-test playwright: could not list semantic models in workspace {workspace_id}: {exc}",

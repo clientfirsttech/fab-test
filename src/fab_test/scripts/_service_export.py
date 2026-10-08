@@ -220,14 +220,14 @@ def _write_parts(parts: list[dict[str, str]], dest: Path, item_type: str, name: 
 def _select_items(
     name: str, args: argparse.Namespace, client: Any, workspace_id: str
 ) -> list[dict[str, Any]]:
-    from .playwright_validation.resolver import ResolvedEnvironment, resolve_item
+    from .playwright_validation.resolver import ResolvedEnvironment, list_inventory, resolve_item
 
     item_type = SERVICE_ITEM_TYPES[name]
     target = getattr(args, "resolved_target", None)
     if target is not None:
         item = resolve_item(target.name, item_type, ResolvedEnvironment("service", workspace_id), client)
         return [{"id": item.item_id, "displayName": item.display_name}]
-    items = client.list_items(workspace_id, item_type)
+    items = list_inventory(client, workspace_id, item_type)
     if len(items) > ENUMERATION_LIMIT and not getattr(args, "all_items", False):
         raise ServiceExportError(
             f"{name}: {len(items)} {item_type} items in the workspace exceed the "

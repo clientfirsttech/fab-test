@@ -322,3 +322,21 @@ def test_given_a_failed_export_should_close_its_progress_line(fake, tmp_path, ca
         svc.export_for_analyzer("bpa", _args(None, workspace_id=WS), tmp_path)
     assert capsys.readouterr().err == "exporting Item0.SemanticModel... failed\n"
 
+
+def test_given_no_target_should_skip_microsoft_usage_metrics_models(fake, tmp_path):
+    client, calls = fake
+    client.items = [
+        {"id": "m1", "displayName": "Sales"},
+        {"id": "um", "displayName": "Dashboard Usage Metrics Model"},
+    ]
+    [artifact] = svc.export_for_analyzer("bpa", _args(None, workspace_id=WS), tmp_path)
+    assert artifact.name == "Sales.SemanticModel"
+    assert calls == ["m1"]
+
+
+def test_given_a_usage_metrics_model_named_as_target_should_still_export_it(fake, tmp_path):
+    client, calls = fake
+    client.items = [{"id": "um", "displayName": "Dashboard Usage Metrics Model"}]
+    args = _args("Dev.Workspace/Dashboard Usage Metrics Model.SemanticModel", workspace_id=WS)
+    assert svc.export_for_analyzer("bpa", args, tmp_path)[0].name == "Dashboard Usage Metrics Model.SemanticModel"
+    assert calls == ["um"]

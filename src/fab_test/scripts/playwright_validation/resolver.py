@@ -293,6 +293,28 @@ def _no_match_message(
     return f"{base} Closest candidates: {listed}{suffix}."
 
 
+# Usage-metrics items Microsoft creates in a workspace: not the team's content,
+# so a workspace inventory skips them. Naming one explicitly still resolves it.
+MICROSOFT_GENERATED_ITEMS = frozenset(
+    {
+        "Dashboard Usage Metrics Model",
+        "Dashboard Usage Metrics Report",
+        "Report Usage Metrics Model",
+        "Report Usage Metrics Report",
+        "Usage Metrics Report",
+    }
+)
+
+
+def list_inventory(client: ServiceClient, workspace_id: str, item_type: str) -> list[dict[str, Any]]:
+    """Return the workspace's ``item_type`` items, minus Microsoft-generated ones."""
+    return [
+        item
+        for item in client.list_items(workspace_id, item_type)
+        if item.get("displayName", "") not in MICROSOFT_GENERATED_ITEMS
+    ]
+
+
 def resolve_item(
     name: str,
     item_type: str,

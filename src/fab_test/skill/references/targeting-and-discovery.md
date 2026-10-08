@@ -36,7 +36,7 @@ $ fab-test pql_lint "Sales Dev.Workspace/Sales.SemanticModel"
 
 ## Modes: repo, desktop, service
 
-**The TARGET (or its default) decides the mode. Flags and env vars supply defaults; they never silently change the mode.** Every run (except under `--format json` or `-q`, where stderr stays silent) prints `mode=<repo|desktop|service> workspace=<name or —> source=<target|flag|env|config|default>` on stderr first, and the envelope carries additive `mode` and `source` fields. In service mode, each item export then prints `exporting <Name>.<Type>... done (<seconds>s)` (or `... failed`) on stderr, under the same silence rules, so a multi-item `--workspace` run never sits silent while definitions download.
+**The TARGET (or its default) decides the mode. Flags and env vars supply defaults; they never silently change the mode.** Every run (except under `--format json` or `-q`, where stderr stays silent) prints `mode=<repo|desktop|service> workspace=<name or —> source=<target|flag|env|config|default>` on stderr first, and the envelope carries additive `mode` and `source` fields. In service mode, each item export then prints `exporting <Name>.<Type>... done (<seconds>s)` (or `... failed`) on stderr, under the same silence rules, so a multi-item `--workspace` run never sits silent while definitions download. A workspace-wide inventory (no item named) skips the usage-metrics items Microsoft generates (`Dashboard Usage Metrics Model`/`Report`, `Report Usage Metrics Model`/`Report`, `Usage Metrics Report`); naming one explicitly still analyzes it.
 
 | Invocation | Mode |
 |------------|------|

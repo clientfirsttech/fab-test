@@ -670,4 +670,6 @@ fab-test bpa --workspace Dev --dry-run             # list what would be exported
 
 Each export prints `exporting <Name>.<Type>... done (<seconds>s)` on stderr (silent under `-q` and `--format json`); expect about 3s per item.
 
+A workspace inventory skips Microsoft's generated usage-metrics models and reports; name one (`Dev.Workspace/Dashboard Usage Metrics Model.SemanticModel`) to analyze it anyway.
+
 `--workspace` with no target ignores local folders unless `--artifact-dir` is passed. `local/NAME` with `--workspace` exits `2`.
