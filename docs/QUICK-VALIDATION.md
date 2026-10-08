@@ -668,4 +668,6 @@ fab-test bpa --workspace Dev --dry-run             # list what would be exported
 | `desktop` | none | exit `127` if no instance has the artifact |
 | `service` | env service principal, then `.env`, then `DefaultAzureCredential`, then `--interactive` | exit `127` naming the variables and `fab-test auth status` |
 
+Each export prints `exporting <Name>.<Type>... done (<seconds>s)` on stderr (silent under `-q` and `--format json`); expect about 3s per item.
+
 `--workspace` with no target ignores local folders unless `--artifact-dir` is passed. `local/NAME` with `--workspace` exits `2`.

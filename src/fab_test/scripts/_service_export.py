@@ -18,6 +18,8 @@ import contextlib
 import os
 import re
 import shutil
+import sys
+import time
 from pathlib import Path, PurePosixPath
 from typing import Any
 
@@ -253,6 +255,33 @@ def _dry_run_paths(name: str, args: argparse.Namespace, mode: ResolvedMode) -> l
     return [Path(f"{_safe(mode.workspace or '')}") / f"{_safe(target.name)}.{suffix}"]
 
 
+def _progress(args: argparse.Namespace, message: str, end: str = "\n") -> None:
+    """Narrate export progress on stderr; silent under -q and --format json, like the banner."""
+    if getattr(args, "quiet", False) or getattr(args, "output_format", "text") == "json":
+        return
+    print(message, end=end, file=sys.stderr, flush=True)
+
+
+def _fetch_definition(
+    rest: Any, args: argparse.Namespace, workspace_id: str, item: dict[str, Any], item_type: str
+) -> list[dict[str, str]]:
+    """Return one item's definition parts, announcing the export as it runs."""
+    from .playwright_validation.service_client import ServiceClientError
+
+    label = f"{item['displayName']}.{item_type}"
+    _progress(args, f"exporting {label}...", end="")
+    started = time.monotonic()
+    try:
+        parts = rest.get_item_definition(
+            workspace_id, item["id"], definition_format=_DEFINITION_FORMATS.get(item_type, "")
+        )
+    except ServiceClientError as exc:
+        _progress(args, " failed")
+        raise _remediation(exc, label) from exc
+    _progress(args, f" done ({time.monotonic() - started:.1f}s)")
+    return parts
+
+
 def export_for_analyzer(name: str, args: argparse.Namespace, output_dir: Path) -> list[Path]:
     """Return the exported artifact paths ``name`` should analyze.
 
@@ -291,13 +320,7 @@ def export_for_analyzer(name: str, args: argparse.Namespace, output_dir: Path) -
     for item in items:
         key = (workspace_id, item["id"])
         if key not in cache:
-            label = f"{item['displayName']}.{item_type}"
-            try:
-                parts = rest.get_item_definition(
-                    workspace_id, item["id"], definition_format=_DEFINITION_FORMATS.get(item_type, "")
-                )
-            except ServiceClientError as exc:
-                raise _remediation(exc, label) from exc
+            parts = _fetch_definition(rest, args, workspace_id, item, item_type)
             root = output_dir / name / _safe(mode.workspace or workspace_id) / _safe(item["displayName"])
             if output_dir.resolve() not in root.resolve().parents:
                 raise ServiceExportError(f"refusing export path outside {output_dir}", 1)

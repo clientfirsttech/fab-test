@@ -67,6 +67,12 @@ def _decode_payload(payload: str) -> dict[str, Any] | None:
         return None
 
 
+# Fabric answers getDefinition with Retry-After: 20, but a semantic model
+# export is usually done in about a second. Check back after 2s and double
+# up to the server's Retry-After rather than idling on a finished export.
+_FIRST_POLL_SECONDS = 2.0
+_THROTTLED = 429
+
 _VIRTUAL_SERVER_DATASET = re.compile(
     r"sobe_wowvirtualserver-([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
 )
@@ -239,13 +245,17 @@ class FabricRestClient:
             )
         headers = _api_headers(self._token)
         retry_after = float(initial_response.headers.get("Retry-After", "1"))
+        delay = min(_FIRST_POLL_SECONDS, retry_after)
         deadline = time.monotonic() + max(self._timeout * 4, 60)
 
         while True:
-            time.sleep(retry_after)
+            time.sleep(delay)
             status_response = requests.get(
                 operation_url, headers=headers, timeout=self._timeout
             )
+            if status_response.status_code == _THROTTLED and time.monotonic() <= deadline:
+                delay = float(status_response.headers.get("Retry-After", retry_after))
+                continue
             if status_response.status_code >= 400:
                 raise ServiceClientError(
                     "Long-running operation status check failed "
@@ -270,6 +280,7 @@ class FabricRestClient:
             retry_after = float(
                 status_response.headers.get("Retry-After", retry_after)
             )
+            delay = min(delay * 2, retry_after)
 
         result_response = requests.get(
             f"{operation_url}/result", headers=headers, timeout=self._timeout

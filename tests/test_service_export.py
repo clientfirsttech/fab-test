@@ -6,6 +6,7 @@ enumeration, caching, cleanup and refusal rules without a tenant.
 
 import argparse
 import base64
+import re
 from pathlib import Path
 
 import pytest
@@ -289,3 +290,35 @@ def test_given_json_secrets_should_be_redacted_in_kept_exports(fake, tmp_path):
     (artifact / "x.dat").write_text('{"password": "hunter2"}')
     svc.finalize_exports(args)
     assert "hunter2" not in (artifact / "x.dat").read_text()
+
+
+@pytest.mark.parametrize("verbose", [0, 1])
+def test_given_default_or_verbose_should_announce_each_export_with_its_duration(fake, tmp_path, capsys, verbose):
+    client, _ = fake
+    client.items = [{"id": "m0", "displayName": "Sales"}, {"id": "m1", "displayName": "Ops"}]
+    svc.export_for_analyzer("bpa", _args(None, workspace_id=WS, verbose=verbose), tmp_path)
+    lines = capsys.readouterr().err.splitlines()
+    assert [line.split("...")[0] for line in lines] == [
+        "exporting Sales.SemanticModel",
+        "exporting Ops.SemanticModel",
+    ]
+    assert all(re.search(r"\.\.\. done \(\d+\.\ds\)$", line) for line in lines)
+
+
+@pytest.mark.parametrize("extra", [{"quiet": True}, {"output_format": "json"}])
+def test_given_quiet_or_json_should_export_silently(fake, tmp_path, capsys, extra):
+    svc.export_for_analyzer("bpa", _args(None, workspace_id=WS, **extra), tmp_path)
+    assert capsys.readouterr().err == ""
+
+
+def test_given_a_failed_export_should_close_its_progress_line(fake, tmp_path, capsys, monkeypatch):
+    def fail(self, *a, **k):
+        raise ServiceClientError("HTTP", status_code=404)
+
+    monkeypatch.setattr(
+        "fab_test.scripts.playwright_validation.service_client.FabricRestClient.get_item_definition", fail
+    )
+    with pytest.raises(svc.ServiceExportError):
+        svc.export_for_analyzer("bpa", _args(None, workspace_id=WS), tmp_path)
+    assert capsys.readouterr().err == "exporting Item0.SemanticModel... failed\n"
+
