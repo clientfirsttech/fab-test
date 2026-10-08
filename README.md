@@ -16,7 +16,7 @@ every command in this README are unchanged.
 
 ### From PyPI (beta)
 
-The current release is the beta `1.9.0b6`. pip skips pre-releases unless you
+The current release is the beta `1.9.0b7`. pip skips pre-releases unless you
 pass `--pre` or name the version, so a bare `pip install cft-fab-test` finds
 nothing until the first final release.
 
@@ -24,7 +24,7 @@ nothing until the first final release.
 python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
 
-pip install --pre cft-fab-test          # or pin it: "cft-fab-test==1.9.0b6"
+pip install --pre cft-fab-test          # or pin it: "cft-fab-test==1.9.0b7"
 
 fab-test --version
 ```

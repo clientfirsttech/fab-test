@@ -664,8 +664,7 @@ fab-test bpa --workspace Dev --dry-run             # list what would be exported
 
 | Mode | Credential | Failure |
 |------|-----------|---------|
-| `repo` | none | - |
-| `desktop` | none | exit `127` if no instance has the artifact |
+| `local` | none | a `local/NAME` target exits `127` if no Power BI Desktop instance has it open |
 | `service` | env service principal, then `.env`, then `DefaultAzureCredential`, then `--interactive` | exit `127` naming the variables and `fab-test auth status` |
 
 Each export prints `exporting <Name>.<Type>... done (<seconds>s)` on stderr (silent under `-q` and `--format json`); expect about 3s per item.

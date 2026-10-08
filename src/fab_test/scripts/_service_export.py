@@ -79,7 +79,7 @@ def is_service_run(name: str, args: argparse.Namespace) -> bool:
     its `--workspace-id` keeps meaning "run the repository's models over
     XMLA", and a typed workspace target keeps its XMLA path, as before.
     """
-    if getattr(args, "mode", "repo") != "service" or name not in SERVICE_ITEM_TYPES:
+    if getattr(args, "mode", "local") != "service" or name not in SERVICE_ITEM_TYPES:
         return False
     return (
         name != "pql_test"

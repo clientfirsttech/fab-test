@@ -420,7 +420,7 @@ def _build_telemetry_payload(
 ) -> dict[str, Any]:
     """Build a telemetry payload for an analyzer/artifact run.
 
-    ``mode`` (repo|desktop|service) is a dimension; the workspace name and
+    ``mode`` (local|service) is a dimension; the workspace name and
     connection details are deliberately never recorded.
     """
     errors, warnings = severity_counts(envelope.get("findings", []))

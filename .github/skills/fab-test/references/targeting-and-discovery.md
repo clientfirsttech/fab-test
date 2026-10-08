@@ -34,14 +34,14 @@ $ fab-test pql_lint "Sales Dev.Workspace/Sales.SemanticModel"
     (./src/Sales.SemanticModel) or a name (Sales.SemanticModel)
 ```
 
-## Modes: repo, desktop, service
+## Modes: local, service
 
-**The TARGET (or its default) decides the mode. Flags and env vars supply defaults; they never silently change the mode.** Every run (except under `--format json` or `-q`, where stderr stays silent) prints `mode=<repo|desktop|service> workspace=<name or —> source=<target|flag|env|config|default>` on stderr first, and the envelope carries additive `mode` and `source` fields. In service mode, each item export then prints `exporting <Name>.<Type>... done (<seconds>s)` (or `... failed`) on stderr, under the same silence rules, so a multi-item `--workspace` run never sits silent while definitions download. A workspace-wide inventory (no item named) skips the usage-metrics items Microsoft generates (`Dashboard Usage Metrics Model`/`Report`, `Report Usage Metrics Model`/`Report`, `Usage Metrics Report`); naming one explicitly still analyzes it.
+**The TARGET (or its default) decides the mode. Flags and env vars supply defaults; they never silently change the mode.** Every run (except under `--format json` or `-q`, where stderr stays silent) prints `mode=local path=<folder or local/NAME> source=<…>` or `mode=service workspace=<name> source=<…>` (source is `target|flag|env|config|default`) on stderr first, and the envelope carries additive `mode` and `source` fields. In service mode, each item export then prints `exporting <Name>.<Type>... done (<seconds>s)` (or `... failed`) on stderr, under the same silence rules, so a multi-item `--workspace` run never sits silent while definitions download. A workspace-wide inventory (no item named) skips the usage-metrics items Microsoft generates (`Dashboard Usage Metrics Model`/`Report`, `Report Usage Metrics Model`/`Report`, `Usage Metrics Report`); naming one explicitly still analyzes it.
 
 | Invocation | Mode |
 |------------|------|
-| `fab-test bpa`, `bpa Sales.SemanticModel`, `bpa ./src/Sales.SemanticModel` | `repo` |
-| `fab-test pql-test local/Sales` | `desktop` (an ambient `FABRIC_WORKSPACE_ID` never turns it remote) |
+| `fab-test bpa`, `bpa Sales.SemanticModel`, `bpa ./src/Sales.SemanticModel` | `local` — artifact files in a folder; Git is not required |
+| `fab-test pql-test local/Sales` | `local` — the model open in Power BI Desktop (an ambient `FABRIC_WORKSPACE_ID` never turns it remote) |
 | `fab-test bpa "Dev.Workspace/Sales.SemanticModel"` | `service` — typed target |
 | `fab-test bpa "Dev.Workspace/Sales"` | `service` — untyped, resolved by the analyzer's own type |
 | `fab-test bpa --workspace Dev` | `service` — every deployed item of the analyzer's type; local folders are ignored unless `--artifact-dir` is passed |

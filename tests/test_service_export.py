@@ -398,7 +398,7 @@ def _cli(*argv, env=None, cwd=None):
 
 def test_given_any_run_should_print_the_mode_banner_first(tmp_path):
     result = _cli("bpa", "--dry-run", "--artifact-dir", str(tmp_path))
-    assert result.stderr.splitlines()[0] == "mode=repo workspace=— source=default"
+    assert result.stderr.splitlines()[0] == f"mode=local path={tmp_path} source=default"
 
 
 def test_given_desktop_target_with_workspace_flag_should_exit_2(tmp_path):

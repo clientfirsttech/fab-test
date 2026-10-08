@@ -551,7 +551,9 @@ def _explain_mode(args: argparse.Namespace, name: str) -> ResolvedMode | int:
         return 2
     try:
         resolved_mode = resolve_mode(
-            args.resolved_target, workspace_flag=getattr(args, "workspace_id", "")
+            args.resolved_target,
+            workspace_flag=getattr(args, "workspace_id", ""),
+            artifact_dir=str(getattr(args, "artifact_dir", ".")),
         )
     except ModeError as exc:
         print(f"  ✗ fab-test explain: {exc}", file=sys.stderr)
