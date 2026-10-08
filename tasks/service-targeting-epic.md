@@ -163,6 +163,18 @@ Make "what am I testing?" unmissable for all three callers.
 
 ---
 
+## pql-test Connects As fab-test's Identity
+
+**Requirements**:
+- Given a service principal configured in the environment or a `.env` file, under either the `FABRIC_SERVICE_PRINCIPAL_*` or the `FABRIC_CLIENT_*` names, should run pql-test as that same service principal.
+- Given fab-test signed in as a person and pql-test saved as another account, should stop the pql-test run naming both accounts and the sign-in to run.
+- Given pql-test's own sign-in status cannot be read, should let the run proceed rather than block on the check.
+- Given pql-test could not connect to a deployed model, should report that it could not connect and why, not that the model has no tests.
+- Given pql-test reached a model without PQL.Assert installed, should report that the model has no tests.
+- Given the pql-test wrapper, should stay within its module size budget by keeping result classification in its own module.
+
+---
+
 ## Quality Gates
 
 **Requirements**:

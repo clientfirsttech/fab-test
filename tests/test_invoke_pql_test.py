@@ -114,8 +114,60 @@ class TestBuildCommand:
         assert "--desktop-model-name" not in command
 
 
+_FABRIC_SP_VARS = (
+    "FABRIC_TENANT_ID",
+    "FABRIC_SERVICE_PRINCIPAL_ID",
+    "FABRIC_SERVICE_PRINCIPAL_SECRET",
+    "FABRIC_CLIENT_ID",
+    "FABRIC_CLIENT_SECRET",
+)
+
+
 class TestPqlEnv:
-    """Tests for mapping Fabric credentials to pql-test env vars."""
+    """Tests for mapping Fabric credentials to pql-test env vars.
+
+    pql-test must connect as the identity fab-test resolved, wherever that
+    identity was configured -- otherwise it falls back to its own saved
+    login and may not see the workspace fab-test listed.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _isolated(self, monkeypatch, tmp_path):
+        for var in _FABRIC_SP_VARS:
+            monkeypatch.delenv(var, raising=False)
+        monkeypatch.setenv("PLAYWRIGHT_ENV_FILE", str(tmp_path / "absent.env"))
+
+    def test_pql_env_maps_fabric_client_alias_names(self, monkeypatch):
+        """The FABRIC_CLIENT_* spelling fab-test accepts reaches pql-test too."""
+        from fab_test.scripts.invoke_pql_test import _pql_env
+
+        monkeypatch.setenv("FABRIC_TENANT_ID", "tenant-1")
+        monkeypatch.setenv("FABRIC_CLIENT_ID", "client-1")
+        monkeypatch.setenv("FABRIC_CLIENT_SECRET", "secret-1")
+        env = _pql_env()
+        assert (env["PQL_TENANT_ID"], env["PQL_CLIENT_ID"], env["PQL_CLIENT_SECRET"]) == (
+            "tenant-1",
+            "client-1",
+            "secret-1",
+        )
+
+    def test_pql_env_maps_a_service_principal_from_the_env_file(self, monkeypatch, tmp_path):
+        """A principal kept only in .fab-test/.env still reaches pql-test."""
+        from fab_test.scripts.invoke_pql_test import _pql_env
+
+        env_file = tmp_path / ".env"
+        env_file.write_text(
+            "FABRIC_TENANT_ID=tenant-2\nFABRIC_SERVICE_PRINCIPAL_ID=client-2\n"
+            "FABRIC_SERVICE_PRINCIPAL_SECRET=secret-2\n",
+            encoding="utf-8",
+        )
+        monkeypatch.setenv("PLAYWRIGHT_ENV_FILE", str(env_file))
+        env = _pql_env()
+        assert (env["PQL_TENANT_ID"], env["PQL_CLIENT_ID"], env["PQL_CLIENT_SECRET"]) == (
+            "tenant-2",
+            "client-2",
+            "secret-2",
+        )
 
     def test_pql_env_maps_fabric_credentials(self, monkeypatch):
         """FABRIC_* env vars are mapped to PQL_* env vars."""
@@ -140,6 +192,14 @@ class TestPqlEnv:
         assert "PQL_TENANT_ID" not in env
         assert "PQL_CLIENT_ID" not in env
         assert "PQL_CLIENT_SECRET" not in env
+
+    def test_pql_env_maps_nothing_from_a_partial_service_principal(self, monkeypatch):
+        """A half-set principal is a mistake fab-test reports, not one to hand on."""
+        from fab_test.scripts.invoke_pql_test import _pql_env
+
+        monkeypatch.setenv("FABRIC_TENANT_ID", "tenant-1")
+        env = _pql_env()
+        assert not {"PQL_TENANT_ID", "PQL_CLIENT_ID", "PQL_CLIENT_SECRET"} & env.keys()
 
 
 class TestParseFindings:

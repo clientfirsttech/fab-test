@@ -2,6 +2,9 @@
 
 ## 2026-10-08
 
+- 🐛 - pql-test Used Its Own Login Despite A Service Principal - fab-test handed pql-test its service principal only from the environment and only under the `FABRIC_SERVICE_PRINCIPAL_*` names, so a principal kept in `.fab-test/.env` or under `FABRIC_CLIENT_ID`/`FABRIC_CLIENT_SECRET` never reached it: fab-test listed the models as the principal while pql-test connected as its saved `pql-test auth login`. It now resolves the principal exactly as fab-test does. A partially set principal is no longer handed on piecemeal.
+- ♻️ - pql-test's result classification moved out of the wrapper into its own module (`invoke_pql_test.py` 546 → 420 lines), with tests for the connection-failure message and for reading `pql-test auth status`.
+- 📦 - Version `1.9.0b8`.
 - 📦 - Version `1.9.0b7`. Install docs and the skill pin the new version.
 - 🔄 - **Behavior change** - Modes Are `local` And `service` - `repo` read as "a Git repository", but it only ever meant artifact files in a folder, and `desktop` was the same machine. Both are now `local`: the banner prints `mode=local path=. source=default` (or `path=local/NAME` for a model open in Power BI Desktop) instead of `mode=repo workspace=—`, and `mode=service workspace=NAME` is unchanged. The envelope's `mode` field and the telemetry `mode` dimension carry the new value: a saved query filtering on `repo` or `desktop` must use `local`.
 - ✨ - One-Line "Not Signed In" Error - With no service principal set and no Azure sign-in, `fab-test --workspace NAME` printed the Azure SDK's nine-credential report followed by our own list of every place it looked. It now prints one line: `not signed in to Fabric. Run `az login`, or set FABRIC_TENANT_ID, FABRIC_SERVICE_PRINCIPAL_ID and FABRIC_SERVICE_PRINCIPAL_SECRET (or put them in .fab-test/.env).` `-v` adds where it looked; `-vv` adds the SDK's report. `fab-test auth status` gives the same advice.
