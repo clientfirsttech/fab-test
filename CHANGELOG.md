@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-10-09
+
+- 🐛 - `all --workspace` Summarized Items It Never Ran - The aggregate summary rediscovered the local checkout, so a service run listed the repository's fixtures (with envelope paths that did not exist) instead of the deployed items it analyzed. It now names exactly what the run handled, in dry runs too.
+- 🐛 - One Failed Export Stopped A Whole Analyzer - A deployed item that could not be exported (for example over Windows' path limit) ended that analyzer's run, so its other items went unanalyzed. Now that item is named and fails the run, and the rest are still analyzed.
+- 🐛 - `all` Painted Every Row Of An Analyzer Failed - One failing artifact made every row of its analyzer read FAILED in the aggregate summary, even warning-only ones. Each row with its own envelope now takes its status from it, matching `run.json`.
+- 📝 - `all --workspace` runs the analyzers `all` runs in every mode (`bpa`, `pbir`, `pql-test`, `rdl`); `playwright --workspace` gives deployed reports their live render.
+
 ## 2026-10-08
 
 - 🐛 - `--changed-since` Skipped Changed Paginated Reports - A changed `.PaginatedReport` folder reported "no Playwright impact", and a loose `.rdl` file was not seen as a change at all. Both now validate that deployed paginated report, rendered as paginated rather than interactive; the hidden `--impact-manifest` path keeps each report's type too.

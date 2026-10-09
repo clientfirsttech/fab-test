@@ -26,6 +26,7 @@ from ._report_html import (
     resolve_report,
     write_index,
 )
+from ._service_export import service_row_stems
 from ._table_style import TABLE_FORMAT, table_padding
 from ._target import target_from_args
 from .fab_test_registry import ANALYZER_REGISTRY, discover_artifacts
@@ -575,10 +576,9 @@ def build_all_summary_rows(
     rows: list[dict[str, Any]] = []
     for analyzer, code in zip(analyzers, codes):
         glob, _ = ANALYZER_REGISTRY[analyzer]
-        stems = [
-            a.stem
-            for a in discover_artifacts(artifact_dir, glob, target, output_dir=output_dir)
-        ]
+        stems = service_row_stems(analyzer, args)  # a service run names what it ran, never the checkout
+        if stems is None:
+            stems = [a.stem for a in discover_artifacts(artifact_dir, glob, target, output_dir=output_dir)]
         if not stems:
             rows.append({
                 "analyzer": analyzer,
@@ -598,7 +598,7 @@ def build_all_summary_rows(
             else:
                 data = _read_artifact_envelope(output_dir, analyzer, stem)
                 errors, warnings = _envelope_error_warning_counts(data)
-                status = _artifact_status(data, code, errors, warnings)
+                status = _artifact_status(data, code if data is None else 0, errors, warnings)  # envelope wins
             rows.append({
                 "analyzer": analyzer,
                 "artifact": stem,

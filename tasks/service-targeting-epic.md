@@ -58,7 +58,7 @@ Rules carried forward: tokens/secrets never reach stdout, envelopes, the manifes
 2. ✅ The "exporting a deployed item belongs to fabric-cicd-deployment" rule is retired for read-only, ephemeral test-input export; vision and the targeting reference are amended accordingly.
 3. ✅ Exported definitions are **flag-controlled**: deleted after the run by default, kept under `fab-test-results/` with `--keep-export`. TMDL can carry connection strings, so kept exports go through the same redaction audit as envelopes.
 4. ✅ No `fab-test service` subcommand — `fab-test all --workspace Dev` is the composite entry point (simplicity constraint).
-5. ✅ Paginated reports in service mode feed **both** `rdl` (exported `.rdl` definition) and `playwright` (live render) under `all --workspace`.
+5. ✅ Paginated reports in service mode feed **both** `rdl` (exported `.rdl` definition) and `playwright` (live render) under `all --workspace`. **Amended 2026-10-09:** `all --workspace` runs the configured `all` set (`analyzers.json`), which has no `playwright`; a paginated report gets its live render from `playwright --workspace`.
 6. ✅ `fab-test all --workspace Dev` **includes** `pql-test` against every model in the workspace.
 7. ✅ An untyped service target (`Dev.Workspace/Sales`) resolves by the **analyzer's own type**, symmetric with repo-scan behavior.
 8. ✅ `--interactive` browser sign-in is allowed for service mode — in-memory token only, never in CI — behind a **feature flag** (`interactive_auth: on|off` in `fab-test.yml`, default on; env `FAB_TEST_INTERACTIVE_AUTH=0` to disable) so it can be turned off fleet-wide.
@@ -175,9 +175,11 @@ Defects found (tasks below):
 ## `all --workspace` Runs Every Service Analyzer And Reports Only What Ran
 
 **Requirements**:
-- Given `all --workspace WS`, should run every service-capable analyzer -- `bpa`, `pbir`, `a11y`, `rdl`, `pql-test`, and `playwright` -- or name each one it skips and why; `--dry-run` should list the same set
-- Given one deployed item whose export fails, should report that item as failed and still analyze the analyzer's other items
-- Given a service run, should build the aggregate summary only from what this run produced -- never from the local checkout -- so its rows, envelope paths, and totals agree with `run.json`
+- Given `all --workspace WS`, should run the analyzers `all` runs in every mode (`fab_test_all` in `analyzers.json`: `bpa`, `pbir`, `pql-test`, `rdl`), over deployed items; `--dry-run` should list the same set. Decided 2026-10-09: no `a11y` or `playwright` under `--workspace` alone -- this amends decision 5; add them to `analyzers.json` or run `playwright --workspace` ✅
+- Given one deployed item whose export fails, should report that item as failed and still analyze the analyzer's other items ✅
+- Given a service run, should build the aggregate summary only from what this run produced -- never from the local checkout -- so its rows, envelope paths, and totals agree with `run.json` ✅
+
+**Done 2026-10-09.** `_export_items` (split out of `export_for_analyzer`) catches one item's `ServiceExportError`, names it, records it in `_export_failed`, and keeps going; `service_skip_exit` lifts the exit for it; only when nothing exported does the first error stop the analyzer, as before. `export_for_analyzer` records what each analyzer handled, and `service_row_stems` hands that to `build_all_summary_rows` in service mode instead of rediscovering the checkout. A row with its own envelope now takes its status from it -- the analyzer's exit code covers all of its artifacts, so one failure had painted every row of that analyzer failed (local `all` too). Live: `all --workspace` lists exactly the workspace's 24 items, `bpa`/`pbir` analyze 5 of 6 and 7 of 8 around the one export over the path limit, exit 1.
 
 ---
 

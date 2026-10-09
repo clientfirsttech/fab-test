@@ -311,8 +311,26 @@ def export_for_analyzer(name: str, args: argparse.Namespace, output_dir: Path) -
     """Return the exported artifact paths ``name`` should analyze.
 
     Raises `ServiceExportError` carrying the exit code. Each deployed item
-    is exported once per run, however many analyzers read it.
+    is exported once per run, however many analyzers read it. What it
+    returns is recorded for `service_row_stems`, so `all`'s summary names
+    these items rather than rediscovering the local checkout.
     """
+    paths = _export_for_analyzer(name, args, output_dir)
+    args.__dict__.setdefault("_service_items", {})[name] = [path.stem for path in paths]
+    return paths
+
+
+def service_row_stems(name: str, args: argparse.Namespace) -> list[str] | None:
+    """The items a service run handled for ``name`` -- analyzed, then failed to export.
+
+    None outside a service run, where the summary discovers the checkout as before.
+    """
+    if not is_service_run(name, args):
+        return None
+    return getattr(args, "_service_items", {}).get(name, []) + getattr(args, "_export_failed", {}).get(name, [])
+
+
+def _export_for_analyzer(name: str, args: argparse.Namespace, output_dir: Path) -> list[Path]:
     mode: ResolvedMode = args.resolved_mode
     if getattr(args, "dry_run", False):
         planned = _dry_run_paths(name, args, mode)
@@ -331,24 +349,49 @@ def export_for_analyzer(name: str, args: argparse.Namespace, output_dir: Path) -
 
     _announce_credential(args, client)
     rest = FabricRestClient(FabricToken(client.access_token))
-    # None marks a PBIR-Legacy report: exported once, never analyzed.
-    cache: dict[tuple[str, str], Path | None] = args.__dict__.setdefault("_export_cache", {})
-    artifacts: list[Path] = []
-    skipped: list[str] = args.__dict__.setdefault("_export_skipped", {}).setdefault(name, [])
-    for item in items:
-        key = (workspace_id, item["id"])
-        if key not in cache:
-            cache[key] = _export_item(rest, item, name, args, output_dir, workspace_id)
-        if cache[key] is None:
-            skipped.append(f"{item['displayName']}.{item_type}")
-        else:
-            artifacts.append(cache[key])
+    artifacts, skipped = _export_items(rest, items, name, args, output_dir, workspace_id)
     if skipped and not artifacts:
         raise ServiceExportError(f"nothing to test: {', '.join(skipped)} -- {_LEGACY_REASON}", 1)
     output_format = getattr(args, "output_format", "text")
     for label in skipped:
         narrate(f"  ⏭ {label} skipped -- {_LEGACY_REASON}", output_format=output_format)
     return sorted(artifacts)
+
+
+def _export_items(
+    rest: Any, items: list[dict[str, Any]], name: str, args: argparse.Namespace, output_dir: Path, workspace_id: str
+) -> tuple[list[Path], list[str]]:
+    """Export each item, returning what to analyze and the PBIR-Legacy reports skipped.
+
+    One item that cannot be exported fails that item, not the analyzer: it is
+    named, recorded for `service_skip_exit`, and the rest still run. Only when
+    nothing could be exported does its error stop the analyzer.
+    """
+    item_type = SERVICE_ITEM_TYPES[name]
+    # None marks a PBIR-Legacy report: exported once, never analyzed.
+    cache: dict[tuple[str, str], Path | None] = args.__dict__.setdefault("_export_cache", {})
+    artifacts: list[Path] = []
+    skipped: list[str] = args.__dict__.setdefault("_export_skipped", {}).setdefault(name, [])
+    failed: list[str] = args.__dict__.setdefault("_export_failed", {}).setdefault(name, [])
+    errors: list[ServiceExportError] = []
+    for item in items:
+        key = (workspace_id, item["id"])
+        if key not in cache:
+            try:
+                cache[key] = _export_item(rest, item, name, args, output_dir, workspace_id)
+            except ServiceExportError as exc:
+                errors.append(exc)
+                failed.append(item["displayName"])
+                continue
+        if cache[key] is None:
+            skipped.append(f"{item['displayName']}.{item_type}")
+        else:
+            artifacts.append(cache[key])
+    if errors and not artifacts and not skipped:
+        raise errors[0]  # the caller names it; nothing else ran
+    for exc in errors:
+        narrate(f"  ✗ fab-test {name}: {exc}", output_format=getattr(args, "output_format", "text"))
+    return artifacts, skipped
 
 
 def _list_items(
@@ -426,12 +469,14 @@ def _write_failure(exc: OSError, label: str) -> ServiceExportError:
 
 
 def service_skip_exit(name: str, args: argparse.Namespace) -> int:
-    """1 when this run skipped a report ``name`` should have tested, else 0.
+    """1 when this run skipped or failed to export an item ``name`` should have tested, else 0.
 
-    A skipped report was never tested, so the run cannot claim every
+    An item never analyzed was never tested, so the run cannot claim every
     artifact passed.
     """
-    return 1 if getattr(args, "_export_skipped", {}).get(name) else 0
+    if getattr(args, "_export_skipped", {}).get(name) or getattr(args, "_export_failed", {}).get(name):
+        return 1
+    return 0
 
 
 def _announce_credential(args: argparse.Namespace, client: Any) -> None:
