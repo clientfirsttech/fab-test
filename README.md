@@ -311,6 +311,16 @@ keeps today's repository discovery:
 fab-test playwright --workspace "Sales Dev"
 ```
 
+To keep the repository as the denominator while naming the workspace -- the
+behavior `--workspace-id` had before it became an alias -- pass the folder
+explicitly: `fab-test playwright --workspace "Sales Dev" --artifact-dir .`.
+
+A workspace run discovers pages, bookmarks, RLS roles, and paginated
+parameters from the service, so it covers what a checkout would. When one of
+those lookups fails, the report is still rendered with one role or no
+parameters, and its result reads `warning` (a `coverage_limited` finding that
+names the fix) rather than `passed`; the exit code is unchanged.
+
 Add `--changed-since REF` to test only the deployed reports your change
 touches: the reports built on a semantic model changed since that Git branch,
 tag or commit, or the reports themselves -- interactive or paginated (a changed

@@ -1,6 +1,6 @@
 # Playwright Workspace Discovery Epic
 
-**Status**: 🔄 IN-PROGRESS (targeting/compatibility approved; shared alias and workspace-wide discovery implemented and live-verified; remote RLS/paginated-parameter coverage and full documentation remain)
+**Status**: ✅ COMPLETED 2026-10-09 (1.9.0b10; quality gates passed; verified live from an empty directory. Covered by unit tests only: an ambiguous workspace name -- none exists to test -- and headed mode, declined live.)
 **Goal**: Make explicitly workspace-targeted Playwright runs independent of repository artifact discovery.
 
 ## Overview
@@ -83,10 +83,12 @@ Still open here: the unavailable-metadata requirement (a remote role or paramete
 Update user, agent, and pipeline guidance together and review the implementation against the approved contract.
 
 **Requirements**:
-- Given an approved implementation, should update README, QUICK-VALIDATION, and relevant walkthroughs with `--workspace` name and GUID examples, both equivalent aliases, workspace-wide, named-report, and repository-denominator commands, plus the `--artifact-dir .` compatibility migration and the value-taking `--from-workspace` contract.
-- Given an agent using the fab-test skill, should document selector precedence and metadata limitations in the existing SudoLang contract and references, keeping every authored and packaged skill file identical.
-- Given GitHub Actions or Azure DevOps without a report checkout, should provide copy-ready examples using the preferred `--workspace` spelling with explicit credential/configuration sources, browser prerequisites, and result publication.
-- Given an epic-sized source change, should apply the minor prerelease version policy and matching skill version stamps and changelog entry during implementation, not during this plan-only change.
+- Given an approved implementation, should update README, QUICK-VALIDATION, and relevant walkthroughs with `--workspace` name and GUID examples, both equivalent aliases, workspace-wide, named-report, and repository-denominator commands, plus the `--artifact-dir .` compatibility migration and the value-taking `--from-workspace` contract. ✅
+- Given an agent using the fab-test skill, should document selector precedence and metadata limitations in the existing SudoLang contract and references, keeping every authored and packaged skill file identical. ✅
+- Given GitHub Actions or Azure DevOps without a report checkout, should provide copy-ready examples using the preferred `--workspace` spelling with explicit credential/configuration sources, browser prerequisites, and result publication. ✅
+- Given an epic-sized source change, should apply the minor prerelease version policy and matching skill version stamps and changelog entry during implementation, not during this plan-only change. ✅
+
+**Docs done 2026-10-09.** README already carried the aliases, name/GUID, workspace-wide and named-report forms; it gains the `--artifact-dir .` migration and what a workspace run discovers (with the `coverage_limited` warning). QUICK-VALIDATION's service-mode block gains the Playwright `--workspace`, `--plan-only`, and `--artifact-dir .` forms. `flags.md` gains "what a workspace run discovers without a checkout"; the main `SKILL.md`'s SudoLang contract gains the bare-`--workspace` precedence and the `coverage_limited` rule; packaged copies synced. `docs/examples/github-actions/playwright-live.yml` (already checkout-free, installing the published package and browser, uploading results) now passes `--workspace "$FABRIC_WORKSPACE_ID"` when a dispatch names no report or dataset. Version: ships in the unreleased 1.9.0b10, whose skill stamp is current. The review-checkpoint requirement is left to the Quality Gates live pass.
 - Given a review checkpoint, should inspect identity collisions, selector provenance, errors, matrix coverage, and all enumerated shared callers before accepting the prototype as production-ready.
 
 ---
@@ -96,9 +98,19 @@ Update user, agent, and pipeline guidance together and review the implementation
 Run the required repository-wide gates and verify the approved behavior through the installed CLI.
 
 **Requirements**:
-- Given the finished epic, should pass `ruff check .`, the complexity and module-budget ratchets with ruff installed, and the full suite with `--cov --cov-fail-under=80`, using `GITHUB_ACTIONS=true CI=true` as CI does.
-- Given all three workspace aliases through the installed console script, should verify equivalent name and GUID targeting and actionable missing/ambiguous-name errors without depending on repository artifacts.
-- Given the installed console script outside the checkout, should verify discovery, plan-only matrix generation, a real passing report, and intentional broken-report failures with explicit credential/configuration paths and no implicit local artifacts.
-- Given every affected shared caller identified during contract approval, should exercise it through the installed CLI and confirm unaffected repository and aggregate behavior remains unchanged.
-- Given doc/skill distribution changes, should pass the skill-resource guards and confirm `fab-test skill --show` reflects the packaged contract.
+- Given the finished epic, should pass `ruff check .`, the complexity and module-budget ratchets with ruff installed, and the full suite with `--cov --cov-fail-under=80`, using `GITHUB_ACTIONS=true CI=true` as CI does. ✅
+- Given all three workspace aliases through the installed console script, should verify equivalent name and GUID targeting and actionable missing/ambiguous-name errors without depending on repository artifacts. ✅
+- Given the installed console script outside the checkout, should verify discovery, plan-only matrix generation, a real passing report, and intentional broken-report failures with explicit credential/configuration paths and no implicit local artifacts. ✅
+- Given every affected shared caller identified during contract approval, should exercise it through the installed CLI and confirm unaffected repository and aggregate behavior remains unchanged. ✅
+- Given doc/skill distribution changes, should pass the skill-resource guards and confirm `fab-test skill --show` reflects the packaged contract. ✅
 - Given any unverified live-service or CI-platform requirement, should leave the epic incomplete and record the blocker rather than archive it as completed.
+
+**Quality gates 2026-10-09** (1.9.0b10, installed console script, from an empty directory holding only `.fab-test/` unless noted):
+- Gates: `ruff check .` clean; ratchets pass with no new exemption; full suite 2639 passed, 2 skipped, coverage 89.33%, under `GITHUB_ACTIONS=true CI=true`.
+- Aliases: `--workspace`, `--workspace-id`, `--from-workspace`, each with the name `visual-error-testing` and its GUID, list the same 12 deployed reports (8 interactive, 4 paginated). An unknown name exits 1 listing the visible workspaces; a bare `--from-workspace` exits 2 ("expected one argument"). Nothing is written to the working directory.
+- Matrix and verdicts: `--plan-only` matches the repository case for case; real renders match the repository/CI verdicts (see the matrix-coverage task above).
+- Shared callers unchanged: bare `playwright --dry-run` and an ambient `FABRIC_WORKSPACE_ID` alone both stay `mode=local` over the same 27 local reports; `all` stays local.
+- Runner settings on a workspace-discovered report: `--workers 3` split `Report with Bookmarks - Broken Visuals`' 6 cases across gw0-gw2 (5 passed, 1 broken bookmark failed, as in CI). Azure-hosted browsers via `docs/examples/playwright/azure.yml` rendered `Working Visuals` (passed), and a deliberately invalid `PLAYWRIGHT_SERVICE_ACCESS_TOKEN` failed browser setup naming the `PLAYWRIGHT_SERVICE_*` values -- proof the pass ran remotely, not on the locally installed Chromium.
+- Skill guards (`tests/test_skill_resource.py`) pass with the packaged copies synced; the installed package's own `skill/SKILL.md` and `references/flags.md` carry the `ServiceMode` block, the `coverage_limited` rule, and the 1.9.0b10 stamp. (`fab-test skill --show` reports per-harness install status -- none installed in this checkout -- not content, so the packaged files were read directly.)
+
+Not verified live: an ambiguous workspace name (no two visible workspaces share a name; unit-tested), and headed mode (declined, to avoid opening a browser on the desktop; covered by `tests/test_playwright_headed.py`).

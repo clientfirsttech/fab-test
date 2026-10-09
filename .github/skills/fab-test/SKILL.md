@@ -111,6 +111,8 @@ Constraints {
   (HTTP 403) => the message names the read access the identity needs
   (no credential resolves) => exit 127
   exports are deleted after the run; --keep-export keeps them redacted under fab-test-results/export/<item id>/<Item>.<Type>/
+  (playwright --workspace WS, nothing else naming what to run) => every deployed Report/PaginatedReport, no checkout; --artifact, a target, --artifact-dir (even .), or a dataset selector narrows it instead
+  (a playwright role, paginated-definition, or parameter-values lookup fails) => still rendered, with a warning-level coverage_limited finding naming the fix; status warning, exit unchanged
 }
 ```
 

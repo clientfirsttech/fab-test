@@ -660,6 +660,9 @@ fab-test bpa --workspace Dev                       # every semantic model in the
 fab-test all --workspace Dev --keep-export         # the analyzers `all` runs, over deployed items; keep redacted exports
 fab-test all --workspace Dev --all                 # proceed past the 50-item limit
 fab-test bpa --workspace Dev --dry-run             # list what would be exported
+fab-test playwright --workspace Dev                # render every deployed report; no checkout needed
+fab-test playwright --workspace Dev --plan-only    # the page/bookmark/role/parameter matrix, no browser
+fab-test playwright --workspace Dev --artifact-dir .  # the repository's reports, resolved in that workspace
 ```
 
 | Mode | Credential | Failure |

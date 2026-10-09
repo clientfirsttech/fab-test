@@ -485,6 +485,17 @@ fab-test playwright --workspace-id c4698d28-b05c-40bc-926c-707563ac85e7
 fab-test playwright --workspace "Sales Dev" --artifact-dir .
 ```
 
+**What a workspace run discovers without a checkout.** Pages and bookmarks
+come from the deployed report, RLS roles from the semantic model over XMLA,
+and a paginated report's parameters from its deployed definition (valid
+values through the model's `executeQueries`) -- the same matrix a checkout
+produces. Each lookup is best-effort: when one fails, the report is still
+rendered with one role or no parameters, and its envelope gains a
+warning-level `coverage_limited` finding naming the fix (`--roles none` or
+`SemanticModel.Read.All`; `--artifact-dir` with the local `.rdl`; the
+"Dataset Execute Queries REST API" tenant setting). The status is `warning`
+instead of `passed`; the exit code is unchanged.
+
 **`--dataset-workspace-id` alone -- no `--dataset-id`, `--artifact`, target, or
 `--changed-since` -- means every dataset in that workspace.** Every
 semantic model in the workspace is listed live, and each one's own dependent
