@@ -47,6 +47,8 @@ fab-test local              # run it
 fab-test local --format json
 ```
 
+`--format json` prints exactly one document: `{"analyzer": "local", "results": [...], "exit_code": N}`, where each analyzer that ran has an `artifacts` list with one row per artifact (`artifact`, `status`, `errors`, `warnings`, `output_path`, `report_path`) -- the same rows a single-analyzer run prints. `fab-test all --format json` likewise prints only its aggregate.
+
 A missing prerequisite (`pqlint` not installed, Tabular Editor/PBIR Inspector not resolved) is reported as **skipped** with a remediation hint — it never fails the run. Exit code `1` only means a real finding, never a missing tool. `pql-test` is always ready (it's a pinned `fab-test` dependency); if a Desktop instance has the project's `.pbip` open, `pql-test`'s envelope records a `desktop` field naming the port and model it bound to (see `pql-test` below and the run manifest section in the main SKILL.md's Agent Contract for the full shape).
 
 Discovery walks `--artifact-dir` recursively — see [Discovery](targeting-and-discovery.md#discovery) for the rules, which are the same for every subcommand.

@@ -834,30 +834,9 @@ def _print_summary(
     parameter existed.
     """
     if output_format == "json":
-        rows: list[dict[str, Any]] = []
-        for stem, code in results:
-            data = None
-            if output_dir is not None:
-                data = _read_artifact_envelope(output_dir, name, stem)
-            errors, warnings = _envelope_error_warning_counts(data)
-            if data and data.get("status") in {"skipped", "warning"} and code == 0:
-                row_status = data["status"]
-            else:
-                row_status = "failed" if code != 0 else "passed"
-            rows.append({
-                "artifact": stem,
-                "status": row_status,
-                "errors": errors,
-                "warnings": warnings,
-                "output_path": str(output_dir / name / stem / "envelope.json")
-                if output_dir
-                else "",
-                # Same key as the `all` summary emits. A consumer should not
-                # have to branch on how many analyzers happened to run.
-                "report_path": _report_path_for(data),
-            })
-        print(json.dumps({"analyzer": name, "artifacts": rows}, indent=2))
-        return max((code for _, code in results), default=0)
+        from ._summary_json import print_json_summary  # imports this module
+
+        return print_json_summary(name, results, output_dir, args)
 
     if getattr(args, "quiet", False):
         return _print_quiet_summary(name, results, output_dir)

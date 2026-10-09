@@ -48,8 +48,12 @@ def _is_ci() -> bool:
 
 
 def _notice(message: str) -> None:
-    """Print a progress note: a workflow command in CI, plain text elsewhere."""
-    print(f"::notice::{message}" if _is_ci() else message)
+    """Print a progress note on stderr: a workflow command in CI, plain text elsewhere.
+
+    Never stdout: a first-run download would otherwise precede the one
+    document `--format json` promises there.
+    """
+    print(f"::notice::{message}" if _is_ci() else message, file=sys.stderr)
 
 
 def _cache_root(repo_root: Path) -> Path:
