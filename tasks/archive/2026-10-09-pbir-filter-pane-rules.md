@@ -1,6 +1,6 @@
 # PBIR Filter Pane Rules Epic
 
-**Status**: 🔄 IN-PROGRESS (tasks 1-2 done 2026-10-09)
+**Status**: ✅ COMPLETED 2026-10-09 (1.9.0b10; shipped in `5a533f5`)
 **Goal**: Make `NO_VISUAL_LEVEL_FILTERS_VISIBLE_IN_FILTER_PANEL` and `NO_VISUAL_LEVEL_FILTERS_UNLOCKED_IN_FILTER_PANEL` flag exactly the visuals whose visual-level filters are visible or unlocked, and nothing when the report's filter pane is disabled.
 
 ## Overview
@@ -71,3 +71,5 @@ Always last; nothing follows it.
 **Requirements**:
 - Given the finished epic, should pass `ruff check .` over the whole repo, the complexity and module-budget ratchets, and the coverage floor on the full suite, run as CI runs them (vision.md, Definition of Done)
 - Given the installed console script, should run `fab-test pbir` on `ThinReport` and its pane-off copy and see the same visuals named as the tests assert
+
+**Passed 2026-10-09** on the state committed as `5a533f5`: `ruff check .` clean; complexity and module-budget ratchets pass; full suite 2665 passed, 2 skipped, coverage 89.36%, under `GITHUB_ACTIONS=true CI=true`. Live through the installed CLI with the shipped rules: `ThinReport` gets one finding per rule naming exactly the three offending visuals, and its pane-off copy gets none.
