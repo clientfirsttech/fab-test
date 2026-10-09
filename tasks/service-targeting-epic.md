@@ -150,6 +150,66 @@ Make "what am I testing?" unmissable for all three callers.
 - Given the same artifacts on disk, should confirm the service-mode findings match a repo-mode run over the exported definition.
 - Given the blast-radius rule, should exercise every caller of the mode resolver and export seam: each analyzer, `all`, `local`, `list`, `explain`, `doctor`, `-q`, `--format json`, `--dry-run`, `--keep-export`, and the >50-item refusal with and without `--all`.
 
+**Live run 2026-10-09** (1.9.0b10, workspace `visual-error-testing` c4698d28…, service principal from `.fab-test/.env`, installed console script):
+
+Verified:
+- `bpa`, `pbir`, `a11y`, `rdl`: typed target, untyped target (resolved by the analyzer's own type), and standalone `--workspace` (dry-run lists 6 models / 8 reports / 4 paginated, usage-metrics items excluded).
+- Service vs repo parity over the `--keep-export` export: identical for `bpa` (72 tests, 12 failed), `pbir` (11 findings), `a11y` (4 findings), same exit codes.
+- `pql-test --workspace`: all 6 deployed models reached over XMLA, each "no tests" (none has PQL.Assert), exit 0.
+- Export deleted after the run by default, kept with `--keep-export`; `-q` one line; `--format json` one stdout document; envelope carries `mode`/`source`; `explain` and `list` show the workspace scope; `doctor` (with `FABRIC_WORKSPACE_ID`) reports service mode per analyzer; `auth status` resolves an ambient `DefaultAzureCredential`.
+
+Not verifiable here:
+- `az login`: the only user account available is in a different tenant from the workspace (HTTP 401 on every call). Needs a user in the Fabric tenant with workspace access.
+- >50-item refusal: no workspace with more than 50 items of one type (largest has 8). Covered by unit tests only.
+
+Defects found (tasks below):
+1. `all --workspace`: one item's export failure aborts that whole analyzer (`bpa`, `pbir` analyzed nothing), `a11y` and `playwright` never run and are not mentioned, and the aggregate summary invents rows from the local checkout (`SampleModel-PQLAssert`, `ThinReport`, `ACC-03` twice, `QRY-01`, … with nonexistent envelope paths; "27 artifacts"). `run.json` is correct (10). `all --workspace --dry-run` also omits `a11y` and `playwright`.
+2. `pql-test` with a typed or untyped workspace target ignores it: falls into local discovery, prints "no *.SemanticModel artifacts found under <cwd>", exits 0 -- a silent pass on a model never tested. `is_service_run` only treats `pql_test` as service under `all` or `--workspace`; the "typed target keeps its XMLA path" path is never reached because discovery runs first.
+3. Export layout `<out>/<analyzer>/<workspace GUID>/<name>/export/<name>.<Type>/definition/...` exceeds Windows' 260-character limit from a 31-character repo root (`Report with Bookmarks - Broken Visuals` model and report). The `bpa` failure reports "No such file or directory" without the long-path remediation the `pbir` one gives.
+4. `native.json`/`native.xml` ignores `--output-dir` (`pbir`, `rdl`, `pql-test`): written under `./fab-test-results/` while the envelope honors the flag.
+5. HTTP 401 is reported as a missing-permission problem ("this identity may not read its definition ... needs read"); a 401 is a rejected token -- wrong tenant or audience -- and should name `az login --tenant` / the credential source.
+6. Smaller: `rdl --dry-run` prints `(analyzers: none)` for paginated reports; `doctor` has no `--workspace`; `--format json` still prints the wrapper's narration on stderr; the envelope's `workspace` field is `None` in service mode; `explain bpa` shows two different Tabular Editor paths (Tool vs Command); `list` still names the `local/` scope `desktop`.
+
+---
+
+## `all --workspace` Runs Every Service Analyzer And Reports Only What Ran
+
+**Requirements**:
+- Given `all --workspace WS`, should run every service-capable analyzer -- `bpa`, `pbir`, `a11y`, `rdl`, `pql-test`, and `playwright` -- or name each one it skips and why; `--dry-run` should list the same set
+- Given one deployed item whose export fails, should report that item as failed and still analyze the analyzer's other items
+- Given a service run, should build the aggregate summary only from what this run produced -- never from the local checkout -- so its rows, envelope paths, and totals agree with `run.json`
+
+---
+
+## pql-test Honors A Workspace Target
+
+**Requirements**:
+- Given `pql-test "WS.Workspace/NAME.SemanticModel"` or `pql-test "WS.Workspace/NAME"`, should run that one deployed model over XMLA, the way `--workspace` runs every model
+- Given a workspace target that names no deployed model, should exit non-zero naming the model and workspace, never 0 with "no artifacts found under <cwd>"
+
+---
+
+## Exports Fit Windows Path Limits
+
+**Requirements**:
+- Given a deployed item with a long display name and deep PBIR/TMDL parts, should export it under the default results directory from a typical repository path on Windows without exceeding 260 characters (drop the repeated name/GUID segments, or shorten them)
+- Given an export that still cannot be written because a path is too long, should name a shorter `--output-dir` or Windows long-path support for every analyzer, not only `pbir`
+
+---
+
+## Native Output Honors --output-dir
+
+**Requirements**:
+- Given `--output-dir DIR`, should write each analyzer's native output (`native.json`/`native.xml`) under DIR beside its envelope, never under `./fab-test-results/`
+
+---
+
+## A Rejected Token Is Not A Missing Permission
+
+**Requirements**:
+- Given Fabric answers HTTP 401, should say the token was rejected (wrong tenant or audience) and name the credential that was used and `az login --tenant` / the service-principal tenant variable as the fix
+- Given Fabric answers HTTP 403, should keep today's missing-permission message
+
 ---
 
 ## Document All Three Callers
