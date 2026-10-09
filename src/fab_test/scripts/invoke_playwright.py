@@ -39,6 +39,7 @@ from .playwright_validation.config import (
 from .playwright_validation.discovery import (
     acquire_embed_configs,
     apply_coverage_limits,
+    log,
     resolve_discovery,
     resolve_paginated_plan,
 )
@@ -96,11 +97,6 @@ def _spec_path() -> Path:
 
 # Default output location for test-case CSV/JSON artifacts.
 _DEFAULT_TEST_CASES_DIR = Path("fab-test-results") / "playwright" / "test-cases"
-
-
-def log(message: str) -> None:
-    """Print a GitHub Actions-friendly message."""
-    print(message)
 
 
 def log_error(message: str) -> None:

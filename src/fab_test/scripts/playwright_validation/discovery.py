@@ -12,6 +12,8 @@ from __future__ import annotations
 import argparse
 import dataclasses
 import json
+import os
+import re
 from typing import Any
 
 from .config import PlaywrightValidationConfig
@@ -22,10 +24,18 @@ from .rdl_datasource import RdlReportParameter, parse_rdl_report_parameters_text
 from .service_client import FabricRestClient, FabricToken, ServiceClientError
 from .test_cases import DiscoveredBookmark, DiscoveredPage
 
+_WORKFLOW_PREFIX = re.compile(r"^::(?:notice|warning)::")
+
 
 def log(message: str) -> None:
-    """Print a GitHub Actions-friendly message."""
-    print(message)
+    """Print a progress line, with its ``::notice::``/``::warning::`` prefix only in CI.
+
+    fab-test hands the wrapper its terminal under ``--format text``, so the
+    prefix used to reach a laptop verbatim. CI is the parent's definition
+    (``GITHUB_ACTIONS`` or ``CI``), so the two never disagree.
+    """
+    in_ci = os.environ.get("GITHUB_ACTIONS") or os.environ.get("CI")
+    print(message if in_ci else _WORKFLOW_PREFIX.sub("", message))
 
 
 # What the current report's discovery could not cover. Discovery is
