@@ -1,6 +1,6 @@
 # Service Targeting Epic
 
-**Status**: ✅ IMPLEMENTED (live verification against a real workspace pending; needs tenant credentials) — all 9 decisions recorded 2026-10-03.
+**Status**: 🔄 IMPLEMENTED, gates passed 2026-10-09 — live-verified with a service principal and five defects from that run fixed; not archived while two live checks stay blocked: `az login` (needs a user in the Fabric tenant) and the >50-item refusal (needs a workspace that large). All 9 decisions recorded 2026-10-03; decision 5 amended 2026-10-09.
 **Known gaps**: live verification pending; service-run envelopes still live at `<analyzer>/<item-stem>/` (exports at `<analyzer>/<workspace>/<item>/export/`), so same-named items across workspaces share an envelope dir; `--interactive` tokens are not refreshed on long runs; a bare `--workspace` dry-run needs a token to enumerate.
 **Goal**: Let `fab-test bpa`, `pbir`, `a11y`, `rdl`, `pql-test`, and `all` run against deployed models and reports in the Fabric service, with one standardized rule deciding repo scan vs. service testing and one surfaced mode per run.
 
@@ -250,6 +250,8 @@ Defects found (tasks below):
 ## Quality Gates
 
 **Requirements**:
-- Given the whole repository, should pass `ruff check .`, `tests/test_complexity_budget.py`, and `tests/test_module_budget.py` — `fab_test_parser.py` (35.9K) and `_target.py` (10.7K) are near or over their ceilings, so split on existing seams rather than raise exemptions.
-- Given the full suite, should pass with `--cov --cov-fail-under=80` over `src/fab_test`.
-- Given CI-dependent tests, should pass once with `GITHUB_ACTIONS=true CI=true`.
+- Given the whole repository, should pass `ruff check .`, `tests/test_complexity_budget.py`, and `tests/test_module_budget.py` — `fab_test_parser.py` (35.9K) and `_target.py` (10.7K) are near or over their ceilings, so split on existing seams rather than raise exemptions. ✅
+- Given the full suite, should pass with `--cov --cov-fail-under=80` over `src/fab_test`. ✅
+- Given CI-dependent tests, should pass once with `GITHUB_ACTIONS=true CI=true`. ✅
+
+**Passed 2026-10-09** on `9469bee`: `ruff check .` clean; complexity and module-budget ratchets pass with no new exemption (neither `fab_test_parser.py` nor `_target.py` needed a split); full suite 2632 passed, 2 skipped, coverage 89.28%, run with `GITHUB_ACTIONS=true CI=true`.
