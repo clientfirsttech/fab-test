@@ -163,11 +163,12 @@ def apply_execution_environment(
     environment.pop(EXECUTION_LAUNCH, None)
     if getattr(args, "execution_launch", None):
         environment[EXECUTION_LAUNCH] = json.dumps(args.execution_launch)
+    if report_root is not None:
+        # Beside the envelope, so --output-dir governs pytest's own reports too.
+        environment[EXECUTION_REPORT_ROOT] = str(report_root)
     if config.path:
         environment[EXECUTION_PATH] = str(config.path)
         environment[EXECUTION_RUN_ID] = str(uuid4())
-        if report_root is not None:
-            environment[EXECUTION_REPORT_ROOT] = str(report_root)
         environment.update(args.execution_environment)
         environment.pop("DEBUG", None)
         for directory in result_dirs or []:
@@ -176,21 +177,20 @@ def apply_execution_environment(
 
 
 def configure_pytest_execution(command: list[str], environment: dict[str, str]) -> None:
-    """Load the optional adapter and keep its native reports with case evidence."""
-    if not environment.get(EXECUTION_PATH):
-        if environment.get(EXECUTION_LAUNCH) or headless_requested_false(environment):
-            command += ["-p", _PLUGIN]
-        return
-    report_root = (
-        Path(environment[EXECUTION_REPORT_ROOT]) if environment.get(EXECUTION_REPORT_ROOT)
-        else Path(environment["PLAYWRIGHT_RESULTS_ROOT"]) / "report"
-    )
-    replacements = {"--html=": report_root / "index.html", "--junitxml=": report_root / "results.xml"}
-    for index, argument in enumerate(command):
-        for prefix, path in replacements.items():
-            if argument.startswith(prefix):
-                command[index] = f"{prefix}{path}"
-    command += ["-p", _PLUGIN]
+    """Point pytest's native reports beside the envelope and load the optional adapter."""
+    selected = bool(environment.get(EXECUTION_PATH))
+    if environment.get(EXECUTION_REPORT_ROOT) or selected:
+        report_root = (
+            Path(environment[EXECUTION_REPORT_ROOT]) if environment.get(EXECUTION_REPORT_ROOT)
+            else Path(environment["PLAYWRIGHT_RESULTS_ROOT"]) / "report"
+        )
+        replacements = {"--html=": report_root / "index.html", "--junitxml=": report_root / "results.xml"}
+        for index, argument in enumerate(command):
+            for prefix, path in replacements.items():
+                if argument.startswith(prefix):
+                    command[index] = f"{prefix}{path}"
+    if selected or environment.get(EXECUTION_LAUNCH) or headless_requested_false(environment):
+        command += ["-p", _PLUGIN]
 
 
 # Distribution name -> import name for what `_run_pytest` launches. None are

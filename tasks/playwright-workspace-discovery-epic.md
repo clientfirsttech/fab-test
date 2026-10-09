@@ -63,12 +63,18 @@ Carry each selected deployed item's identity through execution and reporting wit
 Establish and test which report metadata can be discovered remotely before claiming checkout-independent coverage.
 
 **Requirements**:
-- Given interactive reports outside any checkout, should generate page and bookmark cases from deployed metadata and preserve `--pages none` and `--roles none` behavior.
-- Given automatic RLS role discovery currently reading local TMDL, should prove a supported remote source or explicitly surface unavailable role coverage; should not silently present a default-role-only matrix as equivalent coverage.
-- Given paginated reports with single-value or multi-value parameters, should discover parameter declarations remotely through a verified supported API or transient deployed definition and preserve parameter-expanded tests without checked-in RDL files.
+- Given interactive reports outside any checkout, should generate page and bookmark cases from deployed metadata and preserve `--pages none` and `--roles none` behavior. ✅
+- Given automatic RLS role discovery currently reading local TMDL, should prove a supported remote source or explicitly surface unavailable role coverage; should not silently present a default-role-only matrix as equivalent coverage. ✅
+- Given paginated reports with single-value or multi-value parameters, should discover parameter declarations remotely through a verified supported API or transient deployed definition and preserve parameter-expanded tests without checked-in RDL files. ✅
 - Given unavailable remote parameter or dataset metadata, should report the limitation and usable override instead of classifying a baseline-only render as complete parameter coverage.
-- Given the same deployed workspace tested from the repository and an empty directory with explicit credentials/configuration, should compare selected item IDs, generated case counts, and verdicts, including Working Visuals, Not Working Visuals, and paginated filter fixtures.
+- Given the same deployed workspace tested from the repository and an empty directory with explicit credentials/configuration, should compare selected item IDs, generated case counts, and verdicts, including Working Visuals, Not Working Visuals, and paginated filter fixtures. ✅
 - Given headed, slow-motion, worker, and optional Azure-browser settings, should keep the Python Playwright/pytest generated-test runner unchanged and independent of the discovery source.
+
+**Verified live 2026-10-09** (1.9.0b10, workspace `visual-error-testing`, service principal from `.fab-test/.env`). `playwright --workspace WS --plan-only` from an empty directory holding only `.fab-test/` versus the repository with `--artifact-dir .`: every report both runs selected generated the same case count -- pages, bookmarks, and both RLS roles (`Team_A`/`Team_B`, discovered over XMLA via `xmla_roles.py`) on all three `RLSTest*` reports, and the paginated parameter cases (`ReportParameter1=2`; the multi-value `2,4`) from the deployed definitions. The only difference was by design: `PaginatedExample` is deployed with no local file, so the repository denominator omits it. Real renders from the empty directory matched the repository/CI verdicts: `Working Visuals` passed; `Not Working Visuals` 1 error; `PaginatedExample-WithMultiFilter` 1 error (the known broken parameter combination); `RLSTest` 2 errors (the `InvalidUnconstrainedJoin` visual under both roles, as in demo run 37871985133).
+
+Found and fixed during this run: pytest's own HTML/JUnit reports ignored `--output-dir` unless an execution config was selected, going to a fixed `./fab-test-results/playwright/report/` shared by every report. They now go beside each report's envelope (`<out>/playwright/<report>/report/`).
+
+Still open here: the unavailable-metadata requirement (a remote role or parameter lookup that fails should name the limitation, not pass as full coverage) is not yet exercised live, and the headed/slow-motion/worker/Azure-browser settings are covered by the existing suites, not re-run against a workspace-discovered report.
 
 ---
 
