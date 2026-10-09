@@ -523,7 +523,7 @@ def run_inspector(args: argparse.Namespace) -> int:
 
     artifact_stem = artifact_path.stem
     output_path = Path(args.output_path) if args.output_path else envelope_path("pbir", artifact_stem)
-    native_out = native_output_path("pbir", artifact_stem, "json")
+    native_out = native_output_path("pbir", artifact_stem, "json", beside=output_path)
     emit_html: bool = getattr(args, "emit_html", False)
 
     level = _verbosity()

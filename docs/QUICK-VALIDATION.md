@@ -657,9 +657,12 @@ Remove-Item -Recurse -Force .venv-test, dist
 fab-test bpa "Dev.Workspace/Sales.SemanticModel"   # typed target -> mode=service
 fab-test bpa "Dev.Workspace/Sales"                 # untyped, resolved by the analyzer's type
 fab-test bpa --workspace Dev                       # every semantic model in the workspace
-fab-test all --workspace Dev --keep-export         # every service-capable analyzer; keep redacted exports
+fab-test all --workspace Dev --keep-export         # the analyzers `all` runs, over deployed items; keep redacted exports
 fab-test all --workspace Dev --all                 # proceed past the 50-item limit
 fab-test bpa --workspace Dev --dry-run             # list what would be exported
+fab-test playwright --workspace Dev                # render every deployed report; no checkout needed
+fab-test playwright --workspace Dev --plan-only    # the page/bookmark/role/parameter matrix, no browser
+fab-test playwright --workspace Dev --artifact-dir .  # the repository's reports, resolved in that workspace
 ```
 
 | Mode | Credential | Failure |

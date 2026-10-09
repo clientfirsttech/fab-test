@@ -57,6 +57,7 @@ _JSON_SECRET = re.compile(r'(?i)("(?:password|pwd|accountkey|sharedaccesskey|cli
 _CI_VARIABLES = ("CI", "GITHUB_ACTIONS", "TF_BUILD")
 _FABRIC_SCOPE = "https://api.fabric.microsoft.com/.default"
 _WINDOWS_PATH_TOO_LONG = 206  # ERROR_FILENAME_EXCED_RANGE
+_WINDOWS_MAX_PATH = 260
 
 
 class ServiceExportError(Exception):
@@ -75,9 +76,10 @@ def service_item_type(name: str) -> str | None:
 def is_service_run(name: str, args: argparse.Namespace) -> bool:
     """True when ``name`` should materialize deployed items for this run.
 
-    `pql-test` does so under `all` or an explicit `--workspace`: otherwise
-    its `--workspace-id` keeps meaning "run the repository's models over
-    XMLA", and a typed workspace target keeps its XMLA path, as before.
+    `pql-test` does so under `all`, an explicit `--workspace`, or a target
+    naming a workspace (`WS.Workspace/NAME`); otherwise its `--workspace-id`
+    keeps meaning "run the repository's models over XMLA", as before. A
+    workspace target used to fall into local discovery and exit 0 untested.
     """
     if getattr(args, "mode", "local") != "service" or name not in SERVICE_ITEM_TYPES:
         return False
@@ -85,6 +87,7 @@ def is_service_run(name: str, args: argparse.Namespace) -> bool:
         name != "pql_test"
         or getattr(args, "analyzer", None) == "all"
         or bool(getattr(args, "service_workspace", ""))
+        or getattr(getattr(args, "resolved_target", None), "scope", "") == "workspace"
     )
 
 
@@ -183,7 +186,15 @@ def _remediation(exc: Exception, label: str) -> ServiceExportError:
             f"cannot export {label}: getDefinition returned 404 -- the item is not in "
             "enhanced/Git-integration format, or it no longer exists"
         )
-    elif status in (401, 403):
+    elif status == 401:
+        # Authentication, not permission: found live with an `az login` user from another tenant.
+        text = (
+            f"cannot export {label}: Fabric rejected the token (HTTP 401) -- it is for a different "
+            "tenant than the workspace, expired, or the tenant does not yet let service principals "
+            "use Fabric APIs. Check which identity `fab-test auth status` reports; sign in "
+            "with `az login --tenant <tenant-id>`, or set FABRIC_TENANT_ID for a service principal"
+        )
+    elif status == 403:
         text = (
             f"cannot export {label}: this identity may not read its definition "
             f"(HTTP {status}); it needs read access plus Fabric API access. "
@@ -311,8 +322,26 @@ def export_for_analyzer(name: str, args: argparse.Namespace, output_dir: Path) -
     """Return the exported artifact paths ``name`` should analyze.
 
     Raises `ServiceExportError` carrying the exit code. Each deployed item
-    is exported once per run, however many analyzers read it.
+    is exported once per run, however many analyzers read it. What it
+    returns is recorded for `service_row_stems`, so `all`'s summary names
+    these items rather than rediscovering the local checkout.
     """
+    paths = _export_for_analyzer(name, args, output_dir)
+    args.__dict__.setdefault("_service_items", {})[name] = [path.stem for path in paths]
+    return paths
+
+
+def service_row_stems(name: str, args: argparse.Namespace) -> list[str] | None:
+    """The items a service run handled for ``name`` -- analyzed, then failed to export.
+
+    None outside a service run, where the summary discovers the checkout as before.
+    """
+    if not is_service_run(name, args):
+        return None
+    return getattr(args, "_service_items", {}).get(name, []) + getattr(args, "_export_failed", {}).get(name, [])
+
+
+def _export_for_analyzer(name: str, args: argparse.Namespace, output_dir: Path) -> list[Path]:
     mode: ResolvedMode = args.resolved_mode
     if getattr(args, "dry_run", False):
         planned = _dry_run_paths(name, args, mode)
@@ -331,24 +360,49 @@ def export_for_analyzer(name: str, args: argparse.Namespace, output_dir: Path) -
 
     _announce_credential(args, client)
     rest = FabricRestClient(FabricToken(client.access_token))
-    # None marks a PBIR-Legacy report: exported once, never analyzed.
-    cache: dict[tuple[str, str], Path | None] = args.__dict__.setdefault("_export_cache", {})
-    artifacts: list[Path] = []
-    skipped: list[str] = args.__dict__.setdefault("_export_skipped", {}).setdefault(name, [])
-    for item in items:
-        key = (workspace_id, item["id"])
-        if key not in cache:
-            cache[key] = _export_item(rest, item, name, args, output_dir, workspace_id)
-        if cache[key] is None:
-            skipped.append(f"{item['displayName']}.{item_type}")
-        else:
-            artifacts.append(cache[key])
+    artifacts, skipped = _export_items(rest, items, name, args, output_dir, workspace_id)
     if skipped and not artifacts:
         raise ServiceExportError(f"nothing to test: {', '.join(skipped)} -- {_LEGACY_REASON}", 1)
     output_format = getattr(args, "output_format", "text")
     for label in skipped:
         narrate(f"  ⏭ {label} skipped -- {_LEGACY_REASON}", output_format=output_format)
     return sorted(artifacts)
+
+
+def _export_items(
+    rest: Any, items: list[dict[str, Any]], name: str, args: argparse.Namespace, output_dir: Path, workspace_id: str
+) -> tuple[list[Path], list[str]]:
+    """Export each item, returning what to analyze and the PBIR-Legacy reports skipped.
+
+    One item that cannot be exported fails that item, not the analyzer: it is
+    named, recorded for `service_skip_exit`, and the rest still run. Only when
+    nothing could be exported does its error stop the analyzer.
+    """
+    item_type = SERVICE_ITEM_TYPES[name]
+    # None marks a PBIR-Legacy report: exported once, never analyzed.
+    cache: dict[tuple[str, str], Path | None] = args.__dict__.setdefault("_export_cache", {})
+    artifacts: list[Path] = []
+    skipped: list[str] = args.__dict__.setdefault("_export_skipped", {}).setdefault(name, [])
+    failed: list[str] = args.__dict__.setdefault("_export_failed", {}).setdefault(name, [])
+    errors: list[ServiceExportError] = []
+    for item in items:
+        key = (workspace_id, item["id"])
+        if key not in cache:
+            try:
+                cache[key] = _export_item(rest, item, name, args, output_dir, workspace_id)
+            except ServiceExportError as exc:
+                errors.append(exc)
+                failed.append(item["displayName"])
+                continue
+        if cache[key] is None:
+            skipped.append(f"{item['displayName']}.{item_type}")
+        else:
+            artifacts.append(cache[key])
+    if errors and not artifacts and not skipped:
+        raise errors[0]  # the caller names it; nothing else ran
+    for exc in errors:
+        narrate(f"  ✗ fab-test {name}: {exc}", output_format=getattr(args, "output_format", "text"))
+    return artifacts, skipped
 
 
 def _list_items(
@@ -403,12 +457,15 @@ def _export_item(
     parts = _fetch_definition(rest, args, workspace_id, item, item_type)
     if any(part["path"] == "report.json" for part in parts):
         return None
-    root = output_dir / name / _safe(args.resolved_mode.workspace or workspace_id) / _safe(item["displayName"])
+    # Shared by every analyzer that reads it, and a run targets one workspace,
+    # so neither is a folder: PBIR's nested visuals already crowd Windows'
+    # 260-character limit. The item ID keeps two same-named items apart.
+    root = output_dir / "export" / _safe(item["id"])[:8]
     if output_dir.resolve() not in root.resolve().parents:
         raise ServiceExportError(f"refusing export path outside {output_dir}", 1)
     args.__dict__.setdefault("_export_roots", []).append(root)
     try:
-        return _write_parts(parts, root / "export", item_type, item["displayName"])
+        return _write_parts(parts, root, item_type, item["displayName"])
     except OSError as exc:
         raise _write_failure(exc, f"{item['displayName']}.{item_type}") from exc
 
@@ -420,18 +477,22 @@ def _write_failure(exc: OSError, label: str) -> ServiceExportError:
     crosses Windows' 260-character limit (WinError 206) under a deep output dir.
     """
     text = f"cannot write the export of {label} to {exc.filename}: {exc.strerror}"
-    if exc.errno == errno.ENAMETOOLONG or getattr(exc, "winerror", None) == _WINDOWS_PATH_TOO_LONG:
+    # Windows also reports an over-long path as "not found" when a parent could not be created.
+    too_long = len(str(Path(exc.filename or "").absolute())) >= _WINDOWS_MAX_PATH or exc.errno == errno.ENAMETOOLONG
+    if too_long or getattr(exc, "winerror", None) == _WINDOWS_PATH_TOO_LONG:
         text += "; the path is too long -- pass a shorter --output-dir or enable Windows long-path support"
     return ServiceExportError(text, 1)
 
 
 def service_skip_exit(name: str, args: argparse.Namespace) -> int:
-    """1 when this run skipped a report ``name`` should have tested, else 0.
+    """1 when this run skipped or failed to export an item ``name`` should have tested, else 0.
 
-    A skipped report was never tested, so the run cannot claim every
+    An item never analyzed was never tested, so the run cannot claim every
     artifact passed.
     """
-    return 1 if getattr(args, "_export_skipped", {}).get(name) else 0
+    if getattr(args, "_export_skipped", {}).get(name) or getattr(args, "_export_failed", {}).get(name):
+        return 1
+    return 0
 
 
 def _announce_credential(args: argparse.Namespace, client: Any) -> None:
@@ -460,9 +521,8 @@ def finalize_exports(args: argparse.Namespace) -> None:
     for root in roots:
         if not getattr(args, "keep_export", False):
             shutil.rmtree(root, ignore_errors=True)
-            for parent in (root.parent, root.parent.parent):
-                with contextlib.suppress(OSError):
-                    parent.rmdir()
+            with contextlib.suppress(OSError):
+                root.parent.rmdir()  # the shared export/ folder, once empty
             continue
         for path in root.rglob("*"):
             if path.is_symlink() or not path.is_file():

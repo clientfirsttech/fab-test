@@ -89,9 +89,8 @@ def run_prompt_lint(args: argparse.Namespace) -> int:
     artifact_path = validate_path(args.artifact_path, "Artifact path")
 
     _env_out = envelope_path("prompt_lint", artifact_path.stem)
-    _nat_out = native_output_path("prompt_lint", artifact_path.stem, "json")
     output_path = Path(args.output_path) if args.output_path else _env_out
-    nat_out = _nat_out
+    nat_out = native_output_path("prompt_lint", artifact_path.stem, "json", beside=output_path)
 
     level = _verbosity()
     if level >= _VERBOSITY_LEVELS["default"]:

@@ -1,6 +1,6 @@
 # Playwright Changed-Since Epic
 
-**Status**: 🔄 IN-PROGRESS
+**Status**: ✅ COMPLETED 2026-10-09 (1.9.0b10; quality gates passed: full suite, 89.22% coverage, ruff, ratchets; paginated follow-up live-verified)
 **Goal**: Let `fab-test playwright --workspace WS --changed-since REF` validate only the deployed reports affected by what changed since a Git ref, and retire `playwright-impact` as a separate command
 
 ## Overview
@@ -31,4 +31,13 @@ Validating every deployed report after a one-model change wastes the run; valida
 ## Follow-up: Paginated Reports In Impact
 
 **Requirements**:
-- Given a changed `.PaginatedReport` or `.rdl`, should validate that deployed paginated report; today the impact step only follows semantic models and interactive reports, so a changed paginated report reports "no Playwright impact"
+- Given a changed `.PaginatedReport` or `.rdl`, should validate that deployed paginated report ✅
+
+**Done 2026-10-08** (1.9.0b10). Three gaps, each with a test: `group_changes_by_artifact` now counts a loose `.rdl` as a `PaginatedReport` (artifact-map.json can't, since every suffix it declares is a folder); `_normalize_name` strips `.PaginatedReport` and `.rdl` so the changed name matches the deployed display name; `build_impact_manifest` resolves a `PaginatedReport` as paginated, and `ImpactEntry.report_type` carries that through to `REPORT_TYPES_ATTR` and to `--impact-manifest`'s loader, which previously rebuilt every entry as interactive.
+
+Not covered, recorded for later: a paginated report reached as a *dependent* of a changed semantic model is still typed `report`, because `FabricRestClient.get_dependent_reports` hardcodes `"type": "Report"` instead of reading the Power BI `reportType`. That lookup is shared with `--dataset-id`/`--dataset-workspace-id`, so fixing it belongs with those callers, not here.
+
+## Quality gates
+
+**Requirements**:
+- Given the finished epic, should pass `ruff check .` over the whole repo, the complexity and module-budget ratchets, and the coverage floor on the full suite, run as CI runs them (vision.md, Definition of Done)

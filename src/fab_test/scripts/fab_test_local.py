@@ -195,5 +195,7 @@ def _run_local(args: argparse.Namespace) -> int:
     manifest.telemetry_error = _close_telemetry(telemetry, args)
     manifest.write(output_dir, exit_code)
     if output_format == "json":
+        for entry in results:  # each analyzer's per-artifact rows, which no longer print separately
+            entry["artifacts"] = getattr(args, "_json_rows", {}).get(entry["analyzer"], [])
         print(json.dumps({"analyzer": "local", "results": results, "exit_code": exit_code}, indent=2))
     return exit_code

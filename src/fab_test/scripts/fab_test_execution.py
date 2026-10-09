@@ -333,6 +333,7 @@ def _emit_process_output(
     *,
     mute: bool = False,
     collapse: bool = False,
+    said: str = "",  # the envelope's message: the wrapper's result annotation repeats it exactly
 ) -> None:
     """Re-narrate stdout (if captured) and stderr from a finished analyzer run.
 
@@ -350,7 +351,7 @@ def _emit_process_output(
             # stripped prefix is a lost annotation.
             print(proc.stderr, end="", file=sys.stderr)
         else:
-            _reemit_lines(proc.stderr, output_format, ctx.seen_stderr if collapse else None)
+            _reemit_lines(proc.stderr, output_format, ctx.seen_stderr if collapse else {said})
 
 
 def _load_artifact_envelope(
@@ -467,14 +468,13 @@ def _run_one_artifact(
         return result
     proc = result
 
-    # Read the envelope and apply the error/warning threshold ourselves so
-    # warnings never fail the build.
+    # Read the envelope and apply the error/warning threshold ourselves: warnings never fail the build.
     envelope, aborted = _load_artifact_envelope(output_dir, name, artifact, proc.returncode)
-    # A nonzero exit with no findings at all -- no envelope, or a stale clean
-    # one from an earlier run -- has only its own output to say what went wrong.
+    # A nonzero exit with no findings (no envelope, or a stale clean one) has only its own output to explain it.
     unexplained = proc.returncode != 0 and not envelope.get("findings")
     _emit_process_output(
-        proc, capture_stdout, ctx, output_format, mute=quiet and not unexplained, collapse=unexplained
+        proc, capture_stdout, ctx, output_format, mute=quiet and not unexplained, collapse=unexplained,
+        said=envelope.get("message", ""),
     )
     artifact_code = _finalize_artifact_run(name, artifact, args, ctx, proc, envelope, aborted, output_dir)
     return (artifact.stem, artifact_code)

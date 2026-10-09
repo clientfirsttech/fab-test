@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
@@ -82,9 +83,9 @@ def emit_workflow_annotations(envelope: dict[str, Any]) -> None:
         sev = finding.get("severity") or finding.get("Severity")
         message = _format_finding_message(finding, analyzer)
         if _is_error_severity(sev):
-            print(f"::error::{message}")
+            print(f"::error::{message}", file=sys.stderr)
         elif _is_warning_severity(sev):
-            print(f"::warning::{message}")
+            print(f"::warning::{message}", file=sys.stderr)
 
 
 def _post_pr_review_comment(context: dict[str, str], body: str) -> bool:
@@ -94,7 +95,7 @@ def _post_pr_review_comment(context: dict[str, str], body: str) -> bool:
         f"issues/{context['pr_number']}/comments"
     )
     if urlsplit(url).scheme != "https":
-        print(f"::warning::Refusing to post to a non-HTTPS API URL: {url}")
+        print(f"::warning::Refusing to post to a non-HTTPS API URL: {url}", file=sys.stderr)
         return False
     payload = json.dumps({"body": body}).encode("utf-8")
     request = Request(  # noqa: S310 - scheme checked above
@@ -112,7 +113,7 @@ def _post_pr_review_comment(context: dict[str, str], body: str) -> bool:
         with urlopen(request, timeout=30) as response:  # noqa: S310 - scheme checked above
             return response.status == 201
     except Exception as exc:  # noqa: BLE001 - PR commenting is best-effort, never fatal
-        print(f"::warning::Could not post PR review comment: {exc}")
+        print(f"::warning::Could not post PR review comment: {exc}", file=sys.stderr)
         return False
 
 

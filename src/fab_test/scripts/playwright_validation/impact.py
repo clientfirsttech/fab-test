@@ -32,6 +32,7 @@ class ImpactEntry:
     semantic_model_id: str
     environment: str
     reasons: list[str] = field(default_factory=list)
+    report_type: str = "report"
 
     def to_dict(self) -> dict[str, Any]:
         """Return a JSON-serializable dictionary."""
@@ -62,6 +63,7 @@ class ImpactManifest:
                     semantic_model_id=existing.semantic_model_id,
                     environment=existing.environment,
                     reasons=[*existing.reasons, reason],
+                    report_type=existing.report_type,
                 )
         else:
             self._reports[key] = ImpactEntry(
@@ -71,6 +73,7 @@ class ImpactManifest:
                 semantic_model_id=report.semantic_model_id,
                 environment=report.environment,
                 reasons=[reason],
+                report_type=report.report_type,
             )
 
     def skip_artifact(self, name: str, artifact_type: str, reason: str = "no Playwright impact") -> None:
@@ -165,6 +168,9 @@ def build_impact_manifest(
             elif artifact_type == "Report":
                 report = resolve_report(name, resolved_env, client)
                 manifest.add_report(report, f"changed report {name}")
+            elif artifact_type == "PaginatedReport":
+                report = resolve_report(name, resolved_env, client, report_type="paginated")
+                manifest.add_report(report, f"changed paginated report {name}")
             else:
                 manifest.skip_artifact(name, artifact_type)
         except ItemNotFoundError:

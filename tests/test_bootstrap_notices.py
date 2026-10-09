@@ -58,7 +58,7 @@ def test_a_local_download_says_what_it_is_doing_without_the_workflow_prefix(tmp_
     metadata, repo_root = _downloadable_tool(tmp_path, monkeypatch)
 
     resolve_executable("pbir_inspector", metadata, repo_root)
-    out = capsys.readouterr().out
+    out = capsys.readouterr().err  # notes go to stderr, never stdout
 
     assert "::notice::" not in out
     assert "pbir_inspector: executable not found; downloading" in out
@@ -73,7 +73,7 @@ def test_a_ci_download_keeps_the_workflow_command(variable, tmp_path, monkeypatc
     metadata, repo_root = _downloadable_tool(tmp_path, monkeypatch)
 
     resolve_executable("pbir_inspector", metadata, repo_root)
-    out = capsys.readouterr().out
+    out = capsys.readouterr().err
 
     assert "::notice::pbir_inspector: executable not found; downloading" in out
     assert "::notice::pbir_inspector: resolved executable at" in out
@@ -86,4 +86,4 @@ def test_notice_formats_by_environment(monkeypatch, capsys):
     monkeypatch.setenv("CI", "1")
     _notice("hello")
 
-    assert capsys.readouterr().out.splitlines() == ["hello", "::notice::hello"]
+    assert capsys.readouterr().err.splitlines() == ["hello", "::notice::hello"]

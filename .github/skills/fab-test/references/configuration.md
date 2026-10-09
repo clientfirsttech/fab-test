@@ -167,6 +167,13 @@ An overlay naming a rule ID that doesn't exist upstream exits `2` listing every 
 
 Two of `rdl`'s rules read a threshold from their own catalog entry instead of a fixed constant — `QRY-07.max_lines` (default `50`, long `CommandText`) and `SUB-02.max_subreports` (default `49`, so `50` fails per the rule's own name). Neither `disable`/`severity`/`extend` can change one (`extend` only appends new rule objects, it never replaces an existing ID's fields) — to change a threshold, pass `--rdl-rules-path` at a fully custom copy of the catalog with that one field edited; there's no config-file way to override just the threshold today.
 
+**Writing a PBIR Inspector rule** -- in an `extend` file or a fully custom `--rules-path` file -- has two traps, both found in fab-test's own filter-pane rules and invisible until the rule runs:
+
+- **The expected value must be the type the test returns.** A rule's `test` is `[logic, data mapping, expected]`, and it passes only when the logic's result equals `expected`. A boolean test (`if`, `some`, `<=`) needs `true`; a test that `map`s offending items to names needs `[]`. A boolean compared with `[]` fails every item, and the fix is the expected value, not the logic.
+- **A non-empty data mapping replaces what the logic sees.** With `{"x": "/some/pointer"}` as the mapping, the logic can read `x` and nothing else from the part -- a visual's `filterConfig` reads as null. Use `{}` when the logic reads the part directly, and map only what it needs.
+
+A JSON pointer in the mapping resolves against the rule's `part`: `/objects/outspacePane/...` (the filter pane) exists in `report.json`, so a rule needing it uses `"part": "Report"` and reaches visuals through a nested `{"part": "Visuals"}`, as `NO_VISUAL_LEVEL_FILTERS_VISIBLE_IN_FILTER_PANEL` does. Check a new rule against a fixture with PBIR Inspector before relying on it: `fab-test pbir REPORT --rules-path my-rules.json`, then read `native.json/*.json` for each result's `Actual`.
+
 The full schema ships with the package at `schemas/fab-test.schema.json` (draft 2020-12) for editor completion.
 
 ## Metadata files and where they come from

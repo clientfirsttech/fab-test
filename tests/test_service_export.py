@@ -156,7 +156,10 @@ def test_given_dry_run_with_typed_target_should_not_touch_the_service(monkeypatc
     assert svc.export_for_analyzer("bpa", args, tmp_path) == [Path("Dev/Sales.SemanticModel")]
 
 
-@pytest.mark.parametrize("status,needle", [(404, "enhanced/Git-integration"), (403, "fab-test auth status")])
+@pytest.mark.parametrize(
+    "status,needle",
+    [(404, "enhanced/Git-integration"), (403, "may not read"), (401, "rejected the token.*az login --tenant")],
+)
 def test_given_getdefinition_failure_should_name_a_remediation(fake, tmp_path, monkeypatch, status, needle):
     client, _ = fake
     client.items = [{"id": "m1", "displayName": "Sales"}]

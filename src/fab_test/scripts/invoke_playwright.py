@@ -38,6 +38,8 @@ from .playwright_validation.config import (
 )
 from .playwright_validation.discovery import (
     acquire_embed_configs,
+    apply_coverage_limits,
+    log,
     resolve_discovery,
     resolve_paginated_plan,
 )
@@ -95,11 +97,6 @@ def _spec_path() -> Path:
 
 # Default output location for test-case CSV/JSON artifacts.
 _DEFAULT_TEST_CASES_DIR = Path("fab-test-results") / "playwright" / "test-cases"
-
-
-def log(message: str) -> None:
-    """Print a GitHub Actions-friendly message."""
-    print(message)
 
 
 def log_error(message: str) -> None:
@@ -527,8 +524,6 @@ def _build_config_from_args(
 
 def _load_impact_manifest(path: Path) -> list[ResolvedReport]:
     """Load reports from an impact manifest JSON."""
-    import json
-
     with open(path, encoding="utf-8") as fh:
         data = json.load(fh)
     return [
@@ -538,6 +533,7 @@ def _load_impact_manifest(path: Path) -> list[ResolvedReport]:
             report_name=report["report_name"],
             semantic_model_id=report["semantic_model_id"],
             environment=report.get("environment", ""),
+            report_type=report.get("report_type", "report"),
         )
         for report in data.get("reports", [])
     ]
@@ -891,7 +887,6 @@ def _run_single_report(
         else f"Playwright visual validation failed: {len(cases)} cases"
     )
 
-    # Parse pytest summary for additional context.
     summary = _parse_pytest_summary(proc.stdout or "")
     if summary:
         message += f" ({summary})"
@@ -916,6 +911,7 @@ def _run_single_report(
         duration_ms=timer.elapsed_ms,
     )
     env_out["test_results"] = test_results
+    apply_coverage_limits(env_out, str(report_name))  # a lookup that failed narrows a pass to a warning
     _write_playwright_envelope(output_path, env_out)
 
     log(message)

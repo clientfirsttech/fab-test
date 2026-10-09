@@ -47,6 +47,8 @@ fab-test local              # run it
 fab-test local --format json
 ```
 
+`--format json` prints exactly one document: `{"analyzer": "local", "results": [...], "exit_code": N}`, where each analyzer that ran has an `artifacts` list with one row per artifact (`artifact`, `status`, `errors`, `warnings`, `output_path`, `report_path`) -- the same rows a single-analyzer run prints. `fab-test all --format json` likewise prints only its aggregate.
+
 A missing prerequisite (`pqlint` not installed, Tabular Editor/PBIR Inspector not resolved) is reported as **skipped** with a remediation hint — it never fails the run. Exit code `1` only means a real finding, never a missing tool. `pql-test` is always ready (it's a pinned `fab-test` dependency); if a Desktop instance has the project's `.pbip` open, `pql-test`'s envelope records a `desktop` field naming the port and model it bound to (see `pql-test` below and the run manifest section in the main SKILL.md's Agent Contract for the full shape).
 
 Discovery walks `--artifact-dir` recursively — see [Discovery](targeting-and-discovery.md#discovery) for the rules, which are the same for every subcommand.
@@ -179,7 +181,7 @@ Playwright validation can run in three modes: static `.env` mode, service-resolv
 | `--dataset-id ID` | Dataset / semantic-model ID. With `--artifact`, overrides that report's binding; with no report named, tests every report built on this dataset (see below) |
 | `--dataset-workspace-id ID` | Workspace ID the dataset lives in, when different from the report's own workspace [env: `PLAYWRIGHT_DATASET_WORKSPACE_ID`] |
 | `--report-type {report,paginated}` | Force the report type instead of auto-detecting it [env: `PLAYWRIGHT_REPORT_TYPE`] |
-| `--changed-since REF` | With `--workspace`, validate only the deployed reports built on a semantic model changed since this Git branch, tag or commit, or themselves changed — committed, uncommitted or new. Needs Git only when used |
+| `--changed-since REF` | With `--workspace`, validate only the deployed reports built on a semantic model changed since this Git branch, tag or commit, or themselves changed (interactive, or paginated via a `.PaginatedReport` folder or loose `.rdl`) — committed, uncommitted or new. Needs Git only when used |
 | `--pages {auto,none}` | Discover every report page and its own bookmarks (default: `auto`); `none` tests only the default page |
 | `--roles {auto,none}` | Discover RLS/OLS roles from the semantic model and test the page matrix under each one whenever RLS is in play — `PLAYWRIGHT_USE_RLS`, **or** an effective-identity user being configured at all (default: `auto`); `none` tests only `PLAYWRIGHT_ROLE` |
 | `--user-name UPN` | Effective-identity user for RLS embed tokens. Outranks `PLAYWRIGHT_USER_NAME`, which outranks `playwright_user_name` in `fab-test.yml` |
@@ -485,6 +487,17 @@ fab-test playwright --workspace-id c4698d28-b05c-40bc-926c-707563ac85e7
 fab-test playwright --workspace "Sales Dev" --artifact-dir .
 ```
 
+**What a workspace run discovers without a checkout.** Pages and bookmarks
+come from the deployed report, RLS roles from the semantic model over XMLA,
+and a paginated report's parameters from its deployed definition (valid
+values through the model's `executeQueries`) -- the same matrix a checkout
+produces. Each lookup is best-effort: when one fails, the report is still
+rendered with one role or no parameters, and its envelope gains a
+warning-level `coverage_limited` finding naming the fix (`--roles none` or
+`SemanticModel.Read.All`; `--artifact-dir` with the local `.rdl`; the
+"Dataset Execute Queries REST API" tenant setting). The status is `warning`
+instead of `passed`; the exit code is unchanged.
+
 **`--dataset-workspace-id` alone -- no `--dataset-id`, `--artifact`, target, or
 `--changed-since` -- means every dataset in that workspace.** Every
 semantic model in the workspace is listed live, and each one's own dependent
@@ -599,7 +612,7 @@ No Report matching 'ThinReport' in workspace 33333333-3333-3333-3333-33333333333
 Closest candidates: Sales Report, Marketing Report, and 3 more.
 ```
 
-Changed-since mode validates only the deployed reports a change touches. Git lists the Fabric artifacts changed since REF (against the merge base, so the working tree's uncommitted and untracked changes count too); Fabric lists the deployed reports in the workspace built on those semantic models, or that are those reports. Only those run:
+Changed-since mode validates only the deployed reports a change touches. Git lists the Fabric artifacts changed since REF (against the merge base, so the working tree's uncommitted and untracked changes count too); Fabric lists the deployed reports in the workspace built on those semantic models, or that are those reports. A changed `.PaginatedReport` folder or loose `.rdl` file is that deployed paginated report, rendered as paginated. Only those run:
 
 ```bash
 fab-test playwright --workspace "Sales Dev" --changed-since main
@@ -607,7 +620,7 @@ fab-test playwright --workspace "Sales Dev" --changed-since main
 
 It prints `mode=service workspace=Sales Dev source=flag`. Without `--workspace`, or with a ref Git cannot resolve, it exits `2` before any network call. When nothing changed, or no deployed report uses what changed, it says so and exits `0`. A changed artifact is matched to the deployed item by display name, so a renamed item shows no impact.
 
-Browser setup -- the pytest packages a run launches (`pytest`, `pytest-playwright`, `pytest-html`, `pytest-xdist`) are the `playwright` extra, not base dependencies. A run without them aborts before any embed token is minted, with an error naming the missing packages and the install command:
+Browser setup -- the pytest packages a run launches (`pytest`, `pytest-playwright`, `pytest-html`, `pytest-xdist`) are the `playwright` extra, not base dependencies. A run without them stops before any embed token is minted and exits `127` -- a setup problem, like any missing tool, never a failed render -- naming the missing packages and the install command; `doctor` reports playwright not ready for the same reason, and `--plan-only` still works without them:
 
 ```bash
 pip install "cft-fab-test[playwright]"
@@ -661,6 +674,6 @@ After all analyzers finish, `fab-test all` prints an aggregate summary table sho
 | Flag | Meaning |
 |------|---------|
 | `--workspace NAME_OR_ID` (aliases `--workspace-id`, `--from-workspace`) | With no TARGET, pure service mode over every deployed item of the analyzer's type |
-| `--keep-export` | Keep exported definitions under `fab-test-results/<analyzer>/<workspace>/<item>/export/` (redacted); default is delete after the run |
+| `--keep-export` | Keep exported definitions under `fab-test-results/export/<first 8 characters of the item ID>/<Item>.<Type>/` (redacted), shared by every analyzer that read them; default is delete after the run |
 | `--all` | Proceed when a workspace enumeration matches more than 50 items |
 | `--interactive` | Browser sign-in, in memory only; never in CI; gated by the `interactive_auth` flag |

@@ -1,6 +1,6 @@
 # Playwright CI Guide Epic
 
-**Status**: 🔄 IN-PROGRESS (all 8 planned tasks done; live-verifying the RLS role-discovery fix end-to-end against real RLSTest* datasets before closing the epic)
+**Status**: ✅ COMPLETED 2026-10-08 (all 8 tasks done; RLS role discovery re-verified live on current `dev` by demo run 37871985133)
 **Goal**: Give a team a documented, copy-ready GitHub Actions path from "no service principal" to a green `fab-test playwright` run against their own Fabric workspace.
 
 ## Overview
@@ -131,7 +131,7 @@ The obvious portable fix -- the Power BI REST `executeQueries` API running `EVAL
 **Requirements**:
 - Given a non-PBIP-enabled semantic model with RLS roles, should discover them, or should log a distinguishable warning (not silent `[]`) when discovery is genuinely not possible, so "no roles" and "couldn't check" never look the same in a doctor/CI run. ✅ `_discover_roles_via_xmla` raises `ServiceClientError` on failure, routing through `discovery.py`'s existing `::warning::` path.
 - Given whichever approach is chosen, should not require a Windows-only runtime on the demo workflow's Linux container, since that's where this gap was actually found. ✅ confirmed live, `net8.0` + `PYTHONNET_RUNTIME=coreclr`, no `setup-dotnet` step needed.
-- Given `generate_embed_token`'s `use_rls and user_name and role` guard, should only be revisited once discovery can actually return correct role names for these datasets -- loosening it before that (tried and reverted once already) breaks every non-RLS dataset instead. Not revisited in this task; now that discovery can return real role names for `RLSTest*`, the existing guard should be satisfied without changing it -- confirm with a live re-dispatch before considering this fully closed.
+- Given `generate_embed_token`'s `use_rls and user_name and role` guard, should only be revisited once discovery can actually return correct role names for these datasets -- loosening it before that (tried and reverted once already) breaks every non-RLS dataset instead. Not revisited in this task; now that discovery can return real role names for `RLSTest*`, the existing guard should be satisfied without changing it -- confirm with a live re-dispatch before considering this fully closed. ✅ Confirmed 2026-10-08 by demo run [37871985133](https://github.com/clientfirsttech/fab-test/actions/runs/37871985133) on `042dfc7` (after `c4bd895` changed RLS user handling): `Team_A`/`Team_B` discovered on all three `RLSTest*` datasets and every role got an embed token. The run's failures were only the intentional broken reports plus an `InvalidUnconstrainedJoin` visual on page `0e66…` of the `RLSTest*` reports -- a genuine report defect, correctly reported.
 - Given the downloaded ADOMD.NET NuGet package's zip archive, should refuse to write any member whose resolved path falls outside the cache directory, so a compromised or malformed package cannot write outside `~/.fab-test/adomd/...` (zip slip, CWE-22) — flagged in AIDD review 2026-09-28. ✅ fixed: `_download_adomd` now resolves each member's destination and raises `OSError` (wrapped into `XmlaQueryError` by `_ensure_adomd_loaded`, same as any other download failure) if it would land outside `cache`.
 
 ---

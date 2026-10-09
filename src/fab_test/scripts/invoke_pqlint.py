@@ -159,7 +159,7 @@ def run_pqlint(args: argparse.Namespace) -> int:
     output_path = (
         Path(args.output_path) if args.output_path else envelope_path("pqlint", artifact_path.stem)
     )
-    nat_out = native_output_path("pqlint", artifact_path.stem, "json")
+    nat_out = native_output_path("pqlint", artifact_path.stem, "json", beside=output_path)
 
     level = _verbosity()
     _log_pqlint_header(level, artifact_path, output_path, nat_out)

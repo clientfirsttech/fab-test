@@ -16,7 +16,7 @@ every command in this README are unchanged.
 
 ### From PyPI (beta)
 
-The current release is the beta `1.9.0b9`. pip skips pre-releases unless you
+The current release is the beta `1.9.0b10`. pip skips pre-releases unless you
 pass `--pre` or name the version, so a bare `pip install cft-fab-test` finds
 nothing until the first final release.
 
@@ -24,7 +24,7 @@ nothing until the first final release.
 python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
 
-pip install --pre cft-fab-test          # or pin it: "cft-fab-test==1.9.0b9"
+pip install --pre cft-fab-test          # or pin it: "cft-fab-test==1.9.0b10"
 
 fab-test --version
 ```
@@ -311,10 +311,21 @@ keeps today's repository discovery:
 fab-test playwright --workspace "Sales Dev"
 ```
 
+To keep the repository as the denominator while naming the workspace -- the
+behavior `--workspace-id` had before it became an alias -- pass the folder
+explicitly: `fab-test playwright --workspace "Sales Dev" --artifact-dir .`.
+
+A workspace run discovers pages, bookmarks, RLS roles, and paginated
+parameters from the service, so it covers what a checkout would. When one of
+those lookups fails, the report is still rendered with one role or no
+parameters, and its result reads `warning` (a `coverage_limited` finding that
+names the fix) rather than `passed`; the exit code is unchanged.
+
 Add `--changed-since REF` to test only the deployed reports your change
 touches: the reports built on a semantic model changed since that Git branch,
-tag or commit, or the reports themselves. Uncommitted and new artifact folders
-count. Nothing changed, or nothing deployed affected, exits 0:
+tag or commit, or the reports themselves -- interactive or paginated (a changed
+`.PaginatedReport` folder or loose `.rdl` file). Uncommitted and new artifact
+folders count. Nothing changed, or nothing deployed affected, exits 0:
 
 ```bash
 fab-test playwright --workspace "Sales Dev" --changed-since main
@@ -486,6 +497,26 @@ fab-test all local/Sales                                  # everything that can 
 ```
 
 Not every analyzer accepts every form. Run `fab-test list` for the Scopes column, and see the [targeting reference](https://github.com/clientfirsttech/fab-test/blob/main/.github/skills/fab-test/references/targeting-and-discovery.md#targeting) for the rules. `--artifact STEM` still works as a deprecated alias.
+
+### Testing what's deployed
+
+`bpa`, `pbir`, `a11y`, and `rdl` can test what is deployed in a workspace instead of what is on disk. They export each item's definition read-only, analyze it like a local folder, and delete the export afterwards. `pql-test` connects to the deployed model directly and downloads nothing.
+
+```bash
+fab-test bpa "Sales Dev.Workspace/Sales.SemanticModel"   # one deployed model
+fab-test bpa "Sales Dev.Workspace/Sales"                 # untyped: resolved as the analyzer's own type
+fab-test pbir --workspace "Sales Dev"                    # every deployed report; local folders are ignored
+fab-test all --workspace "Sales Dev"                     # bpa, pbir, pql-test and rdl over deployed items
+```
+
+The target decides the mode, and every run says which it chose on its first line: `mode=service workspace=Sales Dev source=target`. `workspace:` in `fab-test.yml` and `FABRIC_WORKSPACE_ID` only supply a default; they never turn a bare `fab-test bpa` into a service run.
+
+- **Credentials** come from the chain under [Credentials](#credentials): a service principal, then an ambient `az login`. A rejected token (HTTP 401) names `az login --tenant`; a missing permission (403) names the access the identity needs.
+- **`--keep-export`** keeps the redacted definitions under `fab-test-results/export/<item id>/<Item>.<Type>/` instead of deleting them.
+- **More than 50 items** of one type stops with exit `2` naming `--all`; pass `--all` to proceed.
+- **One item that cannot be exported** (a PBIR-Legacy report, a missing permission) is named and fails the run; the others are still tested.
+
+For CI, copy [docs/examples/github-actions/service-mode.yml](https://github.com/clientfirsttech/fab-test/blob/main/docs/examples/github-actions/service-mode.yml).
 
 ### Credentials
 

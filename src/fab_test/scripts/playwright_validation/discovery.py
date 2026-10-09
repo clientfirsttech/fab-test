@@ -12,6 +12,8 @@ from __future__ import annotations
 import argparse
 import dataclasses
 import json
+import os
+import re
 from typing import Any
 
 from .config import PlaywrightValidationConfig
@@ -22,10 +24,42 @@ from .rdl_datasource import RdlReportParameter, parse_rdl_report_parameters_text
 from .service_client import FabricRestClient, FabricToken, ServiceClientError
 from .test_cases import DiscoveredBookmark, DiscoveredPage
 
+_WORKFLOW_PREFIX = re.compile(r"^::(?:notice|warning)::")
+
 
 def log(message: str) -> None:
-    """Print a GitHub Actions-friendly message."""
-    print(message)
+    """Print a progress line, with its ``::notice::``/``::warning::`` prefix only in CI.
+
+    fab-test hands the wrapper its terminal under ``--format text``, so the
+    prefix used to reach a laptop verbatim. CI is the parent's definition
+    (``GITHUB_ACTIONS`` or ``CI``), so the two never disagree.
+    """
+    in_ci = os.environ.get("GITHUB_ACTIONS") or os.environ.get("CI")
+    print(message if in_ci else _WORKFLOW_PREFIX.sub("", message))
+
+
+# What the current report's discovery could not cover. Discovery is
+# best-effort -- a failed lookup still renders, with one role or no
+# parameters -- so each gap is recorded here and becomes a warning-level
+# finding, rather than a narrower run reading as a plain pass. Reset as each
+# report's discovery starts; drained when its envelope is written.
+_coverage_limits: list[str] = []
+
+
+def reset_coverage_limits() -> None:
+    """Forget the previous report's gaps."""
+    _coverage_limits.clear()
+
+
+def apply_coverage_limits(envelope: dict[str, Any], report_name: str) -> None:
+    """Add a `coverage_limited` warning per gap; a pass becomes a warning, a failure stays one."""
+    envelope["findings"] = list(envelope.get("findings") or []) + [
+        {"rule": "coverage_limited", "severity": "warning", "object": report_name, "message": gap}
+        for gap in _coverage_limits
+    ]
+    if _coverage_limits and envelope.get("status") == "passed":
+        envelope["status"] = "warning"
+    _coverage_limits.clear()
 
 
 def _discover_pages(
@@ -97,6 +131,10 @@ def _discover_roles(
             "Falling back to PLAYWRIGHT_ROLE. Pass --roles none to silence "
             "this warning."
         )
+        _coverage_limits.append(
+            f"RLS roles were not discovered ({exc}), so only the configured role was tested; grant "
+            "SemanticModel.Read.All, or pass --roles none to test without roles deliberately"
+        )
         return None
     return roles or None
 
@@ -118,6 +156,7 @@ def resolve_discovery(
     page/bookmark matrix -- so both are skipped outright rather than
     discovering an empty result the hard way.
     """
+    reset_coverage_limits()  # first for every report, paginated included
     if config.report_type == "paginated":
         return None, None
 
@@ -211,6 +250,10 @@ def _declared_parameters(
         )
     except ServiceClientError as exc:
         log(f"::warning::Could not read the paginated report's definition ({exc}); testing it with no parameters.")
+        _coverage_limits.append(
+            f"the paginated report's parameters were not read ({exc}), so it was tested with none; "
+            "run with --artifact-dir pointing at its local .rdl to test its parameters"
+        )
         return []
     return parse_rdl_report_parameters_text(definition)
 
@@ -237,6 +280,10 @@ def _valid_values(
             f"::warning::Could not query valid values for parameter '{parameter.name}' "
             f"({exc}); the \"Dataset Execute Queries REST API\" tenant setting must allow "
             "the service principal. Testing the report with no parameters."
+        )
+        _coverage_limits.append(
+            f"no valid values for parameter '{parameter.name}' ({exc}), so it was tested with no parameters; "
+            'allow the service principal under the "Dataset Execute Queries REST API" tenant setting'
         )
         return []
     values: list[str] = []

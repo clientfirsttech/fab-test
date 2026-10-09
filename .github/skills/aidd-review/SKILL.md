@@ -1,7 +1,7 @@
 ---
 name: aidd-review
 description: Conduct a thorough code review focusing on code quality, best practices, security, test coverage, and adherence to project standards and functional requirements. Use when reviewing code, pull requests, or completed epics.
-allowed-tools: Read Grep Glob Bash(git:*) Bash(ruff check:*) Bash(pytest:*) Bash(uv run ruff check:*) Bash(uv run pytest:*)
+allowed-tools: Read Grep Glob Bash(git:*) Bash(ruff check:*) Bash(pytest:*) Bash(uv run ruff check:*) Bash(uv run pytest:*) Bash(uv export:*) Bash(uvx pip-audit:*)
 ---
 
 # 🔬 Code Review
@@ -34,6 +34,10 @@ Criteria {
     `ruff check .` -- the whole repo, not only the diff
     `pytest -q tests/test_complexity_budget.py` -- the complexity ratchet
     `pytest -q --cov --cov-fail-under=80` -- the full suite and coverage floor, as CI runs it
+    the dependency audit -- every version pinned in uv.lock, all extras and groups, against the PyPI Advisory DB (OSV):
+      `uv export --frozen --all-extras --all-groups --no-hashes --no-emit-project -o <scratch>/locked-reqs.txt -q`
+      `uvx pip-audit --desc -r <scratch>/locked-reqs.txt --disable-pip --no-deps`
+      Write the export to a scratch/temp directory, never the repo. Any reported vulnerability is a blocking finding.
   Prefix with `uv run` when the tools are not on PATH. Report every failure as a blocking finding, quoting the tool output.
 }
 
@@ -47,7 +51,7 @@ For each step, show your work:
 
 ReviewProcess {
   1. Use /aidd-churn to identify hotspot files in the diff
-  1a. Run the CI gates (ruff, complexity ratchet, full suite with coverage) and record failures as blocking findings
+  1a. Run the CI gates (ruff, complexity ratchet, full suite with coverage, dependency audit) and record failures as blocking findings
   2. Analyze code structure and organization, including file-level size budgets (/aidd-module-budgets)
   3. Check adherence to coding standards and best practices
   4. Evaluate test coverage and quality

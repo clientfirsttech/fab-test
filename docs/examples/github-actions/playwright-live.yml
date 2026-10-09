@@ -72,7 +72,7 @@ jobs:
           # Pin the exact version: the package is cft-fab-test (the
           # command is fab-test), and the current release is a beta.
           # The [playwright] extra brings the pytest plugins a run launches.
-          pip install "cft-fab-test[playwright]==1.9.0b9"
+          pip install "cft-fab-test[playwright]==1.9.0b10"
 
       - name: Install the browser
         run: playwright install --with-deps chromium
@@ -96,6 +96,8 @@ jobs:
         run: |
           args=()
           [ -n "${{ inputs.artifact }}" ] && args+=(--artifact "${{ inputs.artifact }}")
+          # Nothing named: every report deployed in the workspace -- no checkout needed.
+          [ -z "${{ inputs.artifact }}${{ inputs.dataset_id }}${{ inputs.dataset_workspace_id }}" ] && args+=(--workspace "$FABRIC_WORKSPACE_ID")
           fab-test playwright "${args[@]}" --env dev --plan-only
           cat fab-test-results/playwright/*/test-cases/test-cases.csv
 
@@ -108,6 +110,7 @@ jobs:
           [ -n "${{ inputs.dataset_workspace_id }}" ] && args+=(--dataset-workspace-id "${{ inputs.dataset_workspace_id }}")
           [ "${{ inputs.pages }}" = "none" ] && args+=(--pages none)
           [ "${{ inputs.roles }}" = "none" ] && args+=(--roles none)
+          [ -z "${{ inputs.artifact }}${{ inputs.dataset_id }}${{ inputs.dataset_workspace_id }}" ] && args+=(--workspace "$FABRIC_WORKSPACE_ID")
           fab-test playwright "${args[@]}" --env dev --report
 
       # Always -- the failed run is the one you most want to read. Every

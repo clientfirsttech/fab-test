@@ -1,5 +1,6 @@
 """Remote connection and worker semantics for generated Python report tests."""
 
+import argparse
 import tomllib
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
@@ -245,3 +246,25 @@ def test_missing_runner_aborts_before_minting_a_token(tmp_path, monkeypatch):
     output = tmp_path / "envelope.json"
     assert invoke_playwright.main(["--env-file", ".env", "--output-path", str(output)]) == 1
     assert "need pytest" in output.read_text(encoding="utf-8")
+
+
+def test_native_reports_follow_the_envelope_without_an_execution_config(tmp_path):
+    """pytest's HTML/JUnit reports go beside the envelope, under --output-dir, for every run.
+
+    Found live (Workspace Discovery, 2026-10-09): without an execution config they
+    went to a fixed ./fab-test-results/playwright/report/ shared by every report.
+    """
+    from fab_test.scripts.playwright_validation.execution_runtime import (
+        EXECUTION_REPORT_ROOT,
+        apply_execution_environment,
+        configure_pytest_execution,
+    )
+
+    report_root = tmp_path / "out" / "playwright" / "Sales" / "report"
+    environment: dict[str, str] = {}
+    apply_execution_environment(environment, argparse.Namespace(), report_root=report_root)
+    assert environment[EXECUTION_REPORT_ROOT] == str(report_root)
+
+    command = ["pytest", "--html=old/index.html", "--junitxml=old/results.xml"]
+    configure_pytest_execution(command, environment)
+    assert command == ["pytest", f"--html={report_root / 'index.html'}", f"--junitxml={report_root / 'results.xml'}"]

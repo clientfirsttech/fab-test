@@ -83,7 +83,7 @@ class TestBuildInspectorCommand:
         inspector = tmp_path / "PBIRInspectorCLI"
         artifact = tmp_path / "SalesReport.Report"
         rules = tmp_path / "rules.json"
-        output = tmp_path / "out.json"
+        output = tmp_path / "fab-test-results" / "pbir" / "SalesReport" / "envelope.json"
         command = build_inspector_command(inspector, artifact, rules, output)
         assert command[0] == str(inspector)
         assert str(artifact) in command
@@ -257,7 +257,7 @@ class TestVerbosity:
         inspector = tmp_path / "PBIRInspectorCLI"
         inspector.write_text("fake", encoding="utf-8")
         inspector.chmod(0o755)
-        output = tmp_path / "out.json"
+        output = tmp_path / "fab-test-results" / "pbir" / "SalesReport" / "envelope.json"
         native_dir = tmp_path / "fab-test-results" / "pbir" / "SalesReport"
         native_dir.mkdir(parents=True, exist_ok=True)
         (native_dir / "native.json").write_text("[]", encoding="utf-8")
@@ -289,7 +289,7 @@ class TestVerbosity:
         inspector = tmp_path / "PBIRInspectorCLI"
         inspector.write_text("fake", encoding="utf-8")
         inspector.chmod(0o755)
-        output = tmp_path / "out.json"
+        output = tmp_path / "fab-test-results" / "pbir" / "SalesReport" / "envelope.json"
         native_dir = tmp_path / "fab-test-results" / "pbir" / "SalesReport"
         native_dir.mkdir(parents=True, exist_ok=True)
         (native_dir / "native.json").write_text("[]", encoding="utf-8")
@@ -327,7 +327,7 @@ class TestVerbosity:
             inspector = tmp_path / f"PBIRInspectorCLI-{level}"
             inspector.write_text("fake", encoding="utf-8")
             inspector.chmod(0o755)
-            output = tmp_path / f"out-{level}.json"
+            output = tmp_path / "fab-test-results" / "pbir" / f"SalesReport-{level}" / "envelope.json"
             native_dir = (
                 tmp_path / "fab-test-results" / "pbir" / f"SalesReport-{level}"
             )
@@ -447,7 +447,7 @@ class TestClearStaleScreenshotFolder:
         inspector = tmp_path / "PBIRInspectorCLI"
         inspector.write_text("fake", encoding="utf-8")
         inspector.chmod(0o755)
-        output = tmp_path / "out.json"
+        output = tmp_path / "fab-test-results" / "pbir" / "SalesReport" / "envelope.json"
         # FabInspCLI treats the "-output" path as a directory when emitting
         # HTML too, e.g. .../SalesReport/native.json/PBIInspectorPNG/*.png --
         # matching the real on-disk layout this fix targets.
@@ -481,7 +481,7 @@ class TestClearStaleScreenshotFolder:
         inspector = tmp_path / "PBIRInspectorCLI"
         inspector.write_text("fake", encoding="utf-8")
         inspector.chmod(0o755)
-        output = tmp_path / "out.json"
+        output = tmp_path / "fab-test-results" / "pbir" / "SalesReport" / "envelope.json"
         native_dir = tmp_path / "fab-test-results" / "pbir" / "SalesReport"
         native_dir.mkdir(parents=True, exist_ok=True)
         (native_dir / "native.json").write_text("[]", encoding="utf-8")

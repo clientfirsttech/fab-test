@@ -1,6 +1,6 @@
 ---
 name: fab-test
-description: fab-test CLI reference for running Fabric artifact analyzers locally (fab-test 1.9.0b9). Covers all subcommands, flags, artifact isolation, result locations, and how fab-test differs from pytest. Use when invoking, troubleshooting, or extending local artifact validation.
+description: fab-test CLI reference for running Fabric artifact analyzers locally (fab-test 1.9.0b10). Covers all subcommands, flags, artifact isolation, result locations, and how fab-test differs from pytest. Use when invoking, troubleshooting, or extending local artifact validation.
 ---
 
 # fab-test
@@ -44,7 +44,7 @@ From PyPI — the package is **`cft-fab-test`** (the command is still
 pre-releases unless you pass `--pre` or name the version exactly:
 
 ```bash
-pip install "cft-fab-test==1.9.0b9"     # or: pip install --pre cft-fab-test
+pip install "cft-fab-test==1.9.0b10"     # or: pip install --pre cft-fab-test
 ```
 
 `fab-test playwright` has its own install path. It runs its render spec as a
@@ -85,6 +85,34 @@ ExitCode {
   (CLI arguments are invalid; no analyzer was invoked) => 2
   (the analyzer is unsupported on this platform) => 126         // message names the supported OS
   (a required external tool could not be resolved) => 127       // message names the flag, env var, and config key that would fix it
+}
+```
+
+### Service mode
+
+```
+ServiceMode {
+  fn mode(target, flags) {
+    (target is "WS.Workspace/NAME[.Type]")        => service, that one deployed item
+    (--workspace WS and no target)                 => service, every deployed item of the analyzer's type; local folders ignored unless --artifact-dir is passed
+    (workspace: in fab-test.yml, FABRIC_WORKSPACE_ID) => a default only; never turns a bare run into service mode
+  }
+  first stderr line: "mode=service workspace=<name> source=<target|flag|env|config|default>"   // silent under -q and --format json
+  envelope: carries mode and source
+  analyzers: bpa | pbir | a11y | rdl export the definition read-only; pql-test connects over XMLA and exports nothing
+  all --workspace: runs fab_test_all from analyzers.json (bpa, pbir, pql-test, rdl) -- not playwright; use playwright --workspace for renders
+}
+
+Constraints {
+  (more than 50 items of one type and no --all) => exit 2 naming --all
+  (one item cannot be exported or is PBIR-Legacy) => that item is named and fails the run (exit 1); the others are still analyzed
+  (a workspace target names no deployed item) => exit 1 listing the closest names
+  (HTTP 401) => the message says the token was rejected and names az login --tenant / FABRIC_TENANT_ID
+  (HTTP 403) => the message names the read access the identity needs
+  (no credential resolves) => exit 127
+  exports are deleted after the run; --keep-export keeps them redacted under fab-test-results/export/<item id>/<Item>.<Type>/
+  (playwright --workspace WS, nothing else naming what to run) => every deployed Report/PaginatedReport, no checkout; --artifact, a target, --artifact-dir (even .), or a dataset selector narrows it instead
+  (a playwright role, paginated-definition, or parameter-values lookup fails) => still rendered, with a warning-level coverage_limited finding naming the fix; status warning, exit unchanged
 }
 ```
 

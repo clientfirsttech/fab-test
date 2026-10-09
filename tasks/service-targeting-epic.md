@@ -1,6 +1,6 @@
 # Service Targeting Epic
 
-**Status**: ✅ IMPLEMENTED (live verification against a real workspace pending; needs tenant credentials) — all 9 decisions recorded 2026-10-03.
+**Status**: 🔄 IMPLEMENTED, gates passed 2026-10-09 — live-verified with a service principal and five defects from that run fixed; not archived while two live checks stay blocked: `az login` (needs a user in the Fabric tenant) and the >50-item refusal (needs a workspace that large). All 9 decisions recorded 2026-10-03; decision 5 amended 2026-10-09.
 **Known gaps**: live verification pending; service-run envelopes still live at `<analyzer>/<item-stem>/` (exports at `<analyzer>/<workspace>/<item>/export/`), so same-named items across workspaces share an envelope dir; `--interactive` tokens are not refreshed on long runs; a bare `--workspace` dry-run needs a token to enumerate.
 **Goal**: Let `fab-test bpa`, `pbir`, `a11y`, `rdl`, `pql-test`, and `all` run against deployed models and reports in the Fabric service, with one standardized rule deciding repo scan vs. service testing and one surfaced mode per run.
 
@@ -58,7 +58,7 @@ Rules carried forward: tokens/secrets never reach stdout, envelopes, the manifes
 2. ✅ The "exporting a deployed item belongs to fabric-cicd-deployment" rule is retired for read-only, ephemeral test-input export; vision and the targeting reference are amended accordingly.
 3. ✅ Exported definitions are **flag-controlled**: deleted after the run by default, kept under `fab-test-results/` with `--keep-export`. TMDL can carry connection strings, so kept exports go through the same redaction audit as envelopes.
 4. ✅ No `fab-test service` subcommand — `fab-test all --workspace Dev` is the composite entry point (simplicity constraint).
-5. ✅ Paginated reports in service mode feed **both** `rdl` (exported `.rdl` definition) and `playwright` (live render) under `all --workspace`.
+5. ✅ Paginated reports in service mode feed **both** `rdl` (exported `.rdl` definition) and `playwright` (live render) under `all --workspace`. **Amended 2026-10-09:** `all --workspace` runs the configured `all` set (`analyzers.json`), which has no `playwright`; a paginated report gets its live render from `playwright --workspace`.
 6. ✅ `fab-test all --workspace Dev` **includes** `pql-test` against every model in the workspace.
 7. ✅ An untyped service target (`Dev.Workspace/Sales`) resolves by the **analyzer's own type**, symmetric with repo-scan behavior.
 8. ✅ `--interactive` browser sign-in is allowed for service mode — in-memory token only, never in CI — behind a **feature flag** (`interactive_auth: on|off` in `fab-test.yml`, default on; env `FAB_TEST_INTERACTIVE_AUTH=0` to disable) so it can be turned off fleet-wide.
@@ -150,16 +150,88 @@ Make "what am I testing?" unmissable for all three callers.
 - Given the same artifacts on disk, should confirm the service-mode findings match a repo-mode run over the exported definition.
 - Given the blast-radius rule, should exercise every caller of the mode resolver and export seam: each analyzer, `all`, `local`, `list`, `explain`, `doctor`, `-q`, `--format json`, `--dry-run`, `--keep-export`, and the >50-item refusal with and without `--all`.
 
+**Live run 2026-10-09** (1.9.0b10, workspace `visual-error-testing` c4698d28…, service principal from `.fab-test/.env`, installed console script):
+
+Verified:
+- `bpa`, `pbir`, `a11y`, `rdl`: typed target, untyped target (resolved by the analyzer's own type), and standalone `--workspace` (dry-run lists 6 models / 8 reports / 4 paginated, usage-metrics items excluded).
+- Service vs repo parity over the `--keep-export` export: identical for `bpa` (72 tests, 12 failed), `pbir` (11 findings), `a11y` (4 findings), same exit codes.
+- `pql-test --workspace`: all 6 deployed models reached over XMLA, each "no tests" (none has PQL.Assert), exit 0.
+- Export deleted after the run by default, kept with `--keep-export`; `-q` one line; `--format json` one stdout document; envelope carries `mode`/`source`; `explain` and `list` show the workspace scope; `doctor` (with `FABRIC_WORKSPACE_ID`) reports service mode per analyzer; `auth status` resolves an ambient `DefaultAzureCredential`.
+
+Not verifiable here:
+- `az login`: the only user account available is in a different tenant from the workspace (HTTP 401 on every call). Needs a user in the Fabric tenant with workspace access.
+- >50-item refusal: no workspace with more than 50 items of one type (largest has 8). Covered by unit tests only.
+
+Defects found (tasks below):
+1. `all --workspace`: one item's export failure aborts that whole analyzer (`bpa`, `pbir` analyzed nothing), `a11y` and `playwright` never run and are not mentioned, and the aggregate summary invents rows from the local checkout (`SampleModel-PQLAssert`, `ThinReport`, `ACC-03` twice, `QRY-01`, … with nonexistent envelope paths; "27 artifacts"). `run.json` is correct (10). `all --workspace --dry-run` also omits `a11y` and `playwright`.
+2. `pql-test` with a typed or untyped workspace target ignores it: falls into local discovery, prints "no *.SemanticModel artifacts found under <cwd>", exits 0 -- a silent pass on a model never tested. `is_service_run` only treats `pql_test` as service under `all` or `--workspace`; the "typed target keeps its XMLA path" path is never reached because discovery runs first.
+3. Export layout `<out>/<analyzer>/<workspace GUID>/<name>/export/<name>.<Type>/definition/...` exceeds Windows' 260-character limit from a 31-character repo root (`Report with Bookmarks - Broken Visuals` model and report). The `bpa` failure reports "No such file or directory" without the long-path remediation the `pbir` one gives.
+4. `native.json`/`native.xml` ignores `--output-dir` (`pbir`, `rdl`, `pql-test`): written under `./fab-test-results/` while the envelope honors the flag.
+5. HTTP 401 is reported as a missing-permission problem ("this identity may not read its definition ... needs read"); a 401 is a rejected token -- wrong tenant or audience -- and should name `az login --tenant` / the credential source.
+6. Smaller: `rdl --dry-run` prints `(analyzers: none)` for paginated reports; `doctor` has no `--workspace`; `--format json` still prints the wrapper's narration on stderr; the envelope's `workspace` field is `None` in service mode; `explain bpa` shows two different Tabular Editor paths (Tool vs Command); `list` still names the `local/` scope `desktop`.
+
+---
+
+## `all --workspace` Runs Every Service Analyzer And Reports Only What Ran
+
+**Requirements**:
+- Given `all --workspace WS`, should run the analyzers `all` runs in every mode (`fab_test_all` in `analyzers.json`: `bpa`, `pbir`, `pql-test`, `rdl`), over deployed items; `--dry-run` should list the same set. Decided 2026-10-09: no `a11y` or `playwright` under `--workspace` alone -- this amends decision 5; add them to `analyzers.json` or run `playwright --workspace` ✅
+- Given one deployed item whose export fails, should report that item as failed and still analyze the analyzer's other items ✅
+- Given a service run, should build the aggregate summary only from what this run produced -- never from the local checkout -- so its rows, envelope paths, and totals agree with `run.json` ✅
+
+**Done 2026-10-09.** `_export_items` (split out of `export_for_analyzer`) catches one item's `ServiceExportError`, names it, records it in `_export_failed`, and keeps going; `service_skip_exit` lifts the exit for it; only when nothing exported does the first error stop the analyzer, as before. `export_for_analyzer` records what each analyzer handled, and `service_row_stems` hands that to `build_all_summary_rows` in service mode instead of rediscovering the checkout. A row with its own envelope now takes its status from it -- the analyzer's exit code covers all of its artifacts, so one failure had painted every row of that analyzer failed (local `all` too). Live: `all --workspace` lists exactly the workspace's 24 items, `bpa`/`pbir` analyze 5 of 6 and 7 of 8 around the one export over the path limit, exit 1.
+
+---
+
+## pql-test Honors A Workspace Target
+
+**Requirements**:
+- Given `pql-test "WS.Workspace/NAME.SemanticModel"` or `pql-test "WS.Workspace/NAME"`, should run that one deployed model over XMLA, the way `--workspace` runs every model ✅
+- Given a workspace target that names no deployed model, should exit non-zero naming the model and workspace, never 0 with "no artifacts found under <cwd>" ✅
+
+**Done 2026-10-09.** `is_service_run` now counts a workspace-scoped target as a service run for `pql_test`, so it reaches `_deployed_models` narrowed by `_select_items` to the named model -- the path `--workspace` already used. Without a target or `--workspace`, `--workspace-id` keeps its repository-over-XMLA meaning. Live: typed and untyped `RDLSource` targets reach the deployed model ("no tests", exit 0, same as `--workspace`); `No Such Model` exits 1 listing the closest names.
+
+---
+
+## Exports Fit Windows Path Limits
+
+**Requirements**:
+- Given a deployed item with a long display name and deep PBIR/TMDL parts, should export it under the default results directory from a typical repository path on Windows without exceeding 260 characters (drop the repeated name/GUID segments, or shorten them) ✅
+- Given an export that still cannot be written because a path is too long, should name a shorter `--output-dir` or Windows long-path support for every analyzer, not only `pbir` ✅
+
+**Done 2026-10-09** (decided: change it in the beta). Exports go to `<out>/export/<first 8 characters of the item ID>/<Item>.<Type>/`: one export is already shared by every analyzer that reads it and a run targets one workspace, so neither needs a folder, and the item ID also stops two same-named items overwriting each other (a latent collision in the old layout). `_write_failure` adds the remediation whenever the absolute path reaches 260 characters, whatever the errno -- the live `bpa` failure was ENOENT. Live: `bpa` and `pbir --workspace --keep-export` analyze all 6 models and 8 reports, including `Report with Bookmarks - Broken Visuals`; longest kept path 203 characters, was 262.
+
+---
+
+## Native Output Honors --output-dir
+
+**Requirements**:
+- Given `--output-dir DIR`, should write each analyzer's native output (`native.json`/`native.xml`) under DIR beside its envelope, never under `./fab-test-results/` ✅
+
+**Done 2026-10-09.** `native_output_path` takes `beside=` (the envelope path the parent passes as `--output-path`); all seven `invoke_*.py` wrappers pass it, guarded by a test that scans each wrapper. Thirteen PBIR Inspector unit tests had planted the fake tool's `native.json` at the default root while passing a loose `out.json` envelope; they now pass the envelope path the parent really uses. Live: `pbir` and `rdl` service runs with `--output-dir` write envelope and native output side by side and create no `./fab-test-results/`.
+
+---
+
+## A Rejected Token Is Not A Missing Permission
+
+**Requirements**:
+- Given Fabric answers HTTP 401, should say the token was rejected (wrong tenant or audience) and name the credential that was used and `az login --tenant` / the service-principal tenant variable as the fix ✅
+- Given Fabric answers HTTP 403, should keep today's missing-permission message ✅
+
+**Done 2026-10-09.** `_remediation` splits 401 from 403. The 401 text names the three causes (another tenant, expired, service principals not yet allowed to use Fabric APIs -- the last per GETTING-STARTED's troubleshooting table) and points at `fab-test auth status` for the identity in use, which the `auth=` line also prints. Live with an `az login` user from another tenant: the 401 now reads as a rejected token naming `az login --tenant`.
+
 ---
 
 ## Document All Three Callers
 
 **Requirements**:
-- Given the human caller, should update README and `docs/QUICK-VALIDATION.md` with the mode-resolution matrix, service-mode examples (typed, untyped, standalone), auth options, `--keep-export`, and the `--all` threshold.
-- Given the pipeline caller, should add a copy-pasteable CI snippet running `fab-test all --workspace` with service-principal secrets under `docs/examples/`.
-- Given the agent caller, should update the fab-test skill in SudoLang — `SKILL.md`, `references/targeting-and-discovery.md` (the scopes table and the retired fabric-cicd rule, decision 2), `references/credentials.md`, `references/flags.md` — synced byte-for-byte to `src/fab_test/skill/` (guarded by `tests/test_skill_resource.py`).
-- Given vision.md names the fabric-cicd boundary, should amend it per decision 2 (read-only ephemeral export for testing is in scope; deployment remains out).
-- Given an epic-sized `src/` change, should bump MINOR in `src/fab_test/__init__.py` (`.dev1`) and add a CHANGELOG entry via `aidd-log`.
+- Given the human caller, should update README and `docs/QUICK-VALIDATION.md` with the mode-resolution matrix, service-mode examples (typed, untyped, standalone), auth options, `--keep-export`, and the `--all` threshold. ✅
+- Given the pipeline caller, should add a copy-pasteable CI snippet running `fab-test all --workspace` with service-principal secrets under `docs/examples/`. ✅
+- Given the agent caller, should update the fab-test skill in SudoLang — `SKILL.md`, `references/targeting-and-discovery.md` (the scopes table and the retired fabric-cicd rule, decision 2), `references/credentials.md`, `references/flags.md` — synced byte-for-byte to `src/fab_test/skill/` (guarded by `tests/test_skill_resource.py`). ✅
+- Given vision.md names the fabric-cicd boundary, should amend it per decision 2 (read-only ephemeral export for testing is in scope; deployment remains out). ✅
+- Given an epic-sized `src/` change, should bump MINOR in `src/fab_test/__init__.py` (`.dev1`) and add a CHANGELOG entry via `aidd-log`. ✅
+
+**Done 2026-10-09.** Most of this landed with the implementation: QUICK-VALIDATION's service-mode section, `docs/examples/github-actions/service-mode.yml`, `credentials.md`, `flags.md` (`--keep-export`, `--all`, `--interactive`), the targeting matrix, and vision.md's amended boundary. Added now: README's "Testing what's deployed" section (typed, untyped, `--workspace`, `all --workspace`, the mode line, credentials, `--keep-export` location, the 50-item limit, per-item failure) and a SudoLang `ServiceMode` block in the main `SKILL.md`'s Agent Contract (mode resolution, envelope fields, what `all --workspace` runs, and the service exit codes), synced to the packaged copy. Versioning follows the beta series the project moved to after this epic was planned: the fixes ship as the unreleased `1.9.0b10`, with CHANGELOG entries per fix, rather than a MINOR `.dev1` bump.
 
 ---
 
@@ -178,6 +250,8 @@ Make "what am I testing?" unmissable for all three callers.
 ## Quality Gates
 
 **Requirements**:
-- Given the whole repository, should pass `ruff check .`, `tests/test_complexity_budget.py`, and `tests/test_module_budget.py` — `fab_test_parser.py` (35.9K) and `_target.py` (10.7K) are near or over their ceilings, so split on existing seams rather than raise exemptions.
-- Given the full suite, should pass with `--cov --cov-fail-under=80` over `src/fab_test`.
-- Given CI-dependent tests, should pass once with `GITHUB_ACTIONS=true CI=true`.
+- Given the whole repository, should pass `ruff check .`, `tests/test_complexity_budget.py`, and `tests/test_module_budget.py` — `fab_test_parser.py` (35.9K) and `_target.py` (10.7K) are near or over their ceilings, so split on existing seams rather than raise exemptions. ✅
+- Given the full suite, should pass with `--cov --cov-fail-under=80` over `src/fab_test`. ✅
+- Given CI-dependent tests, should pass once with `GITHUB_ACTIONS=true CI=true`. ✅
+
+**Passed 2026-10-09** on `9469bee`: `ruff check .` clean; complexity and module-budget ratchets pass with no new exemption (neither `fab_test_parser.py` nor `_target.py` needed a split); full suite 2632 passed, 2 skipped, coverage 89.28%, run with `GITHUB_ACTIONS=true CI=true`.
