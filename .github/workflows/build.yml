@@ -27,10 +27,15 @@ jobs:
       # (OSV) for known vulnerabilities. Unlike npm audit, findings aren't
       # reliably severity-rated (OSV doesn't guarantee a CVSS score), so any
       # finding fails the build rather than filtering by severity.
+      # Audits the versions pinned in uv.lock (every extra and group), not
+      # what pip happens to resolve for ".[dev]" today -- the same command
+      # /aidd-review runs.
       - name: Dependency audit (pip-audit)
         run: |
-          pip install pip-audit
-          pip-audit --desc
+          pip install pip-audit uv
+          uv export --frozen --all-extras --all-groups --no-hashes \
+            --no-emit-project -o "$RUNNER_TEMP/locked-reqs.txt" -q
+          pip-audit --desc -r "$RUNNER_TEMP/locked-reqs.txt" --disable-pip --no-deps
 
       # Not a gate here: blocking a PR because a function grew one branch is
       # the kind of gate people learn to route around. The *total* is
