@@ -38,6 +38,7 @@ from .playwright_validation.config import (
 )
 from .playwright_validation.discovery import (
     acquire_embed_configs,
+    apply_coverage_limits,
     resolve_discovery,
     resolve_paginated_plan,
 )
@@ -890,7 +891,6 @@ def _run_single_report(
         else f"Playwright visual validation failed: {len(cases)} cases"
     )
 
-    # Parse pytest summary for additional context.
     summary = _parse_pytest_summary(proc.stdout or "")
     if summary:
         message += f" ({summary})"
@@ -915,6 +915,7 @@ def _run_single_report(
         duration_ms=timer.elapsed_ms,
     )
     env_out["test_results"] = test_results
+    apply_coverage_limits(env_out, str(report_name))  # a lookup that failed narrows a pass to a warning
     _write_playwright_envelope(output_path, env_out)
 
     log(message)
