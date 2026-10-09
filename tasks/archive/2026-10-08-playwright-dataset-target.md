@@ -1,6 +1,6 @@
 # Playwright Dataset Target Epic
 
-**Status**: 🔄 IN-PROGRESS
+**Status**: ✅ COMPLETED 2026-10-08 (all three tasks live-verified 2026-09-26; documented in README, `docs/examples/github-actions/playwright-live.yml`, and the fab-test skill's `references/flags.md`)
 **Goal**: Let `fab-test playwright --dataset-id` target the reports built on one dataset instead of every local report
 
 ## Overview
