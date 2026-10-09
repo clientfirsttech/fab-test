@@ -832,45 +832,55 @@
     {
       "id": "NO_VISUAL_LEVEL_FILTERS_VISIBLE_IN_FILTER_PANEL",
       "name": "No visual level filters should be visible in the filter panel",
-      "description": "When the filter panel is enabled, visual level filters should be hidden from the filter pane in view mode. Only page level and report level filters should be visible in the filter panel.",
+      "description": "When the filter panel is enabled, visual level filters should be hidden from the filter pane in view mode. Only page level and report level filters should be visible in the filter panel. Returns the names of visuals with an offending visual-level filter, or none when the filter pane is disabled in report.json. Evaluated per report: the filter pane setting lives in report.json, which a per-visual rule cannot read.",
       "logType": "error",
       "disabled": false,
-      "part": "Visuals",
+      "part": "Report",
       "test": [
         {
           "if": [
             {
               "!=": [
                 {
-                  "var": "outspacePaneVisible"
+                  "var": "filterPaneVisible"
                 },
                 "false"
               ]
             },
             {
-              "!": [
+              "map": [
                 {
-                  "some": [
+                  "filter": [
                     {
-                      "var": "filterConfig.filters"
+                      "part": "Visuals"
                     },
                     {
-                      "!=": [
+                      "some": [
                         {
-                          "var": "isHiddenInViewMode"
+                          "var": "filterConfig.filters"
                         },
-                        true
+                        {
+                          "!=": [
+                            {
+                              "var": "isHiddenInViewMode"
+                            },
+                            true
+                          ]
+                        }
                       ]
                     }
                   ]
+                },
+                {
+                  "var": "name"
                 }
               ]
             },
-            true
+            []
           ]
         },
         {
-          "outspacePaneVisible": "/objects/outspacePane/0/properties/visible/expr/Literal/Value"
+          "filterPaneVisible": "/objects/outspacePane/0/properties/visible/expr/Literal/Value"
         },
         []
       ]
@@ -878,45 +888,55 @@
     {
       "id": "NO_VISUAL_LEVEL_FILTERS_UNLOCKED_IN_FILTER_PANEL",
       "name": "No visual level filters should be unlocked in the filter panel",
-      "description": "When the filter panel is enabled, visual level filters should be locked in the filter pane in view mode. Only page level and report level filters should be available to report consumers.",
+      "description": "When the filter panel is enabled, visual level filters should be locked in the filter pane in view mode. Only page level and report level filters should be available to report consumers. Returns the names of visuals with an offending visual-level filter, or none when the filter pane is disabled in report.json. Evaluated per report: the filter pane setting lives in report.json, which a per-visual rule cannot read.",
       "logType": "error",
       "disabled": false,
-      "part": "Visuals",
+      "part": "Report",
       "test": [
         {
           "if": [
             {
               "!=": [
                 {
-                  "var": "outspacePaneVisible"
+                  "var": "filterPaneVisible"
                 },
                 "false"
               ]
             },
             {
-              "!": [
+              "map": [
                 {
-                  "some": [
+                  "filter": [
                     {
-                      "var": "filterConfig.filters"
+                      "part": "Visuals"
                     },
                     {
-                      "!=": [
+                      "some": [
                         {
-                          "var": "isLockedInViewMode"
+                          "var": "filterConfig.filters"
                         },
-                        true
+                        {
+                          "!=": [
+                            {
+                              "var": "isLockedInViewMode"
+                            },
+                            true
+                          ]
+                        }
                       ]
                     }
                   ]
+                },
+                {
+                  "var": "name"
                 }
               ]
             },
-            true
+            []
           ]
         },
         {
-          "outspacePaneVisible": "/objects/outspacePane/0/properties/visible/expr/Literal/Value"
+          "filterPaneVisible": "/objects/outspacePane/0/properties/visible/expr/Literal/Value"
         },
         []
       ]
