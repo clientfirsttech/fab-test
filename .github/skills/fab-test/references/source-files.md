@@ -12,7 +12,7 @@
 | `scripts/_rdl_lint.py` | `rdl`'s rule engine — namespace-agnostic XML parsing, the catalog loader and its validation, the `CHECKS` dispatch table, `run_checks`, the `test_results` builder |
 | `scripts/_rdl_checks_query.py`, `scripts/_rdl_checks_report.py`, `scripts/_rdl_common.py` | `rdl`'s check functions by family (schema/data source/query; parameters/layout/subreports/accessibility) and the helpers they share |
 | `scripts/invoke_playwright.py` | Playwright validation wrapper |
-| `scripts/invoke_playwright_impact.py` | Playwright impact manifest builder |
+| `scripts/_playwright_changed.py` | `playwright --changed-since`: the deployed reports a Git change touches |
 | `scripts/invoke_playwright_dependencies.py` | Semantic-model dependency discovery wrapper |
 | `scripts/playwright_validation/config.py` | `.env` / environment configuration loader |
 | `scripts/playwright_validation/test_cases.py` | Report × page × bookmark case expansion |

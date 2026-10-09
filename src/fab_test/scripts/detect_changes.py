@@ -80,6 +80,44 @@ def get_changed_files(repo_root: Path) -> list[str]:
         return changed_files
 
 
+class ChangeDetectionError(Exception):
+    """Git could not say what changed since the requested ref."""
+
+
+def _git_lines(repo_root: Path, *argv: str) -> list[str]:
+    import subprocess
+
+    result = subprocess.run(["git", *argv], cwd=repo_root, capture_output=True, text=True, check=True)
+    return [line.strip() for line in result.stdout.splitlines() if line.strip()]
+
+
+def changed_files_since(repo_root: Path, ref: str) -> list[str]:
+    """Return every file changed since ``ref`` branched off: committed, uncommitted, and untracked.
+
+    Compared against the merge base, so commits made on ``ref`` since then
+    are not counted as this branch's changes. The working tree is included
+    because a developer checking a change before committing it means that
+    change too.
+    """
+    import subprocess
+
+    try:
+        base = _git_lines(repo_root, "merge-base", ref, "HEAD")[0]
+        tracked = _git_lines(repo_root, "diff", "--name-only", base)
+        untracked = _git_lines(repo_root, "ls-files", "--others", "--exclude-standard")
+    except (subprocess.CalledProcessError, OSError, IndexError) as exc:
+        raise ChangeDetectionError(
+            f"could not compare with '{ref}': it must be a branch, tag or commit in this Git repository"
+        ) from exc
+    return sorted({*tracked, *untracked})
+
+
+def changed_artifacts_since(repo_root: Path, ref: str) -> list[dict]:
+    """Return the Fabric artifacts with a file changed since ``ref``, one entry per artifact folder."""
+    files = changed_files_since(repo_root, ref)
+    return list(group_changes_by_artifact(files, load_artifact_map(repo_root)).values())
+
+
 def detect_artifact_type(artifact_path: str, artifact_map: dict[str, str]) -> str:
     """Determine artifact type from path using artifact-map.json."""
     for extension, artifact_type in artifact_map.items():

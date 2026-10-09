@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from .resolver import (
+    ItemNotFoundError,
     ResolvedReport,
     ServiceClient,
     resolve_environment,
@@ -72,9 +73,9 @@ class ImpactManifest:
                 reasons=[reason],
             )
 
-    def skip_artifact(self, name: str, artifact_type: str) -> None:
-        """Record an artifact that has no Playwright impact."""
-        self._skipped.append(f"{name} ({artifact_type}): no Playwright impact")
+    def skip_artifact(self, name: str, artifact_type: str, reason: str = "no Playwright impact") -> None:
+        """Record an artifact that adds no report to validate, and why."""
+        self._skipped.append(f"{name} ({artifact_type}): {reason}")
 
     @property
     def reports(self) -> list[ImpactEntry]:
@@ -114,7 +115,7 @@ def load_changed_artifacts(path: Path) -> list[dict[str, Any]]:
 
 
 def build_impact_manifest(
-    changed_artifacts_path: Path,
+    artifacts: list[dict[str, Any]],
     environment: str,
     client: ServiceClient,
     *,
@@ -125,7 +126,8 @@ def build_impact_manifest(
     """Build an impacted-report manifest from changed artifacts.
 
     Args:
-        changed_artifacts_path: Path to ``changed-artifacts.json``.
+        artifacts: Changed artifacts, each with a ``name`` and ``type``
+            (``detect_changes.changed_artifacts_since`` or ``load_changed_artifacts``).
         environment: Target environment label.
         client: Service client for item/dependency lookups.
         env_path: Optional path to environments.yml.
@@ -144,24 +146,28 @@ def build_impact_manifest(
     scope = allowed_workspace_ids or {resolved_env.workspace_id}
 
     manifest = ImpactManifest()
-    artifacts = load_changed_artifacts(changed_artifacts_path)
 
     for artifact in artifacts:
         name = artifact.get("name", "")
         artifact_type = artifact.get("type", "")
 
-        if artifact_type == "SemanticModel":
-            for report in resolve_semantic_model_dependents(
-                name,
-                resolved_env,
-                client,
-                allowed_workspace_ids=scope,
-            ):
-                manifest.add_report(report, f"depends on {name}")
-        elif artifact_type == "Report":
-            report = resolve_report(name, resolved_env, client)
-            manifest.add_report(report, f"changed report {name}")
-        else:
-            manifest.skip_artifact(name, artifact_type)
+        # A changed artifact with no deployed item is usually new and not yet
+        # published: nothing deployed to validate, so note it and go on.
+        try:
+            if artifact_type == "SemanticModel":
+                for report in resolve_semantic_model_dependents(
+                    name,
+                    resolved_env,
+                    client,
+                    allowed_workspace_ids=scope,
+                ):
+                    manifest.add_report(report, f"depends on {name}")
+            elif artifact_type == "Report":
+                report = resolve_report(name, resolved_env, client)
+                manifest.add_report(report, f"changed report {name}")
+            else:
+                manifest.skip_artifact(name, artifact_type)
+        except ItemNotFoundError:
+            manifest.skip_artifact(name, artifact_type, "not deployed in the workspace")
 
     return manifest

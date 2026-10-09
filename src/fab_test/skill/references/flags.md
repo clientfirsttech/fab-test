@@ -168,7 +168,7 @@ assertion failure among connection errors still fails the run.
 
 ### playwright
 
-Playwright validation can run in three modes: static `.env` mode, service-resolved mode, or impact-manifest mode.
+Playwright validation can run in three modes: static `.env` mode, service-resolved mode, or changed-since mode.
 
 | Flag | Description |
 |------|-------------|
@@ -179,7 +179,7 @@ Playwright validation can run in three modes: static `.env` mode, service-resolv
 | `--dataset-id ID` | Dataset / semantic-model ID. With `--artifact`, overrides that report's binding; with no report named, tests every report built on this dataset (see below) |
 | `--dataset-workspace-id ID` | Workspace ID the dataset lives in, when different from the report's own workspace [env: `PLAYWRIGHT_DATASET_WORKSPACE_ID`] |
 | `--report-type {report,paginated}` | Force the report type instead of auto-detecting it [env: `PLAYWRIGHT_REPORT_TYPE`] |
-| `--impact-manifest PATH` | Validate every report listed in the impacted-report manifest once, regardless of local `.Report` artifacts |
+| `--changed-since REF` | With `--workspace`, validate only the deployed reports built on a semantic model changed since this Git branch, tag or commit, or themselves changed — committed, uncommitted or new. Needs Git only when used |
 | `--pages {auto,none}` | Discover every report page and its own bookmarks (default: `auto`); `none` tests only the default page |
 | `--roles {auto,none}` | Discover RLS/OLS roles from the semantic model and test the page matrix under each one whenever RLS is in play — `PLAYWRIGHT_USE_RLS`, **or** an effective-identity user being configured at all (default: `auto`); `none` tests only `PLAYWRIGHT_ROLE` |
 | `--user-name UPN` | Effective-identity user for RLS embed tokens. Outranks `PLAYWRIGHT_USER_NAME`, which outranks `playwright_user_name` in `fab-test.yml` |
@@ -274,8 +274,7 @@ environment, in a .env file, or pass --env-file.
 ```
 
 `fab-test doctor` reports `playwright` as not ready for the same reason rather than
-a false green when only an ambient credential is available — `playwright-impact` and
-`dependencies`, which never call the embed-token API, are unaffected and accept
+a false green when only an ambient credential is available — `dependencies`, which never calls the embed-token API, are unaffected and accept
 ambient auth like every other cloud-backed analyzer.
 
 **Exit `127` is a setup problem, exit `1` is a report failure.** A run that never
@@ -308,7 +307,7 @@ laptop.
 Any other exception while acquiring the embed context (a malformed tenant, an
 unreachable API) is also caught: it never reaches the console as a traceback. It
 writes an error envelope, emits `::error::` to stderr, and returns `1` — and in a
-`--impact-manifest` run, one report's failure does not stop the others.
+multi-report run (`--workspace`, `--changed-since`), one report's failure does not stop the others.
 
 **`environments.yml` is optional once a workspace is already resolved.** When
 `--workspace` (or its `--workspace-id`/`--from-workspace` aliases), `FABRIC_WORKSPACE_ID`,
@@ -446,7 +445,7 @@ clears it. An interactive report's dataset entry is unaffected.
 
 **`--dataset-id` with no report named tests the reports built on that
 dataset -- not every local report.** `fab-test playwright --dataset-id ID`
-with no `--artifact`, target, or `--impact-manifest` looks the dataset's
+with no `--artifact`, target, or `--changed-since` looks the dataset's
 dependent reports up live -- in `--dataset-workspace-id`'s workspace and, when
 set and different, the `--workspace-id`/`FABRIC_WORKSPACE_ID`/`PLAYWRIGHT_WORKSPACE_ID` workspace --
 and runs one per-report validation for each, embedded against that dataset.
@@ -487,7 +486,7 @@ fab-test playwright --workspace "Sales Dev" --artifact-dir .
 ```
 
 **`--dataset-workspace-id` alone -- no `--dataset-id`, `--artifact`, target, or
-`--impact-manifest` -- means every dataset in that workspace.** Every
+`--changed-since` -- means every dataset in that workspace.** Every
 semantic model in the workspace is listed live, and each one's own dependent
 reports (including paginated/RDL reports) are run, embedded against that
 model -- the same per-report resolution `--dataset-id` mode uses, just for
@@ -523,7 +522,7 @@ fab-test playwright --dataset-workspace-id aaaaaaaa-bbbb-cccc-dddd-ffffffffffff 
   --artifact "Invoice RDL"
 ```
 
-Pairing `--dataset-workspace-id` with `--dataset-id`, `--impact-manifest`, or
+Pairing `--dataset-workspace-id` with `--dataset-id`, `--changed-since`, or
 a report that already has a local folder is unaffected by either of the two
 behaviors above:
 
@@ -600,34 +599,19 @@ No Report matching 'ThinReport' in workspace 33333333-3333-3333-3333-33333333333
 Closest candidates: Sales Report, Marketing Report, and 3 more.
 ```
 
-Impact-manifest mode validates every report impacted by changed artifacts. It is repository-scoped and runs once:
+Changed-since mode validates only the deployed reports a change touches. Git lists the Fabric artifacts changed since REF (against the merge base, so the working tree's uncommitted and untracked changes count too); Fabric lists the deployed reports in the workspace built on those semantic models, or that are those reports. Only those run:
 
 ```bash
-fab-test playwright-impact --changed-artifacts changed-artifacts.json --env dev --env-file .env
-fab-test playwright --impact-manifest fab-test-results/playwright/impact-manifest.json --env dev --env-file .env
+fab-test playwright --workspace "Sales Dev" --changed-since main
 ```
+
+It prints `mode=service workspace=Sales Dev source=flag`. Without `--workspace`, or with a ref Git cannot resolve, it exits `2` before any network call. When nothing changed, or no deployed report uses what changed, it says so and exits `0`. A changed artifact is matched to the deployed item by display name, so a renamed item shows no impact.
 
 Browser setup -- the pytest packages a run launches (`pytest`, `pytest-playwright`, `pytest-html`, `pytest-xdist`) are the `playwright` extra, not base dependencies. A run without them aborts before any embed token is minted, with an error naming the missing packages and the install command:
 
 ```bash
 pip install "cft-fab-test[playwright]"
 playwright install chromium
-```
-
-### playwright-impact
-
-Build a service-resolved impacted-report manifest from a `changed-artifacts.json` payload. The manifest is consumed by `fab-test playwright --impact-manifest ...`.
-
-| Flag | Description |
-|------|-------------|
-| `--changed-artifacts PATH` | Path to `changed-artifacts.json` (default: `changed-artifacts.json`) |
-| `--output PATH` | Path to write the JSON impact manifest |
-| `--env-file PATH` | Path to `.env` file with service-principal credentials |
-| `--env ENV` | Target environment label [env: `FABRIC_ENVIRONMENT`] |
-| `--workspace-id ID` | Explicit workspace ID override [env: `FABRIC_WORKSPACE_ID`] |
-
-```bash
-fab-test playwright-impact --changed-artifacts changed-artifacts.json --env dev --env-file .env
 ```
 
 ### dependencies

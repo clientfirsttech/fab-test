@@ -7,6 +7,7 @@ must stay out of the way. `pql-test auth status` is stubbed: no subprocess.
 
 import base64
 import json
+import sys
 
 import pytest
 
@@ -79,3 +80,34 @@ def test_given_pql_credential_variables_should_not_ask_pql_test(monkeypatch):
 def test_given_pql_test_cannot_run_should_proceed(monkeypatch):
     _status(monkeypatch)
     assert guard.pql_identity_mismatch(USER) is None
+
+
+def _print_as_pql_test(monkeypatch, stdout: str) -> None:
+    """Stand in a real process that prints ``stdout`` for `pql-test auth status`."""
+    script = f"import sys; sys.stdout.write({stdout!r})"
+    monkeypatch.setattr(
+        "fab_test.scripts.invoke_pql_test._resolve_pql_command",
+        lambda command: [sys.executable, "-c", script],
+    )
+
+
+def test_auth_status_reads_pql_tests_signed_in_output(monkeypatch):
+    """The exact layout pql-test 0.1.19 prints, indentation included."""
+    _print_as_pql_test(
+        monkeypatch,
+        "Status: Authenticated\n  Method: interactive\n  Account: a@b.c\n  Environment: Public\n",
+    )
+    assert guard._pql_auth_status() == {"Status": "Authenticated", "Method": "interactive", "Account": "a@b.c"}
+
+
+def test_auth_status_reads_pql_tests_signed_out_output(monkeypatch):
+    _print_as_pql_test(monkeypatch, "Status: Not authenticated\n\nTo log in, run: pql-test auth login\n")
+    assert guard._pql_auth_status() == {"Status": "Not authenticated"}
+
+
+def test_auth_status_is_none_when_pql_test_cannot_start(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        "fab_test.scripts.invoke_pql_test._resolve_pql_command",
+        lambda command: [str(tmp_path / "no-such-pql-test")],
+    )
+    assert guard._pql_auth_status() is None

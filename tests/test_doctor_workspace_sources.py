@@ -43,7 +43,7 @@ def _args(**overrides) -> argparse.Namespace:
     return argparse.Namespace(**defaults)
 
 
-@pytest.mark.parametrize("analyzer", ["playwright", "playwright-impact", "dependencies"])
+@pytest.mark.parametrize("analyzer", ["playwright", "dependencies"])
 def test_a_workspace_in_fab_test_yml_makes_the_playwright_family_ready(analyzer):
     result = check_readiness(analyzer, _args(file_config={"workspace": "Sales Dev"}))
     assert result["ready"] is True
@@ -54,7 +54,7 @@ def test_a_workspace_in_fab_test_yml_makes_pql_test_ready():
     assert result["ready"] is True
 
 
-@pytest.mark.parametrize("analyzer", ["playwright", "playwright-impact", "dependencies"])
+@pytest.mark.parametrize("analyzer", ["playwright", "dependencies"])
 def test_playwright_workspace_id_in_the_env_file_makes_the_playwright_family_ready(
     analyzer, _service_principal_only
 ):

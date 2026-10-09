@@ -37,7 +37,6 @@ def test_subcommand_alias_mapping():
     """Hyphen/underscore aliases resolve to their canonical analyzer name."""
     assert _SUBCOMMAND_ALIASES["pql-test"] == "pql_test"
     assert _SUBCOMMAND_ALIASES["pql-lint"] == "pql_lint"
-    assert _SUBCOMMAND_ALIASES["playwright_impact"] == "playwright-impact"
 
 
 @pytest.mark.fab_test
@@ -68,20 +67,6 @@ def test_pql_lint_hyphen_alias_behaves_like_underscore():
     )
     assert canonical.returncode == aliased.returncode == 0
     assert _mask_timestamp(canonical.stdout) == _mask_timestamp(aliased.stdout)
-
-
-@pytest.mark.fab_test
-def test_playwright_impact_underscore_alias_accepted():
-    """playwright-impact remains canonical; playwright_impact is also accepted."""
-    canonical = subprocess.run(
-        ["fab-test", "playwright-impact", "--help"],
-        capture_output=True, text=True, check=False,
-    )
-    aliased = subprocess.run(
-        ["fab-test", "playwright_impact", "--help"],
-        capture_output=True, text=True, check=False,
-    )
-    assert canonical.returncode == aliased.returncode == 0
 
 
 @pytest.mark.fab_test
@@ -116,10 +101,6 @@ def test_help_displays_hyphenated_form_as_canonical():
     )
     assert result.returncode == 0, result.stderr
     assert "pql-test (pql_test)" in result.stdout
-    # playwright-impact stands in for pql-lint here, which is now hidden
-    # from the listing; the point is that an aliased subcommand shows its
-    # hyphenated form as canonical with the underscore form in parentheses.
-    assert "playwright-impact (playwright_impact)" in result.stdout
 
 
 @pytest.mark.fab_test
@@ -150,11 +131,6 @@ def test_list_reports_canonical_name_and_aliases():
 
     pql_test_row = next(r for r in summary["analyzers"] if r["analyzer"] == "pql-test")
     assert pql_test_row["aliases"] == ["pql_test"]
-
-    impact_row = next(
-        r for r in summary["analyzers"] if r["analyzer"] == "playwright-impact"
-    )
-    assert impact_row["aliases"] == ["playwright_impact"]
 
     bpa_row = next(r for r in summary["analyzers"] if r["analyzer"] == "bpa")
     assert bpa_row["aliases"] == []

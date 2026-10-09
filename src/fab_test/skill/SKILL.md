@@ -1,6 +1,6 @@
 ---
 name: fab-test
-description: fab-test CLI reference for running Fabric artifact analyzers locally (fab-test 1.9.0b7). Covers all subcommands, flags, artifact isolation, result locations, and how fab-test differs from pytest. Use when invoking, troubleshooting, or extending local artifact validation.
+description: fab-test CLI reference for running Fabric artifact analyzers locally (fab-test 1.9.0b9). Covers all subcommands, flags, artifact isolation, result locations, and how fab-test differs from pytest. Use when invoking, troubleshooting, or extending local artifact validation.
 ---
 
 # fab-test
@@ -44,7 +44,7 @@ From PyPI — the package is **`cft-fab-test`** (the command is still
 pre-releases unless you pass `--pre` or name the version exactly:
 
 ```bash
-pip install "cft-fab-test==1.9.0b7"     # or: pip install --pre cft-fab-test
+pip install "cft-fab-test==1.9.0b9"     # or: pip install --pre cft-fab-test
 ```
 
 `fab-test playwright` has its own install path. It runs its render spec as a
@@ -331,7 +331,6 @@ The case a pipeline meets most is a `detail` populated on an aborted run: `fab-t
  fab-test rdl              — RDL static analysis: the active rules for paginated reports (.rdl files) — no external tool
  fab-test pql-test         — pql-test DAX/PQL test runner (SemanticModel artifacts) [alias: pql_test]
  fab-test playwright       — Playwright visual/error validation (Report artifacts)
- fab-test playwright-impact — Build impacted-report manifest from changed artifacts [alias: playwright_impact]
  fab-test dependencies     — Discover reports that depend on a deployed semantic model
  fab-test all              — Run the analyzers listed in analyzers.json
  fab-test local            — Run BPA, PBIR Inspector, and Desktop-bound pql-test — no cloud required
@@ -347,7 +346,7 @@ The case a pipeline meets most is a `detail` populated on an aborted run: `fab-t
  fab-test clean-tools      — Remove or inspect the .fab-test-tools downloaded-binary cache
 ```
 
-Underscore spellings (`pql_test`, `playwright_impact`) still work silently as aliases —
+Underscore spellings (`pql_test`) still work silently as aliases —
 existing scripts and muscle memory keep working. Result directories under `fab-test-results/`
 use the original underscore names regardless of which spelling you invoke.
 
@@ -359,6 +358,6 @@ use the original underscore names regardless of which spelling you invoke.
 | [references/credentials.md](references/credentials.md) | You need to know how `fab-test` resolves an identity, or what `auth status`/`auth login` do |
 | [references/reports.md](references/reports.md) | You're generating or debugging the HTML `--report` output, the per-run index, or its search/sort/filter behavior |
 | [references/configuration.md](references/configuration.md) | You're touching `fab-test.yml`, precedence, telemetry, rule overlays, or metadata-file resolution |
-| [references/flags.md](references/flags.md) | You need the full global flag table or a specific subcommand's flags (`bpa`, `pbir`, `a11y`, `rdl`, `pql-test`, `playwright`, `playwright-impact`, `dependencies`, `all`, `local`) |
+| [references/flags.md](references/flags.md) | You need the full global flag table or a specific subcommand's flags (`bpa`, `pbir`, `a11y`, `rdl`, `pql-test`, `playwright`, `dependencies`, `all`, `local`) |
 | [references/operations.md](references/operations.md) | You need `--dry-run`/verbosity behavior, the on-disk result layout, tool-resolution order, or pre-flight checks |
 | [references/source-files.md](references/source-files.md) | You're navigating or modifying the `fab-test` implementation itself |

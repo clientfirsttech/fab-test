@@ -26,6 +26,14 @@ from ._analyzer_envelope import (
     write_envelope,
 )
 from ._analyzer_process import run_tool
+from ._pql_test_status import (
+    NOTHING_RAN,
+    classify,
+    discovery_connection_error,
+    is_connection_skip,
+    is_skipped,
+    summarize_results,
+)
 from ._report_html import attach_report
 
 _VERBOSITY_LEVELS = {"summary": 0, "default": 1, "verbose": 2, "debug": 3}
@@ -91,27 +99,26 @@ def build_command(
 
 
 def _pql_env() -> dict[str, str]:
-    """Map Fabric credential env vars to pql-test env vars.
+    """Hand fab-test's service principal to pql-test as ``PQL_*`` variables.
 
-    Keeps service principal secrets out of command lines and process listings
-    by passing them through the environment rather than CLI flags.
+    Resolved the way fab-test resolves it -- either variable spelling, from
+    the environment or the `.env` file -- so pql-test connects as the
+    identity that listed the models rather than its own saved login. Passed
+    through the environment to keep the secret out of process listings. A
+    partially set principal maps nothing: fab-test has already refused it.
     """
+    from ._credentials import IncompleteServicePrincipalError, resolve_service_principal
+
     env = {**os.environ}
-    tenant_id = os.getenv("FABRIC_TENANT_ID")
-    client_id = os.getenv("FABRIC_SERVICE_PRINCIPAL_ID")
-    client_secret = os.getenv("FABRIC_SERVICE_PRINCIPAL_SECRET")
-    if tenant_id:
-        env["PQL_TENANT_ID"] = tenant_id
-    if client_id:
-        env["PQL_CLIENT_ID"] = client_id
-    if client_secret:
-        env["PQL_CLIENT_SECRET"] = client_secret
+    try:
+        principal = resolve_service_principal()
+    except IncompleteServicePrincipalError:
+        return env
+    if principal is not None:
+        env["PQL_TENANT_ID"] = principal.tenant_id
+        env["PQL_CLIENT_ID"] = principal.client_id
+        env["PQL_CLIENT_SECRET"] = principal.client_secret
     return env
-
-
-def _is_pql_test_skipped(result: dict[str, Any]) -> bool:
-    """Return True when a pql-test result entry represents a skipped test."""
-    return bool(result.get("skipped"))
 
 
 def _parse_native_output(native_path: Path):
@@ -135,7 +142,7 @@ def _parse_native_output(native_path: Path):
         for r in results
         if isinstance(r, dict)
         and not r.get("passed", True)
-        and not _is_pql_test_skipped(r)
+        and not is_skipped(r)
     ]
     test_summary = None
     counter_keys = ("passed", "failed", "skipped", "total")
@@ -220,139 +227,6 @@ def _resolve_pql_command(command: list[str]) -> list[str]:
     if command[0] == "pql-test":
         return [sys.executable, "-m", "pql_test", *command[1:]]
     return list(command)
-
-
-def _summarize_results(
-    test_results: "list[dict[str, Any]] | None",
-) -> "dict[str, int] | None":
-    """Count passed/failed/skipped when pql-test did not report its own counters."""
-    if not test_results:
-        return None
-    total = len(test_results)
-    passed = sum(1 for r in test_results if isinstance(r, dict) and r.get("passed"))
-    skipped = sum(
-        1 for r in test_results if isinstance(r, dict) and _is_pql_test_skipped(r)
-    )
-    return {
-        "passed": passed,
-        "failed": total - passed - skipped,
-        "skipped": skipped,
-        "total": total,
-    }
-
-
-_CONNECTION_ERROR_MARKER = "a connection cannot be made"
-
-
-def _is_connection_error(result: dict[str, Any]) -> bool:
-    """Whether a failing result's error is pql-test being unable to reach the model.
-
-    pql-test discovers tests statically from the .SemanticModel's PQL
-    definitions -- no live connection needed -- then tries to execute each
-    one. When the model is unreachable (e.g. a closed Desktop session), each
-    execution fails with this ADOMD.NET message rather than an assertion
-    mismatch.
-    """
-    error = result.get("error") or ""
-    return _CONNECTION_ERROR_MARKER in str(error).lower()
-
-
-def _is_connection_skip(findings: list[dict[str, Any]]) -> bool:
-    """Whether every failure in this run was pql-test failing to reach the model.
-
-    One genuine assertion failure among connection errors still fails the
-    run -- a real failure must never hide behind a platform-availability
-    skip.
-    """
-    return bool(findings) and all(_is_connection_error(f) for f in findings)
-
-
-_NOTHING_RAN = {"passed": 0, "failed": 0, "skipped": 0, "total": 0}
-
-
-_DISCOVERY_FAILED_MARKER = "live test discovery failed against "
-
-
-def _discovery_connection_error(output: str) -> str:
-    """pql-test's reason when live discovery could not connect to a deployed model, else "".
-
-    Live discovery is the only way pql-test finds tests in a deployed model,
-    and when the connection fails it prints a warning and reports "No tests
-    found." -- which reads as an empty model. Only a connection failure is
-    returned: a model reached without PQL.Assert installed really has no tests.
-    """
-    for line in output.splitlines():
-        _, marker, rest = line.partition(_DISCOVERY_FAILED_MARKER)
-        if marker and "AdomdConnectionException" in rest:
-            return rest.split(": ", 1)[-1].strip()
-    return ""
-
-
-def _nothing_ran_message(returncode: int, connection_error: str) -> str:
-    """Say why a run with no tests and no findings ran nothing."""
-    if connection_error:
-        return (
-            f"pql-test ran no tests: could not connect to the model ({connection_error}). "
-            "pql-test connects as its own sign-in; check `pql-test auth status`"
-        )
-    if returncode == 0:
-        return "pql-test found no tests to run in this model"
-    return "pql-test ran no tests"
-
-
-def _pql_status(
-    test_summary: "dict[str, int] | None",
-    findings: list[dict[str, Any]],
-    returncode: int,
-    connection_error: str = "",
-) -> tuple[str, str]:
-    """Classify the run and build its message.
-
-    An all-skipped run is reported as skipped, not failed. Skips mean the
-    platform or workspace was unavailable, and vision.md is explicit that
-    platform gaps degrade to skips -- so CI does not go red for missing
-    credentials, while a real assertion failure still does.
-
-    A non-zero exit with no test results at all -- no native output, or a
-    total of zero -- means pql-test never connected to the model (most
-    commonly a local Desktop session that closed). There is nothing to
-    report as a finding, so this degrades to skipped the same way, instead
-    of the misleading "0 tests, 0 passed, 0 failed, 0 skipped" failed
-    message a bare fall-through would produce.
-
-    A run can also have results -- pql-test discovers tests statically from
-    the model's TMDL, so it reports a count of tests it never managed to
-    run, each failing with the same connection-refused error rather than an
-    assertion mismatch. Nothing executed, so that is reported as a warning
-    with no tests: not `failed` (nothing asserted wrong), not `passed`
-    (a green check over an empty run is how a developer comes to believe
-    tests ran when they did not). Only when every failure shares that
-    signature, though -- one genuine assertion failure among connection
-    errors must still fail the run.
-    """
-    counts = test_summary or {}
-    passed = counts.get("passed", 0)
-    failed = counts.get("failed", 0)
-    skipped = counts.get("skipped", 0)
-    total = counts.get("total", 0)
-    counter_msg = f"{total} tests, {passed} passed, {failed} failed, {skipped} skipped"
-
-    # "Did anything run?" is asked before "did it pass?": zero tests passing
-    # is not a pass, and a green check is how a developer comes to believe
-    # tests ran when none did.
-    if total == 0 and not findings:
-        return "warning", _nothing_ran_message(returncode, connection_error)
-    if returncode == 0 and not findings:
-        return "passed", f"pql-test passed: {counter_msg}"
-    all_skipped = (
-        test_summary is not None and total > 0 and passed == 0 and failed == 0
-        and skipped == total
-    )
-    if all_skipped:
-        return "skipped", f"pql-test skipped: {counter_msg}"
-    if _is_connection_skip(findings):
-        return "warning", "pql-test ran no tests: could not connect to the model"
-    return "failed", f"pql-test failed: {counter_msg}"
 
 
 def _narrate_header(
@@ -470,17 +344,17 @@ def run_pql_test(args: argparse.Namespace) -> int:
 
     # Reconstruct counters from the result list when the native file does not
     # include a summary block (older pql-test versions or mocked stdout).
-    test_summary = test_summary or _summarize_results(test_results)
-    connection_error = _discovery_connection_error(f"{proc.stdout or ''}\n{proc.stderr or ''}")
-    status, message = _pql_status(test_summary, findings, proc.returncode, connection_error)
+    test_summary = test_summary or summarize_results(test_results)
+    connection_error = discovery_connection_error(f"{proc.stdout or ''}\n{proc.stderr or ''}")
+    status, message = classify(test_summary, findings, proc.returncode, connection_error)
 
     # pql-test's counts describe tests it discovered from the TMDL, not tests
     # it ran. When none of them executed, reporting any count overstates what
     # happened -- and the counts are what a reader believes, so they have to
     # agree with the status above. native.json keeps pql-test's own numbers.
-    if _is_connection_skip(findings):
+    if is_connection_skip(findings):
         test_results = []
-        test_summary = dict(_NOTHING_RAN)
+        test_summary = dict(NOTHING_RAN)
 
     # One call for every outcome: the branch below differs only in narration
     # and exit code. `findings if status == "failed" else []` covers both --
