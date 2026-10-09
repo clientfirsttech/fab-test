@@ -527,8 +527,6 @@ def _build_config_from_args(
 
 def _load_impact_manifest(path: Path) -> list[ResolvedReport]:
     """Load reports from an impact manifest JSON."""
-    import json
-
     with open(path, encoding="utf-8") as fh:
         data = json.load(fh)
     return [
@@ -538,6 +536,7 @@ def _load_impact_manifest(path: Path) -> list[ResolvedReport]:
             report_name=report["report_name"],
             semantic_model_id=report["semantic_model_id"],
             environment=report.get("environment", ""),
+            report_type=report.get("report_type", "report"),
         )
         for report in data.get("reports", [])
     ]

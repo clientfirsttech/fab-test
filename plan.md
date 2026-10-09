@@ -28,6 +28,8 @@ Guiding vision and constraints: [vision.md](vision.md)
 
 ## Completed Epics
 
+- [Playwright Changed-Since](tasks/archive/2026-10-09-playwright-changed-since.md) — `fab-test playwright --workspace WS --changed-since REF` tests only the deployed reports a Git change touches (reports on a changed semantic model, or changed reports themselves, interactive or paginated, including uncommitted and untracked folders and loose `.rdl` files), replacing the three-step `detect_changes.py` → `playwright-impact` → `--impact-manifest` pipeline; `playwright-impact` retired. Open: a paginated *dependent* of a changed model is still typed interactive (shared dependents lookup).
+
 - [Playwright CI Guide](tasks/archive/2026-10-08-playwright-ci-guide.md) — `docs/PLAYWRIGHT-CI.md` takes a team from no service principal to a green `fab-test playwright` run in GitHub Actions, with a copy-ready example workflow and this repo's own `playwright-demo.yml` behind the protected `fabric-demo` Environment. Live runs surfaced and fixed `doctor` workspace resolution, `sh`-vs-`bash` in the container, Playwright version drift (`PLAYWRIGHT_PIN`), and RLS role discovery for non-PBIP models via XMLA/ADOMD.NET (`xmla_roles.py`). Re-verified live 2026-10-08.
 
 - [Playwright Dataset Target](tasks/archive/2026-10-08-playwright-dataset-target.md) — `fab-test playwright --dataset-id` runs only the dataset's dependent reports (interactive and paginated) instead of every local report; `--dataset-workspace-id` alone runs every semantic model's dependents in that workspace, and with a bare `--artifact` refines to one report or one named dataset, with `--env` able to supply the workspace. Live-verified 2026-09-26.

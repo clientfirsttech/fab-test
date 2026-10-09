@@ -86,11 +86,14 @@ def resolve_changed_reports(args: argparse.Namespace) -> list[Path]:
         raise DatasetTargetExit(0)
 
     reports = {entry.report_id: (entry.report_name, entry.workspace_id) for entry in manifest.reports}
+    types = {entry.report_id: entry.report_type for entry in manifest.reports}
     report_workspaces, report_names = _disambiguate_stems(reports)
     setattr(args, REPORT_WORKSPACES_ATTR, report_workspaces)
     setattr(args, REPORT_NAMES_ATTR, report_names)
-    # The impact lookup only ever surfaces interactive reports.
-    setattr(args, REPORT_TYPES_ATTR, dict.fromkeys(report_workspaces, "report"))
+    # One stem per report ID, in the same order.
+    setattr(args, REPORT_TYPES_ATTR, {
+        stem: types[report_id] for stem, report_id in zip(report_workspaces, reports, strict=True)
+    })
     narrate(
         f"  fab-test playwright: {len(report_workspaces)} report(s) affected by changes since {ref}: "
         + ", ".join(report_workspaces),

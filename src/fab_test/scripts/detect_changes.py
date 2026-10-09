@@ -144,17 +144,23 @@ def group_changes_by_artifact(changed_files: list[str], artifact_map: dict[str, 
             (i for i, part in enumerate(parts) if detect_artifact_type(part, artifact_map) != "Unknown"),
             None,
         )
-        if artifact_index is None:
+        if artifact_index is not None:
+            artifact_path = "/".join(parts[: artifact_index + 1])
+            artifact_name = parts[artifact_index]
+            artifact_type = detect_artifact_type(artifact_name, artifact_map)
+        elif posix_path.endswith(".rdl"):
+            # A loose .rdl is a paginated report on its own, the same way local
+            # discovery treats it; artifact-map.json can't say so, since every
+            # suffix it declares is a folder.
+            artifact_path, artifact_name, artifact_type = posix_path, parts[-1], "PaginatedReport"
+        else:
             continue
-
-        artifact_path = "/".join(parts[: artifact_index + 1])
-        artifact_name = parts[artifact_index]
 
         if artifact_path not in changed_artifacts:
             changed_artifacts[artifact_path] = {
                 "path": artifact_path,
                 "name": artifact_name,
-                "type": detect_artifact_type(artifact_name, artifact_map),
+                "type": artifact_type,
                 "changed_files": []
             }
 

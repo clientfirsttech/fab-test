@@ -18,6 +18,7 @@ from fab_test.scripts import _playwright_changed as changed
 from fab_test.scripts._mode import resolve_mode
 from fab_test.scripts._playwright_dataset_target import (
     REPORT_NAMES_ATTR,
+    REPORT_TYPES_ATTR,
     REPORT_WORKSPACES_ATTR,
     DatasetTargetExit,
 )
@@ -125,7 +126,22 @@ def test_given_a_changed_model_should_target_only_its_deployed_reports(repo, fab
     assert changed.resolve_changed_reports(args) == [Path("Sales Report.Report")]
     assert getattr(args, REPORT_WORKSPACES_ATTR) == {"Sales Report": WS}
     assert getattr(args, REPORT_NAMES_ATTR) == {"Sales Report": "Sales Report"}
+    assert getattr(args, REPORT_TYPES_ATTR) == {"Sales Report": "report"}
     assert "Sales Report" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize(
+    "changed_file",
+    ["fabric-artifacts/Invoice.PaginatedReport/Invoice.rdl", "reports/Invoice.rdl"],
+    ids=["paginated-report-folder", "loose-rdl"],
+)
+def test_given_a_changed_paginated_report_should_target_it_as_paginated(repo, fabric, changed_file):
+    fabric.add_item(WS, "PaginatedReport", "rpt-invoice", "Invoice")
+    _write(repo, changed_file)
+    args = _args(repo)
+    assert changed.resolve_changed_reports(args) == [Path("Invoice.Report")]
+    assert getattr(args, REPORT_WORKSPACES_ATTR) == {"Invoice": WS}
+    assert getattr(args, REPORT_TYPES_ATTR) == {"Invoice": "paginated"}
 
 
 def test_given_a_new_undeployed_report_should_skip_it_and_test_the_rest(repo, fabric, capsys):

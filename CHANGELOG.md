@@ -2,6 +2,8 @@
 
 ## 2026-10-08
 
+- 🐛 - `--changed-since` Skipped Changed Paginated Reports - A changed `.PaginatedReport` folder reported "no Playwright impact", and a loose `.rdl` file was not seen as a change at all. Both now validate that deployed paginated report, rendered as paginated rather than interactive; the hidden `--impact-manifest` path keeps each report's type too.
+- 📦 - Version `1.9.0b10`.
 - ✨ - `fab-test playwright --workspace WS --changed-since REF` - Tests only the deployed reports a change touches: those built on a semantic model changed since a Git branch, tag or commit, or themselves changed. Uncommitted and untracked artifact folders count. It replaces the three-step `detect_changes.py` → `playwright-impact` → `playwright --impact-manifest` pipeline with one command that prints `mode=service`. Without `--workspace`, or with a ref Git cannot resolve, it exits `2` before any network call; nothing changed or nothing affected exits `0`. A changed report or model not yet deployed is skipped with a note, and the rest still run. Paginated reports are not yet followed by the impact step.
 - 🔄 - **Behavior change** - `playwright-impact` Is No Longer A Command - It never fit the mode rule: it printed `mode=local` while always calling the service, took only a workspace GUID, and advertised a `TARGET` it ignored. Use `playwright --changed-since`. `playwright --impact-manifest` still works for existing pipelines but is no longer listed in `--help`.
 - 📦 - Version `1.9.0b9`.

@@ -108,6 +108,26 @@ class TestGroupChangesByArtifact:
         assert shallow["fabric-artifacts/SalesModel.SemanticModel"]["name"] == "SalesModel.SemanticModel"
         assert deep["some/deeply/nested/root/SalesModel.SemanticModel"]["name"] == "SalesModel.SemanticModel"
 
+    def test_a_loose_rdl_file_is_a_paginated_report(self):
+        """An ``.rdl`` outside any artifact folder is still a paginated report."""
+        result = group_changes_by_artifact(["reports/Invoice.rdl"], {".Report": "Report"})
+
+        assert result == {
+            "reports/Invoice.rdl": {
+                "path": "reports/Invoice.rdl",
+                "name": "Invoice.rdl",
+                "type": "PaginatedReport",
+                "changed_files": ["reports/Invoice.rdl"],
+            }
+        }
+
+    def test_an_rdl_inside_a_paginated_report_folder_belongs_to_that_folder(self):
+        """The folder is the artifact; its ``.rdl`` is not counted a second time."""
+        rdl = "fabric-artifacts/Invoice.PaginatedReport/Invoice.rdl"
+        result = group_changes_by_artifact([rdl], {".PaginatedReport": "PaginatedReport"})
+
+        assert list(result) == ["fabric-artifacts/Invoice.PaginatedReport"]
+
     def test_ignores_files_outside_artifacts(self):
         """Files with no segment resolving to a known artifact type are ignored."""
         changed = ["scripts/deploy.py", ".github/workflows/ci.yml"]

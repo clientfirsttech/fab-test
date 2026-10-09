@@ -179,7 +179,7 @@ Playwright validation can run in three modes: static `.env` mode, service-resolv
 | `--dataset-id ID` | Dataset / semantic-model ID. With `--artifact`, overrides that report's binding; with no report named, tests every report built on this dataset (see below) |
 | `--dataset-workspace-id ID` | Workspace ID the dataset lives in, when different from the report's own workspace [env: `PLAYWRIGHT_DATASET_WORKSPACE_ID`] |
 | `--report-type {report,paginated}` | Force the report type instead of auto-detecting it [env: `PLAYWRIGHT_REPORT_TYPE`] |
-| `--changed-since REF` | With `--workspace`, validate only the deployed reports built on a semantic model changed since this Git branch, tag or commit, or themselves changed — committed, uncommitted or new. Needs Git only when used |
+| `--changed-since REF` | With `--workspace`, validate only the deployed reports built on a semantic model changed since this Git branch, tag or commit, or themselves changed (interactive, or paginated via a `.PaginatedReport` folder or loose `.rdl`) — committed, uncommitted or new. Needs Git only when used |
 | `--pages {auto,none}` | Discover every report page and its own bookmarks (default: `auto`); `none` tests only the default page |
 | `--roles {auto,none}` | Discover RLS/OLS roles from the semantic model and test the page matrix under each one whenever RLS is in play — `PLAYWRIGHT_USE_RLS`, **or** an effective-identity user being configured at all (default: `auto`); `none` tests only `PLAYWRIGHT_ROLE` |
 | `--user-name UPN` | Effective-identity user for RLS embed tokens. Outranks `PLAYWRIGHT_USER_NAME`, which outranks `playwright_user_name` in `fab-test.yml` |
@@ -599,7 +599,7 @@ No Report matching 'ThinReport' in workspace 33333333-3333-3333-3333-33333333333
 Closest candidates: Sales Report, Marketing Report, and 3 more.
 ```
 
-Changed-since mode validates only the deployed reports a change touches. Git lists the Fabric artifacts changed since REF (against the merge base, so the working tree's uncommitted and untracked changes count too); Fabric lists the deployed reports in the workspace built on those semantic models, or that are those reports. Only those run:
+Changed-since mode validates only the deployed reports a change touches. Git lists the Fabric artifacts changed since REF (against the merge base, so the working tree's uncommitted and untracked changes count too); Fabric lists the deployed reports in the workspace built on those semantic models, or that are those reports. A changed `.PaginatedReport` folder or loose `.rdl` file is that deployed paginated report, rendered as paginated. Only those run:
 
 ```bash
 fab-test playwright --workspace "Sales Dev" --changed-since main

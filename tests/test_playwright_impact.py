@@ -238,3 +238,31 @@ def test_build_impact_manifest_skips_an_artifact_not_deployed(env_file: Path) ->
     assert [entry.report_name for entry in manifest.reports] == ["Sales Report"]
     assert any("Brand New" in s and "not deployed" in s for s in manifest.skipped)
     assert any("Unpublished" in s and "not deployed" in s for s in manifest.skipped)
+
+
+def test_a_written_manifest_loads_back_with_each_report_type(tmp_path: Path) -> None:
+    """A paginated report in a manifest file still runs as paginated under --impact-manifest."""
+    from fab_test.scripts.invoke_playwright import _load_impact_manifest
+
+    manifest = ImpactManifest()
+    for report_id, name, report_type in (("rpt-1", "Sales Report", "report"), ("rpt-2", "Invoice", "paginated")):
+        manifest.add_report(
+            ResolvedReport(
+                workspace_id="ws-dev",
+                report_id=report_id,
+                report_name=name,
+                semantic_model_id="sm-1",
+                environment="dev",
+                report_type=report_type,
+            ),
+            f"changed {name}",
+        )
+    path = tmp_path / "impact.json"
+    manifest.write(path)
+
+    loaded = _load_impact_manifest(path)
+
+    assert {report.report_name: report.report_type for report in loaded} == {
+        "Sales Report": "report",
+        "Invoice": "paginated",
+    }
