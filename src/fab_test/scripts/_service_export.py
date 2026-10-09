@@ -57,6 +57,7 @@ _JSON_SECRET = re.compile(r'(?i)("(?:password|pwd|accountkey|sharedaccesskey|cli
 _CI_VARIABLES = ("CI", "GITHUB_ACTIONS", "TF_BUILD")
 _FABRIC_SCOPE = "https://api.fabric.microsoft.com/.default"
 _WINDOWS_PATH_TOO_LONG = 206  # ERROR_FILENAME_EXCED_RANGE
+_WINDOWS_MAX_PATH = 260
 
 
 class ServiceExportError(Exception):
@@ -448,12 +449,15 @@ def _export_item(
     parts = _fetch_definition(rest, args, workspace_id, item, item_type)
     if any(part["path"] == "report.json" for part in parts):
         return None
-    root = output_dir / name / _safe(args.resolved_mode.workspace or workspace_id) / _safe(item["displayName"])
+    # Shared by every analyzer that reads it, and a run targets one workspace,
+    # so neither is a folder: PBIR's nested visuals already crowd Windows'
+    # 260-character limit. The item ID keeps two same-named items apart.
+    root = output_dir / "export" / _safe(item["id"])[:8]
     if output_dir.resolve() not in root.resolve().parents:
         raise ServiceExportError(f"refusing export path outside {output_dir}", 1)
     args.__dict__.setdefault("_export_roots", []).append(root)
     try:
-        return _write_parts(parts, root / "export", item_type, item["displayName"])
+        return _write_parts(parts, root, item_type, item["displayName"])
     except OSError as exc:
         raise _write_failure(exc, f"{item['displayName']}.{item_type}") from exc
 
@@ -465,7 +469,9 @@ def _write_failure(exc: OSError, label: str) -> ServiceExportError:
     crosses Windows' 260-character limit (WinError 206) under a deep output dir.
     """
     text = f"cannot write the export of {label} to {exc.filename}: {exc.strerror}"
-    if exc.errno == errno.ENAMETOOLONG or getattr(exc, "winerror", None) == _WINDOWS_PATH_TOO_LONG:
+    # Windows also reports an over-long path as "not found" when a parent could not be created.
+    too_long = len(str(Path(exc.filename or "").absolute())) >= _WINDOWS_MAX_PATH or exc.errno == errno.ENAMETOOLONG
+    if too_long or getattr(exc, "winerror", None) == _WINDOWS_PATH_TOO_LONG:
         text += "; the path is too long -- pass a shorter --output-dir or enable Windows long-path support"
     return ServiceExportError(text, 1)
 
@@ -507,9 +513,8 @@ def finalize_exports(args: argparse.Namespace) -> None:
     for root in roots:
         if not getattr(args, "keep_export", False):
             shutil.rmtree(root, ignore_errors=True)
-            for parent in (root.parent, root.parent.parent):
-                with contextlib.suppress(OSError):
-                    parent.rmdir()
+            with contextlib.suppress(OSError):
+                root.parent.rmdir()  # the shared export/ folder, once empty
             continue
         for path in root.rglob("*"):
             if path.is_symlink() or not path.is_file():

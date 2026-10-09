@@ -196,8 +196,10 @@ Defects found (tasks below):
 ## Exports Fit Windows Path Limits
 
 **Requirements**:
-- Given a deployed item with a long display name and deep PBIR/TMDL parts, should export it under the default results directory from a typical repository path on Windows without exceeding 260 characters (drop the repeated name/GUID segments, or shorten them)
-- Given an export that still cannot be written because a path is too long, should name a shorter `--output-dir` or Windows long-path support for every analyzer, not only `pbir`
+- Given a deployed item with a long display name and deep PBIR/TMDL parts, should export it under the default results directory from a typical repository path on Windows without exceeding 260 characters (drop the repeated name/GUID segments, or shorten them) ✅
+- Given an export that still cannot be written because a path is too long, should name a shorter `--output-dir` or Windows long-path support for every analyzer, not only `pbir` ✅
+
+**Done 2026-10-09** (decided: change it in the beta). Exports go to `<out>/export/<first 8 characters of the item ID>/<Item>.<Type>/`: one export is already shared by every analyzer that reads it and a run targets one workspace, so neither needs a folder, and the item ID also stops two same-named items overwriting each other (a latent collision in the old layout). `_write_failure` adds the remediation whenever the absolute path reaches 260 characters, whatever the errno -- the live `bpa` failure was ENOENT. Live: `bpa` and `pbir --workspace --keep-export` analyze all 6 models and 8 reports, including `Report with Bookmarks - Broken Visuals`; longest kept path 203 characters, was 262.
 
 ---
 
