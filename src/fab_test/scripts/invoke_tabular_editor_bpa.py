@@ -542,10 +542,12 @@ def run_bpa(args: argparse.Namespace) -> int:
     # Stem comes from the .SemanticModel folder, not the definition/ path.
     artifact_stem = artifact_root.stem
     _env_out = envelope_path("bpa", artifact_stem)
-    _nat_out = native_output_path("bpa", artifact_stem, "xml")
-
     output_path = Path(args.output_path) if args.output_path else _env_out
-    native_out = Path(args.native_output_path) if args.native_output_path else _nat_out
+    native_out = (
+        Path(args.native_output_path)
+        if args.native_output_path
+        else native_output_path("bpa", artifact_stem, "xml", beside=output_path)
+    )
 
     level = _verbosity()
     _narrate_header(

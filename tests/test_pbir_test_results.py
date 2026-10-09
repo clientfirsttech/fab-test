@@ -60,7 +60,7 @@ def _run(tmp_path: Path, results: list[dict], monkeypatch):
     inspector = tmp_path / "PBIRInspectorCLI"
     inspector.write_text("fake", encoding="utf-8")
     inspector.chmod(0o755)
-    output = tmp_path / "envelope.json"
+    output = tmp_path / "fab-test-results" / "pbir" / "SalesReport" / "envelope.json"
 
     native_dir = tmp_path / "fab-test-results" / "pbir" / "SalesReport"
     native_dir.mkdir(parents=True, exist_ok=True)

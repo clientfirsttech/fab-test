@@ -287,9 +287,8 @@ def run_pql_test(args: argparse.Namespace) -> int:
     desktop_model_name = getattr(args, "desktop_model_name", "")
 
     _env_out = envelope_path("pql_test", artifact_path.stem)
-    _nat_out = native_output_path("pql_test", artifact_path.stem, "json")
     output_path = Path(args.output_path) if args.output_path else _env_out
-    nat_out = _nat_out
+    nat_out = native_output_path("pql_test", artifact_path.stem, "json", beside=output_path)
 
     level = _verbosity()
     _narrate_header(artifact_name, artifact_path, output_path, nat_out)

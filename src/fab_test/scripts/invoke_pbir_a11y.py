@@ -297,7 +297,7 @@ def run_a11y(args: argparse.Namespace) -> int:
 
     artifact_stem = artifact_path.stem
     output_path = Path(args.output_path) if args.output_path else envelope_path("a11y", artifact_stem)
-    native_out = native_output_path("a11y", artifact_stem, "json")
+    native_out = native_output_path("a11y", artifact_stem, "json", beside=output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     native_out.parent.mkdir(parents=True, exist_ok=True)
 

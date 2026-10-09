@@ -259,9 +259,15 @@ def results_dir(analyzer: str, artifact_stem: str) -> Path:
     return Path(_RESULTS_ROOT) / analyzer / artifact_stem
 
 
-def native_output_path(analyzer: str, artifact_stem: str, extension: str) -> Path:
-    """Return the canonical path for the native output file."""
-    return results_dir(analyzer, artifact_stem) / f"native.{extension.lstrip('.')}"
+def native_output_path(analyzer: str, artifact_stem: str, extension: str, *, beside: Path | None = None) -> Path:
+    """Return the path for the native output file: beside the envelope, else the default root.
+
+    The parent passes the envelope's path (``--output-path``), already under
+    ``--output-dir``; building native output from the default root instead
+    split one artifact's results across two directories.
+    """
+    folder = beside.parent if beside is not None else results_dir(analyzer, artifact_stem)
+    return folder / f"native.{extension.lstrip('.')}"
 
 
 def envelope_path(analyzer: str, artifact_stem: str) -> Path:

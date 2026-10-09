@@ -56,7 +56,7 @@ class TestRunInspector:
         inspector = tmp_path / "PBIRInspectorCLI"
         inspector.write_text("fake", encoding="utf-8")
         inspector.chmod(0o755)
-        output = tmp_path / "out.json"
+        output = tmp_path / "fab-test-results" / "pbir" / "SalesReport" / "envelope.json"
 
         mock_run.return_value = mock.Mock(returncode=0, stdout="", stderr="")
 
@@ -94,7 +94,7 @@ class TestRunInspector:
         inspector = tmp_path / "PBIRInspectorCLI"
         inspector.write_text("fake", encoding="utf-8")
         inspector.chmod(0o755)
-        output = tmp_path / "out.json"
+        output = tmp_path / "fab-test-results" / "pbir" / "SalesReport" / "envelope.json"
 
         mock_run.return_value = mock.Mock(
             returncode=1,
@@ -130,7 +130,7 @@ class TestRunInspector:
         inspector = tmp_path / "PBIRInspectorCLI"
         inspector.write_text("fake", encoding="utf-8")
         inspector.chmod(0o755)
-        output = tmp_path / "out.json"
+        output = tmp_path / "fab-test-results" / "pbir" / "SalesReport" / "envelope.json"
 
         mock_run.return_value = mock.Mock(
             returncode=1,
@@ -164,7 +164,7 @@ class TestRunInspector:
         inspector = tmp_path / "PBIRInspectorCLI"
         inspector.write_text("fake", encoding="utf-8")
         inspector.chmod(0o755)
-        output = tmp_path / "out.json"
+        output = tmp_path / "fab-test-results" / "pbir" / "SalesReport" / "envelope.json"
 
         mock_run.return_value = mock.Mock(
             returncode=1,
@@ -196,7 +196,7 @@ class TestRunInspector:
         inspector = tmp_path / "PBIRInspectorCLI"
         inspector.write_text("fake", encoding="utf-8")
         inspector.chmod(0o755)
-        output = tmp_path / "out.json"
+        output = tmp_path / "fab-test-results" / "pbir" / "SalesReport" / "envelope.json"
 
         # The updated wrapper reads findings from the *native* output path.
         native_dir = tmp_path / "fab-test-results" / "pbir" / "SalesReport"
@@ -234,7 +234,7 @@ class TestRunInspector:
         inspector = tmp_path / "PBIRInspectorCLI"
         inspector.write_text("fake", encoding="utf-8")
         inspector.chmod(0o755)
-        output = tmp_path / "out.json"
+        output = tmp_path / "fab-test-results" / "pbir" / "SalesReport" / "envelope.json"
 
         native_dir = tmp_path / "fab-test-results" / "pbir" / "SalesReport"
         native_dir.mkdir(parents=True, exist_ok=True)
@@ -280,7 +280,7 @@ class TestRunInspector:
         inspector = tmp_path / "PBIRInspectorCLI"
         inspector.write_text("fake", encoding="utf-8")
         inspector.chmod(0o755)
-        output = tmp_path / "out.json"
+        output = tmp_path / "fab-test-results" / "pbir" / "SalesReport" / "envelope.json"
 
         native_dir = tmp_path / "fab-test-results" / "pbir" / "SalesReport"
         native_dir.mkdir(parents=True, exist_ok=True)
@@ -326,7 +326,7 @@ class TestRunInspector:
         inspector = tmp_path / "PBIRInspectorCLI"
         inspector.write_text("fake", encoding="utf-8")
         inspector.chmod(0o755)
-        output = tmp_path / "out.json"
+        output = tmp_path / "fab-test-results" / "pbir" / "SalesReport" / "envelope.json"
 
         native_dir = tmp_path / "fab-test-results" / "pbir" / "SalesReport"
         native_dir.mkdir(parents=True, exist_ok=True)
@@ -385,7 +385,7 @@ class TestRunInspector:
         inspector = tmp_path / "PBIRInspectorCLI"
         inspector.write_text("fake", encoding="utf-8")
         inspector.chmod(0o755)
-        output = tmp_path / "out.json"
+        output = tmp_path / "fab-test-results" / "pbir" / "SalesReport" / "envelope.json"
 
         native_dir = (
             tmp_path / "fab-test-results" / "pbir" / "SalesReport" / "native.json"
@@ -463,7 +463,7 @@ class TestRunInspector:
         inspector = tmp_path / "PBIRInspectorCLI"
         inspector.write_text("fake", encoding="utf-8")
         inspector.chmod(0o755)
-        output = tmp_path / "out.json"
+        output = tmp_path / "fab-test-results" / "pbir" / "SalesReport" / "envelope.json"
 
         native_dir = tmp_path / "fab-test-results" / "pbir" / "SalesReport"
         native_dir.mkdir(parents=True, exist_ok=True)
@@ -535,7 +535,7 @@ class TestRunInspector:
         inspector = tmp_path / "PBIRInspectorCLI"
         inspector.write_text("fake", encoding="utf-8")
         inspector.chmod(0o755)
-        output = tmp_path / "out.json"
+        output = tmp_path / "fab-test-results" / "pbir" / "SalesReport" / "envelope.json"
 
         mock_run.side_effect = subprocess.TimeoutExpired(
             cmd=["PBIRInspectorCLI"], timeout=300
@@ -562,7 +562,7 @@ class TestRunInspector:
         inspector = tmp_path / "PBIRInspectorCLI"
         inspector.write_text("fake", encoding="utf-8")
         inspector.chmod(0o755)
-        output = tmp_path / "out.json"
+        output = tmp_path / "fab-test-results" / "pbir" / "SalesReport" / "envelope.json"
 
         mock_run.side_effect = FileNotFoundError(2, "No such file")
 

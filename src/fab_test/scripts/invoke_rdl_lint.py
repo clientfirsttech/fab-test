@@ -161,7 +161,7 @@ def run_rdl_lint(args: argparse.Namespace) -> int:
     output_path = (
         Path(args.output_path) if getattr(args, "output_path", "") else envelope_path("rdl", artifact_stem)
     )
-    native_out = native_output_path("rdl", artifact_stem, "json")
+    native_out = native_output_path("rdl", artifact_stem, "json", beside=output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     native_out.parent.mkdir(parents=True, exist_ok=True)
 

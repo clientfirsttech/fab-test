@@ -206,7 +206,9 @@ Defects found (tasks below):
 ## Native Output Honors --output-dir
 
 **Requirements**:
-- Given `--output-dir DIR`, should write each analyzer's native output (`native.json`/`native.xml`) under DIR beside its envelope, never under `./fab-test-results/`
+- Given `--output-dir DIR`, should write each analyzer's native output (`native.json`/`native.xml`) under DIR beside its envelope, never under `./fab-test-results/` ✅
+
+**Done 2026-10-09.** `native_output_path` takes `beside=` (the envelope path the parent passes as `--output-path`); all seven `invoke_*.py` wrappers pass it, guarded by a test that scans each wrapper. Thirteen PBIR Inspector unit tests had planted the fake tool's `native.json` at the default root while passing a loose `out.json` envelope; they now pass the envelope path the parent really uses. Live: `pbir` and `rdl` service runs with `--output-dir` write envelope and native output side by side and create no `./fab-test-results/`.
 
 ---
 
