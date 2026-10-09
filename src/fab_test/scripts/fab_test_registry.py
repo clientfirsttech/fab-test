@@ -81,7 +81,6 @@ ANALYZER_REGISTRY: dict[str, tuple[str, str]] = {
     "pql_test": ("*.SemanticModel", "pql-test"),
     "pql_lint": ("*.SemanticModel", "pqlint"),
     "playwright": ("*.Report", "Playwright visual/error validation"),
-    "playwright-impact": ("", "Playwright impact manifest builder"),
     "dependencies": ("", "Report dependency discovery"),
     "rdl": ("*.rdl", "RDL (paginated report) static analysis"),
 }
@@ -121,7 +120,6 @@ ANALYZER_SCOPES: dict[str, frozenset[str]] = {
     "rdl": frozenset({"path", "desktop", "workspace"}),
     "pql_test": frozenset({"path", "desktop", "workspace"}),
     "playwright": frozenset({"path", "workspace"}),
-    "playwright-impact": frozenset({"path", "workspace"}),
     "dependencies": frozenset({"path", "workspace"}),
 }
 
@@ -201,7 +199,7 @@ _BOOTSTRAPPED_ANALYZERS = {"bpa", "pbir", "a11y", "data_agent"}
 # only -- a running Power BI Desktop instance to bind to. Without this set,
 # check_readiness reported them ready on the strength of having no tool to
 # find, a green light `doctor` could not honor.
-_CLOUD_ANALYZERS = {"pql_test", "playwright", "playwright-impact", "dependencies"}
+_CLOUD_ANALYZERS = {"pql_test", "playwright", "dependencies"}
 
 # The subset that can bind to a running Desktop instance instead of a
 # workspace. Only pql_test does today; see build_pql_test_command.
@@ -743,35 +741,6 @@ def build_playwright_command(
     return cmd
 
 
-def build_playwright_impact_command(
-    artifact: Path,  # noqa: ARG001 - uniform builder signature
-    args: argparse.Namespace,
-    output_dir: Path,  # noqa: ARG001 - uniform builder signature
-) -> list[str]:
-    """Build the Playwright impact manifest command for ``artifact``."""
-    changed_artifacts = getattr(args, "changed_artifacts", "changed-artifacts.json")
-    cmd = [
-        sys.executable,
-        "-m",
-        _script_module("invoke_playwright_impact"),
-        "--changed-artifacts",
-        str(changed_artifacts),
-    ]
-    env_file = getattr(args, "playwright_env_file", None)
-    if env_file:
-        cmd += ["--env-file", str(env_file)]
-    env = getattr(args, "environment", "") or __import__("os").getenv("FABRIC_ENVIRONMENT", "")
-    if env:
-        cmd += ["--env", env]
-    workspace_id = getattr(args, "workspace_id", "") or __import__("os").getenv("FABRIC_WORKSPACE_ID", "")
-    if workspace_id:
-        cmd += ["--workspace-id", workspace_id]
-    output_path = getattr(args, "output_path", None)
-    if output_path:
-        cmd += ["--output", str(output_path)]
-    return cmd
-
-
 def build_dependencies_command(
     _artifact: Path,
     args: argparse.Namespace,
@@ -807,7 +776,6 @@ _COMMAND_BUILDERS: dict[str, Any] = {
     "pql_test": build_pql_test_command,
     "pql_lint": build_pql_lint_command,
     "playwright": build_playwright_command,
-    "playwright-impact": build_playwright_impact_command,
     "dependencies": build_dependencies_command,
     "rdl": build_rdl_command,
 }
@@ -815,7 +783,7 @@ _COMMAND_BUILDERS: dict[str, Any] = {
 
 # Analyzers that operate on a repository-level artifact path rather than a
 # Fabric artifact directory.
-_REPOSITORY_SCOPED_ANALYZERS = {"playwright-impact", "dependencies"}
+_REPOSITORY_SCOPED_ANALYZERS = {"dependencies"}
 
 
 def is_repository_scoped(name: str) -> bool:

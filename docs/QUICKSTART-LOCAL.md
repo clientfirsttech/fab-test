@@ -10,7 +10,7 @@ The project must be saved in PBIP format with the semantic model in **TMDL** and
 # 1. Install the beta from PyPI
 #    The exact pin is required because pip skips pre-releases (or pass --pre).
 #    The package is cft-fab-test; the command it installs is still fab-test.
-pip install "cft-fab-test==1.9.0b8"
+pip install "cft-fab-test==1.9.0b9"
 
 # 2. Check what's ready
 fab-test doctor --local

@@ -200,7 +200,6 @@ _SUBCOMMAND_ALIASES = {
     "pql_test": "pql_test",
     "pql-lint": "pql_lint",
     "pql_lint": "pql_lint",
-    "playwright_impact": "playwright-impact",
 }
 
 # Canonical (hyphenated, displayed) subcommand name -> internal registry key,
@@ -515,7 +514,20 @@ def _add_playwright_subparser(subs: argparse._SubParsersAction) -> None:
         default=None,
         dest="impact_manifest",
         metavar="PATH",
-        help="Path to impacted-report manifest JSON",
+        # Kept for pipelines built on the retired `playwright-impact` command;
+        # --changed-since replaces it.
+        help=argparse.SUPPRESS,
+    )
+    playwright_p.add_argument(
+        "--changed-since",
+        default="",
+        dest="changed_since",
+        metavar="REF",
+        help=(
+            "With --workspace, test only the deployed reports built on a semantic model "
+            "changed since this Git branch, tag or commit, or themselves changed "
+            "(committed, uncommitted or new)"
+        ),
     )
     playwright_p.add_argument(
         "--workspace",
@@ -626,50 +638,6 @@ def _add_playwright_subparser(subs: argparse._SubParsersAction) -> None:
         ),
     )
     add_execution_flags(playwright_p)
-
-def _add_playwright_impact_subparser(subs: argparse._SubParsersAction) -> None:
-    impact_p = subs.add_parser(
-        "playwright-impact",
-        aliases=["playwright_impact"],
-        help="Build impacted-report manifest for Playwright validation",
-    )
-    _add_common_flags(impact_p)
-    impact_p.add_argument(
-        "--changed-artifacts",
-        default="changed-artifacts.json",
-        dest="changed_artifacts",
-        metavar="PATH",
-        help="Path to changed-artifacts.json (default: changed-artifacts.json)",
-    )
-    impact_p.add_argument(
-        "--output",
-        default=None,
-        dest="output_path",
-        metavar="PATH",
-        help="Path for the JSON impact manifest",
-    )
-    impact_p.add_argument(
-        "--env-file",
-        default=None,
-        dest="playwright_env_file",
-        metavar="PATH",
-        help="Path to .env file with service principal credentials",
-    )
-    impact_p.add_argument(
-        "--workspace-id",
-        default="",
-        dest="workspace_id",
-        metavar="ID",
-        type=_guid_type,
-        help="Fabric workspace ID [env: FABRIC_WORKSPACE_ID]",
-    )
-    impact_p.add_argument(
-        "--env",
-        default="",
-        dest="environment",
-        metavar="ENV",
-        help="Environment label (e.g. DEV, PROD, ANY) [env: FABRIC_ENVIRONMENT]",
-    )
 
 def _add_dependencies_subparser(subs: argparse._SubParsersAction) -> None:
     deps_p = subs.add_parser(
@@ -1051,7 +1019,6 @@ _SUBPARSER_BUILDERS = (
     _add_pql_lint_subparser,
     _add_rdl_subparser,
     _add_playwright_subparser,
-    _add_playwright_impact_subparser,
     _add_dependencies_subparser,
     _add_all_subparser,
     _add_auth_subparser,

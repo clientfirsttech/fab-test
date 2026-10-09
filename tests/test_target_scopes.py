@@ -71,7 +71,7 @@ def test_only_service_capable_analyzers_accept_a_workspace():
     accepting = {name for name, scopes in ANALYZER_SCOPES.items() if "workspace" in scopes}
 
     assert accepting == {
-        "bpa", "pbir", "a11y", "rdl", "pql_test", "playwright", "playwright-impact", "dependencies"
+        "bpa", "pbir", "a11y", "rdl", "pql_test", "playwright", "dependencies"
     }
 
 

@@ -29,6 +29,7 @@ from ._fab_test_context import (
     _PYPROJECT_CONFIG,
     RESULTS_ROOT,
 )
+from ._playwright_changed import changed_since_requested, resolve_changed_reports
 from ._playwright_dataset_target import (
     DatasetTargetExit,
     dataset_target_requested,
@@ -599,13 +600,15 @@ def _playwright_service_resolved_target(args: argparse.Namespace) -> list[Path] 
     non-local modes, or ``None`` when none apply and ordinary discovery
     should decide instead.
 
-    Covers an impact manifest (repository-scoped), `--dataset-id` (that
+    Covers `--changed-since` and an impact manifest, `--dataset-id` (that
     dataset's dependents), and `--dataset-workspace-id` alone (every dataset
     in that workspace) -- split out of `_discover_for` so its own early
     returns don't count against that function's return-count budget.
     """
     if getattr(args, "impact_manifest", None):
         return [Path(".")]
+    if changed_since_requested(args):
+        return resolve_changed_reports(args)
     if workspace_reports_requested(args):
         return resolve_workspace_reports(args)
     if dataset_target_requested(args):

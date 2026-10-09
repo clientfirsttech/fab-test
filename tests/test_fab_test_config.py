@@ -305,7 +305,6 @@ _SUBCOMMAND_NAMES = (
     "pql-test",
     "pql-lint",
     "playwright",
-    "playwright-impact",
     "dependencies",
     "all",
     "clean-tools",

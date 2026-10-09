@@ -145,7 +145,7 @@ def test_build_impact_manifest_deduplicates(
     client.add_dependent("ws-dev", "sm-1", "rpt-1", "Sales Report")
 
     manifest = build_impact_manifest(
-        changed_artifacts, "dev", client, env_path=env_file
+        load_changed_artifacts(changed_artifacts), "dev", client, env_path=env_file
     )
 
     assert len(manifest.reports) == 1
@@ -167,7 +167,7 @@ def test_build_impact_manifest_skips_unsupported(
     client.add_dependent("ws-dev", "sm-1", "rpt-1", "Sales Report")
 
     manifest = build_impact_manifest(
-        changed_artifacts, "dev", client, env_path=env_file
+        load_changed_artifacts(changed_artifacts), "dev", client, env_path=env_file
     )
 
     assert any("Notebook" in skipped for skipped in manifest.skipped)
@@ -193,7 +193,7 @@ environments:
     client = FakeClient()
 
     with pytest.raises(ServiceResolutionError) as exc_info:
-        build_impact_manifest(changed_artifacts, "dev", client, env_path=env_file)
+        build_impact_manifest(load_changed_artifacts(changed_artifacts), "dev", client, env_path=env_file)
     assert "workspace_id" in str(exc_info.value)
 
 
@@ -219,3 +219,22 @@ def test_impact_manifest_write(tmp_path: Path) -> None:
     assert '"total": 1' in data
     assert '"report_id": "rpt-1"' in data
     assert "Notebook" in data
+
+
+def test_build_impact_manifest_skips_an_artifact_not_deployed(env_file: Path) -> None:
+    """A changed report or model with no deployed item is noted, not fatal."""
+    client = FakeClient()
+    client.add_item("ws-dev", "SemanticModel", "sm-1", "Sales Model")
+    client.add_item("ws-dev", "Report", "rpt-1", "Sales Report")
+    client.add_dependent("ws-dev", "sm-1", "rpt-1", "Sales Report")
+    artifacts = [
+        {"name": "Sales Model.SemanticModel", "type": "SemanticModel"},
+        {"name": "Brand New.Report", "type": "Report"},
+        {"name": "Unpublished.SemanticModel", "type": "SemanticModel"},
+    ]
+
+    manifest = build_impact_manifest(artifacts, "dev", client, env_path=env_file)
+
+    assert [entry.report_name for entry in manifest.reports] == ["Sales Report"]
+    assert any("Brand New" in s and "not deployed" in s for s in manifest.skipped)
+    assert any("Unpublished" in s and "not deployed" in s for s in manifest.skipped)

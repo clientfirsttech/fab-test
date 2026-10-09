@@ -94,7 +94,7 @@ def test_list_empty_artifact_dir_exits_zero_with_zero_counts(tmp_path):
 
 @pytest.mark.fab_test
 def test_list_repository_scoped_analyzers_have_no_glob():
-    """dependencies/playwright-impact run once against the repo, not a glob match."""
+    """dependencies runs once against the repo, not a glob match."""
     result = subprocess.run(
         ["fab-test", "list", "--format", "json"],
         capture_output=True,

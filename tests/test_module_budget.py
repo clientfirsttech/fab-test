@@ -282,8 +282,10 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
         ),
     ),
     "src/fab_test/scripts/fab_test_execution.py": (
-        893,
+        896,
         (
+            "2026-10-08: +3 lines importing and dispatching --changed-since "
+            "(_playwright_changed.py holds the logic) in _playwright_service_resolved_target. "
             "2026-10-08: +1 line appending credential_failure_detail (-v/-vv sign-in detail) "
             "to the could-not-resolve-workspace error; the detail itself lives in "
             "fabric_service_client.py. "
