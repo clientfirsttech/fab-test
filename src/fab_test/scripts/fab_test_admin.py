@@ -34,6 +34,7 @@ from ._metadata import (
     resolve_metadata,
 )
 from ._mode import ModeError, ResolvedMode, resolve_mode
+from ._pql_identity import token_account, token_tenant
 from ._scan import find_skipped_checkouts as _find_skipped_checkouts
 from ._service_export import service_item_type, service_readiness
 from ._target import TargetError, select_target
@@ -642,8 +643,8 @@ def _explain_analyzer(args: argparse.Namespace) -> int:
     return 0
 
 
-def _verify_ambient_credential() -> None:
-    """Acquire a token from the ambient Azure credential, or raise.
+def _verify_ambient_credential() -> str:
+    """Acquire a token from the ambient Azure credential and return it, or raise.
 
     Split out so `auth status` has one seam to stub in tests and one place
     where a network call is deliberately allowed. `check_readiness` may
@@ -652,7 +653,7 @@ def _verify_ambient_credential() -> None:
     """
     from .playwright_validation.fabric_service_client import _authenticate_ambient
 
-    _authenticate_ambient()
+    return _authenticate_ambient()
 
 
 def _check_workspace_reachable(workspace_id: str, args: argparse.Namespace) -> bool:
@@ -695,9 +696,10 @@ def _auth_status(args: argparse.Namespace) -> int:
         )
 
     verified, detail = status.verified, status.detail
+    account, tenant_id = None, status.tenant_id
     if not verified:
         try:
-            _verify_ambient_credential()
+            token = _verify_ambient_credential() or ""
         except Exception as exc:  # noqa: BLE001 - boundary: any credential
             # failure becomes a reported status, never a traceback
             return _print_auth_status(
@@ -715,6 +717,13 @@ def _auth_status(args: argparse.Namespace) -> int:
                 exit_code=127,
             )
         verified, detail = True, f"{status.source} verified"
+        # An ambient sign-in is whoever last ran `az login` (or VS Code, or
+        # ...): name that account, or a run against the wrong tenant's
+        # same-named workspace looks like a fab-test bug.
+        account = token_account(token) or None
+        tenant_id = token_tenant(token) or tenant_id
+        if account:
+            detail = f"{status.source} verified as {account}"
 
     workspace_id = getattr(args, "workspace_id", "") or (
         getattr(args, "file_config", None) or {}
@@ -731,7 +740,8 @@ def _auth_status(args: argparse.Namespace) -> int:
         {
             "identity": {
                 "source": status.source,
-                "tenant_id": status.tenant_id,
+                "account": account,
+                "tenant_id": tenant_id,
                 "verified": verified,
             },
             "workspace": workspace,

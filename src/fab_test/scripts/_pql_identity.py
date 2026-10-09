@@ -22,18 +22,34 @@ _PQL_CREDENTIAL_VARS = ("PQL_TENANT_ID", "PQL_CLIENT_ID", "PQL_CLIENT_SECRET")
 _ACCOUNT_CLAIMS = ("upn", "unique_name", "preferred_username")
 
 
-def token_account(token: str) -> str:
-    """Return the account a Fabric access token was issued to, or "" for an app or unreadable token.
+def _token_claims(token: str) -> dict:
+    """Return a JWT's payload claims, or {} when it cannot be read.
 
-    Reads the JWT payload without verifying it: the token is our own, just
-    acquired, and only its name is compared -- never trusted for access.
+    Reads the payload without verifying it: the token is our own, just
+    acquired, and its claims are only reported or compared -- never trusted
+    for access.
     """
     try:
         payload = token.split(".")[1]
         claims = json.loads(base64.urlsafe_b64decode(payload + "=" * (-len(payload) % 4)))
     except (IndexError, ValueError):
-        return ""
+        return {}
+    return claims if isinstance(claims, dict) else {}
+
+
+def token_account(token: str) -> str:
+    """Return the account a Fabric access token was issued to, or "" for an app or unreadable token."""
+    claims = _token_claims(token)
     return next((str(claims[c]) for c in _ACCOUNT_CLAIMS if claims.get(c)), "")
+
+
+def token_tenant(token: str) -> str:
+    """Return the tenant a token was issued in, or "" when it cannot be read.
+
+    The same address can be signed in to more than one tenant, and each can
+    hold a workspace of the same name -- the tenant is what tells them apart.
+    """
+    return str(_token_claims(token).get("tid", ""))
 
 
 def _pql_auth_status() -> dict[str, str] | None:

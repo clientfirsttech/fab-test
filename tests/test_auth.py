@@ -14,6 +14,7 @@ and always pass on any machine. The CLI tests cover wiring and the paths
 that provably make no network call.
 """
 
+import base64
 import json
 import os
 import subprocess
@@ -114,6 +115,23 @@ def test_status_verifies_an_unverified_ambient_credential(monkeypatch, capsys):
 
     assert fab_test_module._auth(_args()) == 0
     assert "verified" in capsys.readouterr().out.lower()
+
+
+@pytest.mark.fab_test
+def test_status_names_the_signed_in_account_and_tenant(monkeypatch, capsys):
+    """An ambient sign-in is whoever last ran `az login`; status must say who that is."""
+    claims = base64.urlsafe_b64encode(json.dumps({"upn": "a@work.com", "tid": "tenant-guid"}).encode())
+    monkeypatch.setattr(
+        fab_test_admin,
+        "probe_credentials",
+        lambda **kw: _resolved(source="ambient:DefaultAzureCredential", verified=False),
+    )
+    monkeypatch.setattr(fab_test_admin, "_verify_ambient_credential", lambda: f"h.{claims.decode()}.s")
+
+    assert fab_test_module._auth(_args()) == 0
+    out = capsys.readouterr().out
+    assert "a@work.com" in out
+    assert "tenant-guid" in out
 
 
 @pytest.mark.fab_test

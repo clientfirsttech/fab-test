@@ -7,6 +7,7 @@ enumeration, caching, cleanup and refusal rules without a tenant.
 import argparse
 import base64
 import errno
+import json
 import re
 from pathlib import Path
 
@@ -263,6 +264,17 @@ def test_given_a_service_export_should_name_the_credential_once(
     svc.export_for_analyzer("pbir", args, tmp_path)
     svc.export_for_analyzer("a11y", args, tmp_path)
     assert capsys.readouterr().err.count(expected) == 1
+
+
+def test_given_a_signed_in_person_should_name_the_account_and_tenant(fake, tmp_path, capsys):
+    client, _ = fake
+    client.credential_source = "ambient:DefaultAzureCredential"
+    claims = base64.urlsafe_b64encode(json.dumps({"upn": "a@work.com", "tid": "t-guid"}).encode()).decode()
+    client.access_token = f"h.{claims}.s"
+    client.items = [{"id": "r1", "displayName": "Rpt"}]
+    args = _args("Dev.Workspace/Rpt.Report", workspace_id=WS, analyzer="pbir")
+    svc.export_for_analyzer("pbir", args, tmp_path)
+    assert "auth=ambient:DefaultAzureCredential account=a@work.com tenant=t-guid" in capsys.readouterr().err
 
 
 def test_given_json_output_should_not_print_the_credential(fake, tmp_path, capsys):

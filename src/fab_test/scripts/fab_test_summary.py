@@ -168,6 +168,10 @@ def _print_auth_status(
     identity = payload["identity"]
     rows = [
         ("identity", identity["source"] or "(none resolved)"),
+    ]
+    if identity.get("account"):
+        rows.append(("account", identity["account"]))
+    rows += [
         ("tenant", identity["tenant_id"] or "-"),
         ("verified", "yes" if identity["verified"] else "no"),
     ]
