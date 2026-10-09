@@ -88,6 +88,32 @@ ExitCode {
 }
 ```
 
+### Service mode
+
+```
+ServiceMode {
+  fn mode(target, flags) {
+    (target is "WS.Workspace/NAME[.Type]")        => service, that one deployed item
+    (--workspace WS and no target)                 => service, every deployed item of the analyzer's type; local folders ignored unless --artifact-dir is passed
+    (workspace: in fab-test.yml, FABRIC_WORKSPACE_ID) => a default only; never turns a bare run into service mode
+  }
+  first stderr line: "mode=service workspace=<name> source=<target|flag|env|config|default>"   // silent under -q and --format json
+  envelope: carries mode and source
+  analyzers: bpa | pbir | a11y | rdl export the definition read-only; pql-test connects over XMLA and exports nothing
+  all --workspace: runs fab_test_all from analyzers.json (bpa, pbir, pql-test, rdl) -- not playwright; use playwright --workspace for renders
+}
+
+Constraints {
+  (more than 50 items of one type and no --all) => exit 2 naming --all
+  (one item cannot be exported or is PBIR-Legacy) => that item is named and fails the run (exit 1); the others are still analyzed
+  (a workspace target names no deployed item) => exit 1 listing the closest names
+  (HTTP 401) => the message says the token was rejected and names az login --tenant / FABRIC_TENANT_ID
+  (HTTP 403) => the message names the read access the identity needs
+  (no credential resolves) => exit 127
+  exports are deleted after the run; --keep-export keeps them redacted under fab-test-results/export/<item id>/<Item>.<Type>/
+}
+```
+
 ### JSON stdout guarantee
 
 ```

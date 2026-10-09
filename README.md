@@ -488,6 +488,26 @@ fab-test all local/Sales                                  # everything that can 
 
 Not every analyzer accepts every form. Run `fab-test list` for the Scopes column, and see the [targeting reference](https://github.com/clientfirsttech/fab-test/blob/main/.github/skills/fab-test/references/targeting-and-discovery.md#targeting) for the rules. `--artifact STEM` still works as a deprecated alias.
 
+### Testing what's deployed
+
+`bpa`, `pbir`, `a11y`, and `rdl` can test what is deployed in a workspace instead of what is on disk. They export each item's definition read-only, analyze it like a local folder, and delete the export afterwards. `pql-test` connects to the deployed model directly and downloads nothing.
+
+```bash
+fab-test bpa "Sales Dev.Workspace/Sales.SemanticModel"   # one deployed model
+fab-test bpa "Sales Dev.Workspace/Sales"                 # untyped: resolved as the analyzer's own type
+fab-test pbir --workspace "Sales Dev"                    # every deployed report; local folders are ignored
+fab-test all --workspace "Sales Dev"                     # bpa, pbir, pql-test and rdl over deployed items
+```
+
+The target decides the mode, and every run says which it chose on its first line: `mode=service workspace=Sales Dev source=target`. `workspace:` in `fab-test.yml` and `FABRIC_WORKSPACE_ID` only supply a default; they never turn a bare `fab-test bpa` into a service run.
+
+- **Credentials** come from the chain under [Credentials](#credentials): a service principal, then an ambient `az login`. A rejected token (HTTP 401) names `az login --tenant`; a missing permission (403) names the access the identity needs.
+- **`--keep-export`** keeps the redacted definitions under `fab-test-results/export/<item id>/<Item>.<Type>/` instead of deleting them.
+- **More than 50 items** of one type stops with exit `2` naming `--all`; pass `--all` to proceed.
+- **One item that cannot be exported** (a PBIR-Legacy report, a missing permission) is named and fails the run; the others are still tested.
+
+For CI, copy [docs/examples/github-actions/service-mode.yml](https://github.com/clientfirsttech/fab-test/blob/main/docs/examples/github-actions/service-mode.yml).
+
 ### Credentials
 
 **`fab-test` stores no credentials**: no token, no cache, no credential file. It reads what your environment already provides and delegates sign-in to the tool that owns the credential, so there is no `fab-test` token cache to look for.

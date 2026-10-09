@@ -225,11 +225,13 @@ Defects found (tasks below):
 ## Document All Three Callers
 
 **Requirements**:
-- Given the human caller, should update README and `docs/QUICK-VALIDATION.md` with the mode-resolution matrix, service-mode examples (typed, untyped, standalone), auth options, `--keep-export`, and the `--all` threshold.
-- Given the pipeline caller, should add a copy-pasteable CI snippet running `fab-test all --workspace` with service-principal secrets under `docs/examples/`.
-- Given the agent caller, should update the fab-test skill in SudoLang — `SKILL.md`, `references/targeting-and-discovery.md` (the scopes table and the retired fabric-cicd rule, decision 2), `references/credentials.md`, `references/flags.md` — synced byte-for-byte to `src/fab_test/skill/` (guarded by `tests/test_skill_resource.py`).
-- Given vision.md names the fabric-cicd boundary, should amend it per decision 2 (read-only ephemeral export for testing is in scope; deployment remains out).
-- Given an epic-sized `src/` change, should bump MINOR in `src/fab_test/__init__.py` (`.dev1`) and add a CHANGELOG entry via `aidd-log`.
+- Given the human caller, should update README and `docs/QUICK-VALIDATION.md` with the mode-resolution matrix, service-mode examples (typed, untyped, standalone), auth options, `--keep-export`, and the `--all` threshold. ✅
+- Given the pipeline caller, should add a copy-pasteable CI snippet running `fab-test all --workspace` with service-principal secrets under `docs/examples/`. ✅
+- Given the agent caller, should update the fab-test skill in SudoLang — `SKILL.md`, `references/targeting-and-discovery.md` (the scopes table and the retired fabric-cicd rule, decision 2), `references/credentials.md`, `references/flags.md` — synced byte-for-byte to `src/fab_test/skill/` (guarded by `tests/test_skill_resource.py`). ✅
+- Given vision.md names the fabric-cicd boundary, should amend it per decision 2 (read-only ephemeral export for testing is in scope; deployment remains out). ✅
+- Given an epic-sized `src/` change, should bump MINOR in `src/fab_test/__init__.py` (`.dev1`) and add a CHANGELOG entry via `aidd-log`. ✅
+
+**Done 2026-10-09.** Most of this landed with the implementation: QUICK-VALIDATION's service-mode section, `docs/examples/github-actions/service-mode.yml`, `credentials.md`, `flags.md` (`--keep-export`, `--all`, `--interactive`), the targeting matrix, and vision.md's amended boundary. Added now: README's "Testing what's deployed" section (typed, untyped, `--workspace`, `all --workspace`, the mode line, credentials, `--keep-export` location, the 50-item limit, per-item failure) and a SudoLang `ServiceMode` block in the main `SKILL.md`'s Agent Contract (mode resolution, envelope fields, what `all --workspace` runs, and the service exit codes), synced to the packaged copy. Versioning follows the beta series the project moved to after this epic was planned: the fixes ship as the unreleased `1.9.0b10`, with CHANGELOG entries per fix, rather than a MINOR `.dev1` bump.
 
 ---
 
