@@ -186,7 +186,15 @@ def _remediation(exc: Exception, label: str) -> ServiceExportError:
             f"cannot export {label}: getDefinition returned 404 -- the item is not in "
             "enhanced/Git-integration format, or it no longer exists"
         )
-    elif status in (401, 403):
+    elif status == 401:
+        # Authentication, not permission: found live with an `az login` user from another tenant.
+        text = (
+            f"cannot export {label}: Fabric rejected the token (HTTP 401) -- it is for a different "
+            "tenant than the workspace, expired, or the tenant does not yet let service principals "
+            "use Fabric APIs. Check which identity `fab-test auth status` reports; sign in "
+            "with `az login --tenant <tenant-id>`, or set FABRIC_TENANT_ID for a service principal"
+        )
+    elif status == 403:
         text = (
             f"cannot export {label}: this identity may not read its definition "
             f"(HTTP {status}); it needs read access plus Fabric API access. "

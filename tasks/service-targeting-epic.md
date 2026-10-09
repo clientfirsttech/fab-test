@@ -215,8 +215,10 @@ Defects found (tasks below):
 ## A Rejected Token Is Not A Missing Permission
 
 **Requirements**:
-- Given Fabric answers HTTP 401, should say the token was rejected (wrong tenant or audience) and name the credential that was used and `az login --tenant` / the service-principal tenant variable as the fix
-- Given Fabric answers HTTP 403, should keep today's missing-permission message
+- Given Fabric answers HTTP 401, should say the token was rejected (wrong tenant or audience) and name the credential that was used and `az login --tenant` / the service-principal tenant variable as the fix ✅
+- Given Fabric answers HTTP 403, should keep today's missing-permission message ✅
+
+**Done 2026-10-09.** `_remediation` splits 401 from 403. The 401 text names the three causes (another tenant, expired, service principals not yet allowed to use Fabric APIs -- the last per GETTING-STARTED's troubleshooting table) and points at `fab-test auth status` for the identity in use, which the `auth=` line also prints. Live with an `az login` user from another tenant: the 401 now reads as a rejected token naming `az login --tenant`.
 
 ---
 
