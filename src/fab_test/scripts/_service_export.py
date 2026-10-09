@@ -75,9 +75,10 @@ def service_item_type(name: str) -> str | None:
 def is_service_run(name: str, args: argparse.Namespace) -> bool:
     """True when ``name`` should materialize deployed items for this run.
 
-    `pql-test` does so under `all` or an explicit `--workspace`: otherwise
-    its `--workspace-id` keeps meaning "run the repository's models over
-    XMLA", and a typed workspace target keeps its XMLA path, as before.
+    `pql-test` does so under `all`, an explicit `--workspace`, or a target
+    naming a workspace (`WS.Workspace/NAME`); otherwise its `--workspace-id`
+    keeps meaning "run the repository's models over XMLA", as before. A
+    workspace target used to fall into local discovery and exit 0 untested.
     """
     if getattr(args, "mode", "local") != "service" or name not in SERVICE_ITEM_TYPES:
         return False
@@ -85,6 +86,7 @@ def is_service_run(name: str, args: argparse.Namespace) -> bool:
         name != "pql_test"
         or getattr(args, "analyzer", None) == "all"
         or bool(getattr(args, "service_workspace", ""))
+        or getattr(getattr(args, "resolved_target", None), "scope", "") == "workspace"
     )
 
 

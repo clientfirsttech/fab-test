@@ -186,8 +186,10 @@ Defects found (tasks below):
 ## pql-test Honors A Workspace Target
 
 **Requirements**:
-- Given `pql-test "WS.Workspace/NAME.SemanticModel"` or `pql-test "WS.Workspace/NAME"`, should run that one deployed model over XMLA, the way `--workspace` runs every model
-- Given a workspace target that names no deployed model, should exit non-zero naming the model and workspace, never 0 with "no artifacts found under <cwd>"
+- Given `pql-test "WS.Workspace/NAME.SemanticModel"` or `pql-test "WS.Workspace/NAME"`, should run that one deployed model over XMLA, the way `--workspace` runs every model ✅
+- Given a workspace target that names no deployed model, should exit non-zero naming the model and workspace, never 0 with "no artifacts found under <cwd>" ✅
+
+**Done 2026-10-09.** `is_service_run` now counts a workspace-scoped target as a service run for `pql_test`, so it reaches `_deployed_models` narrowed by `_select_items` to the named model -- the path `--workspace` already used. Without a target or `--workspace`, `--workspace-id` keeps its repository-over-XMLA meaning. Live: typed and untyped `RDLSource` targets reach the deployed model ("no tests", exit 0, same as `--workspace`); `No Such Model` exits 1 listing the closest names.
 
 ---
 

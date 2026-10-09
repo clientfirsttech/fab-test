@@ -2,6 +2,7 @@
 
 ## 2026-10-09
 
+- 🐛 - `pql-test "WS.Workspace/NAME"` Passed Without Testing - A typed or untyped workspace target fell into local discovery, printed "no *.SemanticModel artifacts found", and exited 0 for a model it never reached. It now runs that deployed model over XMLA, as `--workspace` does for every model; a name with no deployed model exits 1 naming the closest ones.
 - 🐛 - `all --workspace` Summarized Items It Never Ran - The aggregate summary rediscovered the local checkout, so a service run listed the repository's fixtures (with envelope paths that did not exist) instead of the deployed items it analyzed. It now names exactly what the run handled, in dry runs too.
 - 🐛 - One Failed Export Stopped A Whole Analyzer - A deployed item that could not be exported (for example over Windows' path limit) ended that analyzer's run, so its other items went unanalyzed. Now that item is named and fails the run, and the rest are still analyzed.
 - 🐛 - `all` Painted Every Row Of An Analyzer Failed - One failing artifact made every row of its analyzer read FAILED in the aggregate summary, even warning-only ones. Each row with its own envelope now takes its status from it, matching `run.json`.
