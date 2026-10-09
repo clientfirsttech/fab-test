@@ -267,8 +267,13 @@ def write_execution_text(path: Path, text: str) -> None:
 
 def execution_readiness(result: dict[str, Any], name: str, args: argparse.Namespace | None) -> dict[str, Any]:
     """Extend existing readiness without connecting or exposing credentials."""
+    if name != "playwright" or not result["ready"]:
+        return result
+    missing = missing_runner_message()
+    if missing:
+        return {**result, "ready": False, "reason": missing, "remediation": 'pip install "cft-fab-test[playwright]"'}
     config = getattr(args, "execution_config", ExecutionConfig())
-    if name != "playwright" or config.backend != "azure" or not result["ready"]:
+    if config.backend != "azure":
         return result
     try:
         service_environment(config, resolve_env_file(getattr(args, "playwright_env_file", None)))

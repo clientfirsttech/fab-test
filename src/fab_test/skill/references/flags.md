@@ -620,7 +620,7 @@ fab-test playwright --workspace "Sales Dev" --changed-since main
 
 It prints `mode=service workspace=Sales Dev source=flag`. Without `--workspace`, or with a ref Git cannot resolve, it exits `2` before any network call. When nothing changed, or no deployed report uses what changed, it says so and exits `0`. A changed artifact is matched to the deployed item by display name, so a renamed item shows no impact.
 
-Browser setup -- the pytest packages a run launches (`pytest`, `pytest-playwright`, `pytest-html`, `pytest-xdist`) are the `playwright` extra, not base dependencies. A run without them aborts before any embed token is minted, with an error naming the missing packages and the install command:
+Browser setup -- the pytest packages a run launches (`pytest`, `pytest-playwright`, `pytest-html`, `pytest-xdist`) are the `playwright` extra, not base dependencies. A run without them stops before any embed token is minted and exits `127` -- a setup problem, like any missing tool, never a failed render -- naming the missing packages and the install command; `doctor` reports playwright not ready for the same reason, and `--plan-only` still works without them:
 
 ```bash
 pip install "cft-fab-test[playwright]"

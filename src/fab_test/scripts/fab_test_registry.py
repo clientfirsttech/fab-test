@@ -833,6 +833,12 @@ def preflight_error(name: str, args: argparse.Namespace) -> tuple[str, int] | No
     exit code 127 ("command not found") covers any other resolution failure,
     distinguishing an unconfigured machine from a real rule violation (1).
     """
+    if name == "playwright" and not getattr(args, "plan_only", False):
+        # Its "tool" is the pytest runner; without it every case read as a failed render.
+        from .playwright_validation import execution_runtime
+
+        missing = execution_runtime.missing_runner_message()
+        return (missing, 127) if missing else None
     if name not in _BOOTSTRAPPED_ANALYZERS or not is_enabled(name):
         return None
     try:
