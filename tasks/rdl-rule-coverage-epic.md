@@ -60,6 +60,8 @@ Add a real `.rdl` per rule, as `fabric-artifacts/<RULE-ID>.PaginatedReport/`, fo
 
 ## Tier B checks
 
+**Status**: 🔄 IN-PROGRESS — DS-03, DS-04, DS-06 active (2026-10-10), each with a service-accepted fixture
+
 Implement the rules marked B that need richer analysis than a presence check: STR-03, DS-03, DS-04, DS-06, PRM-02, PRM-06, ACC-04, ACC-05, ACC-06.
 
 **Requirements**:

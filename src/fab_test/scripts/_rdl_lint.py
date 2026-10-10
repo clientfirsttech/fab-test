@@ -16,6 +16,11 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
 
+from ._rdl_checks_dataset import (
+    _check_ds03_static_parameter_lists,
+    _check_ds04_share_one_dataset,
+    _check_ds06_orphan_query_columns,
+)
 from ._rdl_checks_query import (
     _check_ds01_no_embedded_credentials,
     _check_ds02_unused_datasets,
@@ -169,7 +174,10 @@ CHECKS.update({
     "STR-01": _check_str01_current_schema,
     "DS-01": _check_ds01_no_embedded_credentials,
     "DS-02": _check_ds02_unused_datasets,
+    "DS-03": _check_ds03_static_parameter_lists,
+    "DS-04": _check_ds04_share_one_dataset,
     "DS-05": _check_ds05_no_select_star,
+    "DS-06": _check_ds06_orphan_query_columns,
     "DS-07": _check_ds07_prefer_stored_procedures,
     "QRY-01": _check_qry01_filter_in_query,
     "QRY-02": _check_qry02_no_calculated_fields,

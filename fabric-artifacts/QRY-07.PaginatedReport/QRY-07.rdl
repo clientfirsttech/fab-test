@@ -92,60 +92,63 @@
       <Query>
         <DataSourceName>EscapeRoom</DataSourceName>
         <CommandText>SELECT
-        p.PieID AS Col1,
-        p.PieID AS Col2,
-        p.PieID AS Col3,
-        p.PieID AS Col4,
-        p.PieID AS Col5,
-        p.PieID AS Col6,
-        p.PieID AS Col7,
-        p.PieID AS Col8,
-        p.PieID AS Col9,
-        p.PieID AS Col10,
-        p.PieID AS Col11,
-        p.PieID AS Col12,
-        p.PieID AS Col13,
-        p.PieID AS Col14,
-        p.PieID AS Col15,
-        p.PieID AS Col16,
-        p.PieID AS Col17,
-        p.PieID AS Col18,
-        p.PieID AS Col19,
-        p.PieID AS Col20,
-        p.PieID AS Col21,
-        p.PieID AS Col22,
-        p.PieID AS Col23,
-        p.PieID AS Col24,
-        p.PieID AS Col25,
-        p.PieID AS Col26,
-        p.PieID AS Col27,
-        p.PieID AS Col28,
-        p.PieID AS Col29,
-        p.PieID AS Col30,
-        p.PieID AS Col31,
-        p.PieID AS Col32,
-        p.PieID AS Col33,
-        p.PieID AS Col34,
-        p.PieID AS Col35,
-        p.PieID AS Col36,
-        p.PieID AS Col37,
-        p.PieID AS Col38,
-        p.PieID AS Col39,
-        p.PieID AS Col40,
-        p.PieID AS Col41,
-        p.PieID AS Col42,
-        p.PieID AS Col43,
-        p.PieID AS Col44,
-        p.PieID AS Col45,
-        p.PieID AS Col46,
-        p.PieID AS Col47,
-        p.PieID AS Col48,
-        p.PieID AS Col49,
-        p.PieID AS Col50,
-        p.PieID AS Col51,
+        p.PieID,
         p.PieName
     FROM PieData AS p
     WHERE p.PieID &gt; 0
+      AND (
+              p.PieName = 'Pie 1'
+           OR p.PieName = 'Pie 2'
+           OR p.PieName = 'Pie 3'
+           OR p.PieName = 'Pie 4'
+           OR p.PieName = 'Pie 5'
+           OR p.PieName = 'Pie 6'
+           OR p.PieName = 'Pie 7'
+           OR p.PieName = 'Pie 8'
+           OR p.PieName = 'Pie 9'
+           OR p.PieName = 'Pie 10'
+           OR p.PieName = 'Pie 11'
+           OR p.PieName = 'Pie 12'
+           OR p.PieName = 'Pie 13'
+           OR p.PieName = 'Pie 14'
+           OR p.PieName = 'Pie 15'
+           OR p.PieName = 'Pie 16'
+           OR p.PieName = 'Pie 17'
+           OR p.PieName = 'Pie 18'
+           OR p.PieName = 'Pie 19'
+           OR p.PieName = 'Pie 20'
+           OR p.PieName = 'Pie 21'
+           OR p.PieName = 'Pie 22'
+           OR p.PieName = 'Pie 23'
+           OR p.PieName = 'Pie 24'
+           OR p.PieName = 'Pie 25'
+           OR p.PieName = 'Pie 26'
+           OR p.PieName = 'Pie 27'
+           OR p.PieName = 'Pie 28'
+           OR p.PieName = 'Pie 29'
+           OR p.PieName = 'Pie 30'
+           OR p.PieName = 'Pie 31'
+           OR p.PieName = 'Pie 32'
+           OR p.PieName = 'Pie 33'
+           OR p.PieName = 'Pie 34'
+           OR p.PieName = 'Pie 35'
+           OR p.PieName = 'Pie 36'
+           OR p.PieName = 'Pie 37'
+           OR p.PieName = 'Pie 38'
+           OR p.PieName = 'Pie 39'
+           OR p.PieName = 'Pie 40'
+           OR p.PieName = 'Pie 41'
+           OR p.PieName = 'Pie 42'
+           OR p.PieName = 'Pie 43'
+           OR p.PieName = 'Pie 44'
+           OR p.PieName = 'Pie 45'
+           OR p.PieName = 'Pie 46'
+           OR p.PieName = 'Pie 47'
+           OR p.PieName = 'Pie 48'
+           OR p.PieName = 'Pie 49'
+           OR p.PieName = 'Pie 50'
+           OR p.PieName = 'Pie 51'
+      )
     ORDER BY p.PieName</CommandText>
       </Query>
       <Fields>
