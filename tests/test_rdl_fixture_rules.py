@@ -62,3 +62,17 @@ def test_fixture_trips_no_unrelated_rule(rdl: Path):
     root, namespace = parse_rdl(rdl)
     fired = {rule for f in run_checks(root, namespace, _CATALOG) for rule in f["rule"].split("/")}
     assert fired - {rdl.stem} == _KNOWN_EXTRA.get(rdl.stem, set())
+
+
+_PASS_FIXTURES = sorted((_REPO / "fabric-artifacts").glob("*-Pass.PaginatedReport/*-Pass.rdl"))
+
+# Rules a -Pass fixture can't avoid. QRY-07's near-miss is 50 lines of inline
+# SQL, which is DS-07 by definition. Shrink this; never grow it.
+_PASS_KNOWN_EXTRA = {"QRY-07-Pass": {"DS-07"}}
+
+
+@pytest.mark.parametrize("rdl", [pytest.param(p, id=p.stem) for p in _PASS_FIXTURES])
+def test_pass_fixture_trips_no_rule(rdl: Path):
+    root, namespace = parse_rdl(rdl)
+    fired = {rule for f in run_checks(root, namespace, _CATALOG) for rule in f["rule"].split("/")}
+    assert fired == _PASS_KNOWN_EXTRA.get(rdl.stem, set())

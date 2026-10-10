@@ -84,7 +84,7 @@ STR-02, LAY-07, SUB-03..SUB-06 and ACC-07 need a template, the network, other re
 
 ## Pass fixtures
 
-**Status**: 📋 NEXT — RDL Rule Settings landed 2026-10-10; resume from the saved generator and tests.
+**Status**: ✅ DONE (2026-10-10). 33 `-Pass` fixtures, each service-accepted then deleted from Dev; only QRY-07-Pass trips another rule (DS-07). The pre-fix QRY-03 and LAY-05 checks fail 6 of them, so they guard real false positives. PRM-04 has none while it stays planned.
 
 Give every active rule a near-miss fixture, `fabric-artifacts/<RULE-ID>-Pass.PaginatedReport/<RULE-ID>-Pass.rdl`, that must not trip it, so a false positive fails a test against a real file.
 

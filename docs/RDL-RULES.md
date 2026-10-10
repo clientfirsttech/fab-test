@@ -122,7 +122,9 @@ named for it (`DS-02.rdl` exists to violate DS-02). `tests/test_rdl_rule_status.
 every active rule to have a check and a fixture that trips it, so a rule cannot
 become active without one, and `tests/test_rdl_fixture_rules.py` checks each
 fixture against the rule in its name. A fixture for a rule with no check yet is
-an expected failure, so the test flips when the check is added. Promoting a
-rule is one change: add its fixture, then set `"status": "active"` in
-`rdl-rules.json`. The planned rules are tracked in
+an expected failure, so the test flips when the check is added. Every active rule also has a near-miss,
+`fabric-artifacts/<RULE-ID>-Pass.PaginatedReport/`: the fixed form, or a
+threshold just short of firing, which must trip no rule at all, so a false
+positive fails a test against a real file. Promoting a rule is one change: add
+both fixtures, then set `"status": "active"` in `rdl-rules.json`. The planned rules are tracked in
 [tasks/rdl-rule-coverage-epic.md](../tasks/rdl-rule-coverage-epic.md).

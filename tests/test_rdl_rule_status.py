@@ -83,3 +83,12 @@ class TestPackagedCatalog:
         root, ns = parse_rdl(fixture)
         fired = {r for f in run_checks(root, ns, _RULES) for r in f["rule"].split("/")}
         assert rule["id"] in fired
+
+    @pytest.mark.parametrize("rule", _ACTIVE, ids=lambda r: r["id"])
+    def test_an_active_rule_has_a_pass_fixture_it_does_not_trip(self, rule):
+        """The near-miss: the remediated form, or a threshold just short of firing."""
+        fixture = _fixture_path(f"{rule['id']}-Pass")
+        assert fixture.exists(), f"{rule['id']} is active but has no near-miss fixture {fixture.name}"
+        root, ns = parse_rdl(fixture)
+        fired = {r for f in run_checks(root, ns, _RULES) for r in f["rule"].split("/")}
+        assert rule["id"] not in fired
