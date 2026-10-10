@@ -440,6 +440,9 @@ def test_run_analyzer_playwright_with_impact_manifest_is_repository_scoped(
 
     monkeypatch.setattr(fab_test_execution, "_is_ci", lambda: False)
     monkeypatch.setattr(fab_test_execution, "_send_telemetry", lambda *a, **k: None)
+    # Scoping is under test, not prerequisites: the preflight would otherwise
+    # need a pytest runner and a service principal on the machine.
+    monkeypatch.setattr(fab_test_execution, "_preflight_error", lambda *a, **k: None)
 
     commands: list[list[str]] = []
 
