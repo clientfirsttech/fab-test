@@ -206,3 +206,73 @@ def _check_ds04_share_one_dataset(root: ET.Element, _namespace: str, rule: dict[
                     ),
                 })
     return findings
+
+
+_PARAMETER_TYPES = {
+    "System.String": "String",
+    "System.Boolean": "Boolean",
+    "System.DateTime": "DateTime",
+    "System.DateTimeOffset": "DateTime",
+    **dict.fromkeys(
+        ("System.Byte", "System.SByte", "System.Int16", "System.Int32", "System.Int64",
+         "System.UInt16", "System.UInt32", "System.UInt64"),
+        "Integer",
+    ),
+    **dict.fromkeys(("System.Decimal", "System.Double", "System.Single"), "Float"),
+}
+# A name that starts or ends with "Date" (StartDate, DateFrom), not one that
+# merely contains it (UpdatedBy).
+_DATE_NAME = re.compile(r"^[Dd]ate|Date$|^date$")
+
+
+def _source_field_type(datasets: dict[str, ET.Element], reference: ET.Element) -> str | None:
+    dataset = datasets.get((reference.findtext("DataSetName") or "").strip())
+    value_field = (reference.findtext("ValueField") or "").strip()
+    if dataset is None:
+        return None
+    field = next((f for f in dataset.findall("Fields/Field") if f.get("Name") == value_field), None)
+    return _PARAMETER_TYPES.get((field.findtext("TypeName") or "").strip()) if field is not None else None
+
+
+def _check_prm02_parameter_types(root: ET.Element, _namespace: str, _rule: dict[str, Any]) -> list[Finding]:
+    datasets = {ds.get("Name"): ds for ds in root.findall(".//DataSets/DataSet")}
+    findings: list[Finding] = []
+    for parameter in root.findall(".//ReportParameters/ReportParameter"):
+        name = parameter.get("Name") or "?"
+        declared = (parameter.findtext("DataType") or "String").strip()
+        source_types = {
+            source_type
+            for reference in parameter.findall("*/DataSetReference")
+            if (source_type := _source_field_type(datasets, reference)) is not None
+        }
+        mismatched = sorted(source_types - {declared})
+        if mismatched:
+            findings.append({
+                "object": name,
+                "message": f"declared {declared} but its values come from a {mismatched[0]} field -- match the types",
+            })
+        elif declared == "String" and _DATE_NAME.search(name):
+            findings.append({
+                "object": name,
+                "message": "a date parameter declared String -- use DateTime for a date picker and date comparison",
+            })
+    return findings
+
+
+_DATA_FIELD_COLUMN = re.compile(r"\[([^\]]+)\]$")
+
+
+def _check_str03_friendly_field_names(root: ET.Element, _namespace: str, _rule: dict[str, Any]) -> list[Finding]:
+    """A field Report Builder named by swapping a column's spaces for underscores."""
+    findings: list[Finding] = []
+    for dataset in root.findall(".//DataSets/DataSet"):
+        for field in dataset.findall("Fields/Field"):
+            name, data_field = field.get("Name") or "", (field.findtext("DataField") or "").strip()
+            bracketed = _DATA_FIELD_COLUMN.search(data_field)
+            column = bracketed.group(1) if bracketed else data_field
+            if "_" in name and " " in column and name == column.replace(" ", "_"):
+                findings.append({
+                    "object": f"{dataset.get('Name') or '?'} › {name}",
+                    "message": f"'{name}' is generated from '{column}' -- give the field a readable name",
+                })
+    return findings

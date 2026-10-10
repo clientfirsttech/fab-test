@@ -16,10 +16,13 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
 
+from ._rdl_checks_contrast import _check_acc06_text_contrast
 from ._rdl_checks_dataset import (
     _check_ds03_static_parameter_lists,
     _check_ds04_share_one_dataset,
     _check_ds06_orphan_query_columns,
+    _check_prm02_parameter_types,
+    _check_str03_friendly_field_names,
 )
 from ._rdl_checks_query import (
     _check_ds01_no_embedded_credentials,
@@ -172,6 +175,7 @@ def run_checks(root: ET.Element, namespace: str, catalog: list[dict[str, Any]]) 
 
 CHECKS.update({
     "STR-01": _check_str01_current_schema,
+    "STR-03": _check_str03_friendly_field_names,
     "DS-01": _check_ds01_no_embedded_credentials,
     "DS-02": _check_ds02_unused_datasets,
     "DS-03": _check_ds03_static_parameter_lists,
@@ -187,6 +191,7 @@ CHECKS.update({
     "QRY-06": _check_qry06_join_in_query,
     "QRY-07": _check_qry07_move_complex_sql,
     "PRM-01": _check_prm01_default_value,
+    "PRM-02": _check_prm02_parameter_types,
     "PRM-03": _check_prm03_parameter_count,
     "PRM-04": _check_prm04_multivalue_nullable,
     "PRM-05": _check_prm05_show_parameter_values,
@@ -200,6 +205,7 @@ CHECKS.update({
     "ACC-01": _check_acc01_alt_text,
     "ACC-02": _check_acc02_chart_alt_text_quality,
     "ACC-03": _check_acc03_table_caption,
+    "ACC-06": _check_acc06_text_contrast,
     "ACC-08": _check_acc08_html_link_alt_text,
 })
 

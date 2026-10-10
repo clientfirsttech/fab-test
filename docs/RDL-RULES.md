@@ -16,6 +16,7 @@ Severity `error` fails the run; `warning` does not. Tune any rule with a
 | Rule | Name | Severity | Sources |
 |------|------|----------|---------|
 | STR-01 | Report uses a current RDL schema | warning | MS Learn: Find schema version; What are paginated reports<br>[MS Learn](https://learn.microsoft.com/en-us/sql/reporting-services/reports/find-the-report-definition-schema-version-ssrs?view=sql-server-ver16) · [MS Learn](https://learn.microsoft.com/en-us/power-bi/paginated-reports/paginated-reports-report-builder-power-bi) |
+| STR-03 | Field names are friendly | warning | MS Learn: Data retrieval guidance<br>[MS Learn](https://learn.microsoft.com/en-us/power-bi/guidance/report-paginated-data-retrieval) |
 | DS-01 | No credentials in the connection string | warning | MS Learn: Embedded data sources for paginated reports; Plan to migrate .rdl reports to Power BI<br>[MS Learn](https://learn.microsoft.com/en-us/power-bi/paginated-reports/paginated-reports-embedded-data-source) · [MS Learn](https://learn.microsoft.com/en-us/power-bi/guidance/migrate-ssrs-reports-to-power-bi) |
 | DS-02 | No unused datasets | error | MS Learn: Data retrieval guidance; MSSQLTips #3659, rule 3<br>[MS Learn](https://learn.microsoft.com/en-us/power-bi/guidance/report-paginated-data-retrieval) · [MSSQLTips](https://www.mssqltips.com/sqlservertip/3659/sql-server-reporting-services-best-practices-for-performance-and-maintenance/) |
 | DS-03 | No datasets for fixed parameter lists | warning | MSSQLTips #3659, rule 3<br>[MSSQLTips](https://www.mssqltips.com/sqlservertip/3659/sql-server-reporting-services-best-practices-for-performance-and-maintenance/) |
@@ -31,6 +32,7 @@ Severity `error` fails the run; `warning` does not. Tune any rule with a
 | QRY-06 | Join in the query, not with Lookup | error | MSSQLTips #4006; MS Learn: Data retrieval guidance<br>[MSSQLTips](https://www.mssqltips.com/sqlservertip/4006/sql-server-reporting-services-best-practices-for-report-design/) · [MS Learn](https://learn.microsoft.com/en-us/power-bi/guidance/report-paginated-data-retrieval) |
 | QRY-07 | Move complex SQL into views or procs | warning | MSSQLTips #3659, rule 8<br>[MSSQLTips](https://www.mssqltips.com/sqlservertip/3659/sql-server-reporting-services-best-practices-for-performance-and-maintenance/) |
 | PRM-01 | Every parameter has a sensible default | warning | MSSQLTips #3659, rule 13<br>[MSSQLTips](https://www.mssqltips.com/sqlservertip/3659/sql-server-reporting-services-best-practices-for-performance-and-maintenance/) |
+| PRM-02 | Parameter types match the source column | error | MSSQLTips #3659, rule 14<br>[MSSQLTips](https://www.mssqltips.com/sqlservertip/3659/sql-server-reporting-services-best-practices-for-performance-and-maintenance/) |
 | PRM-03 | Keep the parameter count low | warning | MSSQLTips #3659, rule 12<br>[MSSQLTips](https://www.mssqltips.com/sqlservertip/3659/sql-server-reporting-services-best-practices-for-performance-and-maintenance/) |
 | PRM-05 | Show selected parameter values on the report | warning | MSSQLTips #4006<br>[MSSQLTips](https://www.mssqltips.com/sqlservertip/4006/sql-server-reporting-services-best-practices-for-report-design/) |
 | LAY-01 | Body fits the page | error | DataTaal guide, 2026; MSSQLTips #3659, rules 11 and 18<br>[MSSQLTips](https://www.mssqltips.com/sqlservertip/3659/sql-server-reporting-services-best-practices-for-performance-and-maintenance/) |
@@ -44,6 +46,7 @@ Severity `error` fails the run; `warning` does not. Tune any rule with a
 | ACC-01 | Every object has alt text | error | MS Learn: Accessibility features<br>[MS Learn](https://learn.microsoft.com/en-us/power-bi/paginated-reports/report-builder/paginated-create-accessible-reports) |
 | ACC-02 | Chart alt text describes the insight | error | MS Learn: Accessibility features<br>[MS Learn](https://learn.microsoft.com/en-us/power-bi/paginated-reports/report-builder/paginated-create-accessible-reports) |
 | ACC-03 | Tables have a caption or summary | warning | MS Learn: Accessibility features<br>[MS Learn](https://learn.microsoft.com/en-us/power-bi/paginated-reports/report-builder/paginated-create-accessible-reports) |
+| ACC-06 | Text contrast is at least 4.5:1 | error | MS Learn: Accessibility features<br>[MS Learn](https://learn.microsoft.com/en-us/power-bi/paginated-reports/report-builder/paginated-create-accessible-reports) |
 | ACC-08 | HTML links carry alt text | warning | MS Learn: Accessibility features<br>[MS Learn](https://learn.microsoft.com/en-us/power-bi/paginated-reports/report-builder/paginated-create-accessible-reports) |
 
 ## Planned rules
@@ -57,8 +60,6 @@ analysis.
 | Rule | Name | Tier | What it would check | Source |
 |------|------|------|---------------------|--------|
 | STR-02 | Built from a common template | C | PageHeader has logo, `Globals!ExecutionTime`, page number; PageFooter has standard notice. Compare against template. | MSSQLTips #3659 r1 |
-| STR-03 | Field names are friendly | B | `Fields/Field/@Name` has no auto-generated underscores or cryptic names. | MS Learn: Data retrieval guidance |
-| PRM-02 | Parameter types match the source column | B | `DataType` matches the SQL column type; dates use `DateTime`, not `String`. | MSSQLTips #3659 r14 |
 | PRM-04 | No MultiValue + Nullable combination | A | `MultiValue = true` with `Nullable = true` isn't supported. | MS Learn: Power BI Report Builder<br>[MS Learn](https://learn.microsoft.com/en-us/power-bi/paginated-reports/report-builder-power-bi) |
 | PRM-06 | Choose filter vs query parameter deliberately | B | Parameter in `DataSet/Filters` vs `Query/QueryParameters`. | MS Learn: Data retrieval |
 | LAY-07 | External images are reachable and small | C | `Image/Source = External`: no sign-in, under 4 MB. | MS Learn: Image guidance |
@@ -68,7 +69,6 @@ analysis.
 | SUB-06 | Migrate subreports first | C | SSRS migration ordering. | MS Learn: Subreports in Power BI |
 | ACC-04 | Titles are tagged as headings | B | Heading H1–H6 structure type on title textboxes; saved element name unconfirmed. | MS Learn: Accessibility features |
 | ACC-05 | Header rows are tagged as column headers | B | Column-header structure type on tablix header rows. | MS Learn: Accessibility features |
-| ACC-06 | Text contrast is at least 4.5:1 | B | `Style/Color` vs effective `BackgroundColor` (item → container → body). | MS Learn: Accessibility features; overview |
 | ACC-07 | Alt text and headers are clear | C | Manual review for abbreviations/codes. | MS Learn: Accessibility features |
 
 ## Reading a finding

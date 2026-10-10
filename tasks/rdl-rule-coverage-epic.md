@@ -60,7 +60,7 @@ Add a real `.rdl` per rule, as `fabric-artifacts/<RULE-ID>.PaginatedReport/`, fo
 
 ## Tier B checks
 
-**Status**: 🔄 IN-PROGRESS — DS-03, DS-04, DS-06 active (2026-10-10), each with a service-accepted fixture
+**Status**: 🔄 6 of 9 active (2026-10-10) — STR-03, DS-03, DS-04, DS-06, PRM-02, ACC-06, each with a service-accepted fixture. ACC-04/ACC-05 are blocked on one Report Builder save to confirm the structure-type element name. PRM-06 is folded into QRY-01, which already flags every report-side filter, so a separate rule would repeat its findings.
 
 Implement the rules marked B that need richer analysis than a presence check: STR-03, DS-03, DS-04, DS-06, PRM-02, PRM-06, ACC-04, ACC-05, ACC-06.
 
@@ -74,6 +74,8 @@ Implement the rules marked B that need richer analysis than a presence check: ST
 ## Tier C triage
 
 STR-02, LAY-07, SUB-03..SUB-06 and ACC-07 need a template, the network, other reports in the workspace, or manual review.
+
+**Status**: ✅ DONE (2026-10-10). Out of scope for static analysis: STR-02 (needs a team template to compare against), LAY-07 (needs the network; `rdl` stays offline), SUB-05 and SUB-06 (deployment and migration practice, not RDL content), ACC-07 (manual review). Own task: SUB-03 (a child `.rdl` in the same repository can be checked, but the engine reads one file at a time) and SUB-04 (service mode only, needs the workspace's item list).
 
 **Requirements**:
 - Given each rule, should be recorded as deliberately out of scope for static analysis or given its own task, with the reason

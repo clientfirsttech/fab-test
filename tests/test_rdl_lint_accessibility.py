@@ -1,11 +1,12 @@
 """Unit tests for _rdl_lint.py's accessibility rules (ACC-01, ACC-02,
-ACC-03, ACC-08). See _rdl_lint_fixtures.py for the shared XML builders.
+ACC-03, ACC-06, ACC-08). See _rdl_lint_fixtures.py for the shared XML builders.
 
     pytest tests/test_rdl_lint_accessibility.py
 """
 
 import pytest
 
+from fab_test.scripts._rdl_checks_contrast import _check_acc06_text_contrast
 from fab_test.scripts._rdl_lint import (
     _check_acc01_alt_text,
     _check_acc02_chart_alt_text_quality,
@@ -165,3 +166,66 @@ class TestAcc08HtmlLinkAltText:
         root, namespace = parse(tmp_path, xml)
 
         assert _check_acc08_html_link_alt_text(root, namespace, {}) == []
+
+
+def _text(
+    color: str = "", *, background: str = "", body_background: str = "", size: str = "", bold: bool = False
+) -> str:
+    run_style = "".join([
+        f"<Color>{color}</Color>" if color else "",
+        f"<FontSize>{size}</FontSize>" if size else "",
+        "<FontWeight>Bold</FontWeight>" if bold else "",
+    ])
+    box_style = f"<Style><BackgroundColor>{background}</BackgroundColor></Style>" if background else ""
+    body_style = f"<Style><BackgroundColor>{body_background}</BackgroundColor></Style>" if body_background else ""
+    return report(
+        '<Body><ReportItems><Textbox Name="Tb1"><Paragraphs><Paragraph><TextRuns><TextRun>'
+        f"<Value>Revenue</Value><Style>{run_style}</Style></TextRun></TextRuns></Paragraph></Paragraphs>"
+        f"{box_style}</Textbox></ReportItems>{body_style}</Body>"
+    )
+
+
+class TestAcc06TextContrast:
+    def test_flags_light_grey_text_on_the_default_white(self, tmp_path):
+        root, namespace = parse(tmp_path, _text("#AAAAAA"))
+
+        findings = _check_acc06_text_contrast(root, namespace, {})
+
+        assert [f["object"] for f in findings] == ["Tb1"]
+        assert "2.3:1" in findings[0]["message"]
+
+    def test_the_background_is_inherited_from_the_body(self, tmp_path):
+        root, namespace = parse(tmp_path, _text("White", body_background="#F0F0F0"))
+
+        assert len(_check_acc06_text_contrast(root, namespace, {})) == 1
+
+    def test_a_transparent_background_shows_its_container(self, tmp_path):
+        root, namespace = parse(tmp_path, _text("Black", background="Transparent", body_background="Black"))
+
+        assert len(_check_acc06_text_contrast(root, namespace, {})) == 1
+
+    def test_report_builder_header_grey_on_white_passes(self, tmp_path):
+        root, namespace = parse(tmp_path, _text("#666666", background="White"))
+
+        assert _check_acc06_text_contrast(root, namespace, {}) == []
+
+    def test_large_text_needs_only_three_to_one(self, tmp_path):
+        large = _text("#949494", size="18pt")
+        bold = _text("#949494", size="14pt", bold=True)
+        small = _text("#949494", size="12pt")
+
+        assert _check_acc06_text_contrast(*parse(tmp_path, large), {}) == []
+        assert _check_acc06_text_contrast(*parse(tmp_path, bold), {}) == []
+        assert len(_check_acc06_text_contrast(*parse(tmp_path, small), {})) == 1
+
+    def test_expressions_and_unknown_colors_are_not_judged(self, tmp_path):
+        expression = _text('=IIf(Fields!X.Value &lt; 0, "Red", "Black")')
+        unknown = _text("MediumAquamarine", background="White")
+
+        assert _check_acc06_text_contrast(*parse(tmp_path, expression), {}) == []
+        assert _check_acc06_text_contrast(*parse(tmp_path, unknown), {}) == []
+
+    def test_the_minimum_comes_from_the_catalog(self, tmp_path):
+        root, namespace = parse(tmp_path, _text("#666666"))
+
+        assert len(_check_acc06_text_contrast(root, namespace, {"min_contrast": 7.0})) == 1
