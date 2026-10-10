@@ -23,7 +23,14 @@ from ._analyzer_envelope import (
     write_envelope,
 )
 from ._metadata import RDL_RULES, default_repo_root, metadata_path
-from ._rdl_lint import CHECKS, RdlParseError, build_test_results, load_rule_catalog, parse_rdl, run_checks
+from ._rdl_lint import (
+    RdlParseError,
+    build_test_results,
+    implemented_rule_ids,
+    load_rule_catalog,
+    parse_rdl,
+    run_checks,
+)
 from ._report_html import attach_report
 from ._table_style import findings_table
 
@@ -192,7 +199,7 @@ def run_rdl_lint(args: argparse.Namespace) -> int:
         print(f"::error::{parse_error}", file=sys.stderr)
         return 1
 
-    test_results = build_test_results(catalog, findings, set(CHECKS))
+    test_results = build_test_results(catalog, findings, implemented_rule_ids(catalog))
     native_out.write_text(json.dumps(findings, indent=2), encoding="utf-8")
 
     status, message, error_count, warning_count = _outcome(findings, test_results)

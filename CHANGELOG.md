@@ -1,6 +1,11 @@
 # Changelog
 
-## 2026-10-09
+## 2026-10-10
+
+- 🔄 - **Behavior change** - `fab-test rdl` Runs 27 Rules, Up From 8 - Nineteen more Tier A rules are active, each proven by a fixture named for it that the Fabric service accepted (`fabric-artifacts/<RULE-ID>.PaginatedReport/`): DS-01, QRY-03, QRY-05, QRY-06, QRY-07, PRM-01, PRM-03, PRM-05, LAY-01 to LAY-06, SUB-01, SUB-02, ACC-01, ACC-02, ACC-08. Eight have severity `error` and can fail a run that passed before: QRY-03, QRY-06, LAY-01, LAY-03/SUB-01, SUB-02, ACC-01, ACC-02. Disable any of them with a `rules.rdl` overlay in `fab-test.yml`. PRM-04 stays planned: the service rejects any report with a MultiValue + Nullable parameter, so it has no fixture to prove it.
+- 🐛 - QRY-03 Flagged Group Subtotals - `=Sum(Fields!X.Value, "Group1")` names a tablix group, not a dataset, but was reported as aggregating a whole dataset. QRY-03 now fires only when the quoted scope is a dataset in the report, and finds the scope after a nested call such as `Sum(CDec(...), "Sales")`.
+- 🐛 - LAY-05 Flagged Every Table - The Details group Report Builder gives every table counted as a group needing a page break. Only a table with a real grouping (`GroupExpressions`) is checked now.
+- 🐛 - SUB-01 Showed As Skipped On A Clean Report - SUB-01 runs through LAY-03's check, so its `test_results` row read `skip` instead of `pass` when no subreport sat in a table.
 
 - 🐛 - A Report Ran Twice With A Different `--output-dir` - Discovery pruned only the current run's output folder, so with `--output-dir` elsewhere it scanned the default `fab-test-results/` and found the kept exports there (`--keep-export`) as artifacts: `playwright --workspace WS --artifact "Working Visuals"` rendered the report twice into one envelope. `fab-test-results` is now excluded by name, like `.venv` and `.fab-test-tools`; pointing `--artifact-dir` inside it still analyzes a kept export on purpose.
 - 👷 - Playwright Demo Workflow Chooses Browsers And Jobs - Two dispatch inputs, `browsers` (the runner, or Azure Playwright Workspaces from the environment's `PLAYWRIGHT_SERVICE_*` secrets) and `report_jobs`. The step summary leads with the run line, and `run.json`/`index.html` are uploaded. PLAYWRIGHT-CI.md adds the GitHub Actions benchmark: runner `jobs 1` 5m25s, runner `jobs 4` 1m59s, Azure `jobs 4, workers 8` 1m33s.

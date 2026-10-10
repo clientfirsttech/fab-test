@@ -223,19 +223,45 @@ def _check_qry02_no_calculated_fields(root: ET.Element, _namespace: str, _rule: 
 # that aggregates an entire named dataset from inside a report expression,
 # not a plain =Sum(Fields!X.Value) in a tablix group/total footer,  which
 # is the normal, correct way RDL shows a total and would otherwise flood
-# every ordinary report with false positives.
-_AGGREGATE_WITH_DATASET_SCOPE = re.compile(r'(?i)\b(sum|count|countdistinct|avg|max|min)\s*\([^()]*,\s*"([^"]+)"\s*\)')
+# every ordinary report with false positives. The quoted scope must name a
+# DataSet: the same syntax naming a tablix group is a group subtotal.
+_AGGREGATE_START = re.compile(r"(?i)(?<![\w.])(sum|count|countdistinct|avg|max|min)\s*\(")
+_QUOTED_SCOPE = re.compile(r'^"([^"]+)"$')
+
+
+def _last_argument(text: str, open_paren: int) -> str | None:
+    """The call's last top-level argument, or None if it has only one or never closes."""
+    depth, in_string, last_comma = 0, False, None
+    for i in range(open_paren, len(text)):
+        char = text[i]
+        if char == '"':
+            in_string = not in_string
+        elif in_string:
+            continue
+        elif char == "(":
+            depth += 1
+        elif char == ")":
+            depth -= 1
+            if depth == 0:
+                return text[last_comma + 1 : i].strip() if last_comma is not None else None
+        elif char == "," and depth == 1:
+            last_comma = i
+    return None
 
 
 def _check_qry03_aggregate_in_query(root: ET.Element, _namespace: str, _rule: dict[str, Any]) -> list[Finding]:
+    dataset_names = {ds.get("Name") for ds in root.findall(".//DataSets/DataSet")}
     findings: list[Finding] = []
     seen: set[tuple[str, str]] = set()
     for element in root.iter():
         text = (element.text or "").strip()
         if not text.startswith("="):
             continue
-        for match in _AGGREGATE_WITH_DATASET_SCOPE.finditer(text):
-            func, dataset_name = match.group(1), match.group(2)
+        for match in _AGGREGATE_START.finditer(text):
+            scope = _QUOTED_SCOPE.match(_last_argument(text, match.end() - 1) or "")
+            if scope is None or scope.group(1) not in dataset_names:
+                continue
+            func, dataset_name = match.group(1), scope.group(1)
             key = (func.lower(), dataset_name)
             if key in seen:
                 continue

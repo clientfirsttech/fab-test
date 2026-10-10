@@ -1,11 +1,11 @@
 # RDL Rule Coverage Epic
 
-**Status**: 📋 PLANNED
+**Status**: 🔄 IN-PROGRESS
 **Goal**: Every `fab-test rdl` rule is proven by a real `.rdl` fixture named for it, and the Tier B rules from [plan/rdl-rule-set.md](../plan/rdl-rule-set.md) get checks.
 
 ## Overview
 
-The RDL Static Analysis epic shipped 28 Tier A checks, but only DS-02 and QRY-01 have a fixture proving the check fires on a real Report Builder file; the other 26 are covered by synthetic XML in unit tests alone. Naming a fixture for its rule makes the gap visible, and `tests/test_rdl_fixture_rules.py` already enforces it: each `fabric-artifacts/rdl/<RULE-ID>.rdl` must trip the rule it is named for, and a fixture whose rule has no check yet is a strict xfail that flips when the check lands. This epic closes the gaps that test and the rule set expose.
+The RDL Static Analysis epic shipped 28 Tier A checks, but only DS-02 and QRY-01 have a fixture proving the check fires on a real Report Builder file; the other 26 are covered by synthetic XML in unit tests alone. Naming a fixture for its rule makes the gap visible, and `tests/test_rdl_fixture_rules.py` already enforces it: each `fabric-artifacts/<RULE-ID>.PaginatedReport/<RULE-ID>.rdl` must trip the rule it is named for, and a fixture whose rule has no check yet is a strict xfail that flips when the check lands. This epic closes the gaps that test and the rule set expose.
 
 ---
 
@@ -25,13 +25,17 @@ Only verified rules are active. Each catalog rule has `"status": "active" | "pla
 
 ## Promote planned rules
 
-For each family (parameters, layout/subreports, accessibility, query/data source): build the real `.rdl` in Report Builder, name it for the rule, confirm the rule fires, then set the rule `"status": "active"`.
+**Status**: ✅ DONE (2026-10-10) except PRM-04
+
+For each family (parameters, layout/subreports, accessibility, query/data source): build the real `.rdl`, name it for the rule, confirm the rule fires, then set the rule `"status": "active"`. 27 of 28 Tier A rules are active. PRM-04 is blocked: `updateDefinition`/create returns 400 for a MultiValue + Nullable parameter and 201 for the same file with AllowBlank, so the service itself refuses the shape the rule warns about.
 
 ---
 
 ## Isolating fixtures
 
-`QRY-01.rdl` also trips DS-01, DS-02, DS-05 and DS-07. (The old `DS-03.rdl` was a `SELECT *` file, not a DS-03 fixture, and was removed on 2026-10-01.)
+**Status**: 🔄 ratchet in place (2026-10-10)
+
+Every fixture added on 2026-10-10 trips only its rule (QRY-07 also trips DS-07: long inline SQL is inline SQL). The seven hand-built fixtures (ACC-03, DS-05, DS-07, QRY-01, QRY-02, QRY-04, STR-01) still trip others; `_KNOWN_EXTRA` in `tests/test_rdl_fixture_rules.py` lists each exactly, so it can only shrink. (The old `DS-03.rdl` was a `SELECT *` file, not a DS-03 fixture, and was removed on 2026-10-01.)
 
 **Requirements**:
 - Given a fixture named for one rule, should trip that rule and, where practical, no unrelated ones
@@ -41,10 +45,15 @@ For each family (parameters, layout/subreports, accessibility, query/data source
 
 ## Tier A fixtures
 
-Add a real `.rdl` per rule, in `fabric-artifacts/rdl/`, for the 20 planned Tier A rules: DS-01, QRY-03, QRY-05, QRY-06, QRY-07, PRM-01, PRM-03, PRM-04, PRM-05, LAY-01..LAY-06, SUB-01 (fires via LAY-03), SUB-02, ACC-01, ACC-02, ACC-08. Then set each to `"status": "active"`. Known risks to check against the real file when promoting: LAY-05 flags every table (the default `Details` group counts as a group), QRY-03 treats any quoted second argument as a dataset scope and misses nested parentheses, SUB-01 shares LAY-03's switches.
+**Status**: ✅ DONE (2026-10-10) except PRM-04, see Promote planned rules
+
+Each fixture is derived from `DS-02.rdl` (Power Query) plus one edit, with `SampleModel-PQLAssert` in fab-test [Dev] as the semantic-model source and the escape-room Azure SQL source for DS-01/QRY-07; all were deployed to fab-test [Dev] by the service principal and saved from `getDefinition`, byte-identical to what was sent. LAY-05 and QRY-03's false positives were fixed before promotion. Open: SUB-01 has no switch of its own, since disabling LAY-03 in an overlay silences both.
+
+Add a real `.rdl` per rule, as `fabric-artifacts/<RULE-ID>.PaginatedReport/`, for the 20 planned Tier A rules: DS-01, QRY-03, QRY-05, QRY-06, QRY-07, PRM-01, PRM-03, PRM-04, PRM-05, LAY-01..LAY-06, SUB-01 (fires via LAY-03), SUB-02, ACC-01, ACC-02, ACC-08. Then set each to `"status": "active"`. Known risks to check against the real file when promoting: LAY-05 flags every table (the default `Details` group counts as a group), QRY-03 treats any quoted second argument as a dataset scope and misses nested parentheses, SUB-01 shares LAY-03's switches.
 
 **Requirements**:
-- Given each fixture, should be authored or round-tripped in Report Builder rather than hand-written XML, so it reflects a real file
+- Given each fixture, should be one small edit to a real Report Builder file (a Power Query or semantic-model source from this repository), deployed to the workspace and saved from the service's `getDefinition`, so the service has accepted the file that is committed
+- Given a rule the service rejects on upload, should stay planned with the rejection recorded here
 - Given `SUB-01.rdl`, should fire as the single `LAY-03/SUB-01` finding, not two
 
 ---

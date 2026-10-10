@@ -24,7 +24,7 @@ _HEADER = """# RDL rules
 
 `fab-test rdl` checks paginated (`.rdl`) reports against the **active** rules
 below. A rule is active once it trips a real Report Builder file named for it
-(`fabric-artifacts/rdl/<RULE-ID>.rdl`); until then it is planned and does not
+(`fabric-artifacts/<RULE-ID>.PaginatedReport/<RULE-ID>.rdl`); until then it is planned and does not
 run or appear in your results. Each rule links to the guidance it comes from,
 and the same links ship in the JSON envelope as `source_urls` on every finding
 and `test_results` row.

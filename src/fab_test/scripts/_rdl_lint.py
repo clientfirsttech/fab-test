@@ -196,6 +196,12 @@ CHECKS.update({
 })
 
 
+def implemented_rule_ids(catalog: list[dict[str, Any]]) -> set[str]:
+    """Rule IDs with a check: those in CHECKS plus the ``aliases`` they also
+    report under (SUB-01 runs through LAY-03's check)."""
+    return set(CHECKS) | {alias for rule in catalog if rule["id"] in CHECKS for alias in rule.get("aliases", [])}
+
+
 def build_test_results(
     catalog: list[dict[str, Any]], findings: list[Finding], implemented: set[str]
 ) -> list[dict[str, Any]]:
