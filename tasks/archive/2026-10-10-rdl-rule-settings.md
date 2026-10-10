@@ -1,6 +1,6 @@
 # RDL Rule Settings Epic
 
-**Status**: 🔄 IN-PROGRESS
+**Status**: ✅ COMPLETED (2026-10-10)
 **Goal**: Tune and disable `fab-test rdl` rules from `fab-test.yml` without forking the catalog, with every value validated as data.
 
 ## Overview
@@ -81,6 +81,8 @@ Every built-in RDL check already has a catalog entry, so an extended rule is eit
 
 ## Documentation
 
+**Status**: ✅ DONE (2026-10-10)
+
 **Requirements**:
 - Given `docs/RDL-RULES.md`, should show each rule's settings with default and range, and how to override them
 - Given the fab-test skill and QUICK-VALIDATION, should document `settings` and disable reasons for the agent and the pipeline
@@ -88,6 +90,8 @@ Every built-in RDL check already has a catalog entry, so an extended rule is eit
 ---
 
 ## Quality gates
+
+**Status**: ✅ DONE (2026-10-10)
 
 Always last; nothing follows it.
 

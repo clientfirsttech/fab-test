@@ -58,8 +58,16 @@
       "description": "Default Fabric workspace for targets that name an artifact but not a workspace. A display name or a GUID [env: FABRIC_WORKSPACE_ID]; a positional WORKSPACE.Workspace/NAME.Type target overrides it."
     },
     "interactive_auth": {
-      "type": ["string", "boolean"],
-      "enum": ["on", "off", true, false],
+      "type": [
+        "string",
+        "boolean"
+      ],
+      "enum": [
+        "on",
+        "off",
+        true,
+        false
+      ],
       "description": "Feature flag for --interactive browser sign-in in service mode. Default on; off refuses --interactive with exit 2 [env: FAB_TEST_INTERACTIVE_AUTH=0 also disables]. Never prompts in CI."
     },
     "rules": {
@@ -74,7 +82,7 @@
           "$ref": "#/$defs/ruleOverlay"
         },
         "rdl": {
-          "$ref": "#/$defs/ruleOverlay"
+          "$ref": "#/$defs/rdlOverlay"
         }
       }
     },
@@ -151,6 +159,55 @@
         "extend": {
           "type": "string",
           "description": "Path to a JSON file of additional rules to append."
+        }
+      }
+    },
+    "rdlOverlay": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "RDL overlay: checks are built in, so there is no extend.",
+      "properties": {
+        "disable": {
+          "oneOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Rule IDs to turn off."
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "description": "Rule ID -> one-line reason, shown in the rule's skip row."
+            }
+          ]
+        },
+        "severity": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "enum": [
+              "info",
+              "warning",
+              "error"
+            ]
+          },
+          "description": "Rule ID -> severity label overrides."
+        },
+        "settings": {
+          "type": "object",
+          "description": "Rule ID -> {setting: number}. Only settings the catalog declares, inside their range (docs/RDL-RULES.md).",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number"
+            }
+          }
         }
       }
     }

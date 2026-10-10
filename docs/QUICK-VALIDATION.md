@@ -429,7 +429,7 @@ This is the case where uploading `run.json` alone still tells you what to fix. I
     path: fab-test-results/run.json
 ```
 
-To tune which rules gate the build, add a `rules.rdl` overlay in the committed `fab-test.yml` (`disable`/`severity` — see [Rule Overlays](../.github/skills/fab-test/references/configuration.md#rule-overlays)) rather than a CLI flag; there's no `--fail-on`-style flag here, since `rdl`'s severities are already the rule set's own High/Medium/Low, not a single runtime threshold.
+To tune which rules gate the build, add a `rules.rdl` overlay in the committed `fab-test.yml` (`disable`, with an optional reason; `severity`; or `rules.rdl.settings` for a threshold such as `{QRY-07: {max_lines: 80}}`, validated before the run starts — see [Rule Overlays](../.github/skills/fab-test/references/configuration.md#rule-overlays)) rather than a CLI flag; there's no `--fail-on`-style flag here, since `rdl`'s severities are already the rule set's own High/Medium/Low, not a single runtime threshold.
 
 ### Pipeline snippet: pbir-a11y accessibility checks (needs Node)
 

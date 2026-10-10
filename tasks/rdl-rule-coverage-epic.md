@@ -84,7 +84,7 @@ STR-02, LAY-07, SUB-03..SUB-06 and ACC-07 need a template, the network, other re
 
 ## Pass fixtures
 
-**Status**: ⏸ PAUSED (2026-10-10) until the RDL Rule Settings epic lands; several near-misses test its thresholds.
+**Status**: 📋 NEXT — RDL Rule Settings landed 2026-10-10; resume from the saved generator and tests.
 
 Give every active rule a near-miss fixture, `fabric-artifacts/<RULE-ID>-Pass.PaginatedReport/<RULE-ID>-Pass.rdl`, that must not trip it, so a false positive fails a test against a real file.
 

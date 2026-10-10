@@ -140,3 +140,21 @@ def test_quiet_output_is_documented_for_all_three_callers():
     assert "fab-test rdl -q" in _README.read_text(encoding="utf-8")
     assert "fab-test rdl -q" in _QUICK_VALIDATION.read_text(encoding="utf-8")
     assert "fab-test rdl -q" in _skill_text()
+
+
+@pytest.mark.fab_test
+def test_the_rule_reference_shows_each_setting_with_its_default_and_range():
+    """A human tuning a rule needs the name, today's value and what is allowed."""
+    text = (_ROOT / "docs" / "RDL-RULES.md").read_text(encoding="utf-8")
+    row = next(line for line in text.splitlines() if line.startswith("| QRY-07 |"))
+    assert "`max_lines` 50 (1-10000)" in row
+    assert "## Tune the rules" in text
+    for phrase in ("rules.rdl.settings", "disable", "reason", "extend", "fab-test init", "exit 2"):
+        assert phrase in text.split("## Tune the rules")[1].split("\n## ")[0]
+
+
+@pytest.mark.fab_test
+def test_the_agent_and_pipeline_learn_rdl_settings_and_disable_reasons():
+    skill = _skill_text()
+    assert "rules.rdl.settings" in skill and "disable: {" in skill
+    assert "rules.rdl.settings" in _QUICK_VALIDATION.read_text(encoding="utf-8")

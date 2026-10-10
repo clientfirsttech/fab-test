@@ -9,45 +9,75 @@ run or appear in your results. Each rule links to the guidance it comes from,
 and the same links ship in the JSON envelope as `source_urls` on every finding
 and `test_results` row.
 
-Severity `error` fails the run; `warning` does not. Tune any rule with a
-`rules.rdl` overlay in `fab-test.yml` (see
-[Rule Overlays](../.github/skills/fab-test/references/configuration.md)).
+Severity `error` fails the run; `warning` does not. Settings are the
+thresholds you can tune; see [Tune the rules](#tune-the-rules).
 
-| Rule | Name | Severity | Sources |
-|------|------|----------|---------|
-| STR-01 | Report uses a current RDL schema | warning | MS Learn: Find schema version; What are paginated reports<br>[MS Learn](https://learn.microsoft.com/en-us/sql/reporting-services/reports/find-the-report-definition-schema-version-ssrs?view=sql-server-ver16) · [MS Learn](https://learn.microsoft.com/en-us/power-bi/paginated-reports/paginated-reports-report-builder-power-bi) |
-| STR-03 | Field names are friendly | warning | MS Learn: Data retrieval guidance<br>[MS Learn](https://learn.microsoft.com/en-us/power-bi/guidance/report-paginated-data-retrieval) |
-| DS-01 | No credentials in the connection string | warning | MS Learn: Embedded data sources for paginated reports; Plan to migrate .rdl reports to Power BI<br>[MS Learn](https://learn.microsoft.com/en-us/power-bi/paginated-reports/paginated-reports-embedded-data-source) · [MS Learn](https://learn.microsoft.com/en-us/power-bi/guidance/migrate-ssrs-reports-to-power-bi) |
-| DS-02 | No unused datasets | error | MS Learn: Data retrieval guidance; MSSQLTips #3659, rule 3<br>[MS Learn](https://learn.microsoft.com/en-us/power-bi/guidance/report-paginated-data-retrieval) · [MSSQLTips](https://www.mssqltips.com/sqlservertip/3659/sql-server-reporting-services-best-practices-for-performance-and-maintenance/) |
-| DS-03 | No datasets for fixed parameter lists | warning | MSSQLTips #3659, rule 3<br>[MSSQLTips](https://www.mssqltips.com/sqlservertip/3659/sql-server-reporting-services-best-practices-for-performance-and-maintenance/) |
-| DS-04 | Share one dataset across data regions | warning | MSSQLTips #3659, rule 3<br>[MSSQLTips](https://www.mssqltips.com/sqlservertip/3659/sql-server-reporting-services-best-practices-for-performance-and-maintenance/) |
-| DS-05 | No SELECT * | error | MSSQLTips #3659, rule 4; MS Learn: Data retrieval guidance<br>[MSSQLTips](https://www.mssqltips.com/sqlservertip/3659/sql-server-reporting-services-best-practices-for-performance-and-maintenance/) · [MS Learn](https://learn.microsoft.com/en-us/power-bi/guidance/report-paginated-data-retrieval) |
-| DS-06 | No orphan query columns | warning | MS Learn: Data retrieval guidance<br>[MS Learn](https://learn.microsoft.com/en-us/power-bi/guidance/report-paginated-data-retrieval) |
-| DS-07 | Prefer stored procedures for relational sources | warning | MS Learn: Data retrieval guidance; DMC blog, 2023<br>[MS Learn](https://learn.microsoft.com/en-us/power-bi/guidance/report-paginated-data-retrieval) |
-| QRY-01 | Filter in the query, not the report | error | MS Learn: Performance and scalability; MSSQLTips #3659, rule 6<br>[MS Learn](https://learn.microsoft.com/en-us/power-bi/guidance/report-paginated-performance-scalability-considerations) · [MSSQLTips](https://www.mssqltips.com/sqlservertip/3659/sql-server-reporting-services-best-practices-for-performance-and-maintenance/) |
-| QRY-02 | No report-level calculated fields | warning | MS Learn: Data retrieval guidance; MSSQLTips #3659, rule 7<br>[MS Learn](https://learn.microsoft.com/en-us/power-bi/guidance/report-paginated-data-retrieval) · [MSSQLTips](https://www.mssqltips.com/sqlservertip/3659/sql-server-reporting-services-best-practices-for-performance-and-maintenance/) |
-| QRY-03 | Aggregate in the query | error | MS Learn: Performance and scalability; MSSQLTips #4006<br>[MS Learn](https://learn.microsoft.com/en-us/power-bi/guidance/report-paginated-performance-scalability-considerations) · [MSSQLTips](https://www.mssqltips.com/sqlservertip/4006/sql-server-reporting-services-best-practices-for-report-design/) |
-| QRY-04 | Sort in the query | warning | MSSQLTips #3659, rule 10<br>[MSSQLTips](https://www.mssqltips.com/sqlservertip/3659/sql-server-reporting-services-best-practices-for-performance-and-maintenance/) |
-| QRY-05 | Convert types in the query | warning | MSSQLTips #3659, rule 9<br>[MSSQLTips](https://www.mssqltips.com/sqlservertip/3659/sql-server-reporting-services-best-practices-for-performance-and-maintenance/) |
-| QRY-06 | Join in the query, not with Lookup | error | MSSQLTips #4006; MS Learn: Data retrieval guidance<br>[MSSQLTips](https://www.mssqltips.com/sqlservertip/4006/sql-server-reporting-services-best-practices-for-report-design/) · [MS Learn](https://learn.microsoft.com/en-us/power-bi/guidance/report-paginated-data-retrieval) |
-| QRY-07 | Move complex SQL into views or procs | warning | MSSQLTips #3659, rule 8<br>[MSSQLTips](https://www.mssqltips.com/sqlservertip/3659/sql-server-reporting-services-best-practices-for-performance-and-maintenance/) |
-| PRM-01 | Every parameter has a sensible default | warning | MSSQLTips #3659, rule 13<br>[MSSQLTips](https://www.mssqltips.com/sqlservertip/3659/sql-server-reporting-services-best-practices-for-performance-and-maintenance/) |
-| PRM-02 | Parameter types match the source column | error | MSSQLTips #3659, rule 14<br>[MSSQLTips](https://www.mssqltips.com/sqlservertip/3659/sql-server-reporting-services-best-practices-for-performance-and-maintenance/) |
-| PRM-03 | Keep the parameter count low | warning | MSSQLTips #3659, rule 12<br>[MSSQLTips](https://www.mssqltips.com/sqlservertip/3659/sql-server-reporting-services-best-practices-for-performance-and-maintenance/) |
-| PRM-05 | Show selected parameter values on the report | warning | MSSQLTips #4006<br>[MSSQLTips](https://www.mssqltips.com/sqlservertip/4006/sql-server-reporting-services-best-practices-for-report-design/) |
-| LAY-01 | Body fits the page | error | DataTaal guide, 2026; MSSQLTips #3659, rules 11 and 18<br>[MSSQLTips](https://www.mssqltips.com/sqlservertip/3659/sql-server-reporting-services-best-practices-for-performance-and-maintenance/) |
-| LAY-02 | Avoid TotalPages | warning | MSSQLTips #3659, rule 15<br>[MSSQLTips](https://www.mssqltips.com/sqlservertip/3659/sql-server-reporting-services-best-practices-for-performance-and-maintenance/) |
-| LAY-03 | Avoid subreports inside data regions | error | MSSQLTips #3659, rule 19<br>[MSSQLTips](https://www.mssqltips.com/sqlservertip/3659/sql-server-reporting-services-best-practices-for-performance-and-maintenance/) |
-| LAY-04 | Use interactive sort only when needed | warning | MSSQLTips #3659, rule 17<br>[MSSQLTips](https://www.mssqltips.com/sqlservertip/3659/sql-server-reporting-services-best-practices-for-performance-and-maintenance/) |
-| LAY-05 | Large reports have page breaks | warning | MSSQLTips #3659, rules 16 and 20<br>[MSSQLTips](https://www.mssqltips.com/sqlservertip/3659/sql-server-reporting-services-best-practices-for-performance-and-maintenance/) |
-| LAY-06 | Avoid embedded images | warning | MS Learn: Image guidance<br>[MS Learn](https://learn.microsoft.com/en-us/power-bi/paginated-reports/report-design/embed-image-report-report-builder-service) |
-| SUB-01 | Prefer nested data regions or drillthrough over a subreport in a tablix | error | MS Learn: Add a subreport and parameters; MS Learn: Subreports (SSRS)<br>[MS Learn](https://learn.microsoft.com/en-us/power-bi/paginated-reports/parameters/add-subreport-parameters-report-builder) · [MS Learn](https://learn.microsoft.com/en-us/sql/reporting-services/report-design/subreports-report-builder-and-ssrs?view=sql-server-ver17) |
-| SUB-02 | Stay under 50 subreports per main report | error | MS Learn: Troubleshoot subreports<br>[MS Learn](https://learn.microsoft.com/en-us/power-bi/paginated-reports/subreports-troubleshoot) |
-| ACC-01 | Every object has alt text | error | MS Learn: Accessibility features<br>[MS Learn](https://learn.microsoft.com/en-us/power-bi/paginated-reports/report-builder/paginated-create-accessible-reports) |
-| ACC-02 | Chart alt text describes the insight | error | MS Learn: Accessibility features<br>[MS Learn](https://learn.microsoft.com/en-us/power-bi/paginated-reports/report-builder/paginated-create-accessible-reports) |
-| ACC-03 | Tables have a caption or summary | warning | MS Learn: Accessibility features<br>[MS Learn](https://learn.microsoft.com/en-us/power-bi/paginated-reports/report-builder/paginated-create-accessible-reports) |
-| ACC-06 | Text contrast is at least 4.5:1 | error | MS Learn: Accessibility features<br>[MS Learn](https://learn.microsoft.com/en-us/power-bi/paginated-reports/report-builder/paginated-create-accessible-reports) |
-| ACC-08 | HTML links carry alt text | warning | MS Learn: Accessibility features<br>[MS Learn](https://learn.microsoft.com/en-us/power-bi/paginated-reports/report-builder/paginated-create-accessible-reports) |
+| Rule | Name | Severity | Settings | Sources |
+|------|------|----------|----------|---------|
+| STR-01 | Report uses a current RDL schema | warning |  | MS Learn: Find schema version; What are paginated reports<br>[MS Learn](https://learn.microsoft.com/en-us/sql/reporting-services/reports/find-the-report-definition-schema-version-ssrs?view=sql-server-ver16) · [MS Learn](https://learn.microsoft.com/en-us/power-bi/paginated-reports/paginated-reports-report-builder-power-bi) |
+| STR-03 | Field names are friendly | warning |  | MS Learn: Data retrieval guidance<br>[MS Learn](https://learn.microsoft.com/en-us/power-bi/guidance/report-paginated-data-retrieval) |
+| DS-01 | No credentials in the connection string | warning |  | MS Learn: Embedded data sources for paginated reports; Plan to migrate .rdl reports to Power BI<br>[MS Learn](https://learn.microsoft.com/en-us/power-bi/paginated-reports/paginated-reports-embedded-data-source) · [MS Learn](https://learn.microsoft.com/en-us/power-bi/guidance/migrate-ssrs-reports-to-power-bi) |
+| DS-02 | No unused datasets | error |  | MS Learn: Data retrieval guidance; MSSQLTips #3659, rule 3<br>[MS Learn](https://learn.microsoft.com/en-us/power-bi/guidance/report-paginated-data-retrieval) · [MSSQLTips](https://www.mssqltips.com/sqlservertip/3659/sql-server-reporting-services-best-practices-for-performance-and-maintenance/) |
+| DS-03 | No datasets for fixed parameter lists | warning |  | MSSQLTips #3659, rule 3<br>[MSSQLTips](https://www.mssqltips.com/sqlservertip/3659/sql-server-reporting-services-best-practices-for-performance-and-maintenance/) |
+| DS-04 | Share one dataset across data regions | warning | `min_similarity` 0.9 (0.5-1.0) | MSSQLTips #3659, rule 3<br>[MSSQLTips](https://www.mssqltips.com/sqlservertip/3659/sql-server-reporting-services-best-practices-for-performance-and-maintenance/) |
+| DS-05 | No SELECT * | error |  | MSSQLTips #3659, rule 4; MS Learn: Data retrieval guidance<br>[MSSQLTips](https://www.mssqltips.com/sqlservertip/3659/sql-server-reporting-services-best-practices-for-performance-and-maintenance/) · [MS Learn](https://learn.microsoft.com/en-us/power-bi/guidance/report-paginated-data-retrieval) |
+| DS-06 | No orphan query columns | warning |  | MS Learn: Data retrieval guidance<br>[MS Learn](https://learn.microsoft.com/en-us/power-bi/guidance/report-paginated-data-retrieval) |
+| DS-07 | Prefer stored procedures for relational sources | warning |  | MS Learn: Data retrieval guidance; DMC blog, 2023<br>[MS Learn](https://learn.microsoft.com/en-us/power-bi/guidance/report-paginated-data-retrieval) |
+| QRY-01 | Filter in the query, not the report | error |  | MS Learn: Performance and scalability; MSSQLTips #3659, rule 6<br>[MS Learn](https://learn.microsoft.com/en-us/power-bi/guidance/report-paginated-performance-scalability-considerations) · [MSSQLTips](https://www.mssqltips.com/sqlservertip/3659/sql-server-reporting-services-best-practices-for-performance-and-maintenance/) |
+| QRY-02 | No report-level calculated fields | warning |  | MS Learn: Data retrieval guidance; MSSQLTips #3659, rule 7<br>[MS Learn](https://learn.microsoft.com/en-us/power-bi/guidance/report-paginated-data-retrieval) · [MSSQLTips](https://www.mssqltips.com/sqlservertip/3659/sql-server-reporting-services-best-practices-for-performance-and-maintenance/) |
+| QRY-03 | Aggregate in the query | error |  | MS Learn: Performance and scalability; MSSQLTips #4006<br>[MS Learn](https://learn.microsoft.com/en-us/power-bi/guidance/report-paginated-performance-scalability-considerations) · [MSSQLTips](https://www.mssqltips.com/sqlservertip/4006/sql-server-reporting-services-best-practices-for-report-design/) |
+| QRY-04 | Sort in the query | warning |  | MSSQLTips #3659, rule 10<br>[MSSQLTips](https://www.mssqltips.com/sqlservertip/3659/sql-server-reporting-services-best-practices-for-performance-and-maintenance/) |
+| QRY-05 | Convert types in the query | warning |  | MSSQLTips #3659, rule 9<br>[MSSQLTips](https://www.mssqltips.com/sqlservertip/3659/sql-server-reporting-services-best-practices-for-performance-and-maintenance/) |
+| QRY-06 | Join in the query, not with Lookup | error |  | MSSQLTips #4006; MS Learn: Data retrieval guidance<br>[MSSQLTips](https://www.mssqltips.com/sqlservertip/4006/sql-server-reporting-services-best-practices-for-report-design/) · [MS Learn](https://learn.microsoft.com/en-us/power-bi/guidance/report-paginated-data-retrieval) |
+| QRY-07 | Move complex SQL into views or procs | warning | `max_lines` 50 (1-10000) | MSSQLTips #3659, rule 8<br>[MSSQLTips](https://www.mssqltips.com/sqlservertip/3659/sql-server-reporting-services-best-practices-for-performance-and-maintenance/) |
+| PRM-01 | Every parameter has a sensible default | warning |  | MSSQLTips #3659, rule 13<br>[MSSQLTips](https://www.mssqltips.com/sqlservertip/3659/sql-server-reporting-services-best-practices-for-performance-and-maintenance/) |
+| PRM-02 | Parameter types match the source column | error |  | MSSQLTips #3659, rule 14<br>[MSSQLTips](https://www.mssqltips.com/sqlservertip/3659/sql-server-reporting-services-best-practices-for-performance-and-maintenance/) |
+| PRM-03 | Keep the parameter count low | warning | `max_parameters` 5 (1-100) | MSSQLTips #3659, rule 12<br>[MSSQLTips](https://www.mssqltips.com/sqlservertip/3659/sql-server-reporting-services-best-practices-for-performance-and-maintenance/) |
+| PRM-05 | Show selected parameter values on the report | warning |  | MSSQLTips #4006<br>[MSSQLTips](https://www.mssqltips.com/sqlservertip/4006/sql-server-reporting-services-best-practices-for-report-design/) |
+| LAY-01 | Body fits the page | error |  | DataTaal guide, 2026; MSSQLTips #3659, rules 11 and 18<br>[MSSQLTips](https://www.mssqltips.com/sqlservertip/3659/sql-server-reporting-services-best-practices-for-performance-and-maintenance/) |
+| LAY-02 | Avoid TotalPages | warning |  | MSSQLTips #3659, rule 15<br>[MSSQLTips](https://www.mssqltips.com/sqlservertip/3659/sql-server-reporting-services-best-practices-for-performance-and-maintenance/) |
+| LAY-03 | Avoid subreports inside data regions | error |  | MSSQLTips #3659, rule 19<br>[MSSQLTips](https://www.mssqltips.com/sqlservertip/3659/sql-server-reporting-services-best-practices-for-performance-and-maintenance/) |
+| LAY-04 | Use interactive sort only when needed | warning |  | MSSQLTips #3659, rule 17<br>[MSSQLTips](https://www.mssqltips.com/sqlservertip/3659/sql-server-reporting-services-best-practices-for-performance-and-maintenance/) |
+| LAY-05 | Large reports have page breaks | warning |  | MSSQLTips #3659, rules 16 and 20<br>[MSSQLTips](https://www.mssqltips.com/sqlservertip/3659/sql-server-reporting-services-best-practices-for-performance-and-maintenance/) |
+| LAY-06 | Avoid embedded images | warning |  | MS Learn: Image guidance<br>[MS Learn](https://learn.microsoft.com/en-us/power-bi/paginated-reports/report-design/embed-image-report-report-builder-service) |
+| SUB-01 | Prefer nested data regions or drillthrough over a subreport in a tablix | error |  | MS Learn: Add a subreport and parameters; MS Learn: Subreports (SSRS)<br>[MS Learn](https://learn.microsoft.com/en-us/power-bi/paginated-reports/parameters/add-subreport-parameters-report-builder) · [MS Learn](https://learn.microsoft.com/en-us/sql/reporting-services/report-design/subreports-report-builder-and-ssrs?view=sql-server-ver17) |
+| SUB-02 | Stay under 50 subreports per main report | error | `max_subreports` 49 (0-49) | MS Learn: Troubleshoot subreports<br>[MS Learn](https://learn.microsoft.com/en-us/power-bi/paginated-reports/subreports-troubleshoot) |
+| ACC-01 | Every object has alt text | error |  | MS Learn: Accessibility features<br>[MS Learn](https://learn.microsoft.com/en-us/power-bi/paginated-reports/report-builder/paginated-create-accessible-reports) |
+| ACC-02 | Chart alt text describes the insight | error |  | MS Learn: Accessibility features<br>[MS Learn](https://learn.microsoft.com/en-us/power-bi/paginated-reports/report-builder/paginated-create-accessible-reports) |
+| ACC-03 | Tables have a caption or summary | warning |  | MS Learn: Accessibility features<br>[MS Learn](https://learn.microsoft.com/en-us/power-bi/paginated-reports/report-builder/paginated-create-accessible-reports) |
+| ACC-06 | Text contrast is at least 4.5:1 | error | `min_contrast` 4.5 (1.0-21.0)<br>`min_contrast_large` 3.0 (1.0-21.0) | MS Learn: Accessibility features<br>[MS Learn](https://learn.microsoft.com/en-us/power-bi/paginated-reports/report-builder/paginated-create-accessible-reports) |
+| ACC-08 | HTML links carry alt text | warning |  | MS Learn: Accessibility features<br>[MS Learn](https://learn.microsoft.com/en-us/power-bi/paginated-reports/report-builder/paginated-create-accessible-reports) |
+
+## Tune the rules
+
+Tune the packaged rules with a `rules.rdl` overlay in `fab-test.yml`; the
+packaged catalog is never edited or forked. `fab-test init` writes this block
+with every setting commented out at its current value, so tuning a rule means
+uncommenting one line:
+
+```yaml
+rules:
+  rdl:
+    disable: {LAY-04: "interactive sort is a product requirement"}   # or a list: [LAY-04]
+    severity: {QRY-07: info}                  # info | warning | error
+    settings:
+      QRY-07: {max_lines: 80}
+```
+
+- `disable` turns a rule off. Give a reason and it shows in that rule's `skip`
+  row as `disabled: <reason>`, in the report and in telemetry. A reason is one
+  line of at most 200 printable characters, and it is shown as text, never markup.
+- `severity` changes whether a rule fails the run.
+- `rules.rdl.settings` changes a rule's threshold for the run. Only the settings
+  in the table above can be set, each to a number of its type inside its range.
+  A string, true/false, a list, NaN, or an out-of-range value is refused, never
+  converted, so nothing in the file is run or evaluated.
+- `extend` is refused for RDL: every check is built in, so an added rule would
+  have no check behind it.
+
+A mistake in the overlay stops the run before any report is analyzed, with one
+line naming the key and what is allowed, and exit 2. `fab-test config --show`
+lists every setting and disabled rule in effect, with where it came from.
 
 ## Planned rules
 
@@ -87,8 +117,8 @@ A finding names where the problem is and what was found:
 
 ## Testing the rules
 
-Real fixtures live in `fabric-artifacts/rdl/`, one file per rule named for it
-(`DS-02.rdl` exists to violate DS-02). `tests/test_rdl_rule_status.py` requires
+Real fixtures live in `fabric-artifacts/<RULE-ID>.PaginatedReport/`, one per rule
+named for it (`DS-02.rdl` exists to violate DS-02). `tests/test_rdl_rule_status.py` requires
 every active rule to have a check and a fixture that trips it, so a rule cannot
 become active without one, and `tests/test_rdl_fixture_rules.py` checks each
 fixture against the rule in its name. A fixture for a rule with no check yet is

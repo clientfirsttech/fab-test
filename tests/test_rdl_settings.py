@@ -355,3 +355,16 @@ class TestEffectiveSettingsShown:
         rows = rows if isinstance(rows, list) else rows.get("settings", rows.get("rows", []))
         assert {"key": "rules.rdl.settings.QRY-07.max_lines", "value": 80,
                 "origin": "fab-test.yml:rules.rdl.settings"} in rows
+
+
+class TestEditorSchema:
+    def test_the_rdl_overlay_schema_knows_settings_reasons_and_refuses_extend(self):
+        schema_path = _REPO / "src" / "fab_test" / "schemas" / "fab-test.schema.json"
+        schema = json.loads(schema_path.read_text(encoding="utf-8"))
+        rdl = schema["$defs"][schema["properties"]["rules"]["properties"]["rdl"]["$ref"].rsplit("/", 1)[1]]
+
+        assert set(rdl["properties"]) == {"disable", "severity", "settings"}
+        assert rdl["additionalProperties"] is False
+        reasons = next(option for option in rdl["properties"]["disable"]["oneOf"] if option["type"] == "object")
+        assert reasons["additionalProperties"] == {"type": "string", "minLength": 1, "maxLength": 200}
+        assert rdl["properties"]["settings"]["additionalProperties"]["additionalProperties"] == {"type": "number"}

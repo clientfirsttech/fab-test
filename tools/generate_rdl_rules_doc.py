@@ -29,12 +29,44 @@ run or appear in your results. Each rule links to the guidance it comes from,
 and the same links ship in the JSON envelope as `source_urls` on every finding
 and `test_results` row.
 
-Severity `error` fails the run; `warning` does not. Tune any rule with a
-`rules.rdl` overlay in `fab-test.yml` (see
-[Rule Overlays](../.github/skills/fab-test/references/configuration.md)).
+Severity `error` fails the run; `warning` does not. Settings are the
+thresholds you can tune; see [Tune the rules](#tune-the-rules).
 
-| Rule | Name | Severity | Sources |
-|------|------|----------|---------|
+| Rule | Name | Severity | Settings | Sources |
+|------|------|----------|----------|---------|
+"""
+
+_TUNING = """
+## Tune the rules
+
+Tune the packaged rules with a `rules.rdl` overlay in `fab-test.yml`; the
+packaged catalog is never edited or forked. `fab-test init` writes this block
+with every setting commented out at its current value, so tuning a rule means
+uncommenting one line:
+
+```yaml
+rules:
+  rdl:
+    disable: {LAY-04: "interactive sort is a product requirement"}   # or a list: [LAY-04]
+    severity: {QRY-07: info}                  # info | warning | error
+    settings:
+      QRY-07: {max_lines: 80}
+```
+
+- `disable` turns a rule off. Give a reason and it shows in that rule's `skip`
+  row as `disabled: <reason>`, in the report and in telemetry. A reason is one
+  line of at most 200 printable characters, and it is shown as text, never markup.
+- `severity` changes whether a rule fails the run.
+- `rules.rdl.settings` changes a rule's threshold for the run. Only the settings
+  in the table above can be set, each to a number of its type inside its range.
+  A string, true/false, a list, NaN, or an out-of-range value is refused, never
+  converted, so nothing in the file is run or evaluated.
+- `extend` is refused for RDL: every check is built in, so an added rule would
+  have no check behind it.
+
+A mistake in the overlay stops the run before any report is analyzed, with one
+line naming the key and what is allowed, and exit 2. `fab-test config --show`
+lists every setting and disabled rule in effect, with where it came from.
 """
 
 _PLANNED_HEADER = """
@@ -67,8 +99,8 @@ A finding names where the problem is and what was found:
 
 ## Testing the rules
 
-Real fixtures live in `fabric-artifacts/rdl/`, one file per rule named for it
-(`DS-02.rdl` exists to violate DS-02). `tests/test_rdl_rule_status.py` requires
+Real fixtures live in `fabric-artifacts/<RULE-ID>.PaginatedReport/`, one per rule
+named for it (`DS-02.rdl` exists to violate DS-02). `tests/test_rdl_rule_status.py` requires
 every active rule to have a check and a fixture that trips it, so a rule cannot
 become active without one, and `tests/test_rdl_fixture_rules.py` checks each
 fixture against the rule in its name. A fixture for a rule with no check yet is
@@ -89,6 +121,11 @@ def _cell(rule: dict) -> str:
     # The catalog's own source text names rules and authors; keep it so a
     # source without a URL (DMC, DataTaal) is still credited.
     return f"{rule['source']}<br>{' · '.join(links)}" if links else rule["source"]
+
+
+def _settings(rule: dict) -> str:
+    specs = rule.get("settings", {})
+    return "<br>".join(f"`{name}` {rule[name]} ({spec['min']}-{spec['max']})" for name, spec in specs.items())
 
 
 def _planned(rules: list[dict]) -> list[str]:
@@ -119,12 +156,12 @@ def _planned(rules: list[dict]) -> list[str]:
 def render() -> str:
     rules = json.loads(CATALOG.read_text(encoding="utf-8"))["rules"]
     rows = [
-        f"| {r['id']} | {r['name']} | {r['severity']} | {_cell(r)} |"
+        f"| {r['id']} | {r['name']} | {r['severity']} | {_settings(r)} | {_cell(r)} |"
         for r in rules
         if r.get("status", "active") == "active"
     ]
     planned = _planned(rules)
-    return _HEADER + "\n".join(rows) + "\n" + _PLANNED_HEADER + "\n".join(planned) + "\n" + _FOOTER
+    return _HEADER + "\n".join(rows) + "\n" + _TUNING + _PLANNED_HEADER + "\n".join(planned) + "\n" + _FOOTER
 
 
 if __name__ == "__main__":
