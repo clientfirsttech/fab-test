@@ -115,8 +115,8 @@ QRY-01, QRY-02, QRY-04, STR-01) are generated from `DS-02.rdl`, one edit each,
 by `tools/generate_rdl_fixtures.py`, and `tests/test_rdl_fixture_generator.py`
 requires the committed files to match it byte for byte. Add a fixture there,
 then `python tools/deploy_rdl_fixtures.py --workspace <name> <RULE-ID> <RULE-ID>-Pass`
-so the Fabric service accepts it and writes its `.platform`. The planned rules are tracked in
-[tasks/rdl-rule-coverage-epic.md](../tasks/rdl-rule-coverage-epic.md).
+so the Fabric service accepts it and writes its `.platform`. The remaining planned rules are
+tracked in [plan.md](../plan.md).
 """
 
 

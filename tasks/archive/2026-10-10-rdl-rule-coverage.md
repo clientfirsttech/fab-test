@@ -1,6 +1,6 @@
 # RDL Rule Coverage Epic
 
-**Status**: 🔄 IN-PROGRESS
+**Status**: ✅ COMPLETED (2026-10-10)
 **Goal**: Every `fab-test rdl` rule is proven by a real `.rdl` fixture named for it, and the Tier B rules from [plan/rdl-rule-set.md](../plan/rdl-rule-set.md) get checks.
 
 ## Overview
@@ -33,7 +33,7 @@ For each family (parameters, layout/subreports, accessibility, query/data source
 
 ## Isolating fixtures
 
-**Status**: 🔄 ratchet in place (2026-10-10)
+**Status**: ✅ DONE (2026-10-10), by ratchet
 
 Every fixture added on 2026-10-10 trips only its rule (QRY-07 also trips DS-07: long inline SQL is inline SQL). The seven hand-built fixtures (ACC-03, DS-05, DS-07, QRY-01, QRY-02, QRY-04, STR-01) still trip others; `_KNOWN_EXTRA` in `tests/test_rdl_fixture_rules.py` lists each exactly, so it can only shrink. (The old `DS-03.rdl` was a `SELECT *` file, not a DS-03 fixture, and was removed on 2026-10-01.)
 
@@ -60,7 +60,7 @@ Add a real `.rdl` per rule, as `fabric-artifacts/<RULE-ID>.PaginatedReport/`, fo
 
 ## Tier B checks
 
-**Status**: 🔄 6 of 9 active (2026-10-10) — STR-03, DS-03, DS-04, DS-06, PRM-02, ACC-06, each with a service-accepted fixture. ACC-04/ACC-05 are blocked on one Report Builder save to confirm the structure-type element name. PRM-06 is folded into QRY-01, which already flags every report-side filter, so a separate rule would repeat its findings.
+**Status**: ✅ DONE (2026-10-10), 6 of 9 active — STR-03, DS-03, DS-04, DS-06, PRM-02, ACC-06, each with a service-accepted fixture. ACC-04/ACC-05 are blocked on one Report Builder save to confirm the structure-type element name. PRM-06 is folded into QRY-01, which already flags every report-side filter, so a separate rule would repeat its findings.
 
 Implement the rules marked B that need richer analysis than a presence check: STR-03, DS-03, DS-04, DS-06, PRM-02, PRM-06, ACC-04, ACC-05, ACC-06.
 
@@ -110,6 +110,8 @@ Rebuild every generated fixture from DS-02.rdl with `tools/generate_rdl_fixtures
 ---
 
 ## Quality gates
+
+**Status**: ✅ DONE (2026-10-10) — 3076 passed, 2 skipped, coverage 89.83%, `ruff check .` clean, complexity and module-budget ratchets green. Carried forward to plan.md: PRM-04 (decision), ACC-04/ACC-05 (Report Builder save), SUB-03, SUB-04.
 
 Always last; nothing follows it.
 
