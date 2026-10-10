@@ -183,6 +183,16 @@ class TestPrm07MultivalueDaxFilter:
 
         assert _check_prm07_multivalue_dax_filter(root, namespace, {}) == []
 
+    def test_a_filter_defined_as_a_var_passes(self, tmp_path):
+        """The shape in github.com/kerski/paginated-reports-multivalue-example."""
+        dax = (
+            "DEFINE VAR _FilterX =RSCustomDaxFilter(@Colour,EqualToCondition,[DimVehicle].[Color],String) "
+            "EVALUATE SUMMARIZECOLUMNS(DimVehicle[Make],_FilterX)"
+        )
+        root, namespace = parse(tmp_path, _dax_report(dax))
+
+        assert _check_prm07_multivalue_dax_filter(root, namespace, {}) == []
+
     def test_a_single_value_parameter_passes(self, tmp_path):
         xml = _dax_report("EVALUATE FILTER(DimVehicle, DimVehicle[Color] = @Colour)", multi_value=False)
         root, namespace = parse(tmp_path, xml)
