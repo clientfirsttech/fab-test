@@ -69,7 +69,7 @@ def test_the_agent_skill_documents_the_subcommand_and_rule_count():
     can act on an rdl envelope or tune the catalog."""
     text = _skill_text()
     assert "fab-test rdl" in text
-    assert "Tier A" in text
+    assert "enabled once a real fixture verifies it" in text
     assert "docs/RDL-RULES.md" in text
     assert "--rdl-rules-path" in text
 
