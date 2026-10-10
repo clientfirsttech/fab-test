@@ -278,19 +278,44 @@ fab-test playwright --workspace visual-error-testing \
   --playwright-config docs/examples/playwright/azure.yml --output-dir results/azure-j4  # YAML sets jobs: 4
 ```
 
+The same matrix on GitHub Actions (the `Playwright demo` workflow's
+`browsers` and `report_jobs` inputs; a public repository's 4-vCPU
+`ubuntu-latest` runner in the `mcr.microsoft.com/playwright/python`
+container), again with identical verdicts. *CI job* is the whole job,
+including about a minute of checkout and install before the run starts:
+
+| Run | Wall | Artifact time | Parallel | Render (summed) | Browser setup (summed) | CI job |
+|---|---|---|---|---|---|---|
+| runner, `jobs 1`, `workers 4` | 5m25s | 5m23s | 1.0x | 3m34s | 20s | 6m21s |
+| Azure, `jobs 1`, `workers 8` | 5m00s | 4m59s | 1.0x | 3m43s | 1m08s | 6m03s |
+| runner, `jobs 4`, `workers 4` | 1m59s | 7m02s | 3.6x | 5m26s | 41s | 2m57s |
+| Azure, `jobs 4`, `workers 8` | **1m33s** | 5m48s | 3.7x | 4m00s | 1m41s | **2m41s** |
+
+```bash
+gh workflow run playwright-demo.yml --ref dev -f workspace_id=visual-error-testing \
+  -f test_rls=true -f browsers=azure -f report_jobs=4
+```
+
 What the numbers say:
 
-- **`jobs` is the lever.** Reports here have 1-10 cases, so `workers` is
-  capped by each report's case count. Azure with `jobs 1` is no faster than
-  local: remote browsers add setup (1m16s vs 27s summed) and nothing runs
-  at once.
+- **`jobs` is the lever, on a laptop and in CI.** Reports here have 1-10
+  cases, so `workers` is capped by each report's case count. `jobs 4` cut
+  the laptop from 6m18s to 2m53s and the runner from 5m25s to 1m59s with
+  local browsers alone. With `jobs 1`, Azure saves little or nothing: remote
+  browsers add setup (about 1m10s summed) and nothing runs at once.
 - **Azure is what lets `jobs` scale.** With `jobs 4`, 16 local browsers
-  compete for one machine, and summed render time nearly doubles (3m53s to
-  7m23s). On Azure it barely moves (to 4m20s), so the same `jobs 4` finishes
-  in 1m54s instead of 2m53s, 3.3x faster than the baseline. Expect the gap
-  to grow on a smaller machine such as a CI runner, or with higher `jobs`.
-- **Discovery and embed tokens cost about 1m45s per run** (summed), once per
+  compete for one machine's CPU. Summed render time nearly doubled on the
+  laptop (3m53s to 7m23s) and rose by half on the runner (3m34s to 5m26s);
+  on Azure it barely moved. So Azure `jobs 4` is the fastest everywhere:
+  1m54s on the laptop (3.3x the baseline) and 1m33s in CI (3.5x). In CI the
+  Azure gain over local `jobs 4` is smaller (26s) than on the laptop (59s),
+  because the runner had more CPU to spare. Expect it to grow with higher
+  `jobs` or larger workspaces.
+- **Discovery and embed tokens cost 1-2 minutes per run** (summed), once per
   report. `jobs` overlaps them; more `workers` does not.
+- **For CI, start with `jobs: 4`.** It is the biggest single saving and needs
+  no service. Add Azure-hosted browsers when the runner's CPU becomes the
+  limit, that is, when raising `jobs` stops shortening the wall clock.
 
 ### Watching the browser locally
 

@@ -1,6 +1,6 @@
 # Run Timing Epic
 
-**Status**: ✅ IMPLEMENTED 2026-10-09 (all 4 tasks and the quality gates; GitHub Actions timing not yet measured, see the follow-up under task 4)
+**Status**: ✅ IMPLEMENTED 2026-10-09 (all 4 tasks and the quality gates, plus the GitHub Actions follow-up)
 **Goal**: Every run records and shows how long it took, where the time went, and which execution settings produced it. Two runs, for example local `jobs: 1` against Azure `jobs: 4, workers: 8`, can then be compared side by side to show what parallelism and Azure-hosted browsers save.
 
 ## Overview
@@ -60,7 +60,7 @@ A new `timing_plugin`, loaded with `-p` on every render run (the execution plugi
 
 ## Task 4: Benchmark and document (completed 2026-10-09)
 
-Four live runs of `visual-error-testing` (12 reports, 37 cases), all with identical verdicts, are written up in [PLAYWRIGHT-CI.md](../docs/PLAYWRIGHT-CI.md#reading-run-timing-is-jobs-or-azure-worth-it). Local `jobs 1`: 6m18s. Azure `jobs 1`: 6m22s. Local `jobs 4`: 2m53s, with summed render time nearly doubled by local CPU contention. Azure `jobs 4, workers 8`: 1m54s. `jobs` is the lever, and Azure is what lets it scale. A fourth run (local `jobs 4`) was added to the planned three, because without it the Azure benefit could not be separated from `jobs`. Follow-up: the same matrix on GitHub Actions runners, local and Azure browsers, which this laptop-only benchmark cannot answer.
+Four live runs of `visual-error-testing` (12 reports, 37 cases), all with identical verdicts, are written up in [PLAYWRIGHT-CI.md](../docs/PLAYWRIGHT-CI.md#reading-run-timing-is-jobs-or-azure-worth-it). Local `jobs 1`: 6m18s. Azure `jobs 1`: 6m22s. Local `jobs 4`: 2m53s, with summed render time nearly doubled by local CPU contention. Azure `jobs 4, workers 8`: 1m54s. `jobs` is the lever, and Azure is what lets it scale. A fourth run (local `jobs 4`) was added to the planned three, because without it the Azure benefit could not be separated from `jobs`. Follow-up done the same day: the `Playwright demo` workflow gained `browsers` and `report_jobs` inputs and a run-line step summary, and the same matrix ran on GitHub Actions (runs 38014360531, 38014794981, 38014997034, 38015403160), identical verdicts. Runner `jobs 1` 5m25s, Azure `jobs 1` 5m00s, runner `jobs 4` 1m59s, Azure `jobs 4, workers 8` 1m33s (CI job 2m41s including install). Written up beside the laptop table.
 
 Quality gates (2026-10-09): `ruff check .` clean, complexity and module budgets pass, coverage 89.45% with CI env vars. Under `-n 8` with live credentials present, two discovery tests and one live parity case failed from parallel contention; each passed when rerun alone (the parity file 10/10).
 
