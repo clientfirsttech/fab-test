@@ -1,7 +1,7 @@
 # RDL Rule Settings Epic
 
 **Status**: 🔄 IN-PROGRESS
-**Goal**: Tune, disable and extend `fab-test rdl` rules from `fab-test.yml` without forking the catalog, with every value validated as data.
+**Goal**: Tune and disable `fab-test rdl` rules from `fab-test.yml` without forking the catalog, with every value validated as data.
 
 ## Overview
 
@@ -50,13 +50,18 @@ Each tunable rule declares its parameters in the catalog with a type and an incl
 
 ## Honest extend
 
+**Status**: ✅ DONE (2026-10-10)
+
+Every built-in RDL check already has a catalog entry, so an extended rule is either a duplicate or has no check and would show `skip` forever.
+
 **Requirements**:
-- Given an extended RDL rule whose ID has no built-in check, should exit 2 rather than show `skip` forever
-- Given an extended rule that repeats a catalog ID, or an ID not shaped `ABC-01`, should exit 2
+- Given `rules.rdl.extend`, should exit 2 explaining that RDL checks are built in and pointing to `settings`, `severity` and `disable`
 
 ---
 
 ## Init writes the RDL section
+
+**Status**: ✅ DONE (2026-10-10)
 
 **Requirements**:
 - Given `fab-test init`, should write `rules.rdl` with every declared setting commented out at its default, with the rule's name and range
@@ -66,6 +71,8 @@ Each tunable rule declares its parameters in the catalog with a type and an incl
 ---
 
 ## Effective settings shown
+
+**Status**: ✅ DONE (2026-10-10)
 
 **Requirements**:
 - Given `fab-test config --show`, should list each overridden RDL setting and disabled rule with its origin

@@ -212,11 +212,12 @@ def apply_rdl_overlay(upstream_path: Path, overlay: dict[str, Any]) -> dict[str,
     (``{"rules": [...]}``), returning the resolved document. Never mutates
     or rewrites ``upstream_path``.
 
-    Same ``overlay`` keys and disable convention as ``apply_pbir_overlay``,
-    but ``severity`` sets the catalog's own ``"severity"`` field directly,
-    and accepts any of the envelope's three labels
-    (``"error"``/``"warning"``/``"info"``) -- the RDL catalog has no
-    PBIR-style restriction to rule out ``"info"``.
+    Same disable convention as ``apply_pbir_overlay``, but ``severity`` sets
+    the catalog's own ``"severity"`` field directly and accepts any of the
+    envelope's three labels (``"error"``/``"warning"``/``"info"``). Unlike
+    BPA and PBIR, ``disable`` may map an ID to a reason, ``settings``
+    overrides a declared threshold (validated, never coerced), and
+    ``extend`` is refused: the checks are built in.
     """
     data = json.loads(upstream_path.read_text(encoding="utf-8"))
     rules = data.get("rules", [])
@@ -252,10 +253,11 @@ def apply_rdl_overlay(upstream_path: Path, overlay: dict[str, Any]) -> dict[str,
     if "settings" in overlay:
         _apply_rdl_settings(resolved_rules, overlay["settings"])
 
-    extend_path = overlay.get("extend")
-    if extend_path:
-        extra = json.loads(Path(extend_path).read_text(encoding="utf-8"))
-        resolved_rules.extend(extra.get("rules", []) if isinstance(extra, dict) else extra)
+    if "extend" in overlay:
+        raise RuleOverlayError(
+            "rules.rdl.extend isn't supported: RDL checks are built in, so an added rule would have no check. "
+            "Tune the built-in rules with settings, severity or disable"
+        )
 
     return {**data, "rules": resolved_rules}
 
@@ -275,3 +277,48 @@ def validate_rule_overlays(rules: dict[str, Any], rule_files: dict[str, Path]) -
             _APPLY[section](rule_files[section], overlay)
         except (OSError, ValueError) as exc:
             raise RuleOverlayError(f"rules.{section}.extend could not be read: {exc}") from exc
+
+
+def _range_text(spec: dict[str, Any]) -> str:
+    kind = "whole number" if spec["type"] == "integer" else "number"
+    return f"{kind} {spec['min']}-{spec['max']}"
+
+
+def rdl_overlay_template(catalog_path: Path) -> str:
+    """The commented `rules.rdl` block `fab-test init` writes, built from the
+    catalog so every declared setting appears at its default, with its range."""
+    rules = json.loads(catalog_path.read_text(encoding="utf-8"))["rules"]
+    lines = [
+        "#   rdl:",
+        '#     disable: {LAY-04: "why it does not apply here"}   # or a list: [LAY-04]',
+        "#     severity: {QRY-07: info}            # info | warning | error",
+        "#     settings:                           # thresholds; each is checked against its range",
+    ]
+    for rule in (r for r in rules if r.get("settings")):
+        values = ", ".join(f"{name}: {json.dumps(rule[name])}" for name in rule["settings"])
+        specs = rule["settings"]
+        ranges = ", ".join((f"{name} " if len(specs) > 1 else "") + _range_text(spec) for name, spec in specs.items())
+        lines.append(f"#       {rule['id']}: {{{values}}}".ljust(44) + f"  # {ranges}; {rule['name']}")
+    return "\n".join(lines)
+
+
+def overlay_rows(rules: dict[str, Any]) -> list[dict[str, Any]]:
+    """`config --show` rows for each rule overlay delta (disabled rules, with
+    their reason; severity overrides; RDL settings), each naming its origin.
+    Expects a config already checked by validate_config."""
+    rows = []
+    for section in sorted(rules):
+        overlay, origin = rules[section], f"fab-test.yml:rules.{section}"
+        disable = overlay.get("disable", [])
+        reasons = disable if isinstance(disable, dict) else dict.fromkeys(disable)
+        for rule_id, reason in reasons.items():
+            value = f"disabled: {reason}" if reason else "disabled"
+            rows.append({"key": f"rules.{section}.disable.{rule_id}", "value": value, "origin": f"{origin}.disable"})
+        for rule_id, label in overlay.get("severity", {}).items():
+            rows.append({"key": f"rules.{section}.severity.{rule_id}", "value": label, "origin": f"{origin}.severity"})
+        for rule_id, values in overlay.get("settings", {}).items():
+            rows.extend(
+                {"key": f"rules.{section}.settings.{rule_id}.{name}", "value": value, "origin": f"{origin}.settings"}
+                for name, value in values.items()
+            )
+    return rows

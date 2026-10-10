@@ -261,3 +261,97 @@ class TestDisableWithAReason:
         assert row["message"] == "disabled: <script>alert(1)</script> & <b>bold</b>"
         assert "<script>alert(1)</script>" not in html
         assert "&lt;script&gt;alert(1)&lt;/script&gt; &amp; &lt;b&gt;bold&lt;/b&gt;" in html
+
+
+def _uncommented_rdl_block(template: str) -> dict:
+    """The template's `rules.rdl` block with its `# ` prefixes removed, parsed."""
+    import yaml
+
+    lines = template.splitlines()
+    start = lines.index("#   rdl:")
+    block = []
+    for line in lines[start:]:
+        if not line.startswith("#   "):
+            break
+        block.append(line[2:])
+    return yaml.safe_load("rules:\n" + "\n".join(block))
+
+
+class TestInitTemplate:
+    def test_lists_every_declared_setting_at_its_packaged_default(self):
+        from fab_test.scripts.fab_test_admin import _FAB_TEST_YML_TEMPLATE
+
+        settings = _uncommented_rdl_block(_FAB_TEST_YML_TEMPLATE)["rules"]["rdl"]["settings"]
+
+        assert settings == {
+            r["id"]: {name: r[name] for name in r["settings"]} for r in _RULES if r.get("settings")
+        }
+
+    def test_names_each_setting_range_beside_it(self):
+        from fab_test.scripts.fab_test_admin import _FAB_TEST_YML_TEMPLATE
+
+        line = next(row for row in _FAB_TEST_YML_TEMPLATE.splitlines() if "QRY-07: {max_lines:" in row)
+
+        assert "whole number 1-10000" in line and "Move complex SQL into views or procs" in line
+
+    def test_the_uncommented_block_is_a_valid_config_that_changes_no_threshold(self):
+        from fab_test.scripts._config import validate_config
+        from fab_test.scripts._rule_overlay import apply_rdl_overlay, validate_rule_overlays
+        from fab_test.scripts.fab_test_admin import _FAB_TEST_YML_TEMPLATE
+        from fab_test.scripts.fab_test_registry import PACKAGED_RULE_FILES
+
+        config = _uncommented_rdl_block(_FAB_TEST_YML_TEMPLATE)
+        validate_config(config)
+        validate_rule_overlays(config["rules"], PACKAGED_RULE_FILES)
+        resolved = apply_rdl_overlay(_CATALOG_PATH, {"settings": config["rules"]["rdl"]["settings"]})
+
+        assert resolved["rules"] == [
+            {**r} for r in json.loads(_CATALOG_PATH.read_text(encoding="utf-8"))["rules"]
+        ]
+
+    def test_shows_a_disable_reason_and_no_extend(self):
+        from fab_test.scripts.fab_test_admin import _FAB_TEST_YML_TEMPLATE
+
+        rdl = _uncommented_rdl_block(_FAB_TEST_YML_TEMPLATE)["rules"]["rdl"]
+
+        assert isinstance(rdl["disable"], dict) and "extend" not in rdl
+
+
+class TestEffectiveSettingsShown:
+    def test_lists_each_overlay_delta_with_its_origin(self):
+        from fab_test.scripts._rule_overlay import overlay_rows
+
+        rows = overlay_rows({
+            "rdl": {"disable": {"LAY-04": "product wants sort"}, "severity": {"QRY-07": "info"},
+                    "settings": {"QRY-07": {"max_lines": 80}}},
+            "bpa": {"disable": ["AVOID_FLOATING_POINT_DATA_TYPES"]},
+        })
+
+        assert rows == [
+            {"key": "rules.bpa.disable.AVOID_FLOATING_POINT_DATA_TYPES", "value": "disabled",
+             "origin": "fab-test.yml:rules.bpa.disable"},
+            {"key": "rules.rdl.disable.LAY-04", "value": "disabled: product wants sort",
+             "origin": "fab-test.yml:rules.rdl.disable"},
+            {"key": "rules.rdl.severity.QRY-07", "value": "info", "origin": "fab-test.yml:rules.rdl.severity"},
+            {"key": "rules.rdl.settings.QRY-07.max_lines", "value": 80, "origin": "fab-test.yml:rules.rdl.settings"},
+        ]
+
+    def test_config_show_prints_them(self, tmp_path):
+        import os
+        import subprocess
+        import sys
+
+        config = tmp_path / "fab-test.yml"
+        config.write_text("rules:\n  rdl:\n    settings:\n      QRY-07: {max_lines: 80}\n", encoding="utf-8")
+        env = {**os.environ, "PYTHONPATH": str(_REPO / "src"), "PYTHONIOENCODING": "utf-8"}
+
+        result = subprocess.run(
+            [sys.executable, "-m", "fab_test.scripts.fab_test", "--config", str(config), "config", "--show",
+             "--format", "json"],
+            capture_output=True, text=True, encoding="utf-8", env=env, timeout=120, check=False,
+        )
+
+        rows = json.loads(result.stdout)
+        rows = rows if isinstance(rows, list) else rows.get("settings", rows.get("rows", []))
+        assert {"key": "rules.rdl.settings.QRY-07.max_lines", "value": 80,
+                "origin": "fab-test.yml:rules.rdl.settings"} in rows

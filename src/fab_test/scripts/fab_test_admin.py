@@ -35,6 +35,7 @@ from ._metadata import (
 )
 from ._mode import ModeError, ResolvedMode, resolve_mode
 from ._pql_identity import token_account, token_tenant
+from ._rule_overlay import overlay_rows, rdl_overlay_template
 from ._scan import find_skipped_checkouts as _find_skipped_checkouts
 from ._service_export import service_item_type, service_readiness
 from ._target import TargetError, select_target
@@ -234,6 +235,7 @@ def _config_show(args: argparse.Namespace) -> int:
         display_value = "<redacted>" if _is_secret_key(key) else value
         rows.append({"key": key, "value": display_value, "origin": origin})
     rows.extend(_ruleset_rows())
+    rows.extend(overlay_rows(file_config.get("rules", {})))
     rows.extend(eventhouse_rows(file_config))
     rows.extend(lakehouse_rows(file_config))
     return _print_config_show(rows, output_format)
@@ -277,9 +279,7 @@ _FAB_TEST_YML_TEMPLATE = """\
 #   pbir:
 #     disable: [RULE_ID]
 #     severity: {RULE_ID: warning}        # warning | error (PBIR Inspector has no "info" level)
-#   rdl:
-#     disable: [DS-02]
-#     severity: {QRY-07: info}            # info | warning | error
+{rdl_overlay}
 
 # Ship analyzer telemetry to a Fabric Eventhouse and/or a Fabric Lakehouse.
 # A configured destination is the enablement -- there is no separate on/off
@@ -292,6 +292,7 @@ _FAB_TEST_YML_TEMPLATE = """\
 #     workspace: <workspace-name-or-guid>                     # [env: LAKEHOUSE_WORKSPACE]
 #     lakehouse: <lakehouse-name>                              # [env: LAKEHOUSE_NAME]
 """
+_FAB_TEST_YML_TEMPLATE = _FAB_TEST_YML_TEMPLATE.replace("{rdl_overlay}", rdl_overlay_template(Path(_DEFAULT_RDL_RULES)))
 
 _ENV_EXAMPLE_TEMPLATE = """\
 # .env.example -- copy to .fab-test/.env and fill in the values you need.
