@@ -717,6 +717,46 @@ def alignment_id_parameter(text):
 FIXTURES["PRM-02"] = lambda t: alignment_id_parameter(with_semantic(t, ALIGNMENT_IDS))
 
 
+def characters_for(filter_dax):
+    """Characters filtered by multi-value parameter AlignmentIDs, passed into DAX as @AlignmentIDs."""
+    return f"""<DataSet Name="Characters">
+  <Query>
+    <DataSourceName>SampleModel</DataSourceName>
+    <QueryParameters>
+      <QueryParameter Name="AlignmentIDs">
+        <Value>=Parameters!AlignmentIDs.Value</Value>
+      </QueryParameter>
+    </QueryParameters>
+    <CommandText>EVALUATE SUMMARIZECOLUMNS(MarvelFact[Name], {filter_dax})</CommandText>
+  </Query>
+  <Fields>
+    <Field Name="Name">
+      <rd:TypeName>System.String</rd:TypeName>
+      <DataField>MarvelFact[Name]</DataField>
+    </Field>
+  </Fields>
+</DataSet>"""
+
+
+def multivalue_dax(text, filter_dax):
+    valid = """
+  <ValidValues>
+    <DataSetReference>
+      <DataSetName>AlignmentIDs</DataSetName>
+      <ValueField>AlignmentID</ValueField>
+    </DataSetReference>
+  </ValidValues>
+  <MultiValue>true</MultiValue>"""
+    text = with_semantic(text, ALIGNMENT_IDS, characters_for(filter_dax))
+    text = add_parameter(text, "AlignmentIDs", extra=valid, default_value=["1", "2"], data_type="Integer")
+    text = add_body(text, first_textbox("FirstCharacterName", "Name", "Characters"))
+    return shown(text, '=Join(Parameters!AlignmentIDs.Value, ", ")')
+
+
+# PRM-07: credit Chris Webb, blog.crossjoin.co.uk/2019/11/03/power-bi-report-builder-and-rscustomdaxfilter/
+FIXTURES["PRM-07"] = lambda t: multivalue_dax(t, "KEEPFILTERS(TREATAS({@AlignmentIDs}, MarvelFact[AlignmentID]))")
+
+
 CHANGES = dax_dataset(
     "Changes",
     "EVALUATE SUMMARIZECOLUMNS(MarvelFact[Name], MarvelFact[Test Change])",
@@ -968,6 +1008,9 @@ PASS = {
     "ACC-08": lambda t: add_body(t, with_tooltip(html_link(), "Paginated report documentation on Microsoft Learn")),
 }
 PASS["SUB-01"] = PASS["LAY-03"]
+PASS["PRM-07"] = lambda t: multivalue_dax(
+    t, "RSCustomDaxFilter(@AlignmentIDs, EqualToCondition, [MarvelFact].[AlignmentID], Int64)"
+)
 
 
 # DS-02.rdl with its dataset used, so it trips no rule: every fixture's base.
