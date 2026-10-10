@@ -183,3 +183,69 @@ def prepare_execution(args: argparse.Namespace, repo_root: Path) -> int | None:
         args.playwright_config = str(args.execution_config.path)
     return None
 
+
+def resolve_workers(config: ExecutionConfig, explicit: int | None = None) -> int:
+    """Resolve CLI > process environment > execution YAML > four workers."""
+    raw = os.environ.get("PLAYWRIGHT_XDIST_WORKERS")
+    if explicit is not None:
+        workers = explicit
+    elif raw:
+        try:
+            workers = int(raw)
+        except ValueError:
+            workers = 4
+    else:
+        workers = config.workers if config.workers is not None else 4
+    if type(workers) is not int or workers <= 0:
+        raise ConfigError("--workers / PLAYWRIGHT_XDIST_WORKERS must be a positive integer")
+    return workers
+
+
+def resolve_jobs(analyzer: str, args: argparse.Namespace, default: int) -> int:
+    """Resolve concurrent artifacts: --jobs > execution YAML `jobs` (playwright only) > config file > 1.
+
+    `workers` parallelizes cases within one report; `jobs` runs several
+    reports at once, so `jobs x workers` is the browser concurrency an
+    Azure-hosted run can reach.
+    """
+    explicit = getattr(args, "jobs", None)
+    if explicit is not None:
+        return explicit
+    config = getattr(args, "execution_config", None)
+    if analyzer == "playwright" and config is not None and config.jobs:
+        return config.jobs
+    return default
+
+
+def execution_summary(args: argparse.Namespace, config_jobs: int | None) -> dict[str, Any]:
+    """Name the backend, workers, and jobs a playwright run used, and where each came from.
+
+    For `run.json`, so two runs' timings can be compared knowing what produced them.
+    Never includes the service URL or any credential.
+    """
+    config = getattr(args, "execution_config", None) or ExecutionConfig()
+    if getattr(args, "workers", None) is not None:
+        workers_origin = "flag"
+    elif os.environ.get("PLAYWRIGHT_XDIST_WORKERS"):
+        workers_origin = "env:PLAYWRIGHT_XDIST_WORKERS"
+    else:
+        workers_origin = "execution_config" if config.workers is not None else "default"
+    try:
+        workers: int | None = resolve_workers(config, getattr(args, "workers", None))
+    except ConfigError:
+        workers = None  # the wrapper refuses an invalid value; this record only describes the run
+    if getattr(args, "jobs", None) is not None:
+        jobs_origin = "flag"
+    elif config.jobs:
+        jobs_origin = "execution_config"
+    else:
+        jobs_origin = "config" if config_jobs else "default"
+    return {
+        "backend": config.backend,
+        "execution_config": str(config.path) if config.path else None,
+        "execution_config_origin": config.origin,
+        "workers": workers,
+        "workers_origin": workers_origin,
+        "jobs": resolve_jobs("playwright", args, config_jobs or 1),
+        "jobs_origin": jobs_origin,
+    }

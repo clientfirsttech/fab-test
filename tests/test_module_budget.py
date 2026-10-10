@@ -282,8 +282,10 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
         ),
     ),
     "src/fab_test/scripts/fab_test_execution.py": (
-        904,
+        913,
         (
+            "2026-10-09: +9 lines timing each artifact's subprocess for run.json's duration_ms "
+            "(Run Timing epic, task 1), paired with `aborted` to stay within the argument budget. "
             "2026-10-09: +1 line importing resolve_jobs so a playwright execution YAML's `jobs` "
             "sets concurrent reports when --jobs is absent. "
             "2026-10-09: +7 lines removing an artifact's envelope before its analyzer runs and "

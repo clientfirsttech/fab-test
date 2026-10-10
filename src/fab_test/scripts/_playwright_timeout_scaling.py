@@ -170,6 +170,7 @@ def run_playwright_with_scaled_timeout(
             ctx.manifest.record_artifact(
                 name, display_name, "timeout", None, 0, 0,
                 detail=f"exceeded {effective_timeout}s timeout",
+                duration_ms=effective_timeout * 1000,
             )
         return (display_name, 1)
 

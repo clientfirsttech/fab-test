@@ -6,7 +6,11 @@ from pathlib import Path
 import pytest
 
 from fab_test.scripts._config import ConfigError
-from fab_test.scripts.playwright_validation.execution_config import ExecutionConfig, resolve_execution_config
+from fab_test.scripts.playwright_validation.execution_config import (
+    ExecutionConfig,
+    execution_summary,
+    resolve_execution_config,
+)
 from fab_test.scripts.playwright_validation.execution_runtime import resolve_jobs
 
 pytestmark = pytest.mark.playwright
@@ -189,3 +193,36 @@ def test_jobs_is_retained(tmp_path):
 def test_jobs_resolve_flag_then_yaml_then_config(analyzer, flag, yaml_jobs, expected):
     args = argparse.Namespace(jobs=flag, execution_config=ExecutionConfig(jobs=yaml_jobs))
     assert resolve_jobs(analyzer, args, 3) == expected
+
+
+def test_execution_summary_names_each_setting_and_its_origin(tmp_path, monkeypatch):
+    """Given an Azure YAML and an explicit --jobs, should record values and origins for run.json."""
+    monkeypatch.delenv("PLAYWRIGHT_XDIST_WORKERS", raising=False)
+    path = write_config(tmp_path, "azure.yml", "backend: azure\nworkers: 8\njobs: 4\n")
+    config = resolve_execution_config(str(path), repo_root=tmp_path)
+    args = argparse.Namespace(jobs=2, workers=None, execution_config=config)
+
+    summary = execution_summary(args, None)
+
+    assert summary == {
+        "backend": "azure",
+        "execution_config": str(path),
+        "execution_config_origin": "flag",
+        "workers": 8,
+        "workers_origin": "execution_config",
+        "jobs": 2,
+        "jobs_origin": "flag",
+    }
+
+
+def test_execution_summary_defaults_without_a_yaml(monkeypatch):
+    """Given no YAML or flags, should record the local defaults and the config-file jobs."""
+    monkeypatch.setenv("PLAYWRIGHT_XDIST_WORKERS", "3")
+    args = argparse.Namespace(jobs=None, workers=None)
+
+    summary = execution_summary(args, 5)
+
+    assert summary["backend"] == "local"
+    assert summary["execution_config"] is None
+    assert (summary["workers"], summary["workers_origin"]) == (3, "env:PLAYWRIGHT_XDIST_WORKERS")
+    assert (summary["jobs"], summary["jobs_origin"]) == (5, "config")

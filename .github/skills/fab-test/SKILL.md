@@ -274,6 +274,20 @@ RunManifest {
   totals { errors: Integer, warnings: Integer }
   telemetry_error: String | null
   exit_code: Integer
+  started_at: String       // UTC ISO 8601, when the invocation began
+  finished_at: String      // UTC ISO 8601, when run.json was written
+  wall_ms: Integer         // what the caller waited, end to end
+  execution: Execution | null
+}
+
+Execution {                 // present only when the run included playwright
+  backend: "local" | "azure"
+  execution_config: String | null        // the selected execution YAML's path
+  execution_config_origin: String        // "flag" | "env:PLAYWRIGHT_CONFIG_PATH" | "config:playwright_config" | "default"
+  workers: Integer | null                // xdist workers per report (capped by its case count)
+  workers_origin: "flag" | "env:PLAYWRIGHT_XDIST_WORKERS" | "execution_config" | "default"
+  jobs: Integer                          // reports run at once
+  jobs_origin: "flag" | "execution_config" | "config" | "default"
 }
 
 Target {
@@ -294,12 +308,13 @@ ArtifactResult {
   errors: Integer
   warnings: Integer
   detail: String | null
+  duration_ms: Integer | null   // the analyzer subprocess's wall time; null when it never ran (preflight_failed)
 }
 
 Constraints {
   Every analyzer invocation (a single subcommand or `all`) writes exactly one run.json under --output-dir (default fab-test-results/), so a caller reads one file instead of globbing result directories
   ("timeout" or "preflight_failed") => the run was aborted without producing a result to report
-  (the run ended without a result to report) => detail carries the human-readable reason: the resolved remediation message for preflight_failed, the exceeded duration for timeout, or the analyzer's own error message when it exited non-zero before writing an envelope (status "failed", envelope_path null)
+  (the run ended without a result to report) => detail carries the human-readable reason: the resolved remediation message for preflight_failed, the exceeded duration for timeout, or the analyzer's own error message when it exited non-zero before writing an envelope (status "failed"; envelope_path points at the envelope fab-test wrote in its place, whose message is that same error and whose findings are empty -- never an earlier run's envelope)
   (the analyzer did write an envelope, however it failed) => detail is null; the findings are the reason, and envelope_path points at them
   run.json alone is always enough to learn what to fix — a caller never has to fall back to stderr, which matters when run.json is the only file a pipeline uploads
   (no CI environment variable is detected) => origin = "local"
@@ -313,6 +328,8 @@ Constraints {
   (telemetry failed) => telemetry_error names why: an unreachable cluster, an unreachable OneLake endpoint, a missing install extra, a missing permission grant. One destination's failure never blocks the other's delivery; if both fail, telemetry_error names both, prefixed by destination
   telemetry_error never changes exit_code — telemetry is diagnostic and must not fail a build. See [Telemetry](references/configuration.md#telemetry)
   doctor, list, explain, auth, and clean-tools never write a manifest — they don't run an analyzer
+  sum(artifacts[].duration_ms) / wall_ms => how much the run gained from parallelism (about 1 with jobs 1); compare runs only with their execution blocks, and only when they tested the same artifacts
+  execution never holds the service URL, a token, or any credential
 }
 ```
 
@@ -339,12 +356,17 @@ Constraints {
       "envelope_path": "fab-test-results/bpa/SampleModel-PQLAssert/envelope.json",
       "errors": 0,
       "warnings": 21,
-      "detail": null
+      "detail": null,
+      "duration_ms": 8412
     }
   ],
   "totals": {"errors": 0, "warnings": 21},
   "telemetry_error": null,
-  "exit_code": 0
+  "exit_code": 0,
+  "started_at": "2026-10-09T20:04:12+00:00",
+  "finished_at": "2026-10-09T20:04:21+00:00",
+  "wall_ms": 9105,
+  "execution": null
 }
 ```
 

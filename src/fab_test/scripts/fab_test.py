@@ -119,7 +119,7 @@ from .fab_test_telemetry import (  # noqa: F401
     _telemetry_readiness,
     _validate_telemetry_payload,
 )
-from .playwright_validation.execution_config import prepare_execution
+from .playwright_validation.execution_config import execution_summary, prepare_execution
 
 # Ensure UTF-8 output on Windows where the default pipe encoding is cp1252.
 if hasattr(sys.stdout, "reconfigure"):
@@ -340,6 +340,8 @@ def _dispatch_run(args: argparse.Namespace) -> int:
                 )
             else:
                 runnable.append(name)
+        if "playwright" in runnable:
+            manifest.execution = execution_summary(args, _PYPROJECT_CONFIG.get("jobs"))
         if runnable:
             codes = [
                 _run_analyzer(name, args, output_dir, manifest, telemetry) for name in runnable
@@ -360,6 +362,8 @@ def _dispatch_run(args: argparse.Namespace) -> int:
     else:
         # The scope refusal for a single analyzer already ran above, before
         # any network call.
+        if args.analyzer == "playwright":
+            manifest.execution = execution_summary(args, _PYPROJECT_CONFIG.get("jobs"))
         exit_code = _run_analyzer(args.analyzer, args, output_dir, manifest, telemetry)
 
     # One flush for the whole run, `all` included: a sink per analyzer would

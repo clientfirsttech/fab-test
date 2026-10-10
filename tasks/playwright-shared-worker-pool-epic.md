@@ -55,3 +55,12 @@ Depends on the [Run Timing](run-timing-epic.md) epic, so the numbers come from `
 **Requirements**:
 - Given README, PLAYWRIGHT-CI.md, and the skill's flags reference, should describe `workers` as the run's browser concurrency and say when `jobs` still applies.
 - Given a live Azure run of `visual-error-testing`, should match the per-report verdicts and record the wall-clock against Task 1's numbers.
+
+---
+
+## Quality gates
+
+Always last; nothing follows it.
+
+**Requirements**:
+- Given the finished epic, should pass `ruff check .` over the whole repo, the complexity and module-budget ratchets, and the coverage floor on the full suite, run as CI runs them (vision.md, Definition of Done)

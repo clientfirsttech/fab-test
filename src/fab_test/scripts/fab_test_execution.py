@@ -11,6 +11,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -90,7 +91,7 @@ from .fab_test_telemetry import (
     _telemetry_decision,
     _telemetry_destination,
 )
-from .playwright_validation.execution_runtime import resolve_jobs
+from .playwright_validation.execution_config import resolve_jobs
 from .playwright_validation.resolver import resolve_workspace_id
 
 # Referenced by _run_analyzer via _is_ci(); a module-level function rather
@@ -322,6 +323,7 @@ def _run_artifact_process(
                 0,
                 0,
                 detail=f"exceeded {ctx.timeout}s timeout",
+                duration_ms=ctx.timeout * 1000,
             )
         return (display_name, 1)
 
@@ -404,10 +406,14 @@ def _finalize_artifact_run(
     ctx: "_RunContext",
     proc: subprocess.CompletedProcess,
     envelope: dict[str, Any],
-    aborted: bool,
+    outcome: tuple[bool, int],
     output_dir: Path,
 ) -> int:
-    """Apply the error/warning threshold, send telemetry, and record the manifest."""
+    """Apply the error/warning threshold, send telemetry, and record the manifest.
+
+    ``outcome`` is ``(aborted, duration_ms)`` -- paired to stay within the argument budget.
+    """
+    aborted, duration_ms = outcome
     artifact_code = _artifact_exit_code(proc.returncode, envelope)
     _stamp_mode(envelope, args, output_dir, name, artifact)
 
@@ -428,6 +434,7 @@ def _finalize_artifact_run(
             errors,
             warnings,
             detail=_stderr_detail(proc.stderr) if aborted else None,
+            duration_ms=duration_ms,
         )
 
     return artifact_code
@@ -468,6 +475,7 @@ def _run_one_artifact(
     with contextlib.suppress(OSError):  # an aborted run must not inherit (and re-stamp) an earlier envelope
         envelope_file.unlink(missing_ok=True)
 
+    started = time.monotonic()
     result = _run_artifact_process(cmd, ctx, capture_stdout, output_format, name, display_name, test_cases_path)
     if isinstance(result, tuple):
         return result
@@ -484,7 +492,8 @@ def _run_one_artifact(
         proc, capture_stdout, ctx, output_format, mute=quiet and not unexplained, collapse=unexplained,
         said=envelope.get("message", ""),
     )
-    artifact_code = _finalize_artifact_run(name, artifact, args, ctx, proc, envelope, aborted, output_dir)
+    outcome = (aborted, int((time.monotonic() - started) * 1000))
+    artifact_code = _finalize_artifact_run(name, artifact, args, ctx, proc, envelope, outcome, output_dir)
     return (artifact.stem, artifact_code)
 
 

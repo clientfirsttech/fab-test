@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import json
 import re
+import time
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -42,6 +44,10 @@ def _sanitize_command(command: list[str]) -> list[str]:
     return sanitized
 
 
+def _utc_now() -> str:
+    return datetime.now(UTC).isoformat(timespec="seconds")
+
+
 class RunManifest:
     """Accumulates per-artifact results across one fab-test invocation."""
 
@@ -66,6 +72,13 @@ class RunManifest:
         # records were dropped.
         self.telemetry_error: str | None = None
         self.artifacts: list[dict[str, Any]] = []
+        # Wall clock for the whole invocation: the sum of artifact durations
+        # against it is what shows how much --jobs / Azure-hosted browsers saved.
+        self.started_at = _utc_now()
+        self._started = time.monotonic()
+        # Playwright's resolved backend/workers/jobs and where each came from,
+        # or None when the run did not include playwright. Never credentials.
+        self.execution: dict[str, Any] | None = None
 
     def record_artifact(
         self,
@@ -76,12 +89,14 @@ class RunManifest:
         errors: int,
         warnings: int,
         detail: str | None = None,
+        duration_ms: int | None = None,
     ) -> None:
         """Record one artifact's outcome for the manifest.
 
         ``detail`` carries the human-readable failure reason for abort
         statuses (``preflight_failed``, ``timeout``); it is ``None`` when
-        the artifact completed normally.
+        the artifact completed normally. ``duration_ms`` is the parent's
+        wall time for the analyzer subprocess; ``None`` when it never ran.
         """
         self.artifacts.append(
             {
@@ -92,6 +107,7 @@ class RunManifest:
                 "errors": errors,
                 "warnings": warnings,
                 "detail": detail,
+                "duration_ms": duration_ms,
             }
         )
 
@@ -111,6 +127,11 @@ class RunManifest:
             # optional: a reader that does not know the key is unaffected.
             "telemetry_error": self.telemetry_error,
             "exit_code": exit_code,
+            # Additive timing (Run Timing epic, task 1).
+            "started_at": self.started_at,
+            "finished_at": _utc_now(),
+            "wall_ms": int((time.monotonic() - self._started) * 1000),
+            "execution": self.execution,
         }
 
     def write(self, output_dir: Path, exit_code: int) -> Path:
