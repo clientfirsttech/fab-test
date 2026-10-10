@@ -44,6 +44,7 @@ from ._fab_test_context import (
 )
 from ._mode import ModeError, resolve_mode
 from ._report_html import open_report_conflict
+from ._rule_overlay import RuleOverlayError, validate_rule_overlays
 from ._run_manifest import RunManifest
 from ._run_timing import print_timing_line
 from ._service_export import (
@@ -84,6 +85,7 @@ from .fab_test_parser import (
     _SUBCOMMAND_ALIASES,
     build_parser,
 )
+from .fab_test_registry import PACKAGED_RULE_FILES
 from .fab_test_registry import (
     load_fab_test_all_analyzers as _load_fab_test_all_analyzers,  # noqa: F401
 )
@@ -169,7 +171,8 @@ def _prepare_config(args: argparse.Namespace) -> int | None:
             REPO_ROOT, REPO_ROOT / "pyproject.toml", args.config
         )
         validate_config(args.file_config)
-    except ConfigError as exc:
+        validate_rule_overlays(args.file_config.get("rules", {}), PACKAGED_RULE_FILES)
+    except (ConfigError, RuleOverlayError) as exc:
         print(f"  ✗ fab-test: {exc}", file=sys.stderr)
         return 2
     for warning in warnings:

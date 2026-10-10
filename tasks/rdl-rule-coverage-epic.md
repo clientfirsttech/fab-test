@@ -82,6 +82,20 @@ STR-02, LAY-07, SUB-03..SUB-06 and ACC-07 need a template, the network, other re
 
 ---
 
+## Pass fixtures
+
+**Status**: ⏸ PAUSED (2026-10-10) until the RDL Rule Settings epic lands; several near-misses test its thresholds.
+
+Give every active rule a near-miss fixture, `fabric-artifacts/<RULE-ID>-Pass.PaginatedReport/<RULE-ID>-Pass.rdl`, that must not trip it, so a false positive fails a test against a real file.
+
+**Requirements**:
+- Given an active rule, should have a `-Pass` fixture, enforced like its tripping fixture
+- Given a `-Pass` fixture, should be the remediated form or a threshold just short of firing, and should trip no rule at all unless a shrink-only allowlist names the unavoidable one
+- Given a `-Pass` fixture that trips its rule, should fix the check test-first, not the fixture
+- Given each `-Pass` fixture, should be accepted by the service on upload, then removed from the workspace so Dev runs don't grow
+
+---
+
 ## Quality gates
 
 Always last; nothing follows it.

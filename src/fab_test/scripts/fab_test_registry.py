@@ -70,6 +70,9 @@ _DEFAULT_INSPECTOR_PATH = str(REPO_ROOT / "PBIR-Inspector" / "PBIRInspectorCLI")
 _DEFAULT_A11Y_PATH = str(REPO_ROOT / "pbir-a11y" / "dist" / "cli.js")
 _DEFAULT_PBIR_RULES = str(metadata_path(PBIR_RULES, REPO_ROOT))
 _DEFAULT_RDL_RULES = str(metadata_path(RDL_RULES, REPO_ROOT))
+PACKAGED_RULE_FILES = {
+    "bpa": Path(_DEFAULT_BPA_RULES), "pbir": Path(_DEFAULT_PBIR_RULES), "rdl": Path(_DEFAULT_RDL_RULES)
+}
 
 ANALYZERS_JSON = metadata_path(ANALYZERS, REPO_ROOT)
 

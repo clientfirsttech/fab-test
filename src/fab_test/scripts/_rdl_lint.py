@@ -255,5 +255,7 @@ def build_test_results(
             )
             continue
         status = "pass" if rule_id in implemented and not rule.get("disabled") else "skip"
-        rows.append({**base, "object": "", "message": rule.get("description", ""), "status": status, **urls})
+        reason = rule.get("disabled_reason") if rule.get("disabled") else None
+        message = f"disabled: {reason}" if reason else rule.get("description", "")
+        rows.append({**base, "object": "", "message": message, "status": status, **urls})
     return rows

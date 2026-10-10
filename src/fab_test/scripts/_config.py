@@ -129,27 +129,30 @@ def merged_file_config(
 
 _RULE_OVERLAY_ANALYZERS = ("bpa", "pbir", "rdl")
 _RULE_OVERLAY_KEYS: dict[str, type] = {"disable": list, "severity": dict, "extend": str}
+# Per-rule parameter overrides exist only for fab-test's own RDL catalog; BPA
+# and PBIR thresholds live inside upstream rule expressions.
+_RDL_OVERLAY_KEYS: dict[str, Any] = {**_RULE_OVERLAY_KEYS, "disable": (list, dict), "settings": dict}
 
 
 def _validate_rule_overlay(analyzer: str, overlay: Any) -> None:
     """Validate one `rules.<analyzer>` overlay's keys, types, and item shapes."""
     path = f"rules.{analyzer}"
+    allowed = _RDL_OVERLAY_KEYS if analyzer == "rdl" else _RULE_OVERLAY_KEYS
     if not isinstance(overlay, dict):
         raise ConfigError(f"config key '{path}' must be of type dict, got {type(overlay).__name__}")
     for key, value in overlay.items():
         key_path = f"{path}.{key}"
-        if key not in _RULE_OVERLAY_KEYS:
-            suggestion = difflib.get_close_matches(key, _RULE_OVERLAY_KEYS, n=1)
+        if key not in allowed:
+            suggestion = difflib.get_close_matches(str(key), allowed, n=1)
             hint = f" (did you mean '{suggestion[0]}'?)" if suggestion else ""
             raise ConfigError(f"unknown config key '{key_path}'{hint}")
-        expected_type = _RULE_OVERLAY_KEYS[key]
+        expected_type = allowed[key]
         if not isinstance(value, expected_type):
-            raise ConfigError(
-                f"config key '{key_path}' must be of type {expected_type.__name__}, "
-                f"got {type(value).__name__}"
-            )
+            types = expected_type if isinstance(expected_type, tuple) else (expected_type,)
+            names = " or ".join(t.__name__ for t in types)
+            raise ConfigError(f"config key '{key_path}' must be of type {names}, got {type(value).__name__}")
         if key == "disable" and not all(isinstance(item, str) for item in value):
-            raise ConfigError(f"config key '{key_path}' must be a list of rule ID strings")
+            raise ConfigError(f"config key '{key_path}' must list rule ID strings, or map them to a reason")
         if key == "severity" and not all(
             isinstance(k, str) and isinstance(v, str) for k, v in value.items()
         ):
