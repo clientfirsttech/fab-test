@@ -45,6 +45,7 @@ from ._fab_test_context import (
 from ._mode import ModeError, resolve_mode
 from ._report_html import open_report_conflict
 from ._run_manifest import RunManifest
+from ._run_timing import print_timing_line
 from ._service_export import (
     finalize_exports,
     interactive_refusal,
@@ -119,7 +120,7 @@ from .fab_test_telemetry import (  # noqa: F401
     _telemetry_readiness,
     _validate_telemetry_payload,
 )
-from .playwright_validation.execution_config import prepare_execution
+from .playwright_validation.execution_config import execution_summary, prepare_execution
 
 # Ensure UTF-8 output on Windows where the default pipe encoding is cp1252.
 if hasattr(sys.stdout, "reconfigure"):
@@ -318,6 +319,7 @@ def _dispatch_run(args: argparse.Namespace) -> int:
     manifest = RunManifest(
         _FAB_TEST_VERSION, sys.argv, origin=_detect_origin(), target=_manifest_target(args)
     )
+    args.run_manifest = manifest  # the summary, index, and JSON read run timing from it
     telemetry = _open_telemetry(args)
 
     target = args.resolved_target
@@ -340,6 +342,8 @@ def _dispatch_run(args: argparse.Namespace) -> int:
                 )
             else:
                 runnable.append(name)
+        if "playwright" in runnable:
+            manifest.execution = execution_summary(args, _PYPROJECT_CONFIG.get("jobs"))
         if runnable:
             codes = [
                 _run_analyzer(name, args, output_dir, manifest, telemetry) for name in runnable
@@ -360,11 +364,14 @@ def _dispatch_run(args: argparse.Namespace) -> int:
     else:
         # The scope refusal for a single analyzer already ran above, before
         # any network call.
+        if args.analyzer == "playwright":
+            manifest.execution = execution_summary(args, _PYPROJECT_CONFIG.get("jobs"))
         exit_code = _run_analyzer(args.analyzer, args, output_dir, manifest, telemetry)
 
     # One flush for the whole run, `all` included: a sink per analyzer would
     # reopen the ingest client for each of them.
     manifest.telemetry_error = _close_telemetry(telemetry, args)
+    print_timing_line(args)
     manifest.write(output_dir, exit_code)
     return exit_code
 

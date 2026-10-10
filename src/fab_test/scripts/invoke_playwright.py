@@ -59,6 +59,7 @@ from .playwright_validation.execution_runtime import (
     redact_execution_text,
 )
 from .playwright_validation.fabric_service_client import build_fabric_service_client
+from .playwright_validation.phase_timing import TIMING_PLUGIN, PhaseClock, case_timing, clear_case_timing
 from .playwright_validation.power_bi_api import PowerBiApiError
 from .playwright_validation.resolver import (
     ResolvedReport,
@@ -235,6 +236,8 @@ def _test_results_rows(
                 "bookmark_name": case.bookmark_name,
                 "role": case.role,
                 "report_link": _report_deep_link(case, cloud),
+                # Absent, not zero, when the case never ran.
+                **case_timing(result_dir),
             }
         )
     return rows
@@ -387,6 +390,8 @@ def _run_pytest(
         "-m",
         "playwright",
         "-v",
+        "-p",
+        TIMING_PLUGIN,
         "--html=fab-test-results/playwright/report/index.html",
         "--self-contained-html",
         "--junitxml=fab-test-results/playwright/report/results.xml",
@@ -785,6 +790,7 @@ def _run_single_report(
     report_name_override: str = "",
 ) -> int:
     """Run Playwright validation for a single resolved report."""
+    clock = PhaseClock()
     pages, roles = resolve_discovery(config, args)
     parameter_sets = None
     if config.report_type == "paginated":
@@ -800,6 +806,7 @@ def _run_single_report(
 
     test_cases_dir = Path(args.test_cases_dir or _DEFAULT_TEST_CASES_DIR).resolve()
     write_test_cases(cases, test_cases_dir)
+    clock.lap("discovery_ms")
 
     report_name = report_name_override or config.report_name
     output_path = Path(args.output_path).resolve() if args.output_path else envelope_path("playwright", report_name)
@@ -855,6 +862,8 @@ def _run_single_report(
             cloud=config.cloud,
         )
 
+    clock.lap("token_ms")
+    clear_case_timing(_case_result_dir(case, test_cases_dir) for case in cases)
     base_embed_config = next(iter(embed_configs_by_role.values()))
     embed_configs_by_role_for_env = (
         embed_configs_by_role if len(embed_configs_by_role) > 1 else None
@@ -876,10 +885,31 @@ def _run_single_report(
         proc = _run_pytest(
             env, verbosity=level, case_count=len(cases), max_workers=getattr(args, "workers", None)
         )
+    clock.lap("render_ms")
+    clock.render_duration_ms = timer.elapsed_ms
 
     setup_error = execution_failure(
         proc.returncode, [_case_result_dir(case, test_cases_dir) for case in cases]
     ) if env.get(EXECUTION_PATH) else None
+    return _finish_report(proc, setup_error, cases, test_cases_dir, config, clock, args, (report_name, output_path))
+
+
+def _finish_report(
+    proc: subprocess.CompletedProcess[str],
+    setup_error: str | None,
+    cases: list[TestCase],
+    test_cases_dir: Path,
+    config: PlaywrightValidationConfig,
+    clock: PhaseClock,
+    args: argparse.Namespace,
+    destination: tuple[str, Path],
+) -> int:
+    """Turn a finished pytest session into the report's envelope; return its exit code.
+
+    Split out of `_run_single_report` to keep it under the statement budget.
+    ``destination`` is ``(report_name, envelope output path)``.
+    """
+    report_name, output_path = destination
     success = proc.returncode == 0 and not setup_error
     message = (
         f"Playwright visual validation passed: {len(cases)} cases"
@@ -908,9 +938,11 @@ def _run_single_report(
         status="error" if setup_error else ("passed" if success else "failed"),
         message=message,
         findings=findings,
-        duration_ms=timer.elapsed_ms,
+        started_at=clock.started_at,
+        duration_ms=clock.render_duration_ms,
     )
     env_out["test_results"] = test_results
+    env_out["timings"] = clock.timings(test_results, args)
     apply_coverage_limits(env_out, str(report_name))  # a lookup that failed narrows a pass to a warning
     _write_playwright_envelope(output_path, env_out)
 

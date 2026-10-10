@@ -1,5 +1,6 @@
 backend: azure
 workers: 8
+jobs: 4
 connection:
   os: linux
   timeout_ms: 30000

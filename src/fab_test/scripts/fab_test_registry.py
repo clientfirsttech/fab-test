@@ -825,6 +825,30 @@ _TOOL_FLAG_HINTS = {
 }
 
 
+def _playwright_preflight_error(args: argparse.Namespace) -> tuple[str, int] | None:
+    """Return (message, 127) when the pytest runner or the service principal is missing."""
+    # Its "tool" is the pytest runner; without it every case read as a failed render.
+    from .playwright_validation import execution_runtime
+
+    missing = execution_runtime.missing_runner_message()
+    if missing:
+        return missing, 127
+    # Every artifact would refuse at the same check; say it once, before fanning out.
+    status = probe_credentials(getattr(args, "playwright_env_file", None))
+    if status.verified:
+        return None
+    # Only a partial principal's remediation helps; the ambient-credential detail
+    # ("would attempt DefaultAzureCredential") is not an option playwright has.
+    partial = f" ({status.remediation})" if status.remediation else ""
+    message = (
+        f"playwright needs a full service principal to generate an embed token{partial}.\n"
+        "  Set FABRIC_TENANT_ID, FABRIC_CLIENT_ID (or FABRIC_SERVICE_PRINCIPAL_ID), and "
+        "FABRIC_CLIENT_SECRET (or FABRIC_SERVICE_PRINCIPAL_SECRET) in the environment, "
+        "a .env file, or pass --env-file."
+    )
+    return message, 127
+
+
 def preflight_error(name: str, args: argparse.Namespace) -> tuple[str, int] | None:
     """Return an (error message, exit code) pair if a required tool is missing.
 
@@ -834,11 +858,7 @@ def preflight_error(name: str, args: argparse.Namespace) -> tuple[str, int] | No
     distinguishing an unconfigured machine from a real rule violation (1).
     """
     if name == "playwright" and not getattr(args, "plan_only", False):
-        # Its "tool" is the pytest runner; without it every case read as a failed render.
-        from .playwright_validation import execution_runtime
-
-        missing = execution_runtime.missing_runner_message()
-        return (missing, 127) if missing else None
+        return _playwright_preflight_error(args)
     if name not in _BOOTSTRAPPED_ANALYZERS or not is_enabled(name):
         return None
     try:

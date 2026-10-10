@@ -18,6 +18,7 @@ from fab_test import __version__ as _FAB_TEST_VERSION
 from ._cli_utils import narrate
 from ._pbip_discovery import discover_pbip_projects as _discover_pbip_projects
 from ._run_manifest import RunManifest
+from ._run_timing import print_timing_line, timing_summary
 from .fab_test_execution import _manifest_target, _run_analyzer
 from .fab_test_registry import (
     ANALYZER_REGISTRY as _ANALYZER_REGISTRY,
@@ -173,6 +174,7 @@ def _run_local(args: argparse.Namespace) -> int:
     manifest = RunManifest(
         _FAB_TEST_VERSION, sys.argv, origin=_detect_origin(), target=_manifest_target(args)
     )
+    args.run_manifest = manifest  # the summary, index, and JSON read run timing from it
     telemetry = _open_telemetry(args)
 
     results: list[dict[str, Any]] = []
@@ -193,9 +195,12 @@ def _run_local(args: argparse.Namespace) -> int:
     # Flushed before the manifest is written so run.json can record whether
     # this run's telemetry landed.
     manifest.telemetry_error = _close_telemetry(telemetry, args)
+    print_timing_line(args)
     manifest.write(output_dir, exit_code)
     if output_format == "json":
         for entry in results:  # each analyzer's per-artifact rows, which no longer print separately
             entry["artifacts"] = getattr(args, "_json_rows", {}).get(entry["analyzer"], [])
-        print(json.dumps({"analyzer": "local", "results": results, "exit_code": exit_code}, indent=2))
+        print(json.dumps(
+            {"analyzer": "local", "results": results, "exit_code": exit_code, "timing": timing_summary(args)}, indent=2
+        ))
     return exit_code

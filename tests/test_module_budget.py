@@ -224,8 +224,12 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
         ),
     ),
     "src/fab_test/scripts/invoke_playwright.py": (
-        1021,
+        1049,
         (
+            "2026-10-09: +28 lines for Run Timing task 2: loading the timing plugin, lapping "
+            "discovery/token/render phases, and splitting the envelope-building tail into "
+            "_finish_report so _run_single_report stays under the statement budget. The timing "
+            "helpers themselves live in playwright_validation/phase_timing.py. "
             "2026-10-07: +7 lines aborting with an install command when the pytest "
             "runner packages are missing (the check itself lives in execution_runtime.py), "
             "sharing one error return with the RLS-user check, now _missing_rls_user, to stay "
@@ -282,8 +286,15 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
         ),
     ),
     "src/fab_test/scripts/fab_test_execution.py": (
-        896,
+        913,
         (
+            "2026-10-09: +9 lines timing each artifact's subprocess for run.json's duration_ms "
+            "(Run Timing epic, task 1), paired with `aborted` to stay within the argument budget. "
+            "2026-10-09: +1 line importing resolve_jobs so a playwright execution YAML's `jobs` "
+            "sets concurrent reports when --jobs is absent. "
+            "2026-10-09: +7 lines removing an artifact's envelope before its analyzer runs and "
+            "persisting an aborted run's stderr detail as the envelope message, so an aborted "
+            "run neither inherits an earlier run's findings nor reads \"failed, 0 errors\" with no reason. "
             "2026-10-08: +3 lines importing and dispatching --changed-since "
             "(_playwright_changed.py holds the logic) in _playwright_service_resolved_target. "
             "2026-10-08: +1 line appending credential_failure_detail (-v/-vv sign-in detail) "

@@ -126,9 +126,11 @@ def _add_common_flags(
     parser.add_argument(
         "--jobs",
         type=int,
-        default=_PYPROJECT_CONFIG.get("jobs", 1),
+        # None, not the config default, so a playwright execution YAML's `jobs` can tell an explicit flag apart.
+        default=None,
         metavar="N",
-        help="Run up to N artifacts in parallel for the same analyzer (default: 1)",
+        help="Run up to N artifacts in parallel for the same analyzer "
+        "[playwright: execution YAML `jobs`; config: jobs; default: 1]",
     )
     verbosity_group = parser.add_mutually_exclusive_group()
     verbosity_group.add_argument(

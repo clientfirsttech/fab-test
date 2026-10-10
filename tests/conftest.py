@@ -289,6 +289,22 @@ def _stub_subprocess_run(*_args, **_kwargs):
     return subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
 
 
+def _writes_envelope(envelope_path: Path, run):
+    """Wrap a fake subprocess.run so it writes ``envelope_path``'s current content.
+
+    The parent removes an artifact's envelope before running its analyzer, so a
+    test that pre-writes one must have the "analyzer" write it, as the real one would.
+    """
+    text = envelope_path.read_text(encoding="utf-8")
+
+    def _run(*args, **kwargs):
+        envelope_path.parent.mkdir(parents=True, exist_ok=True)
+        envelope_path.write_text(text, encoding="utf-8")
+        return run(*args, **kwargs)
+
+    return _run
+
+
 # --------------------------------------------------------------------------- #
 # Shared helpers for the HTML report renderer tests (test_report_html*.py)
 # --------------------------------------------------------------------------- #

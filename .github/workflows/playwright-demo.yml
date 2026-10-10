@@ -53,6 +53,18 @@ on:
         required: false
         default: false
         type: boolean
+      browsers:
+        description: "Where browsers run: on this runner (local) or on Azure Playwright Workspaces (azure, using the fabric-demo Environment's PLAYWRIGHT_SERVICE_* secrets and docs/examples/playwright/azure.yml)"
+        required: false
+        default: "local"
+        type: choice
+        options: ["local", "azure"]
+      report_jobs:
+        description: "Reports rendered at once (--jobs). The run line in the summary shows what it saved."
+        required: false
+        default: "1"
+        type: choice
+        options: ["1", "2", "4", "8"]
 
 jobs:
   playwright-demo:
@@ -88,6 +100,9 @@ jobs:
       # unset unless test_rls opts in.
       PLAYWRIGHT_USE_RLS: ${{ inputs.test_rls }}
       PLAYWRIGHT_USER_NAME: ${{ inputs.test_rls && secrets.PLAYWRIGHT_USER_NAME || '' }}
+      # Only an azure run receives the browser-service credentials.
+      PLAYWRIGHT_SERVICE_URL: ${{ inputs.browsers == 'azure' && secrets.PLAYWRIGHT_SERVICE_URL || '' }}
+      PLAYWRIGHT_SERVICE_ACCESS_TOKEN: ${{ inputs.browsers == 'azure' && secrets.PLAYWRIGHT_SERVICE_ACCESS_TOKEN || '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -175,7 +190,8 @@ jobs:
           [ -n "${{ inputs.workspace_id }}" ] && set -- "$@" --workspace-id "${{ inputs.workspace_id }}"
           [ "${{ inputs.pages }}" = "none" ] && set -- "$@" --pages none
           [ "${{ inputs.roles }}" = "none" ] && set -- "$@" --roles none
-          fab-test playwright "$@" --report
+          [ "${{ inputs.browsers }}" = "azure" ] && set -- "$@" --playwright-config docs/examples/playwright/azure.yml
+          fab-test playwright "$@" --jobs "${{ inputs.report_jobs }}" --report
 
       # Always -- the failed run is the one you most want to read. Every
       # case's own evidence lives under playwright/<report>/test-cases/**;
@@ -189,6 +205,8 @@ jobs:
             fab-test-results/playwright/**/report.html
             fab-test-results/playwright/**/envelope.json
             fab-test-results/playwright/**/test-cases/**
+            fab-test-results/run.json
+            fab-test-results/index.html
 
       - name: Write the per-case summary
         if: always()
@@ -216,6 +234,21 @@ jobs:
           summary_path = os.environ["GITHUB_STEP_SUMMARY"]
           with open(summary_path, "a", encoding="utf-8") as fh:
               fh.write("## Playwright demo results\n\n")
+              # The same run line the terminal prints (Run Timing epic), from run.json.
+              try:
+                  with open("fab-test-results/run.json", encoding="utf-8") as run_fh:
+                      run = json.load(run_fh)
+                  artifact_ms = sum(a.get("duration_ms") or 0 for a in run["artifacts"])
+                  wall_ms = run["wall_ms"] or 1
+                  ex = run.get("execution") or {}
+                  fh.write(
+                      f"**Wall {wall_ms / 1000:.1f}s** · artifact time {artifact_ms / 1000:.1f}s · "
+                      f"{artifact_ms / wall_ms:.1f}x parallel · {ex.get('backend')}, "
+                      f"jobs {ex.get('jobs')}, workers {ex.get('workers')} · "
+                      f"{len(run['artifacts'])} report(s), runner {os.cpu_count()} CPU\n\n"
+                  )
+              except (OSError, KeyError, ValueError):
+                  fh.write("No run timing -- run.json was not written.\n\n")
               if rows:
                   fh.write("| Report | Page | Bookmark | Role | Status | Link |\n")
                   fh.write("|---|---|---|---|---|---|\n")

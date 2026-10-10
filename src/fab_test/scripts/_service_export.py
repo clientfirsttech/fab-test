@@ -498,15 +498,25 @@ def service_skip_exit(name: str, args: argparse.Namespace) -> int:
 def _announce_credential(args: argparse.Namespace, client: Any) -> None:
     """Name the credential the run resolved, once, beside the mode banner.
 
-    The label and the env-file path only -- never a secret. Silent under
-    ``--format json`` and ``-q``, like the banner.
+    The label, the env-file path, and for a signed-in person the account and
+    tenant -- never a secret. An ambient sign-in is whoever last ran `az
+    login`, and two tenants can each hold a workspace of the same name, so
+    the account is what tells a caller which one this run is reading.
+    Silent under ``--format json`` and ``-q``, like the banner.
     """
+    from ._pql_identity import token_account, token_tenant
+
     if getattr(args, "_auth_announced", False):
         return
     args._auth_announced = True
     source = getattr(client, "credential_source", "unknown")
     if source == "service-principal":
         source += f" ({probe_credentials(getattr(args, 'playwright_env_file', None)).source})"
+    token = getattr(client, "access_token", "") or ""
+    account = token_account(token)
+    if account:
+        tenant = token_tenant(token)
+        source += f" account={account}" + (f" tenant={tenant}" if tenant else "")
     _progress(args, f"auth={source}")
 
 

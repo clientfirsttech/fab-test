@@ -17,6 +17,7 @@ import sys
 import pytest
 
 from fab_test.scripts._run_manifest import RunManifest, _sanitize_command
+from tests.conftest import _writes_envelope
 
 _REQUIRED_KEYS = {
     "schema_version",
@@ -36,6 +37,12 @@ _REQUIRED_KEYS = {
     # from one whose records were dropped.
     "telemetry_error",
     "exit_code",
+    # Run Timing epic, task 1: additive, always present. `execution` is null
+    # unless the run included playwright.
+    "started_at",
+    "finished_at",
+    "wall_ms",
+    "execution",
 }
 
 
@@ -598,6 +605,11 @@ def test_manifest_detail_stays_null_when_the_analyzer_wrote_an_envelope(
 
     _stub_analyzer_run(monkeypatch, fab_test_execution, stderr="noise on stderr\n")
     monkeypatch.setattr(
+        fab_test_execution.subprocess,
+        "run",
+        _writes_envelope(envelope_dir / "envelope.json", fab_test_execution.subprocess.run),
+    )
+    monkeypatch.setattr(
         sys,
         "argv",
         [
@@ -612,3 +624,78 @@ def test_manifest_detail_stays_null_when_the_analyzer_wrote_an_envelope(
     manifest = json.loads((output_dir / "run.json").read_text(encoding="utf-8"))
     assert manifest["artifacts"][0]["status"] == "failed"
     assert manifest["artifacts"][0]["detail"] is None
+
+
+@pytest.mark.fab_test
+def test_manifest_records_wall_clock_and_artifact_duration(monkeypatch):
+    """Given a run, should record when it started and finished, its wall time, and each artifact's duration."""
+    from fab_test.scripts import _run_manifest
+
+    clock = iter([100.0, 104.25])
+    monkeypatch.setattr(_run_manifest.time, "monotonic", lambda: next(clock))
+    manifest = RunManifest("1.0.0", ["fab-test", "playwright"])
+    manifest.record_artifact("playwright", "A", "passed", "e.json", 0, 0, duration_ms=3100)
+    manifest.record_artifact("playwright", "B", "preflight_failed", None, 0, 0, detail="no runner")
+
+    data = manifest.to_dict(exit_code=0)
+
+    assert data["wall_ms"] == 4250
+    assert data["started_at"] <= data["finished_at"]
+    assert [a["duration_ms"] for a in data["artifacts"]] == [3100, None]
+    assert data["execution"] is None
+
+
+@pytest.mark.fab_test
+def test_manifest_records_a_timed_out_artifact_with_its_timeout_as_duration(tmp_path, monkeypatch):
+    """Given an analyzer that times out, should record the timeout as its duration."""
+    from fab_test.scripts import fab_test_execution
+    from fab_test.scripts.fab_test import _run_analyzer
+    from tests.conftest import _RunAnalyzerArgs
+
+    artifact_dir = tmp_path / "artifacts"
+    (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
+    output_dir = tmp_path / "results"
+
+    def _timeout(cmd, **_kwargs):
+        raise subprocess.TimeoutExpired(cmd, 7)
+
+    monkeypatch.setattr(fab_test_execution.subprocess, "run", _timeout)
+    monkeypatch.setattr(fab_test_execution, "_preflight_error", lambda *a, **k: None)
+    monkeypatch.setattr(fab_test_execution, "_send_telemetry", lambda *a, **k: None)
+    manifest = RunManifest("1.0.0", ["fab-test", "pql_lint"])
+    args = _RunAnalyzerArgs(artifact_dir, output_dir, timeout=7)
+
+    _run_analyzer("pql_lint", args, output_dir, manifest)
+
+    assert manifest.artifacts[0]["status"] == "timeout"
+    assert manifest.artifacts[0]["duration_ms"] == 7000
+
+
+@pytest.mark.fab_test
+def test_playwright_run_records_its_execution_settings(tmp_path):
+    """Given a playwright run with an execution YAML, run.json should name backend, workers, and jobs."""
+    artifact_dir = tmp_path / "artifacts"
+    (artifact_dir / "Sales.Report").mkdir(parents=True)
+    output_dir = tmp_path / "fab-test-results"
+    config = tmp_path / "local.yml"
+    config.write_text("backend: local\nworkers: 6\njobs: 3\n", encoding="utf-8")
+
+    result = subprocess.run(
+        [
+            "fab-test", "playwright",
+            "--artifact-dir", str(artifact_dir),
+            "--output-dir", str(output_dir),
+            "--playwright-config", str(config),
+            "--dry-run",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    execution = json.loads((output_dir / "run.json").read_text(encoding="utf-8"))["execution"]
+    assert execution["backend"] == "local"
+    assert (execution["workers"], execution["workers_origin"]) == (6, "execution_config")
+    assert (execution["jobs"], execution["jobs_origin"]) == (3, "execution_config")
+    assert execution["execution_config_origin"] == "flag"

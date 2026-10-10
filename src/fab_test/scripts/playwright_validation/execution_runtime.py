@@ -19,7 +19,13 @@ from playwright.sync_api import BrowserType
 
 from .._config import ConfigError, merged_file_config
 from .config import _env_or_env_file, resolve_env_file
-from .execution_config import ExecutionConfig, resolve_execution_config
+from .execution_config import (  # noqa: F401 - resolve_jobs/execution_summary re-exported
+    ExecutionConfig,
+    execution_summary,
+    resolve_execution_config,
+    resolve_jobs,
+    resolve_workers,
+)
 
 EXECUTION_PATH = "FAB_TEST_PLAYWRIGHT_EXECUTION_CONFIG"
 EXECUTION_RUN_ID = "FAB_TEST_PLAYWRIGHT_RUN_ID"
@@ -78,23 +84,6 @@ def browser_connection_options(
         "timeout": config.connection.get("timeout_ms", 30000),
         "expose_network": config.connection.get("expose_network", "<loopback>"),
     }
-
-
-def resolve_workers(config: ExecutionConfig, explicit: int | None = None) -> int:
-    """Resolve CLI > process environment > execution YAML > four workers."""
-    raw = os.environ.get("PLAYWRIGHT_XDIST_WORKERS")
-    if explicit is not None:
-        workers = explicit
-    elif raw:
-        try:
-            workers = int(raw)
-        except ValueError:
-            workers = 4
-    else:
-        workers = config.workers if config.workers is not None else 4
-    if type(workers) is not int or workers <= 0:
-        raise ConfigError("--workers / PLAYWRIGHT_XDIST_WORKERS must be a positive integer")
-    return workers
 
 
 def _resolve_max_workers(explicit: int | None) -> int:

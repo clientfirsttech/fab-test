@@ -129,6 +129,28 @@ def test_the_output_directory_is_pruned_when_the_caller_says_so(tmp_path):
 
 
 @pytest.mark.fab_test
+def test_kept_exports_in_the_default_results_folder_are_pruned_with_another_output_dir(tmp_path):
+    """Given --output-dir elsewhere, a kept export under fab-test-results must not
+    be found beside the real artifact -- that ran `--artifact X` twice (2026-10-09)."""
+    _artifact(tmp_path / "fab-test-results" / "layout" / "export" / "28fac5ac", "Working Visuals.Report")
+    real = _artifact(tmp_path / "fabric-artifacts", "Working Visuals.Report")
+
+    found = find_artifact_dirs(tmp_path, SUFFIXES, excluded_paths=[tmp_path / "bench" / "results"])
+
+    assert found == [real]
+
+
+@pytest.mark.fab_test
+def test_a_scan_rooted_inside_fab_test_results_still_finds_a_kept_export(tmp_path):
+    """Only directories met during the walk are pruned, so pointing --artifact-dir
+    at a kept export analyzes it on purpose."""
+    export = tmp_path / "fab-test-results" / "export" / "28fac5ac"
+    kept = _artifact(export, "Working Visuals.Report")
+
+    assert find_artifact_dirs(tmp_path / "fab-test-results", SUFFIXES) == [kept]
+
+
+@pytest.mark.fab_test
 def test_a_missing_root_yields_nothing_rather_than_raising(tmp_path):
     assert find_artifact_dirs(tmp_path / "absent", SUFFIXES) == []
 

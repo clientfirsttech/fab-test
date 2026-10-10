@@ -26,6 +26,7 @@ from ._report_html import (
     resolve_report,
     write_index,
 )
+from ._run_timing import add_durations, timing_line, timing_summary
 from ._service_export import service_row_stems
 from ._table_style import TABLE_FORMAT, table_padding
 from ._target import target_from_args
@@ -168,6 +169,10 @@ def _print_auth_status(
     identity = payload["identity"]
     rows = [
         ("identity", identity["source"] or "(none resolved)"),
+    ]
+    if identity.get("account"):
+        rows.append(("account", identity["account"]))
+    rows += [
         ("tenant", identity["tenant_id"] or "-"),
         ("verified", "yes" if identity["verified"] else "no"),
     ]
@@ -540,6 +545,13 @@ def _display_path(path: Path | str) -> str:
         return str(resolved)
 
 
+def _unexplained_failure_detail(data: dict[str, Any] | None, status: str, errors: int) -> str | None:
+    """Return the envelope's message for a failure no error finding explains, else None."""
+    if status != "failed" or errors > 0 or not data:
+        return None
+    return data.get("message") or None
+
+
 def _artifact_status(data: dict[str, Any] | None, code: int, errors: int, warnings: int) -> str:
     """Classify one artifact's outcome from its envelope and the analyzer's exit code."""
     if code != 0 or (data and data.get("status") == "failed") or errors > 0:
@@ -607,7 +619,9 @@ def build_all_summary_rows(
                 "warnings": warnings,
                 "output_path": str(output_dir / analyzer / stem / "envelope.json"),
                 "report_path": _report_path_for(data),
+                "detail": _unexplained_failure_detail(data, status, errors),
             })
+    add_durations(rows, args)
     return rows
 
 
@@ -626,7 +640,7 @@ def _write_and_open_index(
     report_on = resolve_report(args)
     open_wanted = resolve_open_report(args)
     if report_on and len(analyzers) > 1:
-        index = write_index(rows, output_dir)
+        index = write_index(rows, output_dir, run_summary=timing_line(args))
         if index:
             print(f"  Index:  {_display_path(index)}")
             if open_wanted:
@@ -670,6 +684,7 @@ def _print_all_summary(
                 "warnings": total_warnings,
             },
             "dry_run": dry_run,
+            "timing": timing_summary(args),
         }
         print(json.dumps(summary, indent=2))
         return worst
@@ -908,7 +923,8 @@ def _open_single_analyzer_report(
             }
             for stem, code in results
         ]
-        index = write_index(rows, output_dir)
+        add_durations(rows, args)
+        index = write_index(rows, output_dir, run_summary=timing_line(args))
         if index:
             print(f"  Index:  {_display_path(index)}")
             if open_wanted:
@@ -926,10 +942,12 @@ def _index_row_fields(
     """
     data = _read_artifact_envelope(output_dir, analyzer, stem)
     errors, warnings = _envelope_error_warning_counts(data)
+    status = _artifact_status(data, code, errors, warnings)
     return {
-        "status": _artifact_status(data, code, errors, warnings),
+        "status": status,
         "errors": errors,
         "warnings": warnings,
         "output_path": str(output_dir / analyzer / stem / "envelope.json"),
         "report_path": _report_path_for(data),
+        "detail": _unexplained_failure_detail(data, status, errors),
     }

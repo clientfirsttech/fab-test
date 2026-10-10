@@ -196,9 +196,10 @@ local default. Flag/environment paths are relative to the invocation directory;
 `playwright_config` paths are relative to their owning YAML or pyproject file.
 `config --show` reports the selection and origin; dry-run makes no browser
 connection. Worker limits resolve `--workers` > `PLAYWRIGHT_XDIST_WORKERS` >
-execution YAML > `4` and are bounded by the current report's case count.
+execution YAML > `4` and are bounded by the current report's case count. Concurrent
+reports resolve `--jobs` > execution YAML `jobs` > `jobs` in fab-test config > `1`.
 
-Execution YAML permits only `backend` (`local`/`azure`), positive `workers`,
+Execution YAML permits only `backend` (`local`/`azure`), positive `workers`, positive `jobs`,
 `launch` (`headless`, string-list `args`, nonnegative `slow_mo`), `context`
 (`viewport` width/height, `locale`, `timezone_id`, `color_scheme`,
 `ignore_https_errors`), and Azure `connection` (`os` linux/windows,
@@ -322,6 +323,12 @@ discoverable: `fab-test init` scaffolds a commented line for it, and
 `env:FABRIC_WORKSPACE_ID`, etc.) alongside every other setting.
 
 **Every generated case gets its own accurate result, not the run's outcome copy-pasted.**
+Beside it, `timing.json` (written by the always-loaded `timing_plugin`) records the case's
+`setup_ms` (fixture setup, including the browser launch or Azure connection on a worker's first
+case) and `duration_ms` (the render itself); each `test_results` row carries both, absent rather
+than zero for a case that never ran. `report.html` shows the phase timing, the three slowest
+cases, and a sortable Duration column.
+
 `fab-test-results/playwright/<report>/test-cases/<case>/result.json` (written by the pytest
 spec itself, per case) records that case's real `status` (`pass`/`error`) and, on
 failure, the actual detail -- the embed error, a render timeout, or an RDL error

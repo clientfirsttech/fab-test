@@ -42,6 +42,11 @@ def test_token_account_is_empty_for_an_app_or_unreadable_token(token):
     assert guard.token_account(token) == ""
 
 
+def test_token_tenant_reads_the_tid_claim():
+    assert guard.token_tenant(_token(upn="a@b.c", tid="tenant-guid")) == "tenant-guid"
+    assert guard.token_tenant("not-a-jwt") == ""
+
+
 def test_given_different_accounts_should_name_both(monkeypatch):
     _status(monkeypatch, Status="Authenticated", Method="interactive", Account="jkerski@cftechnologiesllc.com")
     message = guard.pql_identity_mismatch(USER)

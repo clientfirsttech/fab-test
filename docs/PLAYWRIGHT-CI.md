@@ -209,7 +209,7 @@ fab-test config --show
 
 Omitting a selector keeps local execution even if Azure credentials exist.
 Use `backend: local` in YAML to customize local browsers without service
-credentials. Supported keys are `backend`, positive `workers`, `launch`
+credentials. Supported keys are `backend`, positive `workers`, positive `jobs`, `launch`
 (`headless`, string-list `args`, nonnegative `slow_mo`), `context` (`viewport`
 width/height, `locale`, `timezone_id`, `color_scheme`, `ignore_https_errors`),
 and Azure `connection` (`os`, `timeout_ms`, `expose_network`). Defaults are
@@ -220,8 +220,10 @@ Arbitrary plugins, tests, reporters, and executable configurations are refused.
 
 Workers resolve `--workers` > `PLAYWRIGHT_XDIST_WORKERS` > YAML > `4`.
 Only cases within the current report are parallelized, capped by its case
-count. Begin with a modest limit and respect your Azure service quota; more
-workers do not guarantee faster reports. Contexts and browser sessions use
+count. `jobs` runs that many reports at once and resolves `--jobs` > YAML
+`jobs` > `jobs` in fab-test config > `1`, so a run can hold up to
+`jobs x workers` browsers. Begin with a modest limit and respect your Azure
+service quota; more workers do not guarantee faster reports. Contexts and browser sessions use
 pytest-playwright's normal teardown.
 
 For selected YAML, native pytest HTML and JUnit are written to
@@ -231,6 +233,89 @@ existing locations. Connection/authentication failure becomes an execution
 error, not a broken-visual finding; raw connection diagnostics are withheld
 to avoid exposing authorization headers. There is no automatic local fallback.
 Plan-only does not require the Azure token or launch a browser.
+
+### Reading run timing: is `jobs` or Azure worth it?
+
+Every run records how long it took (`run.json`: `wall_ms`, each artifact's
+`duration_ms`, and an `execution` block naming `backend`, `workers`, and
+`jobs`). A multi-report run ends with one line, which also sits under the
+`index.html` title:
+
+```text
+⏱ Wall 1m54s · artifact time 7m02s · 3.7x parallel · azure, jobs 4, workers 8
+```
+
+*Wall* is what you waited. *Artifact time* is the sum of each report's own
+time, which is what the run would take with nothing in parallel. Their
+ratio is how much ran at once. Each report's `report.html` shows where its
+time went: discovery (pages, bookmarks, roles, parameters), embed tokens,
+render, and browser setup summed across cases (the browser launch or Azure
+connection, plus context and page creation), with the slowest cases listed
+first.
+
+To compare settings, give each run its own `--output-dir` and open both
+pages. Before reading the faster run as a speedup, check that both tested
+the same reports and reached the same verdicts.
+
+**Worked example** (2026-10-09, the `visual-error-testing` workspace:
+12 reports, 37 cases, 6 of them failing on purpose; one Windows laptop and
+Azure Playwright Workspaces, Linux browsers). All four runs reached
+identical verdicts:
+
+| Run | Wall | Artifact time | Parallel | Render (summed) | Browser setup (summed) |
+|---|---|---|---|---|---|
+| local, `jobs 1`, `workers 4` | 6m18s | 6m16s | 1.0x | 3m53s | 27s |
+| Azure, `jobs 1`, `workers 8` | 6m22s | 6m20s | 1.0x | 3m56s | 1m16s |
+| local, `jobs 4`, `workers 4` | 2m53s | 10m59s | 3.8x | 7m23s | 1m30s |
+| Azure, `jobs 4`, `workers 8` | **1m54s** | 7m02s | 3.7x | 4m20s | 1m33s |
+
+```bash
+fab-test playwright --workspace visual-error-testing --jobs 1 --output-dir results/local-j1
+fab-test playwright --workspace visual-error-testing --jobs 4 --output-dir results/local-j4
+fab-test playwright --workspace visual-error-testing --jobs 1 \
+  --playwright-config docs/examples/playwright/azure.yml --output-dir results/azure-j1
+fab-test playwright --workspace visual-error-testing \
+  --playwright-config docs/examples/playwright/azure.yml --output-dir results/azure-j4  # YAML sets jobs: 4
+```
+
+The same matrix on GitHub Actions (the `Playwright demo` workflow's
+`browsers` and `report_jobs` inputs; a public repository's 4-vCPU
+`ubuntu-latest` runner in the `mcr.microsoft.com/playwright/python`
+container), again with identical verdicts. *CI job* is the whole job,
+including about a minute of checkout and install before the run starts:
+
+| Run | Wall | Artifact time | Parallel | Render (summed) | Browser setup (summed) | CI job |
+|---|---|---|---|---|---|---|
+| runner, `jobs 1`, `workers 4` | 5m25s | 5m23s | 1.0x | 3m34s | 20s | 6m21s |
+| Azure, `jobs 1`, `workers 8` | 5m00s | 4m59s | 1.0x | 3m43s | 1m08s | 6m03s |
+| runner, `jobs 4`, `workers 4` | 1m59s | 7m02s | 3.6x | 5m26s | 41s | 2m57s |
+| Azure, `jobs 4`, `workers 8` | **1m33s** | 5m48s | 3.7x | 4m00s | 1m41s | **2m41s** |
+
+```bash
+gh workflow run playwright-demo.yml --ref dev -f workspace_id=visual-error-testing \
+  -f test_rls=true -f browsers=azure -f report_jobs=4
+```
+
+What the numbers say:
+
+- **`jobs` is the lever, on a laptop and in CI.** Reports here have 1-10
+  cases, so `workers` is capped by each report's case count. `jobs 4` cut
+  the laptop from 6m18s to 2m53s and the runner from 5m25s to 1m59s with
+  local browsers alone. With `jobs 1`, Azure saves little or nothing: remote
+  browsers add setup (about 1m10s summed) and nothing runs at once.
+- **Azure is what lets `jobs` scale.** With `jobs 4`, 16 local browsers
+  compete for one machine's CPU. Summed render time nearly doubled on the
+  laptop (3m53s to 7m23s) and rose by half on the runner (3m34s to 5m26s);
+  on Azure it barely moved. So Azure `jobs 4` is the fastest everywhere:
+  1m54s on the laptop (3.3x the baseline) and 1m33s in CI (3.5x). In CI the
+  Azure gain over local `jobs 4` is smaller (26s) than on the laptop (59s),
+  because the runner had more CPU to spare. Expect it to grow with higher
+  `jobs` or larger workspaces.
+- **Discovery and embed tokens cost 1-2 minutes per run** (summed), once per
+  report. `jobs` overlaps them; more `workers` does not.
+- **For CI, start with `jobs: 4`.** It is the biggest single saving and needs
+  no service. Add Azure-hosted browsers when the runner's CPU becomes the
+  limit, that is, when raising `jobs` stops shortening the wall clock.
 
 ### Watching the browser locally
 
