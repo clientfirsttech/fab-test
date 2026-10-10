@@ -32,9 +32,15 @@ from typing import NamedTuple
 # reason for the same rule: they hold agent tooling -- skill instructions,
 # worked examples, worktrees, scratch config -- not this project's own
 # artifacts, so anything suffix-matching found there is documentation about
-# the project, never the project itself.
+# the project, never the project itself. fab-test-results is fab-test's own
+# default output: its kept exports (`--keep-export`) are copies of deployed
+# items, so a run with a different --output-dir rediscovered them and tested
+# the same report twice. Only a directory found during the walk is pruned,
+# never the walk's root, so `--artifact-dir fab-test-results/export/...`
+# still analyzes a kept export on purpose.
 EXCLUDED_DIR_NAMES: frozenset[str] = frozenset(
     {
+        "fab-test-results",
         ".git",
         ".venv",
         "venv",
