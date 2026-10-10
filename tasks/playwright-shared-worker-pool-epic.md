@@ -24,6 +24,8 @@ The live run that prompted this (2026-10-09, `visual-error-testing`, 12 reports)
 
 Depends on the [Run Timing](run-timing-epic.md) epic, so the numbers come from `run.json` rather than a stopwatch.
 
+**Baseline recorded 2026-10-09** (Run Timing task 4, same verdicts in every run): Azure `jobs 1` 6m22s, Azure `jobs 4, workers 8` 1m54s, local `jobs 1` 6m18s, local `jobs 4` 2m53s. Discovery and embed tokens sum to about 1m45s per run, once per report, and pooling does not reduce that; `jobs` already overlaps it. The pooled session can only beat `jobs 4` on the render phase (4m20s summed on Azure), so the remaining requirement is the hand-pooled run.
+
 **Requirements**:
 - Given the 12-report `visual-error-testing` workspace on Azure-hosted browsers, should record wall-clock for `jobs: 1`, `jobs: 4`, and a hand-pooled single session (all `test-cases.json` merged into one run with `workers: 8`), with the same verdicts in all three.
 - Given the pooled time is not materially better than `jobs: 4`, should close this epic with the measurements recorded and recommend a `jobs` default for Azure runs instead.

@@ -1,6 +1,6 @@
 # Run Timing Epic
 
-**Status**: 🔄 IN-PROGRESS (tasks 1-3 of 4 done; task 4 needs live Azure runs)
+**Status**: ✅ IMPLEMENTED 2026-10-09 (all 4 tasks and the quality gates; GitHub Actions timing not yet measured, see the follow-up under task 4)
 **Goal**: Every run records and shows how long it took, where the time went, and which execution settings produced it. Two runs, for example local `jobs: 1` against Azure `jobs: 4, workers: 8`, can then be compared side by side to show what parallelism and Azure-hosted browsers save.
 
 ## Overview
@@ -58,7 +58,11 @@ A new `timing_plugin`, loaded with `-p` on every render run (the execution plugi
 - Given `-q` or `--format json`, should add timing to the JSON summary and leave the quiet one-line-per-artifact format unchanged.
 - Given `--open-report` on a finished run, should show the run line (wall clock, artifact time, ratio, execution settings) on the page it opens, so two runs can be compared by opening each one (decision 1).
 
-## Task 4: Benchmark and document
+## Task 4: Benchmark and document (completed 2026-10-09)
+
+Four live runs of `visual-error-testing` (12 reports, 37 cases), all with identical verdicts, are written up in [PLAYWRIGHT-CI.md](../docs/PLAYWRIGHT-CI.md#reading-run-timing-is-jobs-or-azure-worth-it). Local `jobs 1`: 6m18s. Azure `jobs 1`: 6m22s. Local `jobs 4`: 2m53s, with summed render time nearly doubled by local CPU contention. Azure `jobs 4, workers 8`: 1m54s. `jobs` is the lever, and Azure is what lets it scale. A fourth run (local `jobs 4`) was added to the planned three, because without it the Azure benefit could not be separated from `jobs`. Follow-up: the same matrix on GitHub Actions runners, local and Azure browsers, which this laptop-only benchmark cannot answer.
+
+Quality gates (2026-10-09): `ruff check .` clean, complexity and module budgets pass, coverage 89.45% with CI env vars. Under `-n 8` with live credentials present, two discovery tests and one live parity case failed from parallel contention; each passed when rerun alone (the parity file 10/10).
 
 **Requirements**:
 - Given the `visual-error-testing` workspace (12 reports), should record local `jobs: 1`, Azure `jobs: 1`, and Azure `jobs: 4` with `workers: 8`, all with the same verdicts, in PLAYWRIGHT-CI.md as a worked example of reading the timing.

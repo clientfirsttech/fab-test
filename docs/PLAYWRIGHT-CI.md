@@ -234,6 +234,64 @@ error, not a broken-visual finding; raw connection diagnostics are withheld
 to avoid exposing authorization headers. There is no automatic local fallback.
 Plan-only does not require the Azure token or launch a browser.
 
+### Reading run timing: is `jobs` or Azure worth it?
+
+Every run records how long it took (`run.json`: `wall_ms`, each artifact's
+`duration_ms`, and an `execution` block naming `backend`, `workers`, and
+`jobs`). A multi-report run ends with one line, which also sits under the
+`index.html` title:
+
+```text
+⏱ Wall 1m54s · artifact time 7m02s · 3.7x parallel · azure, jobs 4, workers 8
+```
+
+*Wall* is what you waited. *Artifact time* is the sum of each report's own
+time, which is what the run would take with nothing in parallel. Their
+ratio is how much ran at once. Each report's `report.html` shows where its
+time went: discovery (pages, bookmarks, roles, parameters), embed tokens,
+render, and browser setup summed across cases (the browser launch or Azure
+connection, plus context and page creation), with the slowest cases listed
+first.
+
+To compare settings, give each run its own `--output-dir` and open both
+pages. Before reading the faster run as a speedup, check that both tested
+the same reports and reached the same verdicts.
+
+**Worked example** (2026-10-09, the `visual-error-testing` workspace:
+12 reports, 37 cases, 6 of them failing on purpose; one Windows laptop and
+Azure Playwright Workspaces, Linux browsers). All four runs reached
+identical verdicts:
+
+| Run | Wall | Artifact time | Parallel | Render (summed) | Browser setup (summed) |
+|---|---|---|---|---|---|
+| local, `jobs 1`, `workers 4` | 6m18s | 6m16s | 1.0x | 3m53s | 27s |
+| Azure, `jobs 1`, `workers 8` | 6m22s | 6m20s | 1.0x | 3m56s | 1m16s |
+| local, `jobs 4`, `workers 4` | 2m53s | 10m59s | 3.8x | 7m23s | 1m30s |
+| Azure, `jobs 4`, `workers 8` | **1m54s** | 7m02s | 3.7x | 4m20s | 1m33s |
+
+```bash
+fab-test playwright --workspace visual-error-testing --jobs 1 --output-dir results/local-j1
+fab-test playwright --workspace visual-error-testing --jobs 4 --output-dir results/local-j4
+fab-test playwright --workspace visual-error-testing --jobs 1 \
+  --playwright-config docs/examples/playwright/azure.yml --output-dir results/azure-j1
+fab-test playwright --workspace visual-error-testing \
+  --playwright-config docs/examples/playwright/azure.yml --output-dir results/azure-j4  # YAML sets jobs: 4
+```
+
+What the numbers say:
+
+- **`jobs` is the lever.** Reports here have 1-10 cases, so `workers` is
+  capped by each report's case count. Azure with `jobs 1` is no faster than
+  local: remote browsers add setup (1m16s vs 27s summed) and nothing runs
+  at once.
+- **Azure is what lets `jobs` scale.** With `jobs 4`, 16 local browsers
+  compete for one machine, and summed render time nearly doubles (3m53s to
+  7m23s). On Azure it barely moves (to 4m20s), so the same `jobs 4` finishes
+  in 1m54s instead of 2m53s, 3.3x faster than the baseline. Expect the gap
+  to grow on a smaller machine such as a CI runner, or with higher `jobs`.
+- **Discovery and embed tokens cost about 1m45s per run** (summed), once per
+  report. `jobs` overlaps them; more `workers` does not.
+
 ### Watching the browser locally
 
 Browsers are hidden by default, which is what CI wants. For a live demonstration on a
