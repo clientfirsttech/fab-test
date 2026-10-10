@@ -26,6 +26,7 @@ from tests.conftest import (
     _fake_git_run,
     _RunAnalyzerArgs,
     _stub_subprocess_run,
+    _writes_envelope,
 )
 
 # --------------------------------------------------------------------------- #
@@ -401,7 +402,7 @@ def test_telemetry_send_network_failure_does_not_affect_analyzer_exit_code(
     )
 
     monkeypatch.setenv("ENABLE_EVENTHOUSE_LOGGING", "true")
-    monkeypatch.setattr(fab_test_execution.subprocess, "run", _stub_subprocess_run)
+    monkeypatch.setattr(fab_test_execution.subprocess, "run", _writes_envelope(envelope_dir_json, _stub_subprocess_run))
     monkeypatch.setattr(
         fab_test_telemetry,
         "publish_analyzer_telemetry",

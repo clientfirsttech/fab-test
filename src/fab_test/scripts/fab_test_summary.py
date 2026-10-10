@@ -544,6 +544,13 @@ def _display_path(path: Path | str) -> str:
         return str(resolved)
 
 
+def _unexplained_failure_detail(data: dict[str, Any] | None, status: str, errors: int) -> str | None:
+    """Return the envelope's message for a failure no error finding explains, else None."""
+    if status != "failed" or errors > 0 or not data:
+        return None
+    return data.get("message") or None
+
+
 def _artifact_status(data: dict[str, Any] | None, code: int, errors: int, warnings: int) -> str:
     """Classify one artifact's outcome from its envelope and the analyzer's exit code."""
     if code != 0 or (data and data.get("status") == "failed") or errors > 0:
@@ -611,6 +618,7 @@ def build_all_summary_rows(
                 "warnings": warnings,
                 "output_path": str(output_dir / analyzer / stem / "envelope.json"),
                 "report_path": _report_path_for(data),
+                "detail": _unexplained_failure_detail(data, status, errors),
             })
     return rows
 
@@ -930,10 +938,12 @@ def _index_row_fields(
     """
     data = _read_artifact_envelope(output_dir, analyzer, stem)
     errors, warnings = _envelope_error_warning_counts(data)
+    status = _artifact_status(data, code, errors, warnings)
     return {
-        "status": _artifact_status(data, code, errors, warnings),
+        "status": status,
         "errors": errors,
         "warnings": warnings,
         "output_path": str(output_dir / analyzer / stem / "envelope.json"),
         "report_path": _report_path_for(data),
+        "detail": _unexplained_failure_detail(data, status, errors),
     }

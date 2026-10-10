@@ -1,11 +1,13 @@
 """Selection and validation of optional browser execution settings."""
 
+import argparse
 from pathlib import Path
 
 import pytest
 
 from fab_test.scripts._config import ConfigError
-from fab_test.scripts.playwright_validation.execution_config import resolve_execution_config
+from fab_test.scripts.playwright_validation.execution_config import ExecutionConfig, resolve_execution_config
+from fab_test.scripts.playwright_validation.execution_runtime import resolve_jobs
 
 pytestmark = pytest.mark.playwright
 
@@ -26,6 +28,7 @@ def test_absent_config_preserves_local_defaults(tmp_path):
     assert config.backend == "local"
     assert config.path is None
     assert config.workers is None
+    assert config.jobs is None
     assert config.launch == {}
     assert config.context == {}
     assert config.origin == "default"
@@ -75,6 +78,9 @@ def test_supported_browser_settings_are_retained(tmp_path):
     "workers: true\n",
     "workers: auto\n",
     "workers: 1.5\n",
+    "jobs: 0\n",
+    "jobs: true\n",
+    "jobs: 2.5\n",
     "launch: []\n",
     "launch: {headless: nope}\n",
     "launch: {args: [1]}\n",
@@ -167,3 +173,19 @@ def test_config_show_reports_selection_origin(tmp_path, monkeypatch, capsys):
     selected = next(row for row in rows if row["key"] == "playwright_config")
     assert selected["value"] == str(path)
     assert "PLAYWRIGHT_CONFIG_PATH" in selected["origin"]
+
+
+def test_jobs_is_retained(tmp_path):
+    path = write_config(tmp_path, "azure.yml", "backend: azure\nworkers: 8\njobs: 4\n")
+    assert resolve_execution_config(str(path), repo_root=tmp_path).jobs == 4
+
+
+@pytest.mark.parametrize(("analyzer", "flag", "yaml_jobs", "expected"), [
+    ("playwright", None, 4, 4),     # YAML fills in when --jobs is absent
+    ("playwright", 2, 4, 2),        # an explicit --jobs wins
+    ("playwright", None, None, 3),  # no YAML jobs: the config-file default
+    ("bpa", None, 4, 3),            # the browser YAML never parallelizes another analyzer
+])
+def test_jobs_resolve_flag_then_yaml_then_config(analyzer, flag, yaml_jobs, expected):
+    args = argparse.Namespace(jobs=flag, execution_config=ExecutionConfig(jobs=yaml_jobs))
+    assert resolve_jobs(analyzer, args, 3) == expected

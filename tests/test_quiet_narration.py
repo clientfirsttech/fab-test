@@ -106,7 +106,8 @@ def test_quiet_path_is_relative_to_the_working_directory(tmp_path, monkeypatch, 
 
 
 def test_quiet_run_that_wrote_no_envelope_still_says_why(tmp_path, monkeypatch, capsys):
-    """Given an analyzer that died before writing an envelope, should replay its stderr and name the artifact."""
+    """Given an analyzer that died before writing an envelope, should replay its stderr and point at the
+    envelope the parent wrote in its place."""
     artifact_dir, output_dir = _project(tmp_path, "Alpha")
     monkeypatch.setattr(
         fab_test_execution.subprocess,
@@ -121,7 +122,8 @@ def test_quiet_run_that_wrote_no_envelope_still_says_why(tmp_path, monkeypatch, 
 
     assert code == 127
     assert "TABULAR_EDITOR_PATH" in out
-    assert "bpa failed e=0 w=0 Alpha" in out
+    assert "bpa failed e=0 w=0 " in out
+    assert str(Path("bpa") / "Alpha" / "envelope.json") in out
 
 
 def test_quiet_timeout_still_reports(tmp_path, monkeypatch, capsys):

@@ -97,6 +97,22 @@ def resolve_workers(config: ExecutionConfig, explicit: int | None = None) -> int
     return workers
 
 
+def resolve_jobs(analyzer: str, args: argparse.Namespace, default: int) -> int:
+    """Resolve concurrent artifacts: --jobs > execution YAML `jobs` (playwright only) > config file > 1.
+
+    `workers` parallelizes cases within one report; `jobs` runs several
+    reports at once, so `jobs x workers` is the browser concurrency an
+    Azure-hosted run can reach.
+    """
+    explicit = getattr(args, "jobs", None)
+    if explicit is not None:
+        return explicit
+    config = getattr(args, "execution_config", None)
+    if analyzer == "playwright" and config is not None and config.jobs:
+        return config.jobs
+    return default
+
+
 def _resolve_max_workers(explicit: int | None) -> int:
     """Preserve the default runner's worker-resolution entry point."""
     return resolve_workers(ExecutionConfig(), explicit)

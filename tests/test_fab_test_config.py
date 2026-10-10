@@ -49,6 +49,7 @@ def test_common_flags_use_pyproject_config_as_default(monkeypatch):
     """--jobs/--format/--artifact-dir/--output-dir default from [tool.fab-test]."""
     from fab_test.scripts import fab_test as fab_test_module
     from fab_test.scripts import fab_test_parser
+    from fab_test.scripts.playwright_validation.execution_runtime import resolve_jobs
 
     # build_parser (and _add_common_flags) live in fab_test_parser since the
     # Fab-Test Module Split epic; that module's own binding of
@@ -65,7 +66,9 @@ def test_common_flags_use_pyproject_config_as_default(monkeypatch):
     )
     parser = fab_test_module.build_parser()
     ns = parser.parse_args(["bpa", "--dry-run"])
-    assert ns.jobs == 4
+    # --jobs stays None at parse time (an execution YAML may set it for playwright);
+    # the configured value is the default the run resolves it to.
+    assert resolve_jobs("bpa", ns, fab_test_parser._PYPROJECT_CONFIG["jobs"]) == 4
     assert ns.output_format == "json"
     assert ns.artifact_dir == "/configured/artifacts"
     assert ns.output_dir == "/configured/results"

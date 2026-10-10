@@ -22,6 +22,7 @@ class ExecutionConfig:
     origin: str = "default"
     backend: str = "local"
     workers: int | None = None
+    jobs: int | None = None
     launch: dict[str, Any] = field(default_factory=dict)
     context: dict[str, Any] = field(default_factory=dict)
     connection: dict[str, Any] = field(default_factory=dict)
@@ -98,7 +99,7 @@ def _load_execution_config(path: Path, origin: str) -> ExecutionConfig:
     except (OSError, UnicodeError, yaml.YAMLError):
         _refuse(path, "cannot read valid UTF-8 YAML; file contents withheld")
     data = _mapping(
-        {} if data is None else data, {"backend", "workers", "launch", "context", "connection"}, path, "config"
+        {} if data is None else data, {"backend", "workers", "jobs", "launch", "context", "connection"}, path, "config"
     )
     backend = data.get("backend", "local")
     if backend not in ("local", "azure"):
@@ -106,8 +107,11 @@ def _load_execution_config(path: Path, origin: str) -> ExecutionConfig:
     workers = data.get("workers")
     if "workers" in data and not _positive_integer(workers):
         _refuse(path, "workers must be a positive integer")
+    jobs = data.get("jobs")
+    if "jobs" in data and not _positive_integer(jobs):
+        _refuse(path, "jobs must be a positive integer")
     return ExecutionConfig(
-        path=path, origin=origin, backend=backend, workers=workers,
+        path=path, origin=origin, backend=backend, workers=workers, jobs=jobs,
         launch=_validate_launch(data.get("launch", {}), path),
         context=_validate_context(data.get("context", {}), path),
         connection=_validate_connection(data.get("connection", {}), path, backend),

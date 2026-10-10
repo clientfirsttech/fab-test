@@ -282,8 +282,13 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
         ),
     ),
     "src/fab_test/scripts/fab_test_execution.py": (
-        896,
+        904,
         (
+            "2026-10-09: +1 line importing resolve_jobs so a playwright execution YAML's `jobs` "
+            "sets concurrent reports when --jobs is absent. "
+            "2026-10-09: +7 lines removing an artifact's envelope before its analyzer runs and "
+            "persisting an aborted run's stderr detail as the envelope message, so an aborted "
+            "run neither inherits an earlier run's findings nor reads \"failed, 0 errors\" with no reason. "
             "2026-10-08: +3 lines importing and dispatching --changed-since "
             "(_playwright_changed.py holds the logic) in _playwright_service_resolved_target. "
             "2026-10-08: +1 line appending credential_failure_detail (-v/-vv sign-in detail) "

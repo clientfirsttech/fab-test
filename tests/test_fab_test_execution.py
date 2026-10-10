@@ -20,7 +20,7 @@ import pytest
 
 from fab_test.scripts.fab_test import _resolve_timeout, _run_analyzer, build_parser
 from fab_test.scripts.fab_test_registry import build_pbir_command
-from tests.conftest import _RunAnalyzerArgs, _stub_subprocess_run, _TimeoutArgs
+from tests.conftest import _RunAnalyzerArgs, _stub_subprocess_run, _TimeoutArgs, _writes_envelope
 
 # --------------------------------------------------------------------------- #
 # Configurable subprocess timeout
@@ -112,10 +112,17 @@ def test_run_analyzer_passes_resolved_timeout_to_subprocess(tmp_path, monkeypatc
 
 @pytest.mark.fab_test
 def test_jobs_flag_default_is_one():
-    """--jobs defaults to 1 (sequential) when not passed."""
+    """--jobs defaults to 1 (sequential) when not passed.
+
+    The parser leaves it None so a playwright execution YAML's `jobs` can tell an
+    explicit flag apart; the config default applies when the run resolves it.
+    """
+    from fab_test.scripts.playwright_validation.execution_runtime import resolve_jobs
+
     parser = build_parser()
     ns = parser.parse_args(["bpa", "--dry-run"])
-    assert ns.jobs == 1
+    assert ns.jobs is None
+    assert resolve_jobs("bpa", ns, 1) == 1
 
 
 @pytest.mark.fab_test
@@ -367,7 +374,10 @@ def test_run_analyzer_warning_no_name_error_outside_ci(tmp_path, monkeypatch):
     monkeypatch.setattr(
         fab_test_execution.subprocess,
         "run",
-        lambda *a, **k: subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr=""),
+        _writes_envelope(
+            output_dir / "pql_lint" / "SampleModel" / "envelope.json",
+            lambda *a, **k: subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr=""),
+        ),
     )
 
     args = _RunAnalyzerArgs(artifact_dir, output_dir, artifact="SampleModel")
@@ -401,7 +411,10 @@ def test_run_analyzer_warning_emits_pr_review_comment_in_ci(tmp_path, monkeypatc
     monkeypatch.setattr(
         fab_test_execution.subprocess,
         "run",
-        lambda *a, **k: subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr=""),
+        _writes_envelope(
+            output_dir / "pql_lint" / "SampleModel" / "envelope.json",
+            lambda *a, **k: subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr=""),
+        ),
     )
 
     args = _RunAnalyzerArgs(artifact_dir, output_dir, artifact="SampleModel")
@@ -486,7 +499,10 @@ def test_run_analyzer_error_does_not_emit_pr_review_comment(tmp_path, monkeypatc
     monkeypatch.setattr(
         fab_test_execution.subprocess,
         "run",
-        lambda *a, **k: subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr=""),
+        _writes_envelope(
+            output_dir / "pql_lint" / "SampleModel" / "envelope.json",
+            lambda *a, **k: subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr=""),
+        ),
     )
 
     args = _RunAnalyzerArgs(artifact_dir, output_dir, artifact="SampleModel")

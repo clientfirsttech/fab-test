@@ -196,9 +196,10 @@ local default. Flag/environment paths are relative to the invocation directory;
 `playwright_config` paths are relative to their owning YAML or pyproject file.
 `config --show` reports the selection and origin; dry-run makes no browser
 connection. Worker limits resolve `--workers` > `PLAYWRIGHT_XDIST_WORKERS` >
-execution YAML > `4` and are bounded by the current report's case count.
+execution YAML > `4` and are bounded by the current report's case count. Concurrent
+reports resolve `--jobs` > execution YAML `jobs` > `jobs` in fab-test config > `1`.
 
-Execution YAML permits only `backend` (`local`/`azure`), positive `workers`,
+Execution YAML permits only `backend` (`local`/`azure`), positive `workers`, positive `jobs`,
 `launch` (`headless`, string-list `args`, nonnegative `slow_mo`), `context`
 (`viewport` width/height, `locale`, `timezone_id`, `color_scheme`,
 `ignore_https_errors`), and Azure `connection` (`os` linux/windows,

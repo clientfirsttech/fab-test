@@ -17,6 +17,7 @@ import sys
 import pytest
 
 from fab_test.scripts._run_manifest import RunManifest, _sanitize_command
+from tests.conftest import _writes_envelope
 
 _REQUIRED_KEYS = {
     "schema_version",
@@ -597,6 +598,11 @@ def test_manifest_detail_stays_null_when_the_analyzer_wrote_an_envelope(
     )
 
     _stub_analyzer_run(monkeypatch, fab_test_execution, stderr="noise on stderr\n")
+    monkeypatch.setattr(
+        fab_test_execution.subprocess,
+        "run",
+        _writes_envelope(envelope_dir / "envelope.json", fab_test_execution.subprocess.run),
+    )
     monkeypatch.setattr(
         sys,
         "argv",

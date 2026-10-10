@@ -401,8 +401,9 @@ Store `PLAYWRIGHT_SERVICE_URL` and `PLAYWRIGHT_SERVICE_ACCESS_TOKEN` in the
 gitignored `.fab-test/.env` or the process environment, separately from Fabric
 embedding credentials. See [Azure browser setup](https://github.com/clientfirsttech/fab-test/blob/main/docs/PLAYWRIGHT-CI.md#azure-hosted-browsers)
 for supported settings, token authentication, and Python-only GitHub Actions
-and Azure DevOps examples. More workers parallelize cases within one report,
-not reports; service limits still apply.
+and Azure DevOps examples. `workers` parallelizes cases within one report;
+`jobs` (or `--jobs`) runs several reports at once, for up to `jobs x workers`
+browsers. Service limits still apply.
 
 ### Playwright tests every page, bookmark, and role by default
 

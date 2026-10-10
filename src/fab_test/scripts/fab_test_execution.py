@@ -20,7 +20,7 @@ from ._analyzer_annotations import (
     emit_pr_review_comments,
     emit_workflow_annotations,
 )
-from ._analyzer_envelope import severity_counts
+from ._analyzer_envelope import severity_counts, write_envelope
 from ._cli_utils import CHECKOUT_REMEDIATION, narrate, skipped_checkout_lines
 from ._config import resolve_setting
 from ._credentials import configured_workspace, redact_secrets
@@ -90,6 +90,7 @@ from .fab_test_telemetry import (
     _telemetry_decision,
     _telemetry_destination,
 )
+from .playwright_validation.execution_runtime import resolve_jobs
 from .playwright_validation.resolver import resolve_workspace_id
 
 # Referenced by _run_analyzer via _is_ci(); a module-level function rather
@@ -463,6 +464,10 @@ def _run_one_artifact(
         # the flat outer timeout unchanged.
         test_cases_path = _playwright_test_cases_dir(output_dir, artifact) / "test-cases.json"
 
+    envelope_file = output_dir / name / artifact.stem / "envelope.json"
+    with contextlib.suppress(OSError):  # an aborted run must not inherit (and re-stamp) an earlier envelope
+        envelope_file.unlink(missing_ok=True)
+
     result = _run_artifact_process(cmd, ctx, capture_stdout, output_format, name, display_name, test_cases_path)
     if isinstance(result, tuple):
         return result
@@ -470,6 +475,9 @@ def _run_one_artifact(
 
     # Read the envelope and apply the error/warning threshold ourselves: warnings never fail the build.
     envelope, aborted = _load_artifact_envelope(output_dir, name, artifact, proc.returncode)
+    if aborted and (detail := _stderr_detail(proc.stderr)):  # the index reads why from disk
+        with contextlib.suppress(OSError):
+            write_envelope(envelope_file, {**envelope, "message": detail})
     # A nonzero exit with no findings (no envelope, or a stale clean one) has only its own output to explain it.
     unexplained = proc.returncode != 0 and not envelope.get("findings")
     _emit_process_output(
@@ -875,7 +883,7 @@ def _run_analyzer(
         return _run_one_artifact(name, artifact, args, output_dir, ctx, index, total)
 
     indexed = list(enumerate(artifacts, start=1))
-    jobs = max(1, getattr(args, "jobs", 1) or 1)
+    jobs = max(1, resolve_jobs(name, args, _PYPROJECT_CONFIG.get("jobs", 1)) or 1)
     if jobs > 1 and total > 1:
         with ThreadPoolExecutor(max_workers=jobs) as executor:
             results = list(executor.map(_run, indexed))

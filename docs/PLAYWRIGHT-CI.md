@@ -209,7 +209,7 @@ fab-test config --show
 
 Omitting a selector keeps local execution even if Azure credentials exist.
 Use `backend: local` in YAML to customize local browsers without service
-credentials. Supported keys are `backend`, positive `workers`, `launch`
+credentials. Supported keys are `backend`, positive `workers`, positive `jobs`, `launch`
 (`headless`, string-list `args`, nonnegative `slow_mo`), `context` (`viewport`
 width/height, `locale`, `timezone_id`, `color_scheme`, `ignore_https_errors`),
 and Azure `connection` (`os`, `timeout_ms`, `expose_network`). Defaults are
@@ -220,8 +220,10 @@ Arbitrary plugins, tests, reporters, and executable configurations are refused.
 
 Workers resolve `--workers` > `PLAYWRIGHT_XDIST_WORKERS` > YAML > `4`.
 Only cases within the current report are parallelized, capped by its case
-count. Begin with a modest limit and respect your Azure service quota; more
-workers do not guarantee faster reports. Contexts and browser sessions use
+count. `jobs` runs that many reports at once and resolves `--jobs` > YAML
+`jobs` > `jobs` in fab-test config > `1`, so a run can hold up to
+`jobs x workers` browsers. Begin with a modest limit and respect your Azure
+service quota; more workers do not guarantee faster reports. Contexts and browser sessions use
 pytest-playwright's normal teardown.
 
 For selected YAML, native pytest HTML and JUnit are written to

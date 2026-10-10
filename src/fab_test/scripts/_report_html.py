@@ -51,11 +51,12 @@ th { font-weight: 600; border-bottom: 2px solid #8886; }
 td.sev { white-space: nowrap; font-variant: small-caps; }
 tr.error td.sev { color: #b3261e; font-weight: 600; }
 tr.warning td.sev { color: #8a6100; }
-td.msg { color: #444; }
+td.msg, div.msg { color: #444; }
+div.msg { font-size: 0.85em; }
 .none { color: #666; font-style: italic; }
 @media (prefers-color-scheme: dark) {
   body { background: #111; color: #ddd; }
-  .meta, td.msg, .none { color: #aaa; }
+  .meta, td.msg, div.msg, .none { color: #aaa; }
   tr.error td.sev { color: #f2b8b5; }
   tr.warning td.sev { color: #e8c37a; }
 }
@@ -605,6 +606,9 @@ def render_index(
             href = Path(path).as_posix()
         return f'<a href="{escape(href)}">{escape(Path(path).name)}</a>'
 
+    def _detail(text: str | None) -> str:
+        return f'<div class="msg">{escape(text)}</div>' if text else ""
+
     body = []
     for r in rows:
         css = _row_class(r.get("status"))
@@ -612,7 +616,7 @@ def render_index(
         body.append(
             f"<tr{attr}>"
             f"<td>{escape(str(r.get('analyzer', '')))}</td>"
-            f"<td>{escape(str(r.get('artifact', '')))}</td>"
+            f"<td>{escape(str(r.get('artifact', '')))}{_detail(r.get('detail'))}</td>"
             f"<td class=\"sev\">{escape(str(r.get('status', '')))}</td>"
             f"<td>{escape(str(r.get('errors', 0)))}</td>"
             f"<td>{escape(str(r.get('warnings', 0)))}</td>"
