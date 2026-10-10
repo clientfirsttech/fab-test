@@ -1,4 +1,4 @@
-"""Tier B RDL checks on datasets and fields (DS-03, DS-04, DS-06, STR-03, PRM-02).
+"""RDL checks on datasets and fields (DS-03, DS-04, DS-06, STR-03, PRM-02, PRM-07).
 
 One function per rule ID, registered in ``_rdl_lint.CHECKS``. See
 plan/rdl-rule-set.md for what each rule ID checks.
@@ -256,6 +256,45 @@ def _check_prm02_parameter_types(root: ET.Element, _namespace: str, _rule: dict[
                 "object": name,
                 "message": "a date parameter declared String -- use DateTime for a date picker and date comparison",
             })
+    return findings
+
+
+# The whole parameter list, as a QueryParameter's value: not .Value(0), not Join(...).
+_WHOLE_PARAMETER = re.compile(r"(?i)^\s*=\s*Parameters!(\w+)\.Value\s*$")
+
+
+def _check_prm07_multivalue_dax_filter(root: ET.Element, _namespace: str, _rule: dict[str, Any]) -> list[Finding]:
+    """A multi-value parameter reaches a DAX query only through RSCustomDaxFilter.
+
+    Report Builder expands ``RSCustomDaxFilter(@P, EqualToCondition, [T].[C], Type)``
+    into one OR-ed test per selected value; ``@P`` used directly gets a list it
+    can't evaluate. Credit: Chris Webb,
+    https://blog.crossjoin.co.uk/2019/11/03/power-bi-report-builder-and-rscustomdaxfilter/
+    """
+    multi_value = {
+        p.get("Name")
+        for p in root.findall(".//ReportParameters/ReportParameter")
+        if (p.findtext("MultiValue") or "").strip().lower() == "true"
+    }
+    findings: list[Finding] = []
+    for dataset in root.findall(".//DataSets/DataSet"):
+        query = dataset.find("Query")
+        if query is None or _dataset_provider(root, query) != "PBIDATASET":
+            continue
+        command_text = query.findtext("CommandText") or ""
+        for query_parameter in query.findall("QueryParameters/QueryParameter"):
+            source = _WHOLE_PARAMETER.match(query_parameter.findtext("Value") or "")
+            name = query_parameter.get("Name") or "?"
+            filtered = re.search(rf"(?i)RSCustomDaxFilter\s*\(\s*@{re.escape(name)}\b", command_text)
+            if source and source.group(1) in multi_value and not filtered:
+                findings.append({
+                    "object": f"{dataset.get('Name') or '?'} › @{name}",
+                    "message": (
+                        f"multi-value parameter '{source.group(1)}' reaches DAX as @{name} without "
+                        "RSCustomDaxFilter -- the query fails when more than one value is selected; use "
+                        f"RSCustomDaxFilter(@{name}, EqualToCondition, [Table].[Column], String)"
+                    ),
+                })
     return findings
 
 

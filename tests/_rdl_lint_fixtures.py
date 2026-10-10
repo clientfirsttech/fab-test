@@ -50,7 +50,15 @@ def data_source(name: str, provider: str, *, connect_string: str = "", reference
     )
 
 
-def dataset(name: str, data_source_name: str, command_text: str, *, command_type: str = "") -> str:
+def dataset(
+    name: str,
+    data_source_name: str,
+    command_text: str,
+    *,
+    command_type: str = "",
+    query_parameters: dict[str, str] | None = None,
+    filters: str = "",
+) -> str:
     # A DesignerState blob with its own (different-namespace) CommandText,
     # deliberately included so a check that used a recursive .// search
     # for CommandText would double the wrong way -- confirms the fixture
@@ -61,9 +69,14 @@ def dataset(name: str, data_source_name: str, command_text: str, *, command_type
         "</QueryDefinition></rd:DesignerState>"
     )
     command_type_xml = f"<CommandType>{command_type}</CommandType>" if command_type else ""
+    params_xml = "".join(
+        f'<QueryParameter Name="{p}"><Value>{v}</Value></QueryParameter>' for p, v in (query_parameters or {}).items()
+    )
+    params_xml = f"<QueryParameters>{params_xml}</QueryParameters>" if params_xml else ""
     return (
         f'<DataSet Name="{name}"><Query><DataSourceName>{data_source_name}</DataSourceName>'
-        f"{designer_state}{command_type_xml}<CommandText>{command_text}</CommandText></Query></DataSet>"
+        f"{designer_state}{params_xml}{command_type_xml}<CommandText>{command_text}</CommandText></Query>"
+        f"{filters}</DataSet>"
     )
 
 

@@ -92,6 +92,7 @@ analysis.
 | STR-02 | Built from a common template | C | PageHeader has logo, `Globals!ExecutionTime`, page number; PageFooter has standard notice. Compare against template. | MSSQLTips #3659 r1 |
 | PRM-04 | No MultiValue + Nullable combination | A | `MultiValue = true` with `Nullable = true` isn't supported. | MS Learn: Power BI Report Builder<br>[MS Learn](https://learn.microsoft.com/en-us/power-bi/paginated-reports/report-builder-power-bi) |
 | PRM-06 | Choose filter vs query parameter deliberately | B | Parameter in `DataSet/Filters` vs `Query/QueryParameters`. | MS Learn: Data retrieval |
+| PRM-07 | Multi-value parameters reach DAX through RSCustomDaxFilter | A | A `PBIDATASET` dataset's `QueryParameter` is `=Parameters!X.Value` for a `MultiValue` X, and its `CommandText` has no `RSCustomDaxFilter(@Name`. | Chris Webb, Power BI Report Builder And RSCustomDaxFilter<br>[MS Learn](https://blog.crossjoin.co.uk/2019/11/03/power-bi-report-builder-and-rscustomdaxfilter/) |
 | LAY-07 | External images are reachable and small | C | `Image/Source = External`: no sign-in, under 4 MB. | MS Learn: Image guidance |
 | SUB-03 | Passed parameters match the child's | C | Each `Subreport/Parameters/Parameter/@Name` exists in the child RDL; required child params are passed. | MS Learn: Troubleshoot; Subreports in Power BI |
 | SUB-04 | ReportName resolves to one uniquely named report | C | `Subreport/ReportName` matches exactly one published report in the workspace. | MS Learn: Subreports in Power BI; Troubleshoot |

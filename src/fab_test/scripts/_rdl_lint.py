@@ -22,6 +22,7 @@ from ._rdl_checks_dataset import (
     _check_ds04_share_one_dataset,
     _check_ds06_orphan_query_columns,
     _check_prm02_parameter_types,
+    _check_prm07_multivalue_dax_filter,
     _check_str03_friendly_field_names,
 )
 from ._rdl_checks_query import (
@@ -195,6 +196,7 @@ CHECKS.update({
     "PRM-03": _check_prm03_parameter_count,
     "PRM-04": _check_prm04_multivalue_nullable,
     "PRM-05": _check_prm05_show_parameter_values,
+    "PRM-07": _check_prm07_multivalue_dax_filter,
     "LAY-01": _check_lay01_body_fits_page,
     "LAY-02": _check_lay02_avoid_total_pages,
     "LAY-03": _check_lay03_sub01_subreport_in_tablix,
