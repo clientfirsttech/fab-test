@@ -323,6 +323,12 @@ discoverable: `fab-test init` scaffolds a commented line for it, and
 `env:FABRIC_WORKSPACE_ID`, etc.) alongside every other setting.
 
 **Every generated case gets its own accurate result, not the run's outcome copy-pasted.**
+Beside it, `timing.json` (written by the always-loaded `timing_plugin`) records the case's
+`setup_ms` (fixture setup, including the browser launch or Azure connection on a worker's first
+case) and `duration_ms` (the render itself); each `test_results` row carries both, absent rather
+than zero for a case that never ran. `report.html` shows the phase timing, the three slowest
+cases, and a sortable Duration column.
+
 `fab-test-results/playwright/<report>/test-cases/<case>/result.json` (written by the pytest
 spec itself, per case) records that case's real `status` (`pass`/`error`) and, on
 failure, the actual detail -- the embed error, a render timeout, or an RDL error

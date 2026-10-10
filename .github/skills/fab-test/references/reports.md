@@ -38,6 +38,8 @@ The full list also has a **search box and clickable, sortable column headers** (
 
 The index header also shows **when the run happened and who ran it**: a UTC timestamp, plus branch/commit/actor sourced from `GITHUB_*` environment variables in CI, falling back to local `git` (branch, commit, `git config user.email`) outside CI, and to an em-dash (`—`) placeholder outside a git checkout entirely — it never raises. Per-analyzer `report.html` deliberately has no timestamp (see above): the index is scoped to one run, not a reusable artifact, which is why only it gained one.
 
+**How long the run took** sits on the same page (Run Timing epic): a Duration column per artifact (the subprocess wall time `run.json` records) and a run line -- `⏱ Wall 4m12s · artifact time 14m30s · 3.5x parallel · azure, jobs 4, workers 8` -- also printed at the end of a multi-artifact text run and carried as `timing` in the `--format json` document. Summed artifact time over wall clock is how much ran at once. To compare two runs (say `jobs: 1` against `jobs: 4`), give each its own `--output-dir`, open both pages, and confirm they tested the same artifacts with the same verdicts before reading the faster one as a speedup.
+
 ## Finding the paths
 
 The `all` summary lists one path per artifact beneath the table — the report where there is one, the envelope otherwise:

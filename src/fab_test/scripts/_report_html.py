@@ -32,6 +32,7 @@ from typing import Any
 
 from ._analyzer_envelope import normalize_findings, normalize_test_results
 from ._git_context import git_context
+from ._run_timing import format_duration
 
 # Inlined rather than linked, deliberately — see the module docstring.
 # prefers-color-scheme rather than a toggle: no script, and it follows
@@ -92,9 +93,6 @@ div.msg { font-size: 0.85em; }
 _RULE_HEADERS = ("Rule", "Severity", "Object", "Message")
 _RULE_STATUS_HEADERS = (*_RULE_HEADERS, "Status")
 _TEST_HEADERS = ("Test Suite", "Test", "Expected", "Actual", "Result")
-_TEST_EVIDENCE_HEADERS = (*_TEST_HEADERS, "Evidence")
-_TEST_REPORT_HEADERS = (*_TEST_HEADERS, "Report Page")
-_TEST_EVIDENCE_REPORT_HEADERS = (*_TEST_EVIDENCE_HEADERS, "Report Page")
 
 # Row classes drive severity colouring in CSS rather than inline styles, so
 # the markup stays readable and a finding's text is never mixed with markup.
@@ -343,35 +341,74 @@ def _filterable_table(
     )
 
 
+# (row index, header) for the test table's additive columns, in display order.
+_OPTIONAL_TEST_COLUMNS = ((5, "Evidence"), (6, "Report Page"), (7, "Duration"))
+
+
 def _render_test_results_table(rows: list[tuple], base_dir: Path | None) -> str:
-    """Render the full test-results table, with Evidence and Report Page as
-    independent additive columns (index 5 and 6 respectively).
+    """Render the full test-results table, with Evidence, Report Page, and
+    Duration as independent additive columns (row index 5, 6, and 7).
 
-    Split out of ``render_report`` so its four evidence/report_link
-    combinations don't push that function's own branch count over budget --
-    each row always carries both fields (see ``normalize_test_results``);
-    only their presence across the whole table decides which columns show.
+    Split out of ``render_report`` to keep that function under its branch
+    budget. Each row always carries all three fields (see
+    ``normalize_test_results``); only their presence across the whole table
+    decides which columns show, so an analyzer with none of them (pql-test
+    today) renders exactly as it did before any existed.
     """
-    has_evidence = any(row[5] for row in rows)
-    has_report_link = any(row[6] for row in rows)
-    common = {"class_index": 4, "status_index": 4, "msg_index": 3, "base_dir": base_dir}
+    present = [(index, header) for index, header in _OPTIONAL_TEST_COLUMNS if any(row[index] for row in rows)]
+    if not present:
+        return _filterable_table(_TEST_HEADERS, [row[:5] for row in rows], class_index=4, status_index=4)
+    positions = {index: 5 + offset for offset, (index, _header) in enumerate(present)}
 
-    if has_evidence and has_report_link:
-        return _filterable_table(
-            _TEST_EVIDENCE_REPORT_HEADERS, rows, evidence_index=5, report_link_index=6, **common
+    def cell(row: tuple, index: int) -> Any:
+        # Always seconds with one decimal (never "1m05s"), so the numeric column sort orders them;
+        # blank for a case that never ran.
+        if index == 7:
+            return f"{row[index] / 1000:.1f}s" if isinstance(row[index], (int, float)) else ""
+        return row[index]
+
+    return _filterable_table(
+        _TEST_HEADERS + tuple(header for _index, header in present),
+        [row[:5] + tuple(cell(row, index) for index, _header in present) for row in rows],
+        class_index=4,
+        status_index=4,
+        msg_index=3,
+        evidence_index=positions.get(5),
+        report_link_index=positions.get(6),
+        base_dir=base_dir,
+    )
+
+
+_PHASE_LABELS = (("discovery_ms", "Discovery"), ("token_ms", "Embed tokens"), ("render_ms", "Render"))
+_SLOWEST_SHOWN = 3
+
+
+def _timing_section(envelope: dict[str, Any]) -> str:
+    """Where a report's time went (Run Timing epic, task 3); empty for an envelope without ``timings``.
+
+    The phase line comes first and the slowest cases after it, above the
+    table, which keeps sorting failures first.
+    """
+    timings = envelope.get("timings")
+    if not isinstance(timings, dict):
+        return ""
+    parts = [f"{label} {format_duration(timings[key])}" for key, label in _PHASE_LABELS if key in timings]
+    if "total_ms" in timings:
+        parts.append(f"Total {format_duration(timings['total_ms'])}")
+    if "browser_setup_ms" in timings:
+        parts.append(f"browser setup {format_duration(timings['browser_setup_ms'])} (summed across cases)")
+    if timings.get("backend"):
+        parts.append(f"{timings['backend']}, workers {timings.get('workers', '?')}")
+    section = f'<p class="meta run-timing">⏱ {escape(" · ".join(parts))}</p>\n'
+    timed = [row for row in envelope.get("test_results") or [] if isinstance(row.get("duration_ms"), int)]
+    slowest = sorted(timed, key=lambda row: row["duration_ms"], reverse=True)[:_SLOWEST_SHOWN]
+    if slowest:
+        names = ", ".join(
+            f"<code>{escape(str(row.get('test_name', '?')))}</code> {format_duration(row['duration_ms'])}"
+            for row in slowest
         )
-    if has_evidence:
-        return _filterable_table(
-            _TEST_EVIDENCE_HEADERS, [row[:6] for row in rows], evidence_index=5, **common
-        )
-    if has_report_link:
-        return _filterable_table(
-            _TEST_REPORT_HEADERS,
-            [row[:5] + row[6:] for row in rows],
-            report_link_index=5,
-            **common,
-        )
-    return _filterable_table(_TEST_HEADERS, [row[:5] for row in rows], class_index=4, status_index=4)
+        section += f'<p class="meta">Slowest: {names}</p>\n'
+    return section
 
 
 def render_report(envelope: dict[str, Any], base_dir: Path | None = None) -> str:
@@ -442,6 +479,7 @@ def render_report(envelope: dict[str, Any], base_dir: Path | None = None) -> str
         f"<style>{_STYLE}</style>\n</head>\n<body>\n"
         f"<h1>fab-test {escape(analyzer)}</h1>\n"
         f'<p class="meta">{meta}</p>\n'
+        f"{_timing_section(envelope)}"
         f"{body}\n"
         "</body>\n</html>\n"
     )
@@ -581,6 +619,7 @@ def render_index(
     rows: list[dict[str, Any]],
     base_dir: Path,
     metadata: dict[str, str] | None = None,
+    run_summary: str = "",
 ) -> str:
     """Render the per-run index linking every report and envelope.
 
@@ -609,6 +648,9 @@ def render_index(
     def _detail(text: str | None) -> str:
         return f'<div class="msg">{escape(text)}</div>' if text else ""
 
+    # Duration and the run line come from the rows and ``run_summary`` (the
+    # run manifest's timing), never from the clock here, so this stays pure.
+    has_duration = any(r.get("duration_ms") is not None for r in rows)
     body = []
     for r in rows:
         css = _row_class(r.get("status"))
@@ -622,15 +664,19 @@ def render_index(
             f"<td>{escape(str(r.get('warnings', 0)))}</td>"
             f"<td>{_link(r.get('report_path'))}</td>"
             f"<td>{_link(r.get('output_path'))}</td>"
-            "</tr>"
+            + (f'<td class="num">{escape(format_duration(r.get("duration_ms")))}</td>' if has_duration else "")
+            + "</tr>"
         )
-    headers = ("Analyzer", "Artifact", "Status", "Errors", "Warnings", "Report", "Envelope")
+    headers = ("Analyzer", "Artifact", "Status", "Errors", "Warnings", "Report", "Envelope") + (
+        ("Duration",) if has_duration else ()
+    )
     head = "".join(f"<th>{escape(h)}</th>" for h in headers)
     totals_errors = sum(int(r.get("errors", 0) or 0) for r in rows)
     totals_warnings = sum(int(r.get("warnings", 0) or 0) for r in rows)
     run_meta_line = (
         f'<p class="meta run-meta">{_format_run_metadata(metadata)}</p>\n' if metadata else ""
     )
+    run_timing_line = f'<p class="meta run-timing">⏱ {escape(run_summary)}</p>\n' if run_summary else ""
 
     return (
         "<!DOCTYPE html>\n"
@@ -642,6 +688,7 @@ def render_index(
         f"{run_meta_line}"
         f'<p class="meta">{totals_errors} error(s), {totals_warnings} warning(s) '
         f"across {len(rows)} artifact(s)</p>\n"
+        f"{run_timing_line}"
         f"<table><thead><tr>{head}</tr></thead><tbody>{''.join(body)}</tbody></table>\n"
         "</body>\n</html>\n"
     )
@@ -667,6 +714,7 @@ def write_index(
     rows: list[dict[str, Any]],
     output_dir: Path | str,
     metadata: dict[str, str] | None = None,
+    run_summary: str = "",
 ) -> Path | None:
     """Write the per-run index under ``output_dir``. Never raises.
 
@@ -680,7 +728,7 @@ def write_index(
     run_metadata = metadata if metadata is not None else _collect_run_metadata()
     try:
         base.mkdir(parents=True, exist_ok=True)
-        target.write_text(render_index(rows, base, metadata=run_metadata), encoding="utf-8")
+        target.write_text(render_index(rows, base, metadata=run_metadata, run_summary=run_summary), encoding="utf-8")
     except (OSError, ValueError, TypeError) as exc:
         print(f"::warning::could not write {target}: {exc}", file=sys.stderr)
         return None

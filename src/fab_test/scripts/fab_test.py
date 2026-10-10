@@ -45,6 +45,7 @@ from ._fab_test_context import (
 from ._mode import ModeError, resolve_mode
 from ._report_html import open_report_conflict
 from ._run_manifest import RunManifest
+from ._run_timing import print_timing_line
 from ._service_export import (
     finalize_exports,
     interactive_refusal,
@@ -318,6 +319,7 @@ def _dispatch_run(args: argparse.Namespace) -> int:
     manifest = RunManifest(
         _FAB_TEST_VERSION, sys.argv, origin=_detect_origin(), target=_manifest_target(args)
     )
+    args.run_manifest = manifest  # the summary, index, and JSON read run timing from it
     telemetry = _open_telemetry(args)
 
     target = args.resolved_target
@@ -369,6 +371,7 @@ def _dispatch_run(args: argparse.Namespace) -> int:
     # One flush for the whole run, `all` included: a sink per analyzer would
     # reopen the ingest client for each of them.
     manifest.telemetry_error = _close_telemetry(telemetry, args)
+    print_timing_line(args)
     manifest.write(output_dir, exit_code)
     return exit_code
 

@@ -111,6 +111,10 @@ class RunManifest:
             }
         )
 
+    def elapsed_ms(self) -> int:
+        """Wall time since the run began; what run.json's ``wall_ms`` records when written."""
+        return int((time.monotonic() - self._started) * 1000)
+
     def to_dict(self, exit_code: int) -> dict[str, Any]:
         """Return the manifest as a plain dict, without writing it."""
         total_errors = sum(a["errors"] for a in self.artifacts)
@@ -130,7 +134,7 @@ class RunManifest:
             # Additive timing (Run Timing epic, task 1).
             "started_at": self.started_at,
             "finished_at": _utc_now(),
-            "wall_ms": int((time.monotonic() - self._started) * 1000),
+            "wall_ms": self.elapsed_ms(),
             "execution": self.execution,
         }
 

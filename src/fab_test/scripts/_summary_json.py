@@ -15,6 +15,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from ._run_timing import add_durations, timing_summary
 from .fab_test_summary import _envelope_error_warning_counts, _read_artifact_envelope, _report_path_for
 
 _AGGREGATE_COMMANDS = ("all", "local")
@@ -48,8 +49,9 @@ def print_json_summary(
 ) -> int:
     """Print this analyzer's document, or keep its rows for the aggregate; return the worst exit code."""
     rows = json_rows(name, results, output_dir)
+    add_durations(rows, args, name)
     if getattr(args, "analyzer", None) in _AGGREGATE_COMMANDS:
         args.__dict__.setdefault("_json_rows", {})[name] = rows
     else:
-        print(json.dumps({"analyzer": name, "artifacts": rows}, indent=2))
+        print(json.dumps({"analyzer": name, "artifacts": rows, "timing": timing_summary(args)}, indent=2))
     return max((code for _, code in results), default=0)

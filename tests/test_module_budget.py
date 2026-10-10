@@ -224,8 +224,12 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
         ),
     ),
     "src/fab_test/scripts/invoke_playwright.py": (
-        1021,
+        1049,
         (
+            "2026-10-09: +28 lines for Run Timing task 2: loading the timing plugin, lapping "
+            "discovery/token/render phases, and splitting the envelope-building tail into "
+            "_finish_report so _run_single_report stays under the statement budget. The timing "
+            "helpers themselves live in playwright_validation/phase_timing.py. "
             "2026-10-07: +7 lines aborting with an install command when the pytest "
             "runner packages are missing (the check itself lives in execution_runtime.py), "
             "sharing one error return with the RLS-user check, now _missing_rls_user, to stay "

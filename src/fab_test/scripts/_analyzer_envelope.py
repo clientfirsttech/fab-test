@@ -171,6 +171,7 @@ def normalize_test_results(test_results: list[dict]) -> tuple[str, list[tuple]]:
                 _test_result_status(f),
                 f.get("evidence") or {},
                 f.get("report_link") or {},
+                f.get("duration_ms"),  # Playwright's per-case render time; None elsewhere
             )
             for f in test_results
         ]

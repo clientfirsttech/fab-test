@@ -1,6 +1,6 @@
 # Run Timing Epic
 
-**Status**: 🔄 IN-PROGRESS (task 1 of 4 done)
+**Status**: 🔄 IN-PROGRESS (tasks 1-3 of 4 done; task 4 needs live Azure runs)
 **Goal**: Every run records and shows how long it took, where the time went, and which execution settings produced it. Two runs, for example local `jobs: 1` against Azure `jobs: 4, workers: 8`, can then be compared side by side to show what parallelism and Azure-hosted browsers save.
 
 ## Overview
@@ -22,7 +22,7 @@ The [Playwright Shared Worker Pool](playwright-shared-worker-pool-epic.md) epic'
 
 ## Decisions
 
-1. ~~**How runs are compared.**~~ **Decided: by hand.** No compare command, no delta view, no KQL. Each run keeps its own `--output-dir`, and the reader opens both with `fab-test open-report` and reads the timing side by side. So the timing must be visible in the opened pages, not only in `run.json`.
+1. ~~**How runs are compared.**~~ **Decided: by hand.** No compare command, no delta view, no KQL. Each run keeps its own `--output-dir`, and the reader opens both pages (`--open-report` on the run, or the files later) and reads the timing side by side. So the timing must be visible in the opened pages, not only in `run.json`.
 2. ~~**Where per-case timing comes from.**~~ **Decided: the packaged pytest plugin's hooks.** Not `results.xml`: JUnit output exists only for the native report, and a hook records duration whether or not it is on.
 3. ~~**Scope beyond playwright.**~~ **Decided: phase timing (Task 2) is playwright-only.** Run-level timing (Task 1) is cheap and generic, so it still applies to every analyzer; the others finish in seconds and need no phase breakdown.
 
@@ -38,27 +38,31 @@ The [Playwright Shared Worker Pool](playwright-shared-worker-pool-epic.md) epic'
 - Given a playwright run, should record an `execution` block with `backend`, the resolved `workers` and `jobs`, and each setting's origin (flag, environment, YAML, config, default). It must never include the service URL, tokens or credential values.
 - Given an existing `run.json` consumer, should keep every change additive under the current `schema_version`, or bump it if a reviewer finds any field's meaning changed.
 
-## Task 2: Time each playwright phase and case
+## Task 2: Time each playwright phase and case (completed 2026-10-09)
+
+A new `timing_plugin`, loaded with `-p` on every render run (the execution plugin loads only for a YAML or `--headed`), writes `timing.json` beside each case's `result.json` from `pytest_runtest_makereport`: `setup_ms` (fixture setup, including the browser launch or Azure connection on a worker's first case) and `duration_ms` (the render). `playwright_validation/phase_timing.py` reads them into `test_results`, clears an earlier run's files first, and laps the wrapper's phases into the envelope's `timings`. The connection is not timed separately: it falls inside `browser_setup_ms`, which is enough to tell a slow service from slow rendering. `_finish_report` was split out of `_run_single_report` to stay under the statement budget. Verified live: one interactive report took discovery 9.9s, tokens 1.0s, render 11.5s, total 22.4s, so discovery is nearly half a report's wall time (relevant to the Shared Worker Pool epic).
 
 **Requirements**:
 - Given a playwright report, should record `started_at` and a `timings` object in its envelope with `discovery_ms`, `token_ms`, `render_ms` and `total_ms`. `duration_ms` keeps meaning the render phase, so existing readers are unaffected.
 - Given each generated case, should add its `duration_ms` to `test_results[]` recorded by the pytest plugin's hooks (decision 2), and leave it absent rather than zero when unknown.
 - Given an Azure run, should record the browser connection time separately from rendering when the adapter can measure it, so a slow service connection is not read as slow Power BI rendering.
 
-## Task 3: Show timing where people look
+## Task 3: Show timing where people look (completed 2026-10-09)
+
+`_run_timing.py` builds the run line from the run manifest, which `_dispatch_run` and `local` put on `args`. It is printed after a multi-artifact text summary, shown under the index title beside a Duration column, and carried as `timing` (plus per-row `duration_ms`) in the `--format json` documents of a single analyzer, `all`, and `local`. `report.html` gains the phase line, the three slowest cases, and a Duration column. Its optional columns are now built from data instead of four hard-coded combinations. Correction: there is no `open-report` subcommand. The page a run opens comes from the `--open-report` flag (`report.html` for one artifact, `index.html` for several), and both now show timing.
 
 **Requirements**:
 - Given a multi-artifact run, should end the terminal summary with one line naming the wall clock, the sum of artifact durations, the ratio between them, and the execution settings, for example `Wall 4m12s · artifact time 14m30s · 3.5x parallel · azure, jobs 4, workers 8`.
 - Given `index.html`, should add a Duration column and the same run line under the title. `render_index` stays a pure function: durations come from its inputs, never from the clock.
 - Given a playwright `report.html`, should show the phase breakdown and a per-case duration column, sorted to put the slowest cases where a reader looks first.
 - Given `-q` or `--format json`, should add timing to the JSON summary and leave the quiet one-line-per-artifact format unchanged.
-- Given `fab-test open-report` on a finished run, should show the run line (wall clock, artifact time, ratio, execution settings) on the page it opens, so two runs can be compared by opening each one (decision 1).
+- Given `--open-report` on a finished run, should show the run line (wall clock, artifact time, ratio, execution settings) on the page it opens, so two runs can be compared by opening each one (decision 1).
 
 ## Task 4: Benchmark and document
 
 **Requirements**:
 - Given the `visual-error-testing` workspace (12 reports), should record local `jobs: 1`, Azure `jobs: 1`, and Azure `jobs: 4` with `workers: 8`, all with the same verdicts, in PLAYWRIGHT-CI.md as a worked example of reading the timing.
-- Given that worked example, should show how to compare two runs by hand: give each run its own `--output-dir`, open both with `open-report`, and check that the report set and verdicts match before reading a faster run as a speedup.
+- Given that worked example, should show how to compare two runs by hand: give each run its own `--output-dir`, open both pages, and check that the report set and verdicts match before reading a faster run as a speedup.
 - Given those numbers, should hand the Shared Worker Pool epic's Task 1 its baseline.
 
 ---
