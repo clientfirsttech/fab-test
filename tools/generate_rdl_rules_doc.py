@@ -108,7 +108,14 @@ an expected failure, so the test flips when the check is added. Every active rul
 `fabric-artifacts/<RULE-ID>-Pass.PaginatedReport/`: the fixed form, or a
 threshold just short of firing, which must trip no rule at all, so a false
 positive fails a test against a real file. Promoting a rule is one change: add
-both fixtures, then set `"status": "active"` in `rdl-rules.json`. The planned rules are tracked in
+both fixtures, then set `"status": "active"` in `rdl-rules.json`.
+
+Fixtures other than the eight hand-built ones (ACC-03, DS-02, DS-05, DS-07,
+QRY-01, QRY-02, QRY-04, STR-01) are generated from `DS-02.rdl`, one edit each,
+by `tools/generate_rdl_fixtures.py`, and `tests/test_rdl_fixture_generator.py`
+requires the committed files to match it byte for byte. Add a fixture there,
+then `python tools/deploy_rdl_fixtures.py --workspace <name> <RULE-ID> <RULE-ID>-Pass`
+so the Fabric service accepts it and writes its `.platform`. The planned rules are tracked in
 [tasks/rdl-rule-coverage-epic.md](../tasks/rdl-rule-coverage-epic.md).
 """
 
