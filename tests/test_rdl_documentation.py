@@ -105,6 +105,13 @@ def test_the_rule_reference_is_generated_from_the_catalog():
     assert (_ROOT / "docs" / "RDL-RULES.md").read_text(encoding="utf-8") == gen.render()
 
 
+def test_a_source_link_is_labelled_for_its_own_site():
+    """PRM-07 credits Chris Webb's blog; labelling it "MS Learn" would misattribute it."""
+    text = (_ROOT / "docs" / "RDL-RULES.md").read_text(encoding="utf-8")
+    assert "[Chris Webb's BI Blog](https://blog.crossjoin.co.uk/" in text
+    assert "[MS Learn](https://blog.crossjoin.co.uk/" not in text
+
+
 def test_the_human_readme_points_at_the_rule_reference():
     assert "docs/RDL-RULES.md" in _README.read_text(encoding="utf-8")
 

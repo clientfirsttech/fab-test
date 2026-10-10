@@ -109,7 +109,7 @@
             <Value>=Parameters!AlignmentIDs.Value</Value>
           </QueryParameter>
         </QueryParameters>
-        <CommandText>EVALUATE SUMMARIZECOLUMNS(MarvelFact[Name], RSCustomDaxFilter(@AlignmentIDs, EqualToCondition, [MarvelFact].[AlignmentID], Int64))</CommandText>
+        <CommandText>EVALUATE SUMMARIZECOLUMNS(MarvelFact[Name], RSCustomDaxFilter(@AlignmentIDs,EqualToCondition,[MarvelFact].[AlignmentID],Int64))</CommandText>
       </Query>
       <Fields>
         <Field Name="Name">

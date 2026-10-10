@@ -137,7 +137,7 @@ class TestPrm05ShowParameterValues:
         assert _check_prm05_show_parameter_values(root, namespace, {}) == []
 
 
-_RS_FILTER = "RSCustomDaxFilter(@Colour, EqualToCondition, [DimVehicle].[Color], String)"
+_RS_FILTER = "RSCustomDaxFilter(@Colour,EqualToCondition,[DimVehicle].[Color],String)"
 
 
 def _dax_report(
@@ -175,13 +175,52 @@ class TestPrm07MultivalueDaxFilter:
         assert "RSCustomDaxFilter(@Colour" in findings[0]["message"]
 
     @pytest.mark.parametrize(
+        ("data_type", "dax_type"),
+        [("Integer", "Int64"), ("Float", "Double"), ("DateTime", "DateTime"), ("Boolean", "Boolean"),
+         ("String", "String"), (None, "String")],
+    )
+    def test_the_suggested_fix_names_the_parameters_type(self, tmp_path, data_type, dax_type):
+        replacement = f"<DataType>{data_type}</DataType>" if data_type else ""
+        xml = _dax_report("EVALUATE FILTER(DimVehicle, DimVehicle[Color] = @Colour)").replace(
+            "<DataType>Integer</DataType>", replacement
+        )
+        root, namespace = parse(tmp_path, xml)
+
+        message = _check_prm07_multivalue_dax_filter(root, namespace, {})[0]["message"]
+
+        assert message.endswith(f"[Table].[Column],{dax_type})")
+
+    @pytest.mark.parametrize(
         "call",
-        [_RS_FILTER, _RS_FILTER.lower(), _RS_FILTER.upper().replace("(@COLOUR,", " ( @COLOUR ,")],
+        [
+            _RS_FILTER,
+            _RS_FILTER.lower(),
+            _RS_FILTER.replace(",String)", ", String)"),  # rendered fine in fab-test [Dev], 2026-10-10
+            "RSCustomDaxFilter(@Colour,EqualToCondition,[Dim Vehicle].[Body Color],String)",
+        ],
     )
     def test_rscustomdaxfilter_passes(self, tmp_path, call):
         root, namespace = parse(tmp_path, _dax_report(f"EVALUATE SUMMARIZECOLUMNS(DimVehicle[Make], {call})"))
 
         assert _check_prm07_multivalue_dax_filter(root, namespace, {}) == []
+
+    @pytest.mark.parametrize(
+        "call",
+        [
+            # Each failed to render in fab-test [Dev], 2026-10-10: "Cannot find table ." / "Failed to resolve name ."
+            "RSCustomDaxFilter(@Colour,EqualToCondition, [DimVehicle].[Color],String)",
+            "RSCustomDaxFilter( @Colour , EqualToCondition,[DimVehicle].[Color],String)",
+            "RSCustomDaxFilter(@Colour, EqualToCondition, [DimVehicle].[Color], String)",
+        ],
+    )
+    def test_flags_rscustomdaxfilter_written_with_spaces(self, tmp_path, call):
+        root, namespace = parse(tmp_path, _dax_report(f"EVALUATE SUMMARIZECOLUMNS(DimVehicle[Make], {call})"))
+
+        findings = _check_prm07_multivalue_dax_filter(root, namespace, {})
+
+        assert [f["object"] for f in findings] == ["Sales › @Colour"]
+        assert "spaces" in findings[0]["message"]
+        assert "RSCustomDaxFilter(@Colour,EqualToCondition,[Table].[Column],Int64)" in findings[0]["message"]
 
     def test_a_filter_defined_as_a_var_passes(self, tmp_path):
         """The shape in github.com/kerski/paginated-reports-multivalue-example."""

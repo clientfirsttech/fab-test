@@ -120,9 +120,16 @@ tracked in [plan.md](../plan.md).
 """
 
 
+_SITE_LABELS = {
+    "learn.microsoft.com": "MS Learn",
+    "www.mssqltips.com": "MSSQLTips",
+    "blog.crossjoin.co.uk": "Chris Webb's BI Blog",
+}
+
+
 def _label(url: str) -> str:
     host = urlparse(url).netloc
-    return "MSSQLTips" if "mssqltips" in host else "MS Learn"
+    return _SITE_LABELS.get(host, host)
 
 
 def _cell(rule: dict) -> str:

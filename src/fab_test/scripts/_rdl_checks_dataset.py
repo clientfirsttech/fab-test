@@ -261,18 +261,38 @@ def _check_prm02_parameter_types(root: ET.Element, _namespace: str, _rule: dict[
 
 # The whole parameter list, as a QueryParameter's value: not .Value(0), not Join(...).
 _WHOLE_PARAMETER = re.compile(r"(?i)^\s*=\s*Parameters!(\w+)\.Value\s*$")
+# A report parameter's DataType (String when absent) as RSCustomDaxFilter's type argument.
+_DAX_FILTER_TYPES = {"Integer": "Int64", "Float": "Double", "DateTime": "DateTime", "Boolean": "Boolean"}
+
+
+def _prm07_problem(name: str, parameter: str, dax_type: str, command_text: str) -> str | None:
+    """Why @name's multi-value list won't reach DAX as written, or None when it will."""
+    fix = f"RSCustomDaxFilter(@{name},EqualToCondition,[Table].[Column],{dax_type})"
+    escaped = re.escape(name)
+    if re.search(rf"(?i)RSCustomDaxFilter\(@{escaped},\w+,\[[^\]]+\]\.\[[^\]]+\]", command_text):
+        return None
+    if re.search(rf"(?i)RSCustomDaxFilter\s*\(\s*@{escaped}\b", command_text):
+        return f"@{name}'s RSCustomDaxFilter has spaces before its column reference, so it fails to expand; write {fix}"
+    return (
+        f"multi-value parameter '{parameter}' reaches DAX as @{name} without RSCustomDaxFilter -- "
+        f"the query fails when more than one value is selected; use {fix}"
+    )
 
 
 def _check_prm07_multivalue_dax_filter(root: ET.Element, _namespace: str, _rule: dict[str, Any]) -> list[Finding]:
     """A multi-value parameter reaches a DAX query only through RSCustomDaxFilter.
 
-    Report Builder expands ``RSCustomDaxFilter(@P, EqualToCondition, [T].[C], Type)``
+    Report Builder expands ``RSCustomDaxFilter(@P,EqualToCondition,[T].[C],Type)``
     into one OR-ed test per selected value; ``@P`` used directly gets a list it
     can't evaluate. Credit: Chris Webb,
     https://blog.crossjoin.co.uk/2019/11/03/power-bi-report-builder-and-rscustomdaxfilter/
+
+    Rendered in fab-test [Dev] on 2026-10-10: a space anywhere from ``(`` to the
+    column reference fails even with one value ("Cannot find table ."); a space
+    before the type argument renders.
     """
     multi_value = {
-        p.get("Name")
+        p.get("Name"): _DAX_FILTER_TYPES.get((p.findtext("DataType") or "").strip(), "String")
         for p in root.findall(".//ReportParameters/ReportParameter")
         if (p.findtext("MultiValue") or "").strip().lower() == "true"
     }
@@ -285,16 +305,12 @@ def _check_prm07_multivalue_dax_filter(root: ET.Element, _namespace: str, _rule:
         for query_parameter in query.findall("QueryParameters/QueryParameter"):
             source = _WHOLE_PARAMETER.match(query_parameter.findtext("Value") or "")
             name = query_parameter.get("Name") or "?"
-            filtered = re.search(rf"(?i)RSCustomDaxFilter\s*\(\s*@{re.escape(name)}\b", command_text)
-            if source and source.group(1) in multi_value and not filtered:
-                findings.append({
-                    "object": f"{dataset.get('Name') or '?'} › @{name}",
-                    "message": (
-                        f"multi-value parameter '{source.group(1)}' reaches DAX as @{name} without "
-                        "RSCustomDaxFilter -- the query fails when more than one value is selected; use "
-                        f"RSCustomDaxFilter(@{name}, EqualToCondition, [Table].[Column], String)"
-                    ),
-                })
+            parameter = source.group(1) if source else ""
+            if parameter not in multi_value:
+                continue
+            problem = _prm07_problem(name, parameter, multi_value[parameter], command_text)
+            if problem:
+                findings.append({"object": f"{dataset.get('Name') or '?'} › @{name}", "message": problem})
     return findings
 
 

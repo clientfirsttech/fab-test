@@ -1009,7 +1009,7 @@ PASS = {
 }
 PASS["SUB-01"] = PASS["LAY-03"]
 PASS["PRM-07"] = lambda t: multivalue_dax(
-    t, "RSCustomDaxFilter(@AlignmentIDs, EqualToCondition, [MarvelFact].[AlignmentID], Int64)"
+    t, "RSCustomDaxFilter(@AlignmentIDs,EqualToCondition,[MarvelFact].[AlignmentID],Int64)"
 )
 
 
