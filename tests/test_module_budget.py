@@ -151,8 +151,9 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
         ),
     ),
     "src/fab_test/scripts/fab_test_registry.py": (
-        1038,
+        973,
         (
+            "2026-10-10: -65 lines moving _cloud_readiness into _cloud_readiness.py (Doctor Severity). "
             "2026-10-10: +3 net lines mapping an exported .PaginatedReport folder to the rdl "
             "analyzer for the dry-run label (Service-mode polish). "
             "2026-10-06: +3 lines forwarding --user-name to invoke_playwright. "

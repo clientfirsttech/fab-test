@@ -149,12 +149,10 @@ jobs:
           pip install --user -e ".[dev]" "playwright==$PLAYWRIGHT_PIN"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
-      # `doctor` has no `--workspace-id` flag and no visibility into --env /
-      # environments.yml, so it reports every cloud analyzer as "no
-      # workspace ... resolved" and exits 1 even when the service principal
-      # is fully configured -- resolve the same workspace the run step below
-      # will use and export it as FABRIC_WORKSPACE_ID (the one source
-      # `doctor` does read) so this row reflects the real run.
+      # `doctor` has no visibility into --env / environments.yml, so with no
+      # workspace it reports playwright as "no workspace set" -- resolve the
+      # same workspace the run step below will use and export it as
+      # FABRIC_WORKSPACE_ID so this row reflects the real run.
       - name: Confirm the service principal is ready
         env:
           FABRIC_WORKSPACE_ID: ${{ inputs.workspace_id }}
@@ -174,7 +172,7 @@ jobs:
           PY
           )
           fi
-          fab-test doctor
+          fab-test doctor --analyzer playwright
 
       # Bash arrays (`args=(...)`), not POSIX -- the container image above
       # runs steps under `sh`, not `bash`, and `sh -e {0}` chokes on that

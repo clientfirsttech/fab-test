@@ -22,7 +22,8 @@ from ._analyzer_tool_bootstrap import (
     resolve_executable,
 )
 from ._artifact_types import load_artifact_map
-from ._credentials import configured_workspace, probe_credentials
+from ._cloud_readiness import cloud_readiness
+from ._credentials import probe_credentials
 from ._desktop import (
     DesktopMatchError,
     desktop_ports,
@@ -211,8 +212,6 @@ _DESKTOP_CAPABLE_ANALYZERS = {"pql_test"}
 # Which variables actually resolve a credential lives in _credentials.py,
 # the single chain both `doctor` and `auth status` read. This is only the
 # phrasing used when no workspace is set and there is nothing to probe yet.
-_SERVICE_PRINCIPAL_HINT = "FABRIC_TENANT_ID, FABRIC_SERVICE_PRINCIPAL_ID, and FABRIC_SERVICE_PRINCIPAL_SECRET"
-
 # Maps fab-test subcommand name to the matching analyzer registry key in
 # .github/metadata/analyzers.json.
 _BOOTSTRAP_REGISTRY_NAME = {
@@ -885,80 +884,13 @@ def preflight_error(name: str, args: argparse.Namespace) -> tuple[str, int] | No
 
 
 def _cloud_readiness(name: str, args: argparse.Namespace | None) -> dict[str, Any]:
-    """Return readiness for an analyzer that needs a workspace or Desktop.
-
-    Reports the target it would actually use, or names every source it
-    accepts, so a caller is never told "ready" for a run that cannot
-    reach anything. Stays as cheap as the rest of the probe: no
-    subprocess, no network call, and no secret value in any field --
-    whether the workspace is genuinely *reachable* is `auth status`'s
-    question, not this one's.
-    """
-    workspace_id = configured_workspace(args, playwright=name != "pql_test")
-
-    if workspace_id:
-        status = probe_credentials()
-        # Playwright always calls MSAL with a service-principal secret to
-        # generate an embed token -- unlike pql_test, an ambient credential
-        # (az login, managed identity) cannot stand in. Reporting ready off
-        # `status.resolved` alone would be the false green task 1 exists to
-        # remove: green from `doctor`, then an MSAL error on the one
-        # command that cannot use an ambient sign-in.
-        if name == "playwright" and not status.verified:
-            return {
-                "ready": False,
-                "resolved_path": None,
-                "reason": f"workspace configured; playwright needs a full service principal ({status.detail})",
-                "remediation": status.remediation
-                or (
-                    "set FABRIC_TENANT_ID, FABRIC_CLIENT_ID (or "
-                    "FABRIC_SERVICE_PRINCIPAL_ID), and FABRIC_CLIENT_SECRET "
-                    "(or FABRIC_SERVICE_PRINCIPAL_SECRET) in the environment "
-                    "or a .env file"
-                ),
-            }
-        if status.resolved:
-            reason = (
-                f"workspace configured, credentials from {status.source}"
-                if status.verified
-                else f"workspace configured; {status.detail}"
-            )
-            return {
-                "ready": True,
-                "resolved_path": None,
-                "reason": reason,
-                "remediation": None,
-            }
-        return {
-            "ready": False,
-            "resolved_path": None,
-            "reason": f"workspace configured but {status.detail}",
-            "remediation": status.remediation,
-        }
-
-    desktop_capable = name in _DESKTOP_CAPABLE_ANALYZERS
-    if desktop_capable and desktop_ports():
-        return {
-            "ready": True,
-            "resolved_path": None,
-            "reason": "no workspace set; would bind to a running Power BI Desktop instance",
-            "remediation": None,
-        }
-
-    remediation = f"Set FABRIC_WORKSPACE_ID (or pass --workspace) plus {_SERVICE_PRINCIPAL_HINT}"
-    if desktop_capable:
-        return {
-            "ready": False,
-            "resolved_path": None,
-            "reason": "no workspace, credentials, or running Desktop instance",
-            "remediation": (f"{remediation}; or open the .pbip in Power BI Desktop to run locally"),
-        }
-    return {
-        "ready": False,
-        "resolved_path": None,
-        "reason": "no workspace or credentials resolved",
-        "remediation": remediation,
-    }
+    """Readiness for an analyzer that needs a workspace or Desktop (see `_cloud_readiness.py`)."""
+    return cloud_readiness(
+        name,
+        args,
+        desktop_capable=name in _DESKTOP_CAPABLE_ANALYZERS,
+        desktop_ports=desktop_ports,
+    )
 
 
 def check_readiness(name: str, args: argparse.Namespace | None) -> dict[str, Any]:
@@ -970,14 +902,17 @@ def check_readiness(name: str, args: argparse.Namespace | None) -> dict[str, Any
     workspace (pql_lint) is always ready; the rest resolve an external
     tool -- see ``probe_executable`` for that shape.
 
-    Every branch's dict gets a ``version`` key here rather than in each of
-    them, so the doctor row shape stays uniform (only ``probe_executable``'s
-    bootstrapped-tool path ever has one to report) without touching
-    `_cloud_readiness`'s five return statements for a field that never
-    applies to them.
+    Every branch's dict gets ``version`` and ``status`` keys here rather
+    than in each of them, so the doctor row shape stays uniform (only
+    ``probe_executable``'s bootstrapped-tool path ever has a version, and
+    only ``_cloud_readiness`` ever says ``warning``).
     """
     result = execution_readiness(_readiness_without_version(name, args), name, args)
     result.setdefault("version", None)
+    if result.get("status") in (None, "ready"):
+        # Derived for every branch that sets none, and re-derived when
+        # execution_readiness turned a ready row not-ready after the fact.
+        result["status"] = {True: "ready", None: "info"}.get(result["ready"], "error")
     return result
 
 

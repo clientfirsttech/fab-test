@@ -37,6 +37,7 @@ _CLIENT_ID_VARS = ("FABRIC_SERVICE_PRINCIPAL_ID", "FABRIC_CLIENT_ID")
 _CLIENT_SECRET_VARS = ("FABRIC_SERVICE_PRINCIPAL_SECRET", "FABRIC_CLIENT_SECRET")
 
 AMBIENT_SOURCE = "ambient:DefaultAzureCredential"
+_INCOMPLETE_DETAIL = "service principal is incomplete"
 
 # Listed in the order the chain tries them, so a caller reading the
 # remediation top to bottom learns the precedence for free.
@@ -75,6 +76,11 @@ class CredentialStatus:
     def resolved(self) -> bool:
         """Whether any source in the chain would supply a credential."""
         return self.source is not None
+
+    @property
+    def incomplete(self) -> bool:
+        """Whether some service-principal variables are set and others are not."""
+        return self.detail == _INCOMPLETE_DETAIL
 
 
 def ambient_credential_available() -> bool:
@@ -306,7 +312,7 @@ def probe_credentials(env_file: Path | str | None = None) -> CredentialStatus:
             source=None,
             tenant_id=tenant or None,
             verified=False,
-            detail="service principal is incomplete",
+            detail=_INCOMPLETE_DETAIL,
             remediation=_missing_variable_remediation(tenant, client_id, client_secret),
         )
 

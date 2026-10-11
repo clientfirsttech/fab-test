@@ -14,7 +14,7 @@ steps:
   - bash: |
       set -euo pipefail
       mkdir -p fab-test-results
-      fab-test doctor
+      fab-test doctor --analyzer playwright
       fab-test playwright --artifact "$PLAYWRIGHT_ARTIFACT" --env DEV --report \
         --playwright-config "$PLAYWRIGHT_CONFIG_PATH" --workers 8
     displayName: Check readiness and validate

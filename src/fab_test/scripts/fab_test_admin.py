@@ -487,7 +487,7 @@ def _doctor(args: argparse.Namespace) -> int:
         # whether doctor passes: telemetry is optional, and a run that never
         # wanted it is not a broken installation.
         rows.extend(_telemetry_readiness_rows(args))
-    return _print_doctor(rows, output_format)
+    return _print_doctor(rows, output_format, strict=getattr(args, "strict", False))
 
 
 _TOOL_DISPLAY_NAMES = {

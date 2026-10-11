@@ -19,7 +19,7 @@ import pytest
 from fab_test.scripts.fab_test_registry import visible_analyzers
 from fab_test.scripts.fab_test_summary import _print_doctor
 
-_DOCTOR_KEYS = {"analyzer", "ready", "reason", "resolved_path", "remediation", "version"}
+_DOCTOR_KEYS = {"analyzer", "ready", "reason", "resolved_path", "remediation", "version", "status"}
 
 
 @pytest.mark.fab_test
@@ -115,7 +115,7 @@ def test_doctor_does_not_greenlight_a_cloud_analyzer_without_credentials(tmp_pat
     )
     entry = json.loads(result.stdout)["analyzers"][0]
     assert entry["analyzer"] == "pql_test"
-    assert entry["ready"] is False
+    assert entry["ready"] is not True
     assert "FABRIC_WORKSPACE_ID" in entry["remediation"]
 
 
@@ -134,8 +134,8 @@ def test_doctor_unknown_analyzer_exits_2_and_lists_valid_names():
 
 
 @pytest.mark.fab_test
-def test_print_doctor_returns_zero_when_any_ready():
-    """_print_doctor returns 0 as long as at least one row is ready."""
+def test_print_doctor_returns_one_when_any_row_is_an_error():
+    """One ready row no longer hides a broken one (Doctor Severity epic)."""
     rows = [
         {"analyzer": "bpa", "ready": False, "reason": "x", "resolved_path": None, "remediation": "y"},
         {
@@ -146,7 +146,7 @@ def test_print_doctor_returns_zero_when_any_ready():
             "remediation": None,
         },
     ]
-    assert _print_doctor(rows, output_format="json") == 0
+    assert _print_doctor(rows, output_format="json") == 1
 
 
 @pytest.mark.fab_test

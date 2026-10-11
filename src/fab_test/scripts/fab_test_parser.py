@@ -856,6 +856,9 @@ def _add_doctor_subparser(subs: argparse._SubParsersAction) -> None:
         metavar="NAME_OR_ID",
         help="Check service readiness against this workspace [env: FABRIC_WORKSPACE_ID]",
     )
+    doctor_p.add_argument(
+        "--strict", action="store_true", help="Exit 1 on a warning as well as an error"
+    )
 
 def _add_config_subparser(subs: argparse._SubParsersAction) -> None:
     config_p = subs.add_parser(

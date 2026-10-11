@@ -221,7 +221,7 @@ def test_a11y_is_a_fully_advertised_analyzer():
     assert "a11y" not in HIDDEN_ANALYZERS
     assert "a11y" in visible_analyzers()
     result = check_readiness("a11y", None)
-    assert set(result.keys()) == {"ready", "resolved_path", "reason", "remediation", "version"}
+    assert set(result.keys()) == {"ready", "resolved_path", "reason", "remediation", "version", "status"}
 
 
 @pytest.mark.fab_test
@@ -241,10 +241,10 @@ def test_check_readiness_non_bootstrapped_analyzer_is_always_ready():
 
 @pytest.mark.fab_test
 def test_check_readiness_returns_same_shape_for_every_analyzer():
-    """Every analyzer's readiness dict has the same five keys (stable for `doctor`)."""
+    """Every analyzer's readiness dict has the same six keys (stable for `doctor`)."""
     from fab_test.scripts.fab_test_registry import ANALYZER_REGISTRY
 
-    expected_keys = {"ready", "resolved_path", "reason", "remediation", "version"}
+    expected_keys = {"ready", "resolved_path", "reason", "remediation", "version", "status"}
     for name in ANALYZER_REGISTRY:
         result = check_readiness(name, None)
         assert set(result.keys()) == expected_keys, f"{name} readiness shape mismatch"
@@ -289,7 +289,10 @@ def _set_service_principal(monkeypatch):
 
 @pytest.mark.fab_test
 def test_cloud_analyzer_not_ready_without_workspace_credentials_or_desktop(monkeypatch):
-    """pql_test with nothing configured is not ready -- the false green this fixes."""
+    """pql_test with nothing configured is not ready -- the false green this fixes.
+
+    Not configured is info, not an error (Doctor Severity epic).
+    """
     from fab_test.scripts import fab_test_registry as registry
 
     _clear_cloud_env(monkeypatch)
@@ -297,7 +300,8 @@ def test_cloud_analyzer_not_ready_without_workspace_credentials_or_desktop(monke
 
     result = registry.check_readiness("pql_test", None)
 
-    assert result["ready"] is False
+    assert result["ready"] is not True
+    assert result["status"] == "info"
     assert result["remediation"] is not None
 
 
@@ -397,7 +401,8 @@ def test_playwright_does_not_fall_back_to_desktop(monkeypatch):
 
     result = registry.check_readiness("playwright", None)
 
-    assert result["ready"] is False
+    assert result["ready"] is not True
+    assert result["status"] != "ready"
 
 
 @pytest.mark.fab_test
@@ -465,7 +470,7 @@ def test_readiness_never_echoes_a_credential_value(monkeypatch):
 
 
 @pytest.mark.fab_test
-def test_cloud_analyzer_readiness_keeps_the_stable_five_keys(monkeypatch):
+def test_cloud_analyzer_readiness_keeps_the_stable_keys(monkeypatch):
     """A not-ready cloud row has the same shape as every other row (JSON consumers)."""
     from fab_test.scripts import fab_test_registry as registry
 
@@ -474,7 +479,7 @@ def test_cloud_analyzer_readiness_keeps_the_stable_five_keys(monkeypatch):
 
     result = registry.check_readiness("pql_test", None)
 
-    assert set(result.keys()) == {"ready", "resolved_path", "reason", "remediation", "version"}
+    assert set(result.keys()) == {"ready", "resolved_path", "reason", "remediation", "version", "status"}
 
 
 @pytest.mark.fab_test

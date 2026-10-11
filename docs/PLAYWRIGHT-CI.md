@@ -381,7 +381,8 @@ Every case writes its evidence to `fab-test-results/playwright/<report>/test-cas
 
 | Symptom | Likely cause | Fix |
 |---------|--------------|-----|
-| `doctor` shows ❌ *no workspace or credentials resolved* | `FABRIC_WORKSPACE_ID` isn't exported in this shell | [Name the workspace](#name-the-workspace-and-environment) |
+| `doctor` shows ⚠ *credentials from …; no workspace set* | No workspace in this shell (`FABRIC_WORKSPACE_ID`, `PLAYWRIGHT_WORKSPACE_ID`, or `workspace:` in fab-test.yml) | [Name the workspace](#name-the-workspace-and-environment) |
+| `doctor` shows ❌ *playwright needs a service principal* | Only `az login` is available; Playwright's embed token needs a service principal | Set the `FABRIC_*` secrets on the Environment |
 | *Playwright runs need pytest, …* | the `playwright` extra isn't installed | [Run it locally](#5-run-it-locally) -- `pip install "cft-fab-test[playwright]"` |
 | *No environment given, so there is nothing to resolve…* | `FABRIC_ENVIRONMENT` isn't set and `--env` wasn't passed | Export `FABRIC_ENVIRONMENT` or add `--env dev` |
 | *No Report matching '…'* | The report isn't deployed, or has a different name | [Step 4](#4-deploy-the-reports-you-want-to-test) |
@@ -420,7 +421,7 @@ Once the local run passes, the same values go into a GitHub Environment's secret
 - Triggers only on `workflow_dispatch`, never `pull_request` -- a fork PR has no access to this Environment's secrets at all.
 - Takes `artifact`, `dataset_id`, `dataset_workspace_id`, `pages`, and `roles` as dispatch inputs, so the one workflow covers all three ways of naming what to test (see [Targeting a report or a dataset](#targeting-a-report-or-a-dataset) below).
 - Installs the published package, then the browser and its pytest plugins separately (see [Run it locally](#5-run-it-locally) for why those are separate).
-- Runs `fab-test doctor` before the real command, so a misconfigured Environment fails fast with exit `127` naming what's missing.
+- Runs `fab-test doctor --analyzer playwright` before the real command, so a misconfigured Environment fails fast with exit `1` naming what's missing.
 - Uploads `fab-test-results/playwright/**` under `if: always()`, and writes a per-case pass/fail table to the job's step summary.
 
 ### Targeting a report or a dataset

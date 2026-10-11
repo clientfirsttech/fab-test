@@ -125,7 +125,7 @@ def service_readiness(args: argparse.Namespace) -> str:
         return f"service mode: {detail} (unverified until a run; see `fab-test auth status`)"
     fix = redact_secrets(status.remediation or "")
     interactive = "" if interactive_refusal(_probe_args(args)) else "; or pass --interactive"
-    return f"service mode: {detail}. {fix}{interactive}".strip()
+    return f"service mode: {'. '.join(filter(None, (detail, fix)))}{interactive}"
 
 
 def _probe_args(args: argparse.Namespace) -> argparse.Namespace:

@@ -81,7 +81,7 @@ jobs:
       # browser or network call -- the whole reason this step exists ahead
       # of the real run.
       - name: Confirm the service principal and workspace are ready
-        run: fab-test doctor
+        run: fab-test doctor --analyzer playwright
 
       # A paginated report's parameterized case reads its parameter values with
       # the report's own dataset query (executeQueries), so the tenant's

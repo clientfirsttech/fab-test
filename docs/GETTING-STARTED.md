@@ -352,7 +352,8 @@ If the model uses RLS, set `PLAYWRIGHT_USER_NAME` (or `playwright_user_name` in 
 | `missing: FABRIC_CLIENT_ID ... FABRIC_CLIENT_SECRET` | `.fab-test/.env` is incomplete or not found | [Step 3c](#3c-create-a-client-secret-and-save-it-to-fab-testenv) |
 | `AADSTS7000215: Invalid client secret` | The secret has expired, or the secret **ID** was saved instead of its value | Run 3c again |
 | `401` / `403` in `console.json` | A tenant setting hasn't applied, or the service principal has no workspace role | [Step 4](#4-allow-service-principals-in-the-tenant), [step 5](#5-add-the-service-principal-to-your-workspaces) |
-| `doctor`: *no workspace or credentials resolved* | `FABRIC_WORKSPACE_ID` isn't exported in this shell | [Step 6](#6-run-playwright-from-the-console) |
+| `doctor`: ⚠ *credentials from .fab-test/.env; no workspace set* | No workspace in this shell (`FABRIC_WORKSPACE_ID`, `PLAYWRIGHT_WORKSPACE_ID`, or `workspace:` in fab-test.yml) | [Step 6](#6-run-playwright-from-the-console) |
+| `doctor`: ❌ *playwright needs a service principal* | Only `az login` is available; Playwright's embed token needs a service principal | [Step 3c](#3c-create-a-client-secret-and-save-it-to-fab-testenv) |
 | *No environment given...* | `FABRIC_ENVIRONMENT` isn't set and `--env` wasn't passed | [Step 6](#6-run-playwright-from-the-console) |
 | *No Report matching '...'* | The report isn't published, or it has a different name | Publish it, or use the name the error suggests |
 | Only one case ran | Page or role discovery is missing a permission (a warning was logged) | Recheck 3b consent and the step 5 role |
