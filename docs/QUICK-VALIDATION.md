@@ -170,7 +170,7 @@ fab-test auth status --workspace-id <id>  # also confirm that workspace is reach
 fab-test auth login                       # delegates to `pql-test auth login`
 ```
 
-`fab-test` stores no credentials of its own. `auth status` exits `0` verified, `127` when nothing resolves, `1` when credentials work but the workspace is unreachable. `doctor` never acquires a token, so it reports an ambient `az login` credential as `unverified` and points here.
+`fab-test` stores no credentials of its own. `auth status` exits `0` verified, `127` when nothing resolves, `1` when credentials work but the workspace is unreachable. `doctor` never acquires a token, so it reports an ambient `az login` credential as `unverified` and points here. For `pql_test` it does compare the `az login` account (from `az account show`) with `pql-test auth status`, and reports ❌ when they differ -- the same mismatch a service-mode run stops on.
 
 ### Run the default analyzer set
 

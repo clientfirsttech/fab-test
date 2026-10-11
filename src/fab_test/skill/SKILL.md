@@ -186,6 +186,7 @@ Constraints {
   doctor --workspace NAME_OR_ID checks service readiness against that workspace, as FABRIC_WORKSPACE_ID would
   doctor marks each row ✅ ready, ⚠ warning (one setting away, e.g. credentials but no workspace), ℹ info (not set up, or a tool fetched on first run), or ❌ error (set up, and the run would fail); JSON rows carry it as `status`
   doctor exits 1 on any ❌ (--strict: any ⚠ too), else 0 -- a CI gate for one analyzer uses doctor --analyzer NAME
+  doctor compares the az login account with `pql-test auth status` for pql_test (❌ when they differ, as the run would refuse)
   list's matched-artifact counts respect --artifact-dir
   explain ANALYZER never spawns a subprocess — it only shows the resolved command, tool path, rules path, and output path
 }

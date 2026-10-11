@@ -38,6 +38,9 @@ def _clean(monkeypatch, tmp_path):
     monkeypatch.setenv("PLAYWRIGHT_ENV_FILE", str(tmp_path / "none.env"))
     monkeypatch.setattr(registry, "desktop_ports", list)
     monkeypatch.setattr(_credentials, "ambient_credential_available", lambda: True)
+    from fab_test.scripts import _pql_identity
+
+    monkeypatch.setattr(_pql_identity, "identity_check", lambda: None)  # no az / pql-test subprocess
 
 
 def _service_principal(monkeypatch):
@@ -250,3 +253,55 @@ def test_a_tool_not_yet_downloaded_is_info_and_does_not_fail_doctor():
 
     assert result["status"] == "info"
     assert _print_doctor([{"analyzer": "bpa", **result}], output_format="json") == 0
+
+
+# --------------------------------------------------------------------------- #
+# pql_test with az login: the identity the run would refuse
+# --------------------------------------------------------------------------- #
+
+
+def _identity(monkeypatch, result):
+    from fab_test.scripts import _pql_identity
+
+    monkeypatch.setattr(_pql_identity, "identity_check", lambda: result)
+
+
+def test_pql_test_signed_in_as_another_account_is_an_error(monkeypatch):
+    _identity(monkeypatch, ("john@kerski.net", "fab-test is signed in as john@kerski.net but pql-test as x@y.z."))
+
+    result = registry.check_readiness("pql_test", _args(workspace_id=_WS))
+
+    assert result["status"] == "error"
+    assert "x@y.z" in result["remediation"]
+
+
+def test_pql_test_signed_in_as_the_same_account_is_ready_and_says_so(monkeypatch):
+    _identity(monkeypatch, ("john@kerski.net", None))
+
+    result = registry.check_readiness("pql_test", _args(workspace_id=_WS))
+
+    assert result["status"] == "ready"
+    assert "john@kerski.net" in result["reason"]
+    assert "unverified" not in result["reason"]
+
+
+def test_pql_test_identity_that_cannot_be_compared_stays_unverified(monkeypatch):
+    _identity(monkeypatch, None)
+
+    result = registry.check_readiness("pql_test", _args(workspace_id=_WS))
+
+    assert result["status"] == "ready"
+    assert "unverified" in result["reason"]
+
+
+def test_a_service_principal_never_runs_the_identity_check(monkeypatch):
+    _service_principal(monkeypatch)
+    _identity(monkeypatch, ("a@b.c", "must not be used"))
+
+    assert registry.check_readiness("pql_test", _args(workspace_id=_WS))["status"] == "ready"
+
+
+def test_dependencies_never_runs_the_identity_check(monkeypatch):
+    _identity(monkeypatch, ("a@b.c", "must not be used"))
+
+    assert registry.check_readiness("dependencies", _args(workspace_id=_WS))["status"] == "ready"

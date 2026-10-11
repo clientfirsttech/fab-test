@@ -15,6 +15,7 @@ import argparse
 from collections.abc import Callable
 from typing import Any
 
+from . import _pql_identity
 from ._credentials import SIGN_IN_REMEDIATION, configured_workspace, probe_credentials
 
 # Playwright always calls MSAL with a service-principal secret to generate an
@@ -55,6 +56,10 @@ def cloud_readiness(
     needs_principal = name == "playwright"
     status = probe_credentials()
     if configured_workspace(args, playwright=name != "pql_test"):
+        if name == "pql_test" and status.resolved and not status.verified:
+            identity = _pql_identity_row()
+            if identity:
+                return identity
         return _with_workspace(status, needs_principal)
 
     if desktop_capable and desktop_ports():
@@ -73,6 +78,17 @@ def cloud_readiness(
         "service mode not configured",
         f"{_workspace_hint(name)}. Then: {credentials[0].lower()}{credentials[1:]}",
     )
+
+
+def _pql_identity_row() -> dict[str, Any] | None:
+    """pql-test connects with its own saved login, which must be the az login account (see `_pql_identity`)."""
+    checked = _pql_identity.identity_check()
+    if checked is None:
+        return None
+    account, mismatch = checked
+    if mismatch:
+        return _row("error", f"workspace configured; pql-test would not connect as {account}", mismatch)
+    return _row("ready", f"workspace configured; az login and pql-test both signed in as {account}", None)
 
 
 def _with_workspace(status: Any, needs_principal: bool) -> dict[str, Any]:

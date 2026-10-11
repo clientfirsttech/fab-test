@@ -1,6 +1,6 @@
 # Doctor Severity Epic
 
-**Status**: ✅ IMPLEMENTED 2026-10-10 (5/5 tasks, gates passed). Added during the work: a tool fetched on first run ("not yet downloaded/built/installed") is ℹ, not ❌, so a fresh CI runner's `doctor` is not failed by a tool it will download; the example and demo workflows gate on `doctor --analyzer playwright`.
+**Status**: ✅ IMPLEMENTED 2026-10-10 (6/6 tasks, gates passed). Added during the work: a tool fetched on first run ("not yet downloaded/built/installed") is ℹ, not ❌, so a fresh CI runner's `doctor` is not failed by a tool it will download; the example and demo workflows gate on `doctor --analyzer playwright`.
 **Goal**: `fab-test doctor` says what is actually missing, separates "broken" from "not set up", and exits non-zero only when a run you configured would fail.
 
 ## Overview
@@ -56,6 +56,17 @@ Move `_cloud_readiness` out of `fab_test_registry.py` (over its size budget) int
 
 **Requirements**:
 - Given the change, should update the doctor troubleshooting rows in GETTING-STARTED.md and PLAYWRIGHT-CI.md, `--strict` in the fab-test skill flags reference and its packaged copy, and a **Behavior change** CHANGELOG entry for the exit code
+
+---
+
+## pql-test identity in doctor
+
+Added 2026-10-10 at the user's request ("real check" over a hint line).
+
+**Requirements**:
+- Given pql_test with a workspace and an ambient credential, should compare the `az account show` user with `pql-test auth status`: ❌ naming both accounts when they differ, ✅ naming the shared account when they match
+- Given a service principal, `PQL_*` credentials, no `az` user, or a pql-test that will not run, should not compare, and stay as before
+- Given dependencies or playwright, should never run the check
 
 ---
 

@@ -369,6 +369,7 @@ def test_workspace_plus_ambient_credential_is_ready_but_flagged_unverified(monke
     _clear_cloud_env(monkeypatch)
     monkeypatch.setenv("FABRIC_WORKSPACE_ID", "33333333-3333-3333-3333-333333333333")
     monkeypatch.setattr(_credentials, "ambient_credential_available", lambda: True)
+    monkeypatch.setattr("fab_test.scripts._pql_identity.identity_check", lambda: None)
 
     result = registry.check_readiness("pql_test", None)
 
