@@ -129,7 +129,7 @@ Documentation follows the same three callers as the CLI itself. Shipping for one
 - **Epic-sized change** (anything tracked as an epic in `tasks/`, however many tasks it contains) → bump MINOR, reset PATCH to `0`.
 - **MAJOR** is bumped only at the user's explicit direction — a breaking-change call, not a size threshold, so never bump it without asking.
 
-Three-part semver (`MAJOR.MINOR.PATCH`) — no fourth segment. Until the first final release ships (see "Cutting a final release" in [docs/RELEASE.md](docs/RELEASE.md)), every version stays a pre-release: append `.devN`, restarting at `.dev1` whenever the base `MAJOR.MINOR.PATCH` itself changes to a value that has never been published. A doc-only change with no `src/` edit does not need a bump on its own.
+Three-part semver (`MAJOR.MINOR.PATCH`) — no fourth segment. Until the first final release ships (see "Cutting a final release" in [docs/RELEASE.md](docs/RELEASE.md)), every version is a pre-release. The project is in a public beta series (`1.9.0bN`, see "Cutting a public beta" in [docs/RELEASE.md](docs/RELEASE.md)), which takes precedence over the PATCH/MINOR rule above while it lasts: changes ship in the current beta while it is unpublished, and once PyPI has it the next `src/` change moves to the next beta (`b10` → `b11`). `.devN` is only for TestPyPI rehearsals. A doc-only change with no `src/` edit does not need a bump on its own.
 
 Every bump must also re-stamp the version named in the fab-test skill's own frontmatter `description` (both `.github/skills/fab-test/SKILL.md` and its packaged copy `src/fab_test/skill/SKILL.md`) — see the `document` skill's "After editing `.github/skills/fab-test/`" section for the exact rule and the test that guards it.
 
