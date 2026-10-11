@@ -33,7 +33,7 @@ Criteria {
   Run the CI gates before reading code (see .github/workflows/build.yml). Reading alone misses lint rules and counted thresholds like PLR0911 return counts:
     `ruff check .` -- the whole repo, not only the diff
     `pytest -q tests/test_complexity_budget.py` -- the complexity ratchet
-    `pytest -q --cov --cov-fail-under=80` -- the full suite and coverage floor, as CI runs it
+    `pytest -q -n auto -m "not playwright" --cov` then `pytest -q -m playwright --cov --cov-append --cov-fail-under=80` -- the full suite and coverage floor, as CI runs it
     the dependency audit -- every version pinned in uv.lock, all extras and groups, against the PyPI Advisory DB (OSV):
       `uv export --frozen --all-extras --all-groups --no-hashes --no-emit-project -o <scratch>/locked-reqs.txt -q`
       `uvx pip-audit --desc -r <scratch>/locked-reqs.txt --disable-pip --no-deps`

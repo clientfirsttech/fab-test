@@ -195,7 +195,11 @@ Both are enforced, and both are ratchets — they move down, never up.
 
 ```bash
 pytest -q --cov                      # measure locally, no gate
-pytest -q --cov --cov-fail-under=80  # exactly what CI runs
+
+# exactly what CI runs: everything but playwright on every core, then the
+# browser renders serially (they fail under CPU contention), one coverage total
+pytest -q -n auto -m "not playwright" --cov
+pytest -q -m playwright --cov --cov-append --cov-fail-under=80
 ```
 
 The 80% floor is scoped to `src/fab_test` with tests excluded. One module is omitted by explicit path — `validate_fabric_service_client.py` — because it needs a live service to execute, so a unit test could only assert that its argument parser accepts flags. `eventhouse_logger.py` came off that list once its ingest was separable from the validators in front of it. `tests/test_coverage_config.py` fails if one of those entries goes stale or if a core CLI module is ever added to the list.

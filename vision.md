@@ -109,7 +109,7 @@ Documentation follows the same three callers as the CLI itself. Shipping for one
 1. **Quality gates — always the last task of an epic's plan, run exactly as CI runs them.** A build that fails CI after the code is "done" is not done; catching it here is cheaper. All four, over the whole repository, not only the files the epic touched (an epic's own edits to older test files once failed CI on lint nobody had run there):
    - `ruff check .` — the whole repo, `tests/` and `tools/` included, not just `src/`.
    - The complexity ratchet (`tests/test_complexity_budget.py`) with `ruff` installed — it passes vacuously without it — and `tests/test_module_budget.py`.
-   - Coverage: the full suite with `--cov --cov-fail-under=80` (see [How Coverage Is Measured](#how-coverage-is-measured)); never on a narrowed run.
+   - Coverage: the full suite with `--cov --cov-fail-under=80` (see [How Coverage Is Measured](#how-coverage-is-measured)); never on a narrowed run. CI runs it in two halves that add up to the full suite: `pytest -n auto -m "not playwright" --cov`, then `pytest -m playwright --cov --cov-append --cov-fail-under=80`, since live renders fail under CPU contention.
    - The tests that depend on the environment, run once with `GITHUB_ACTIONS=true CI=true` set, since CI sets them and a local run does not.
 2. **Documentation** — update all three callers together with the `document` skill, so they never drift apart:
 
