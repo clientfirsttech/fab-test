@@ -4,9 +4,6 @@ Existing analyzers that break the contract, surveyed 2026-09-26. These are
 backlog, not precedent: don't copy them into a new analyzer. Remove an entry
 when it's fixed.
 
-- **a11y**: `--fail-on warn` probably doesn't fail the run. The wrapper exits 1,
-  but `_artifact_exit_code` returns 0 when every finding is a warning. Found by
-  reading the code; not yet reproduced through the CLI.
 - **a11y**: drops `Timer.started_at`; missing from `artifact_analyzers.Report.static`,
   `_LOCAL_ANALYZERS`, the conftest marker maps, and has no `release_source`.
 - **pbir**: no `attach_report`, so there's no `report.html` unless FabInspCLI
@@ -23,6 +20,10 @@ when it's fixed.
 - **All wrappers**: `native_output_path` resolves from the working directory, not
   beside `--output-path`, so `--output-dir` doesn't move `native.*` (only bpa
   takes `--native-output-path`).
-- **Unguarded parity**: nothing checks `_COMMAND_BUILDERS`, the subparsers,
-  `analyzers.json`, `_LOCAL_ANALYZERS`, `_TOOL_DISPLAY_NAMES`, or the marker maps
-  against `ANALYZER_REGISTRY`.
+- **dependencies**: no `analyzers.json` entry and no pytest marker.
+
+Registration parity (`_COMMAND_BUILDERS`, the subparsers, `analyzers.json`,
+`_LOCAL_ANALYZERS`, `_TOOL_DISPLAY_NAMES`, the marker maps) is checked against
+`ANALYZER_REGISTRY` by `tests/test_analyzer_contract_parity.py`. Its
+`_KNOWN_GAPS` must match the registration entries above: fixing one fails the
+test until it's removed there too.

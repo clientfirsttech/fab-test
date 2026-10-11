@@ -305,6 +305,35 @@ class TestRunA11y:
         called_command = mock_run.call_args[0][0]
         assert called_command[-2:] == ["--fail-on", "warn"]
 
+    @pytest.mark.parametrize(
+        ("fail_on", "expected_severity", "expected_exit"), [("warn", "error", 1), (None, "warning", 0)]
+    )
+    @mock.patch("fab_test.scripts.invoke_pbir_a11y.shutil.which", return_value="node")
+    @mock.patch("fab_test.scripts.invoke_pbir_a11y.subprocess.run")
+    def test_fail_on_warn_makes_warning_only_findings_fail_the_run(
+        self, mock_run, _mock_which, fail_on, expected_severity, expected_exit, tmp_path: Path, monkeypatch
+    ):
+        """fab-test's exit code comes from finding severity, not the wrapper's
+        exit code, so --fail-on warn must turn a warning into an error finding
+        or a warning-only report reads `failed` and still exits 0."""
+        from fab_test.scripts.fab_test_execution import _artifact_exit_code
+
+        monkeypatch.chdir(tmp_path)
+        artifact = tmp_path / "R.Report"
+        artifact.mkdir()
+        a11y_path = tmp_path / "cli.js"
+        a11y_path.write_text("//", encoding="utf-8")
+        output = tmp_path / "out.json"
+        warning_only = {"pages": [{**_SAMPLE_RESULT["pages"][0], "visuals": []}]}
+        tool_exit = 1 if fail_on == "warn" else 0
+        mock_run.return_value = mock.Mock(returncode=tool_exit, stdout=json.dumps(warning_only), stderr="")
+
+        exit_code = run_a11y(self._args(artifact, a11y_path, output, fail_on=fail_on))
+        data = json.loads(output.read_text(encoding="utf-8"))
+
+        assert [f["severity"] for f in data["findings"]] == [expected_severity]
+        assert _artifact_exit_code(exit_code, data) == expected_exit
+
     @mock.patch("fab_test.scripts.invoke_pbir_a11y.shutil.which", return_value="node")
     @mock.patch("fab_test.scripts.invoke_pbir_a11y.subprocess.run")
     def test_run_uses_utf8_explicitly_for_subprocess_decoding(self, mock_run, _mock_which, tmp_path: Path, monkeypatch):
