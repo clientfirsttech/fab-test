@@ -36,6 +36,25 @@ def test_list_text_shows_every_analyzer_with_glob_and_tool():
 
 
 @pytest.mark.fab_test
+def test_list_table_names_the_local_scope_by_its_target_prefix(capsys):
+    """Given a scope a `local/NAME` target selects, the human table says `local`,
+    the mode's name; JSON keeps `desktop`, the scope run.json records."""
+    from fab_test.scripts.fab_test_summary import _print_list
+
+    row = {"analyzer": "bpa", "glob": "*.SemanticModel", "matched_artifacts": 1, "required_tool": None,
+           "scopes": ["desktop", "path", "workspace"]}
+
+    _print_list([row], "text")
+    table = capsys.readouterr().out
+    _print_list([row], "json")
+    payload = json.loads(capsys.readouterr().out)
+
+    assert "local, path, workspace" in table
+    assert "desktop" not in table
+    assert payload["analyzers"][0]["scopes"] == ["desktop", "path", "workspace"]
+
+
+@pytest.mark.fab_test
 def test_list_json_format_is_one_document():
     """--format json emits one document covering every *visible* analyzer."""
     result = subprocess.run(
@@ -160,6 +179,28 @@ def test_explain_json_payload_shape(tmp_path, capsys):
     assert payload["analyzer"] == "bpa"
     assert isinstance(payload["command"], list)
     assert any("invoke_tabular_editor_bpa" in part for part in payload["command"])
+
+
+@pytest.mark.fab_test
+def test_explain_command_uses_the_tool_it_reports(tmp_path, capsys, monkeypatch):
+    """Given a bootstrapped tool, the command passes the same path the Tool line
+    shows, as a real run does, not the legacy ./TabularEditor default."""
+    from fab_test.scripts import fab_test_admin
+
+    artifact_dir = tmp_path / "artifacts"
+    (artifact_dir / "SampleModel.SemanticModel").mkdir(parents=True)
+    bootstrapped = str(tmp_path / "tools" / "TabularEditor.exe")
+    monkeypatch.delenv("TABULAR_EDITOR_PATH", raising=False)
+    monkeypatch.setattr(
+        fab_test_admin, "_check_readiness", lambda *_a: {"ready": True, "resolved_path": bootstrapped}
+    )
+
+    code = fab_test_admin._explain_analyzer(_ExplainArgs("bpa", artifact_dir, tmp_path / "results"))
+    payload = json.loads(capsys.readouterr().out)
+
+    assert code == 0
+    command = payload["command"]
+    assert command[command.index("--tabular-editor-path") + 1] == payload["tool_path"] == bootstrapped
 
 
 @pytest.mark.fab_test

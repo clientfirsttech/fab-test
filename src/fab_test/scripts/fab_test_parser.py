@@ -848,6 +848,14 @@ def _add_doctor_subparser(subs: argparse._SubParsersAction) -> None:
         action="store_true",
         help="Check prerequisites for the local Desktop workflow (fab-test local)",
     )
+    doctor_p.add_argument(
+        "--workspace",
+        "--workspace-id",
+        default="",
+        dest="workspace_id",
+        metavar="NAME_OR_ID",
+        help="Check service readiness against this workspace [env: FABRIC_WORKSPACE_ID]",
+    )
 
 def _add_config_subparser(subs: argparse._SubParsersAction) -> None:
     config_p = subs.add_parser(

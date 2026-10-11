@@ -26,6 +26,23 @@ from fab_test.scripts.fab_test_registry import (
 # Dry-run artifact discovery — no external tools needed
 # --------------------------------------------------------------------------- #
 
+# Tests asserting on what discovery found scan their own tree, not the
+# repository: under `pytest -n auto` a scan of the shared checkout
+# intermittently came back empty while other workers ran.
+@pytest.fixture
+def sample_model_dir(tmp_path: Path) -> Path:
+    (tmp_path / "SampleModel-PQLAssert.SemanticModel").mkdir()
+    return tmp_path
+
+
+def _dry_run(*argv: str, artifact_dir: Path) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        ["fab-test", *argv, "--dry-run", "--artifact-dir", str(artifact_dir)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
 
 @pytest.mark.fab_test
 def test_bpa_dry_run_exits_zero():
@@ -40,31 +57,22 @@ def test_bpa_dry_run_exits_zero():
 
 
 @pytest.mark.fab_test
-def test_bpa_dry_run_discovers_sample_model():
+def test_bpa_dry_run_discovers_sample_model(sample_model_dir):
     """fab-test bpa --dry-run finds the sample SemanticModel."""
-    result = subprocess.run(
-        ["fab-test", "bpa", "--dry-run"],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    result = _dry_run("bpa", artifact_dir=sample_model_dir)
     assert "SampleModel-PQLAssert" in result.stdout, (
         f"Expected SampleModel-PQLAssert in dry-run output.\nGot: {result.stdout}"
     )
 
 
 @pytest.mark.fab_test
-def test_bpa_dry_run_with_artifact_filter():
+def test_bpa_dry_run_with_artifact_filter(sample_model_dir):
     """--artifact STEM filters the discovered artifact list."""
-    result = subprocess.run(
-        ["fab-test", "bpa", "--dry-run",
-         "--artifact", "SampleModel-PQLAssert"],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    (sample_model_dir / "Other.SemanticModel").mkdir()
+    result = _dry_run("bpa", "--artifact", "SampleModel-PQLAssert", artifact_dir=sample_model_dir)
     assert result.returncode == 0, result.stderr
     assert "SampleModel-PQLAssert" in result.stdout
+    assert "Other" not in result.stdout
 
 
 @pytest.mark.fab_test
@@ -185,14 +193,16 @@ def test_applicable_analyzers_for_report():
 
 
 @pytest.mark.fab_test
-def test_bpa_dry_run_lists_applicable_analyzers():
+def test_applicable_analyzers_for_an_exported_paginated_report():
+    """Given a deployed paginated report exported as a .PaginatedReport folder,
+    should name the analyzers that read its .rdl, as the local file does."""
+    assert applicable_analyzers(Path("Foo.PaginatedReport")) == applicable_analyzers(Path("Foo.rdl")) == ("rdl",)
+
+
+@pytest.mark.fab_test
+def test_bpa_dry_run_lists_applicable_analyzers(sample_model_dir):
     """Dry-run output names the analyzers applicable to each discovered artifact."""
-    result = subprocess.run(
-        ["fab-test", "bpa", "--dry-run"],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    result = _dry_run("bpa", artifact_dir=sample_model_dir)
     assert result.returncode == 0, result.stderr
     assert "pql_test" in result.stdout
 
@@ -304,14 +314,9 @@ def test_all_dry_run_uses_metadata_list_not_pql_lint():
 
 
 @pytest.mark.fab_test
-def test_pql_lint_direct_subcommand_still_works_dry_run():
+def test_pql_lint_direct_subcommand_still_works_dry_run(sample_model_dir):
     """`fab-test pql_lint` can still be invoked directly even when excluded from `all`."""
-    result = subprocess.run(
-        ["fab-test", "pql_lint", "--dry-run"],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    result = _dry_run("pql_lint", artifact_dir=sample_model_dir)
     assert result.returncode == 0, result.stderr
     assert "fab-test pql_lint" in result.stdout
 

@@ -561,6 +561,7 @@ def _explain_mode(args: argparse.Namespace, name: str) -> ResolvedMode | int:
         print(f"  ✗ fab-test explain: {exc}", file=sys.stderr)
         return 2
     args.mode = resolved_mode.mode
+    args.resolved_mode = resolved_mode
     return resolved_mode
 
 
@@ -597,8 +598,13 @@ def _explain_analyzer(args: argparse.Namespace) -> int:
         # No real artifact to point at; show an illustrative command shape.
         artifact = matches[0] if matches else artifact_dir / f"<artifact>{glob.lstrip('*')}"
 
-    command = _build_command(name, artifact, args, output_dir)
     readiness = _check_readiness(name, args)
+    if readiness.get("resolved_path"):
+        # A real run resolves the tool before building its command; without
+        # this the command named the legacy default while Tool named the
+        # bootstrapped install.
+        args._resolved_tool_path = str(readiness["resolved_path"])
+    command = _build_command(name, artifact, args, output_dir)
     default_rules_path = {
         "bpa": _DEFAULT_BPA_RULES,
         "pbir": _DEFAULT_PBIR_RULES,

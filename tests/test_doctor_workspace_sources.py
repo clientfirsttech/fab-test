@@ -76,3 +76,14 @@ def test_no_workspace_anywhere_is_still_not_ready():
     result = check_readiness("playwright", _args())
     assert result["ready"] is False
     assert "FABRIC_WORKSPACE_ID" in result["remediation"]
+
+
+@pytest.mark.parametrize("flag", ["--workspace", "--workspace-id"])
+def test_doctor_takes_the_workspace_flag_the_analyzers_take(flag):
+    """Given `doctor --workspace NAME`, should check readiness against that
+    workspace, as the run that flag belongs to would."""
+    from fab_test.scripts.fab_test_parser import build_parser
+
+    args = build_parser().parse_args(["doctor", flag, "Sales Dev", "--analyzer", "pql_test"])
+
+    assert check_readiness("pql_test", _args(workspace_id=args.workspace_id))["ready"] is True

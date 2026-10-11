@@ -183,6 +183,7 @@ Discoverability {
 Constraints {
   doctor and list both support --format json
   doctor --analyzer NAME checks exactly one analyzer
+  doctor --workspace NAME_OR_ID checks service readiness against that workspace, as FABRIC_WORKSPACE_ID would
   list's matched-artifact counts respect --artifact-dir
   explain ANALYZER never spawns a subprocess — it only shows the resolved command, tool path, rules path, and output path
 }
@@ -191,6 +192,7 @@ Constraints {
 ```bash
 fab-test doctor                       # is each analyzer's tool/credential ready?
 fab-test doctor --local               # readiness for the local Desktop workflow specifically
+fab-test doctor --workspace "Sales Dev"  # readiness for a service run against this workspace
 fab-test list                         # what subcommands exist, and how many artifacts match?
 fab-test explain bpa                  # what command would `fab-test bpa` actually run?
 ```

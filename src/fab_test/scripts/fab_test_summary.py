@@ -99,6 +99,11 @@ def _status_label(status: str) -> str:
     }.get(status, status)
 
 
+# A `local/NAME` target selects the `desktop` scope, a name kept in run.json
+# and `--format json`; the table uses the prefix a person types.
+_SCOPE_LABELS = {"desktop": "local"}
+
+
 def _print_list(
     rows: list[dict[str, Any]],
     output_format: str = "text",
@@ -129,7 +134,7 @@ def _print_list(
             r["glob"] or "(repository)",
             str(r["matched_artifacts"]),
             r["required_tool"] or "(none)",
-            ", ".join(r.get("scopes", ())) or "-",
+            ", ".join(sorted(_SCOPE_LABELS.get(s, s) for s in r.get("scopes", ()))) or "-",
         )
         for r in rows
     ]

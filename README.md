@@ -586,6 +586,7 @@ Status and non-zero counts are coloured in a terminal. Colour is off when output
 
 ```bash
 fab-test doctor --format json          # 1. is each analyzer's tool/credential ready?
+                                       #    (add --workspace NAME for a service run)
 fab-test list --format json            # 2. what subcommands exist, and how many artifacts match?
 fab-test bpa --format json             # 3. run it; stdout is exactly one JSON document
 cat fab-test-results/run.json          # 4. read the manifest instead of globbing result dirs

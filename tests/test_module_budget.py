@@ -109,8 +109,10 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
         ),
     ),
     "src/fab_test/scripts/fab_test_summary.py": (
-        956,
+        958,
         (
+            "2026-10-10: +2 net lines labelling the `desktop` scope `local` in the list table "
+            "(Service-mode polish). "
             "2026-10-03: +2 lines printing the per-analyzer service-readiness line in doctor "
             "(Service Targeting epic). "
             "2026-10-01: +6 lines (_WRAPPER_PRINTS_FINDINGS) so the verbose summary does not repeat "
@@ -149,8 +151,10 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
         ),
     ),
     "src/fab_test/scripts/fab_test_registry.py": (
-        1035,
+        1038,
         (
+            "2026-10-10: +3 net lines mapping an exported .PaginatedReport folder to the rdl "
+            "analyzer for the dry-run label (Service-mode polish). "
             "2026-10-06: +3 lines forwarding --user-name to invoke_playwright. "
             "2026-10-06: +1 line importing the feature-flag gates (Feature Flags epic; the gates "
             "themselves replace existing conditions in place). "
@@ -286,8 +290,10 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
         ),
     ),
     "src/fab_test/scripts/fab_test_execution.py": (
-        913,
+        919,
         (
+            "2026-10-10: +6 lines recording the --workspace flag's name in run.json's target "
+            "when the target is a bare name (Service-mode polish). "
             "2026-10-09: +9 lines timing each artifact's subprocess for run.json's duration_ms "
             "(Run Timing epic, task 1), paired with `aborted` to stay within the argument budget. "
             "2026-10-09: +1 line importing resolve_jobs so a playwright execution YAML's `jobs` "

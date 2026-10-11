@@ -246,9 +246,15 @@ def _suffix_to_analyzers() -> dict[str, tuple[str, ...]]:
     return {suffix: tuple(names) for suffix, names in grouped.items()}
 
 
+# A paginated report is a flat .rdl file locally, but service mode exports
+# it as a NAME.PaginatedReport folder holding that file.
+_EXPORTED_FILE_SUFFIX = {".PaginatedReport": ".rdl"}
+
+
 def applicable_analyzers(artifact: Path) -> tuple[str, ...]:
     """Return the analyzer names whose artifact glob matches this path's suffix."""
-    return _suffix_to_analyzers().get(artifact.suffix, ())
+    suffix = _EXPORTED_FILE_SUFFIX.get(artifact.suffix, artifact.suffix)
+    return _suffix_to_analyzers().get(suffix, ())
 
 
 def discover_pbip_sources(artifact_dir: Path) -> dict[Path, Path]:
@@ -939,7 +945,7 @@ def _cloud_readiness(name: str, args: argparse.Namespace | None) -> dict[str, An
             "remediation": None,
         }
 
-    remediation = f"Set FABRIC_WORKSPACE_ID (or pass --workspace-id) plus {_SERVICE_PRINCIPAL_HINT}"
+    remediation = f"Set FABRIC_WORKSPACE_ID (or pass --workspace) plus {_SERVICE_PRINCIPAL_HINT}"
     if desktop_capable:
         return {
             "ready": False,

@@ -502,7 +502,13 @@ def _manifest_target(args: argparse.Namespace) -> dict[str, Any] | None:
     target = getattr(args, "resolved_target", None)
     if target is None:
         return None
-    return target.as_dict(getattr(args, "workspace_id", "") or "")
+    manifest = target.as_dict(getattr(args, "workspace_id", "") or "")
+    mode = getattr(args, "resolved_mode", None)
+    if manifest["workspace"] is None and mode is not None and mode.mode == "service":
+        # `--workspace NAME --artifact X`: the target is a bare name, and the
+        # workspace came from the flag.
+        manifest["workspace"] = mode.workspace
+    return manifest
 
 
 def _resolve_workspace_target(args: argparse.Namespace) -> int | None:
