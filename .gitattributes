@@ -1,0 +1,3 @@
+# Paginated report fixtures are compared byte for byte (tests/test_rdl_fixture_generator.py)
+# and are the exact bytes the Fabric service accepted, CRLF included: never convert them.
+*.rdl -text

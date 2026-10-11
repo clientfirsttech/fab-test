@@ -33,6 +33,11 @@ def _clean(monkeypatch, tmp_path):
         "FABRIC_CLIENT_ID",
         "FABRIC_CLIENT_SECRET",
         "PLAYWRIGHT_WORKSPACE_ID",
+        # Readiness wording differs in CI (no --interactive hint), so a run
+        # with CI's own variables set must not change what is tested here.
+        "CI",
+        "GITHUB_ACTIONS",
+        "TF_BUILD",
     ):
         monkeypatch.delenv(var, raising=False)
     monkeypatch.setenv("PLAYWRIGHT_ENV_FILE", str(tmp_path / "none.env"))
@@ -239,6 +244,17 @@ def test_the_service_line_has_no_stray_separator_for_an_ambient_credential():
 
     assert ". ;" not in line
     assert line.endswith("; or pass --interactive")
+
+
+def test_the_service_line_offers_no_interactive_sign_in_in_ci(monkeypatch):
+    """Given CI, should not suggest --interactive, which never prompts there."""
+    from fab_test.scripts._service_export import service_readiness
+
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")
+
+    line = service_readiness(_args())
+
+    assert "--interactive" not in line
 
 
 # --------------------------------------------------------------------------- #
