@@ -186,11 +186,15 @@ def apply_fail_on(findings: list[dict[str, Any]], fail_on: str) -> list[dict[str
 
     fab-test decides an artifact's exit code from finding severity, not from
     the wrapper's exit code, so pbir-a11y failing on a warning would
-    otherwise write a `failed` envelope that still exits 0.
+    otherwise write a `failed` envelope that still exits 0. `tool_severity`
+    keeps what pbir-a11y said, so a raised warning stays recognizable.
     """
     if fail_on != "warn":
         return findings
-    return [{**f, "severity": "error"} if f["severity"] == "warning" else f for f in findings]
+    return [
+        {**f, "severity": "error", "tool_severity": "warning"} if f["severity"] == "warning" else f
+        for f in findings
+    ]
 
 
 def _write_a11y_failure(

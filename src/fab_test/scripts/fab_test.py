@@ -47,6 +47,7 @@ from ._report_html import open_report_conflict
 from ._rule_overlay import RuleOverlayError, validate_rule_overlays
 from ._run_manifest import RunManifest
 from ._run_timing import print_timing_line
+from ._scan import ScanError
 from ._service_export import (
     finalize_exports,
     interactive_refusal,
@@ -395,13 +396,15 @@ def main() -> int:
         return _print_help(parser, args.help_topic)
     args.analyzer = _SUBCOMMAND_ALIASES.get(args.analyzer, args.analyzer)
 
-    for step in _PREPARE_STEPS:
-        exit_code = step(args)
-        if exit_code is not None:
-            return exit_code
-
     try:
+        for step in _PREPARE_STEPS:
+            exit_code = step(args)
+            if exit_code is not None:
+                return exit_code
         return _dispatch_run(args)
+    except ScanError as exc:
+        print(f"  ✗ fab-test: {exc}. Check the folder's permissions, or pass --artifact-dir.", file=sys.stderr)
+        return 2
     finally:
         # Exports are test inputs, not results: gone on every exit path.
         finalize_exports(args)

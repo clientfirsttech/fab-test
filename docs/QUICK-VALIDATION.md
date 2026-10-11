@@ -166,7 +166,7 @@ Not every analyzer accepts every form. `fab-test list` has a Scopes column; `bpa
 
 ```bash
 fab-test auth status                      # verified for real, unlike doctor
-fab-test auth status --workspace-id <id>  # also confirm that workspace is reachable
+fab-test auth status --workspace <name-or-id>  # also confirm that workspace is reachable
 fab-test auth login                       # delegates to `pql-test auth login`
 ```
 

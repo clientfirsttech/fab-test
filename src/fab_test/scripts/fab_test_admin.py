@@ -668,19 +668,18 @@ def _check_workspace_reachable(workspace_id: str, args: argparse.Namespace) -> b
 
     Moved here from the §7 probe, which must make no network call. Lists
     items rather than fetching the workspace so a permission that is
-    scoped to reading contents still reports reachable.
+    scoped to reading contents still reports reachable. A name is resolved
+    first, as every analyzer's --workspace takes one.
     """
-    from .playwright_validation.fabric_service_client import (
-        FabricServiceClientError,
-        build_fabric_service_client,
-    )
+    from .playwright_validation.fabric_service_client import FabricServiceClientError, build_fabric_service_client
+    from .playwright_validation.resolver import ServiceResolutionError, resolve_workspace_id
 
     try:
         client = build_fabric_service_client(
             env_file=getattr(args, "playwright_env_file", None)
         )
-        client.list_items(workspace_id, "SemanticModel")
-    except (FabricServiceClientError, OSError):
+        client.list_items(resolve_workspace_id(client, workspace_id), "SemanticModel")
+    except (FabricServiceClientError, ServiceResolutionError, OSError):
         return False
     return True
 

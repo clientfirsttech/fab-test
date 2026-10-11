@@ -745,10 +745,11 @@ def _add_auth_subparser(subs: argparse._SubParsersAction) -> None:
         help="Show which identity fab-test would use, verifying it for real",
     )
     auth_status_p.add_argument(
+        "--workspace",
         "--workspace-id",
         default="",
         dest="workspace_id",
-        metavar="ID",
+        metavar="NAME_OR_ID",
         help="Check whether this workspace is reachable [env: FABRIC_WORKSPACE_ID]",
     )
     auth_status_p.add_argument(

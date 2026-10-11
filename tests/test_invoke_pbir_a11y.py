@@ -332,6 +332,7 @@ class TestRunA11y:
         data = json.loads(output.read_text(encoding="utf-8"))
 
         assert [f["severity"] for f in data["findings"]] == [expected_severity]
+        assert [f.get("tool_severity") for f in data["findings"]] == ["warning" if fail_on else None]
         assert _artifact_exit_code(exit_code, data) == expected_exit
 
     @mock.patch("fab_test.scripts.invoke_pbir_a11y.shutil.which", return_value="node")

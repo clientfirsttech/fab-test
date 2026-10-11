@@ -391,3 +391,27 @@ def test_cloud_is_spelled_cloud_not_environment():
 
     assert result.returncode == 0, result.stderr
     assert "--cloud" in result.stdout
+
+
+@pytest.mark.fab_test
+def test_status_takes_a_workspace_name_like_the_analyzers(monkeypatch):
+    """Given `auth status --workspace NAME`, should resolve the name and check
+    that workspace, not report a name as unreachable because it isn't a GUID."""
+    from fab_test.scripts.fab_test_parser import build_parser
+    from fab_test.scripts.playwright_validation import fabric_service_client
+
+    listed = []
+
+    class _Client:
+        def list_workspaces(self):
+            return [{"displayName": "Sales Dev", "id": _GUID}]
+
+        def list_items(self, workspace_id, item_type):
+            listed.append(workspace_id)
+            return []
+
+    monkeypatch.setattr(fabric_service_client, "build_fabric_service_client", lambda **kw: _Client())
+    args = build_parser().parse_args(["auth", "status", "--workspace", "Sales Dev"])
+
+    assert fab_test_admin._check_workspace_reachable(args.workspace_id, args) is True
+    assert listed == [_GUID]
