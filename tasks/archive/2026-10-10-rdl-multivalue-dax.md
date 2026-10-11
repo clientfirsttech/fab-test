@@ -1,6 +1,6 @@
 # RDL Multi-Value DAX Parameter Epic
 
-**Status**: ✅ DONE (2026-10-10)
+**Status**: ✅ COMPLETED (2026-10-10)
 **Goal**: `fab-test rdl` flags a multi-value report parameter passed into a semantic-model (DAX) query without `RSCustomDaxFilter`, the query shape that breaks when a user selects more than one value.
 
 ## Overview
@@ -54,7 +54,7 @@ New catalog rule PRM-07, "Multi-value parameters reach DAX through RSCustomDaxFi
 
 ## Quality gates
 
-Always last; nothing follows it.
+**Status**: ✅ DONE (2026-10-10), run with the Service-mode polish and parallel-suite changes: `ruff check .`, the complexity and module-budget ratchets, the coverage floor on the full suite, and the CI-env run.
 
 **Requirements**:
 - Given the finished epic, should pass `ruff check .` over the whole repo, the complexity and module-budget ratchets, and the coverage floor on the full suite, run as CI runs them (vision.md, Definition of Done)
