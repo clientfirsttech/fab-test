@@ -66,7 +66,6 @@ from .fab_test_admin import (
     _config_show,
     _doctor,
     _explain_analyzer,
-    _init,
     _list_analyzers,
     _print_help,
 )
@@ -81,6 +80,7 @@ from .fab_test_execution import (  # noqa: F401
     _resolve_workspace_target,
     _run_analyzer,
 )
+from .fab_test_init import _init
 from .fab_test_local import _LOCAL_ANALYZERS, _run_local  # noqa: F401
 from .fab_test_parser import (
     _SUBCOMMAND_ALIASES,

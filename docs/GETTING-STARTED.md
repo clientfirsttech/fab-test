@@ -74,13 +74,14 @@ fab-test --version
 fab-test init
 ```
 
-This writes three files and never overwrites one that already exists:
+This writes three files, never overwriting one that already exists, and adds fab-test's own folders to your `.gitignore`:
 
 | File | Purpose | Commit it? |
 |------|---------|------------|
 | `fab-test.yml` | Commented settings: workspace, environment, and analyzer options | Your choice. Keep it out of Git if it holds personal values like `playwright_user_name` |
 | `.fab-test/.gitignore` | Keeps `.fab-test/.env` out of Git | Yes |
 | `.fab-test/.env.example` | Template for the credentials file | Yes |
+| `.gitignore` (root) | Ignores `.fab-test-tools/` (downloaded tools) and `fab-test-results/` (run output). Created if missing; an existing one only gets the missing lines appended | Yes |
 
 Add `--dry-run` to see what it would write without writing anything.
 

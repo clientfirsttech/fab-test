@@ -61,7 +61,7 @@ holds per-contributor values, such as the UPN `fab-test playwright` uses for
 RLS embed tokens, that must never be committed.
 
 ```bash
-fab-test init            # scaffolds a commented fab-test.yml (and .fab-test/.env.example)
+fab-test init            # scaffolds a commented fab-test.yml (and .fab-test/.env.example), and gitignores .fab-test-tools/ and fab-test-results/
 ```
 
 Uncomment only what you need. For the Playwright RLS tests, set
@@ -603,7 +603,7 @@ See [`docs/QUICK-VALIDATION.md`](https://github.com/clientfirsttech/fab-test/blo
 `fab-test.yml` at the repository root is an entirely optional config-file front door; no file at all means every setting behaves exactly as it always has.
 
 ```bash
-fab-test init                # scaffold a commented fab-test.yml and .env.example
+fab-test init                # scaffold a commented fab-test.yml and .env.example; append fab-test's folders to .gitignore
 fab-test config --show       # every effective setting, its value, and where it came from
 fab-test config --validate   # confirm the config file's keys and types are valid
 ```

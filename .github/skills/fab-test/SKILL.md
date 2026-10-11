@@ -395,7 +395,7 @@ The case a pipeline meets most is a `detail` populated on an aborted run: `fab-t
  fab-test explain ANALYZER — Show the resolved command for one analyzer without running it
  fab-test config --show    — Print every effective setting with its value and origin
  fab-test config --validate — Confirm fab-test.yml's keys and types are valid
- fab-test init             — Scaffold fab-test.yml, .fab-test/.gitignore, and .fab-test/.env.example
+ fab-test init             — Scaffold fab-test.yml, .fab-test/.gitignore, and .fab-test/.env.example; append .fab-test-tools/ and fab-test-results/ to the root .gitignore
  fab-test auth status      — Show which identity fab-test would use, verified for real
  fab-test auth login       — Delegate sign-in to the tool that owns the credential
  fab-test clean-tools      — Remove or inspect the .fab-test-tools downloaded-binary cache

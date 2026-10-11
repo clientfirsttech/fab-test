@@ -10,6 +10,8 @@ fab-test config --show             # every effective setting, its value, and whe
 fab-test config --validate         # confirm the config file's keys and types are valid
 ```
 
+`init` also keeps `.fab-test-tools/` (downloaded tools) and `fab-test-results/` (run output) out of Git: it creates the root `.gitignore` if there is none, and otherwise only appends the lines it lacks, in the file's own line endings. A line it already has in another spelling (`/fab-test-results`, `.fab-test-tools/**`) counts. `--format json` reports this as `gitignore: {path, added, would_add}`.
+
 ## Precedence
 
 | Priority | Source | Example |

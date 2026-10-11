@@ -279,7 +279,7 @@ def _uncommented_rdl_block(template: str) -> dict:
 
 class TestInitTemplate:
     def test_lists_every_declared_setting_at_its_packaged_default(self):
-        from fab_test.scripts.fab_test_admin import _FAB_TEST_YML_TEMPLATE
+        from fab_test.scripts.fab_test_init import _FAB_TEST_YML_TEMPLATE
 
         settings = _uncommented_rdl_block(_FAB_TEST_YML_TEMPLATE)["rules"]["rdl"]["settings"]
 
@@ -288,7 +288,7 @@ class TestInitTemplate:
         }
 
     def test_names_each_setting_range_beside_it(self):
-        from fab_test.scripts.fab_test_admin import _FAB_TEST_YML_TEMPLATE
+        from fab_test.scripts.fab_test_init import _FAB_TEST_YML_TEMPLATE
 
         line = next(row for row in _FAB_TEST_YML_TEMPLATE.splitlines() if "QRY-07: {max_lines:" in row)
 
@@ -297,7 +297,7 @@ class TestInitTemplate:
     def test_the_uncommented_block_is_a_valid_config_that_changes_no_threshold(self):
         from fab_test.scripts._config import validate_config
         from fab_test.scripts._rule_overlay import apply_rdl_overlay, validate_rule_overlays
-        from fab_test.scripts.fab_test_admin import _FAB_TEST_YML_TEMPLATE
+        from fab_test.scripts.fab_test_init import _FAB_TEST_YML_TEMPLATE
         from fab_test.scripts.fab_test_registry import PACKAGED_RULE_FILES
 
         config = _uncommented_rdl_block(_FAB_TEST_YML_TEMPLATE)
@@ -310,7 +310,7 @@ class TestInitTemplate:
         ]
 
     def test_shows_a_disable_reason_and_no_extend(self):
-        from fab_test.scripts.fab_test_admin import _FAB_TEST_YML_TEMPLATE
+        from fab_test.scripts.fab_test_init import _FAB_TEST_YML_TEMPLATE
 
         rdl = _uncommented_rdl_block(_FAB_TEST_YML_TEMPLATE)["rules"]["rdl"]
 
