@@ -16,7 +16,7 @@ import argparse
 import pytest
 
 from fab_test.scripts import _credentials
-from fab_test.scripts import fab_test_registry as registry
+from fab_test.scripts import _readiness as readiness
 from fab_test.scripts.fab_test_summary import _print_doctor
 
 _WS = "798dfd00-0081-45d3-a7a7-f74f62e57277"
@@ -41,7 +41,7 @@ def _clean(monkeypatch, tmp_path):
     ):
         monkeypatch.delenv(var, raising=False)
     monkeypatch.setenv("PLAYWRIGHT_ENV_FILE", str(tmp_path / "none.env"))
-    monkeypatch.setattr(registry, "desktop_ports", list)
+    monkeypatch.setattr(readiness, "desktop_ports", list)
     monkeypatch.setattr(_credentials, "ambient_credential_available", lambda: True)
     from fab_test.scripts import _pql_identity
 
@@ -71,7 +71,7 @@ def test_a_service_principal_without_a_workspace_is_a_warning_about_the_workspac
 ):
     _service_principal(monkeypatch)
 
-    result = registry.check_readiness(analyzer, _args())
+    result = readiness.check_readiness(analyzer, _args())
 
     assert result["status"] == "warning"
     assert result["ready"] is False
@@ -84,7 +84,7 @@ def test_a_service_principal_without_a_workspace_is_a_warning_about_the_workspac
 
 @pytest.mark.parametrize("analyzer", ["pql_test", "dependencies"])
 def test_an_ambient_credential_without_a_workspace_is_info_naming_az_login(analyzer):
-    result = registry.check_readiness(analyzer, _args())
+    result = readiness.check_readiness(analyzer, _args())
 
     assert result["status"] == "info"
     assert result["ready"] is None
@@ -95,7 +95,7 @@ def test_an_ambient_credential_without_a_workspace_is_info_naming_az_login(analy
 
 
 def test_playwright_without_a_workspace_or_service_principal_is_info_without_az_login():
-    result = registry.check_readiness("playwright", _args())
+    result = readiness.check_readiness("playwright", _args())
 
     assert result["status"] == "info"
     assert "run `az login`" not in result["remediation"].lower()
@@ -106,7 +106,7 @@ def test_playwright_without_a_workspace_or_service_principal_is_info_without_az_
 def test_no_credential_machinery_at_all_is_still_info(monkeypatch):
     monkeypatch.setattr(_credentials, "ambient_credential_available", lambda: False)
 
-    result = registry.check_readiness("pql_test", _args())
+    result = readiness.check_readiness("pql_test", _args())
 
     assert result["status"] == "info"
 
@@ -114,7 +114,7 @@ def test_no_credential_machinery_at_all_is_still_info(monkeypatch):
 def test_a_partial_service_principal_without_a_workspace_is_an_error(monkeypatch):
     monkeypatch.setenv("FABRIC_TENANT_ID", "tenant-1")
 
-    result = registry.check_readiness("pql_test", _args())
+    result = readiness.check_readiness("pql_test", _args())
 
     assert result["status"] == "error"
     assert result["ready"] is False
@@ -123,20 +123,20 @@ def test_a_partial_service_principal_without_a_workspace_is_an_error(monkeypatch
 
 
 def test_pql_test_remediation_offers_desktop():
-    assert "Power BI Desktop" in registry.check_readiness("pql_test", _args())["remediation"]
+    assert "Power BI Desktop" in readiness.check_readiness("pql_test", _args())["remediation"]
 
 
 @pytest.mark.parametrize("analyzer", ["playwright", "dependencies"])
 def test_the_playwright_family_remediation_names_its_env_file_key(analyzer, monkeypatch):
     _service_principal(monkeypatch)
 
-    assert "PLAYWRIGHT_WORKSPACE_ID" in registry.check_readiness(analyzer, _args())["remediation"]
+    assert "PLAYWRIGHT_WORKSPACE_ID" in readiness.check_readiness(analyzer, _args())["remediation"]
 
 
 def test_pql_test_with_a_running_desktop_stays_ready(monkeypatch):
-    monkeypatch.setattr(registry, "desktop_ports", lambda: [51001])
+    monkeypatch.setattr(readiness, "desktop_ports", lambda: [51001])
 
-    result = registry.check_readiness("pql_test", _args())
+    result = readiness.check_readiness("pql_test", _args())
 
     assert result["status"] == "ready"
 
@@ -149,26 +149,26 @@ def test_pql_test_with_a_running_desktop_stays_ready(monkeypatch):
 def test_a_workspace_and_service_principal_is_ready(monkeypatch):
     _service_principal(monkeypatch)
 
-    assert registry.check_readiness("playwright", _args(workspace_id=_WS))["status"] == "ready"
+    assert readiness.check_readiness("playwright", _args(workspace_id=_WS))["status"] == "ready"
 
 
 def test_a_workspace_with_only_az_login_is_ready_for_pql_test():
-    assert registry.check_readiness("pql_test", _args(workspace_id=_WS))["status"] == "ready"
+    assert readiness.check_readiness("pql_test", _args(workspace_id=_WS))["status"] == "ready"
 
 
 def test_a_workspace_with_only_az_login_is_an_error_for_playwright():
-    assert registry.check_readiness("playwright", _args(workspace_id=_WS))["status"] == "error"
+    assert readiness.check_readiness("playwright", _args(workspace_id=_WS))["status"] == "error"
 
 
 def test_a_workspace_with_a_partial_service_principal_is_an_error(monkeypatch):
     monkeypatch.setenv("FABRIC_TENANT_ID", "tenant-1")
 
-    assert registry.check_readiness("pql_test", _args(workspace_id=_WS))["status"] == "error"
+    assert readiness.check_readiness("pql_test", _args(workspace_id=_WS))["status"] == "error"
 
 
 @pytest.mark.parametrize("analyzer", ["pql_lint", "rdl", "pql_test", "playwright"])
 def test_every_readiness_row_carries_a_status(analyzer):
-    assert registry.check_readiness(analyzer, _args())["status"] in _STATUSES
+    assert readiness.check_readiness(analyzer, _args())["status"] in _STATUSES
 
 
 # --------------------------------------------------------------------------- #
@@ -285,7 +285,7 @@ def _identity(monkeypatch, result):
 def test_pql_test_signed_in_as_another_account_is_an_error(monkeypatch):
     _identity(monkeypatch, ("john@kerski.net", "fab-test is signed in as john@kerski.net but pql-test as x@y.z."))
 
-    result = registry.check_readiness("pql_test", _args(workspace_id=_WS))
+    result = readiness.check_readiness("pql_test", _args(workspace_id=_WS))
 
     assert result["status"] == "error"
     assert "x@y.z" in result["remediation"]
@@ -294,7 +294,7 @@ def test_pql_test_signed_in_as_another_account_is_an_error(monkeypatch):
 def test_pql_test_signed_in_as_the_same_account_is_ready_and_says_so(monkeypatch):
     _identity(monkeypatch, ("john@kerski.net", None))
 
-    result = registry.check_readiness("pql_test", _args(workspace_id=_WS))
+    result = readiness.check_readiness("pql_test", _args(workspace_id=_WS))
 
     assert result["status"] == "ready"
     assert "john@kerski.net" in result["reason"]
@@ -304,7 +304,7 @@ def test_pql_test_signed_in_as_the_same_account_is_ready_and_says_so(monkeypatch
 def test_pql_test_identity_that_cannot_be_compared_stays_unverified(monkeypatch):
     _identity(monkeypatch, None)
 
-    result = registry.check_readiness("pql_test", _args(workspace_id=_WS))
+    result = readiness.check_readiness("pql_test", _args(workspace_id=_WS))
 
     assert result["status"] == "ready"
     assert "unverified" in result["reason"]
@@ -314,10 +314,10 @@ def test_a_service_principal_never_runs_the_identity_check(monkeypatch):
     _service_principal(monkeypatch)
     _identity(monkeypatch, ("a@b.c", "must not be used"))
 
-    assert registry.check_readiness("pql_test", _args(workspace_id=_WS))["status"] == "ready"
+    assert readiness.check_readiness("pql_test", _args(workspace_id=_WS))["status"] == "ready"
 
 
 def test_dependencies_never_runs_the_identity_check(monkeypatch):
     _identity(monkeypatch, ("a@b.c", "must not be used"))
 
-    assert registry.check_readiness("dependencies", _args(workspace_id=_WS))["status"] == "ready"
+    assert readiness.check_readiness("dependencies", _args(workspace_id=_WS))["status"] == "ready"

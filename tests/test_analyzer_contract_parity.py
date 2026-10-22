@@ -24,12 +24,12 @@ from pathlib import Path
 
 import pytest
 
+from fab_test.scripts._command_builders import _COMMAND_BUILDERS
 from fab_test.scripts.fab_test_admin import _TOOL_DISPLAY_NAMES
 from fab_test.scripts.fab_test_local import _LOCAL_ANALYZERS
 from fab_test.scripts.fab_test_parser import build_parser
 from fab_test.scripts.fab_test_registry import (
     _BOOTSTRAP_REGISTRY_NAME,
-    _COMMAND_BUILDERS,
     ANALYZER_REGISTRY,
     ANALYZER_SCOPES,
     HIDDEN_ANALYZERS,

@@ -22,6 +22,7 @@ from pathlib import Path
 import pytest
 
 from fab_test.scripts import _analyzer_tool_bootstrap as bootstrap
+from fab_test.scripts import _readiness as readiness
 from fab_test.scripts import fab_test_registry as registry
 from fab_test.scripts._analyzer_tool_bootstrap import (
     UnsupportedPlatformError,
@@ -285,9 +286,9 @@ def test_data_agent_readiness_probes_promptfoo(monkeypatch):
         calls.append(analyzer_name)
         return {"ready": True, "resolved_path": "x", "reason": "r", "remediation": None, "version": "1"}
 
-    monkeypatch.setattr(registry, "probe_executable", _fake_probe)
+    monkeypatch.setattr(readiness, "probe_executable", _fake_probe)
 
-    registry.check_readiness(_ANALYZER, None)
+    readiness.check_readiness(_ANALYZER, None)
 
     assert calls == [_ANALYZER]
 
@@ -295,13 +296,13 @@ def test_data_agent_readiness_probes_promptfoo(monkeypatch):
 @pytest.mark.fab_test
 def test_data_agent_preflight_exits_127_naming_node_when_npm_is_missing(tmp_path, monkeypatch):
     monkeypatch.setenv("FAB_TEST_ENABLE_DATA_AGENT", "1")
-    monkeypatch.setattr(registry, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(readiness, "REPO_ROOT", tmp_path)
     monkeypatch.delenv("PROMPTFOO_PATH", raising=False)
     monkeypatch.delenv("PROMPTFOO_INSTALL_URL", raising=False)
     monkeypatch.setattr(bootstrap, "_current_platform_key", lambda: "linux-x64")
     monkeypatch.setattr(bootstrap.shutil, "which", lambda _name: None)
 
-    message, code = registry.preflight_error(_ANALYZER, argparse.Namespace())
+    message, code = readiness.preflight_error(_ANALYZER, argparse.Namespace())
 
     assert code == 127
     assert "Node.js" in message

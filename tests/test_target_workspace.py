@@ -189,7 +189,9 @@ def test_workspace_flag_name_is_translated_to_an_id(monkeypatch):
     """`--workspace NAME` lands in args.workspace_id; it must become a GUID."""
     import argparse
 
-    from fab_test.scripts.fab_test_execution import _resolve_workspace_target
+    from fab_test.scripts._run_targets import (
+    _resolve_workspace_target,
+)
 
     client = _FakeClient([{"id": _GUID, "displayName": "visual-error-testing"}])
     _patch_fabric_client(monkeypatch, client)
@@ -203,7 +205,9 @@ def test_workspace_flag_name_is_translated_to_an_id(monkeypatch):
 def test_workspace_flag_guid_needs_no_client(monkeypatch):
     import argparse
 
-    from fab_test.scripts.fab_test_execution import _resolve_workspace_target
+    from fab_test.scripts._run_targets import (
+    _resolve_workspace_target,
+)
 
     def _boom(**_kwargs):
         raise AssertionError("a GUID must not build a client")
@@ -222,7 +226,9 @@ def test_workspace_flag_guid_needs_no_client(monkeypatch):
 def test_workspace_flag_unknown_name_exits_with_visible_workspaces(monkeypatch, capsys):
     import argparse
 
-    from fab_test.scripts.fab_test_execution import _resolve_workspace_target
+    from fab_test.scripts._run_targets import (
+    _resolve_workspace_target,
+)
 
     _patch_fabric_client(monkeypatch, _FakeClient([{"id": _GUID, "displayName": "Finance"}]))
     args = argparse.Namespace(workspace_id="nope", interactive=False)

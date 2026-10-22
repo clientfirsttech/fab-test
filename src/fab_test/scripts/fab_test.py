@@ -46,6 +46,10 @@ from ._mode import ModeError, resolve_mode
 from ._report_html import open_report_conflict
 from ._rule_overlay import RuleOverlayError, validate_rule_overlays
 from ._run_manifest import RunManifest
+from ._run_targets import (
+    _manifest_target,
+    _resolve_workspace_target,
+)
 from ._run_timing import print_timing_line
 from ._scan import ScanError
 from ._service_export import (
@@ -75,9 +79,7 @@ from .fab_test_admin import (
 from .fab_test_execution import (  # noqa: F401
     _apply_environment_default,
     _artifact_exit_code,
-    _manifest_target,
     _resolve_timeout,
-    _resolve_workspace_target,
     _run_analyzer,
 )
 from .fab_test_init import _init

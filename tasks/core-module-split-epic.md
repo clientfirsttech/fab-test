@@ -1,6 +1,6 @@
 # Core Module Split Epic
 
-**Status**: 📋 PLANNED
+**Status**: 🔄 IN PROGRESS (3/5 tasks)
 **Goal**: `fab_test_registry.py`, `fab_test_execution.py` and `fab_test_summary.py` each fall under the 800-line hard budget, and their `test_module_budget.py` exemptions are deleted.
 
 ## Overview
@@ -9,7 +9,7 @@ Every change to discovery, commands, readiness, or summaries lands in one of thr
 
 ---
 
-## Split command builders out of the registry
+## Split command builders out of the registry ✅
 
 `build_*_command`, the rules-path resolvers, `_COMMAND_BUILDERS` and `build_command` move to `_command_builders.py`.
 
@@ -19,7 +19,7 @@ Every change to discovery, commands, readiness, or summaries lands in one of thr
 
 ---
 
-## Split readiness out of the registry
+## Split readiness out of the registry ✅
 
 `resolve_tool`, `preflight_error`, `check_readiness` and `_cloud_readiness` move to `_readiness.py`.
 
@@ -28,7 +28,7 @@ Every change to discovery, commands, readiness, or summaries lands in one of thr
 
 ---
 
-## Split target resolution out of execution
+## Split target resolution out of execution ✅
 
 Workspace and target resolution (`_manifest_target` through `_discover_for`) moves to `_run_targets.py`.
 

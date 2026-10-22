@@ -37,7 +37,7 @@ NOT_LOCKED = {"42303637da18cab42c69", "ae854917b1805e46dc69", "df89a190bca70b12b
 
 @pytest.fixture(scope="module")
 def inspector() -> None:
-    from fab_test.scripts.fab_test_registry import resolve_tool
+    from fab_test.scripts._readiness import resolve_tool
 
     try:
         resolve_tool("pbir", argparse.Namespace())

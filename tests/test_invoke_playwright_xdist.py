@@ -151,7 +151,7 @@ class TestBuildPlaywrightCommandForwardsWorkers:
     def test_explicit_workers_is_forwarded(self, tmp_path: Path) -> None:
         import argparse
 
-        from fab_test.scripts.fab_test_registry import build_playwright_command
+        from fab_test.scripts._command_builders import build_playwright_command
 
         artifact = tmp_path / "Sales.Report"
         artifact.mkdir()
@@ -170,7 +170,7 @@ class TestBuildPlaywrightCommandForwardsWorkers:
         PLAYWRIGHT_XDIST_WORKERS/the packaged default on its own."""
         import argparse
 
-        from fab_test.scripts.fab_test_registry import build_playwright_command
+        from fab_test.scripts._command_builders import build_playwright_command
 
         artifact = tmp_path / "Sales.Report"
         artifact.mkdir()

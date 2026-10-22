@@ -18,9 +18,14 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from fab_test.scripts._command_builders import build_playwright_command
 from fab_test.scripts._playwright_dataset_target import dataset_target_requested
-from fab_test.scripts.fab_test_execution import _discover_for, _run_analyzer
-from fab_test.scripts.fab_test_registry import build_playwright_command
+from fab_test.scripts._run_targets import (
+    _discover_for,
+)
+from fab_test.scripts.fab_test_execution import (
+    _run_analyzer,
+)
 
 DATASET_ID = "5bf5a7e1-65e5-4d74-944b-1ada5941a664"
 DATASET_WS = "c4698d28-b05c-40bc-926c-707563ac85e7"

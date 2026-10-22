@@ -132,8 +132,8 @@ def test_facade_and_wrapper_accept_the_same_selector(tmp_path):
 
 
 def test_command_builder_forwards_config(tmp_path):
+    from fab_test.scripts._command_builders import build_playwright_command
     from fab_test.scripts.fab_test_parser import build_parser
-    from fab_test.scripts.fab_test_registry import build_playwright_command
 
     path = str(tmp_path / "azure.yml")
     args = build_parser().parse_args(["playwright", "--playwright-config", path])

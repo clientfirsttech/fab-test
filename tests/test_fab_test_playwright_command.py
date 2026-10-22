@@ -11,7 +11,7 @@ import argparse
 import json
 from pathlib import Path
 
-from fab_test.scripts.fab_test_registry import build_playwright_command
+from fab_test.scripts._command_builders import build_playwright_command
 
 
 def _args(**overrides) -> argparse.Namespace:

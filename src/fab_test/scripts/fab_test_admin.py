@@ -14,6 +14,9 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from ._command_builders import (
+    build_command as _build_command,
+)
 from ._config import resolve_setting, verbosity_level
 from ._credentials import SIGN_IN_REMEDIATION, probe_credentials
 from ._desktop import bridge_cli_path, detect_desktop_instances
@@ -34,12 +37,18 @@ from ._metadata import (
 )
 from ._mode import ModeError, ResolvedMode, resolve_mode
 from ._pql_identity import token_account, token_tenant
+from ._readiness import (
+    check_readiness as _check_readiness,
+)
 from ._rule_overlay import overlay_rows
+from ._run_targets import (
+    _manifest_target,
+    _target_of,
+)
 from ._scan import find_skipped_checkouts as _find_skipped_checkouts
 from ._service_export import service_item_type, service_readiness
 from ._target import TargetError, select_target
 from ._telemetry import eventhouse_rows, lakehouse_rows
-from .fab_test_execution import _manifest_target, _target_of
 from .fab_test_local import _LOCAL_ANALYZERS, _local_readiness
 from .fab_test_parser import _aliases_for, _canonical_name
 from .fab_test_registry import (
@@ -52,12 +61,6 @@ from .fab_test_registry import (
 )
 from .fab_test_registry import (
     ANALYZER_SCOPES as _ANALYZER_SCOPES,
-)
-from .fab_test_registry import (
-    build_command as _build_command,
-)
-from .fab_test_registry import (
-    check_readiness as _check_readiness,
 )
 from .fab_test_registry import (
     discover_artifacts as _discover,

@@ -17,14 +17,19 @@ from fab_test import __version__ as _FAB_TEST_VERSION
 
 from ._cli_utils import narrate
 from ._pbip_discovery import discover_pbip_projects as _discover_pbip_projects
+from ._readiness import (
+    check_readiness as _check_readiness,
+)
 from ._run_manifest import RunManifest
+from ._run_targets import (
+    _manifest_target,
+)
 from ._run_timing import print_timing_line, timing_summary
-from .fab_test_execution import _manifest_target, _run_analyzer
-from .fab_test_registry import (
-    ANALYZER_REGISTRY as _ANALYZER_REGISTRY,
+from .fab_test_execution import (
+    _run_analyzer,
 )
 from .fab_test_registry import (
-    check_readiness as _check_readiness,
+    ANALYZER_REGISTRY as _ANALYZER_REGISTRY,
 )
 from .fab_test_registry import (
     discover_artifacts as _discover_artifacts,

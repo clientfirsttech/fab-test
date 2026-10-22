@@ -125,7 +125,9 @@ def test_manifest_target_names_the_workspace_a_flag_selected(mode, expected):
     its own, so the manifest should take the service mode's workspace."""
     from argparse import Namespace
 
-    from fab_test.scripts.fab_test_execution import _manifest_target
+    from fab_test.scripts._run_targets import (
+    _manifest_target,
+)
 
     args = Namespace(resolved_target=parse_target("Sales"), workspace_id=_GUID, resolved_mode=mode)
 
