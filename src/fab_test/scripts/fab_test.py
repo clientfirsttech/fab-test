@@ -44,8 +44,14 @@ from ._fab_test_context import (
 )
 from ._mode import ModeError, resolve_mode
 from ._report_html import open_report_conflict
+from ._rule_overlay import RuleOverlayError, validate_rule_overlays
 from ._run_manifest import RunManifest
+from ._run_targets import (
+    _manifest_target,
+    _resolve_workspace_target,
+)
 from ._run_timing import print_timing_line
+from ._scan import ScanError
 from ._service_export import (
     finalize_exports,
     interactive_refusal,
@@ -64,7 +70,6 @@ from .fab_test_admin import (
     _config_show,
     _doctor,
     _explain_analyzer,
-    _init,
     _list_analyzers,
     _print_help,
 )
@@ -74,16 +79,16 @@ from .fab_test_admin import (
 from .fab_test_execution import (  # noqa: F401
     _apply_environment_default,
     _artifact_exit_code,
-    _manifest_target,
     _resolve_timeout,
-    _resolve_workspace_target,
     _run_analyzer,
 )
+from .fab_test_init import _init
 from .fab_test_local import _LOCAL_ANALYZERS, _run_local  # noqa: F401
 from .fab_test_parser import (
     _SUBCOMMAND_ALIASES,
     build_parser,
 )
+from .fab_test_registry import PACKAGED_RULE_FILES
 from .fab_test_registry import (
     load_fab_test_all_analyzers as _load_fab_test_all_analyzers,  # noqa: F401
 )
@@ -169,7 +174,8 @@ def _prepare_config(args: argparse.Namespace) -> int | None:
             REPO_ROOT, REPO_ROOT / "pyproject.toml", args.config
         )
         validate_config(args.file_config)
-    except ConfigError as exc:
+        validate_rule_overlays(args.file_config.get("rules", {}), PACKAGED_RULE_FILES)
+    except (ConfigError, RuleOverlayError) as exc:
         print(f"  ✗ fab-test: {exc}", file=sys.stderr)
         return 2
     for warning in warnings:
@@ -392,13 +398,15 @@ def main() -> int:
         return _print_help(parser, args.help_topic)
     args.analyzer = _SUBCOMMAND_ALIASES.get(args.analyzer, args.analyzer)
 
-    for step in _PREPARE_STEPS:
-        exit_code = step(args)
-        if exit_code is not None:
-            return exit_code
-
     try:
+        for step in _PREPARE_STEPS:
+            exit_code = step(args)
+            if exit_code is not None:
+                return exit_code
         return _dispatch_run(args)
+    except ScanError as exc:
+        print(f"  ✗ fab-test: {exc}. Check the folder's permissions, or pass --artifact-dir.", file=sys.stderr)
+        return 2
     finally:
         # Exports are test inputs, not results: gone on every exit path.
         finalize_exports(args)

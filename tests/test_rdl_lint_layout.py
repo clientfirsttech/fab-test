@@ -182,7 +182,8 @@ class TestLay05LargeReportsPageBreaks:
     def test_flags_a_tablix_group_with_no_page_break(self, tmp_path):
         xml = report(
             '<Body><ReportItems><Tablix Name="T1"><TablixRowHierarchy><TablixMembers>'
-            '<TablixMember><Group Name="G1" /></TablixMember>'
+            '<TablixMember><Group Name="G1"><GroupExpressions><GroupExpression>=Fields!Region.Value'
+            "</GroupExpression></GroupExpressions></Group></TablixMember>"
             "</TablixMembers></TablixRowHierarchy></Tablix></ReportItems></Body>"
         )
         root, namespace = parse(tmp_path, xml)
@@ -206,6 +207,17 @@ class TestLay05LargeReportsPageBreaks:
 
         assert _check_lay05_large_reports_page_breaks(root, namespace, {}) == []
 
+
+    def test_a_details_group_alone_is_not_flagged(self, tmp_path):
+        """Every Report Builder table has a Details group (no GroupExpressions); breaking it splits each row."""
+        xml = report(
+            '<Body><ReportItems><Tablix Name="T1"><TablixRowHierarchy><TablixMembers>'
+            '<TablixMember><Group Name="Details" /></TablixMember>'
+            "</TablixMembers></TablixRowHierarchy></Tablix></ReportItems></Body>"
+        )
+        root, namespace = parse(tmp_path, xml)
+
+        assert _check_lay05_large_reports_page_breaks(root, namespace, {}) == []
 
 class TestLay06AvoidEmbeddedImages:
     def test_flags_an_embedded_images_declaration(self, tmp_path):

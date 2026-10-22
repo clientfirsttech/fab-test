@@ -169,7 +169,7 @@ def test_prepare_step_applies_the_file_value_before_dispatch():
 def test_init_scaffold_documents_the_key_and_every_level():
     """Given `fab-test init`, should show the key and the levels it accepts, commented out."""
     from fab_test.scripts._config import VERBOSITY_LEVELS
-    from fab_test.scripts.fab_test_admin import _FAB_TEST_YML_TEMPLATE
+    from fab_test.scripts.fab_test_init import _FAB_TEST_YML_TEMPLATE
 
     line = next(row for row in _FAB_TEST_YML_TEMPLATE.splitlines() if "verbosity:" in row)
     assert line.startswith("# verbosity:")

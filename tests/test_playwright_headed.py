@@ -32,8 +32,8 @@ def test_facade_and_wrapper_accept_the_same_flags():
 
 
 def test_flags_are_off_by_default_and_not_forwarded(tmp_path):
+    from fab_test.scripts._command_builders import build_playwright_command
     from fab_test.scripts.fab_test_parser import build_parser
-    from fab_test.scripts.fab_test_registry import build_playwright_command
 
     args = build_parser().parse_args(["playwright"])
     assert args.headed is False and args.slow_mo is None
@@ -42,8 +42,8 @@ def test_flags_are_off_by_default_and_not_forwarded(tmp_path):
 
 
 def test_builder_forwards_the_flags(tmp_path):
+    from fab_test.scripts._command_builders import build_playwright_command
     from fab_test.scripts.fab_test_parser import build_parser
-    from fab_test.scripts.fab_test_registry import build_playwright_command
 
     args = build_parser().parse_args(["playwright", "--headed", "--slow-mo", "250"])
     command = build_playwright_command(tmp_path / "Sales.Report", args, tmp_path / "results")

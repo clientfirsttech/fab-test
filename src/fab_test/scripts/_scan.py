@@ -60,6 +60,26 @@ EXCLUDED_DIR_NAMES: frozenset[str] = frozenset(
 )
 
 
+class ScanError(OSError):
+    """The scan's root could not be listed."""
+
+
+def _walk(root: Path):
+    """``os.walk`` that raises when ``root`` itself cannot be listed.
+
+    `os.walk` skips an unreadable directory silently. Below the root that is
+    right -- one locked folder should not stop discovery -- but at the root
+    it turned a failed listing into "no artifacts found" for a tree that has
+    them.
+    """
+
+    def _onerror(error: OSError) -> None:
+        if error.filename is not None and Path(error.filename).resolve() == root:
+            raise ScanError(f"could not list {root}: {error.strerror or error}") from error
+
+    return os.walk(root, onerror=_onerror)
+
+
 def _is_nested_checkout(directory: Path, root: Path) -> bool:
     """Whether ``directory`` is a separate git checkout below ``root``.
 
@@ -116,7 +136,7 @@ def scan(
     artifacts: list[Path] = []
     checkouts: list[Path] = []
 
-    for dirpath, dirnames, _filenames in os.walk(root):
+    for dirpath, dirnames, _filenames in _walk(root):
         current = Path(dirpath)
         keep: list[str] = []
         for name in sorted(dirnames):
@@ -170,7 +190,7 @@ def find_files_by_suffix(
     pruned = {path.resolve() for path in excluded_paths}
     files: list[Path] = []
 
-    for dirpath, dirnames, filenames in os.walk(root):
+    for dirpath, dirnames, filenames in _walk(root):
         current = Path(dirpath)
         keep: list[str] = []
         for name in sorted(dirnames):

@@ -21,7 +21,9 @@ from unittest.mock import patch
 
 import pytest
 
-from fab_test.scripts.fab_test_execution import _playwright_remote_target
+from fab_test.scripts._run_targets import (
+    _playwright_remote_target,
+)
 from fab_test.scripts.invoke_playwright import _build_config_from_args, parse_args
 from fab_test.scripts.playwright_validation.config import PlaywrightValidationConfig
 from fab_test.scripts.playwright_validation.resolver import (

@@ -18,6 +18,7 @@ import sys
 
 import pytest
 
+from fab_test.scripts._mode import ResolvedMode
 from fab_test.scripts._run_manifest import RunManifest
 from fab_test.scripts._target import parse_target
 
@@ -113,6 +114,26 @@ def test_manifest_target_carries_no_secret(tmp_path):
 
     for forbidden in ("SECRET", "secret", "token", "password"):
         assert forbidden not in written
+
+
+@pytest.mark.fab_test
+@pytest.mark.parametrize(
+    ("mode", "expected"), [(ResolvedMode("service", "Sales WS", "flag"), "Sales WS"), (None, None)]
+)
+def test_manifest_target_names_the_workspace_a_flag_selected(mode, expected):
+    """Given `--workspace NAME --artifact X`, the target names no workspace of
+    its own, so the manifest should take the service mode's workspace."""
+    from argparse import Namespace
+
+    from fab_test.scripts._run_targets import (
+    _manifest_target,
+)
+
+    args = Namespace(resolved_target=parse_target("Sales"), workspace_id=_GUID, resolved_mode=mode)
+
+    target = _manifest_target(args)
+
+    assert (target["workspace"], target["workspace_id"]) == (expected, _GUID)
 
 
 @pytest.mark.fab_test

@@ -317,3 +317,80 @@ def test_find_rdl_files_honors_excluded_paths(tmp_path):
 @pytest.mark.fab_test
 def test_find_rdl_files_missing_root_yields_nothing(tmp_path):
     assert find_rdl_files(tmp_path / "does-not-exist") == []
+
+
+@pytest.mark.fab_test
+@pytest.mark.parametrize("walk", [lambda root: scan(root, SUFFIXES), find_rdl_files])
+def test_a_root_that_cannot_be_listed_is_an_error_not_an_empty_result(tmp_path, monkeypatch, walk):
+    """Given a root whose listing fails, should raise ScanError naming it, not
+    report "no artifacts found" for a tree that has them."""
+    import os
+
+    from fab_test.scripts._scan import ScanError
+
+    _artifact(tmp_path, "Sales.SemanticModel")
+    real_scandir = os.scandir
+
+    def _failing_scandir(path="."):
+        if Path(path) == tmp_path.resolve():
+            raise PermissionError(13, "Access is denied", str(path))
+        return real_scandir(path)
+
+    monkeypatch.setattr(os, "scandir", _failing_scandir)
+
+    with pytest.raises(ScanError, match="Access is denied") as raised:
+        walk(tmp_path)
+    assert str(tmp_path.resolve()) in str(raised.value)
+
+
+@pytest.mark.fab_test
+def test_an_unreadable_subfolder_is_still_skipped(tmp_path, monkeypatch):
+    """Given an unreadable folder below the root, should skip it and keep the rest."""
+    import os
+
+    _artifact(tmp_path, "Sales.SemanticModel")
+    locked = tmp_path / "locked"
+    locked.mkdir()
+    real_scandir = os.scandir
+
+    def _failing_scandir(path="."):
+        if Path(path) == locked.resolve():
+            raise PermissionError(13, "Access is denied", str(path))
+        return real_scandir(path)
+
+    monkeypatch.setattr(os, "scandir", _failing_scandir)
+
+    assert [p.name for p in scan(tmp_path, SUFFIXES).artifacts] == ["Sales.SemanticModel"]
+
+
+@pytest.mark.fab_test
+@pytest.mark.parametrize("command", [["bpa", "--dry-run", "--output-dir", "r"], ["list"]])
+def test_the_cli_exits_2_naming_a_root_it_cannot_list(tmp_path, monkeypatch, capsys, command):
+    """Given an --artifact-dir that can't be listed, should exit 2 with one line
+    naming it: not a traceback, and not exit 1, which means findings."""
+    import os
+    import sys
+
+    from fab_test.scripts import fab_test as fab_test_module
+
+    real_scandir = os.scandir
+
+    def _failing_scandir(path="."):
+        if Path(path) == tmp_path.resolve():
+            raise PermissionError(13, "Access is denied", str(path))
+        return real_scandir(path)
+
+    monkeypatch.setattr(os, "scandir", _failing_scandir)
+    monkeypatch.chdir(tmp_path.parent)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["fab-test", *command, "--artifact-dir", str(tmp_path)],
+    )
+
+    code = fab_test_module.main()
+    err = capsys.readouterr().err
+
+    assert code == 2
+    assert "Access is denied" in err
+    assert "Traceback" not in err

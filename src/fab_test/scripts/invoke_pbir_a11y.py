@@ -181,6 +181,22 @@ def extract_findings(result: dict[str, Any]) -> list[dict[str, Any]]:
     return findings
 
 
+def apply_fail_on(findings: list[dict[str, Any]], fail_on: str) -> list[dict[str, Any]]:
+    """Raise warnings to errors under ``--fail-on warn``.
+
+    fab-test decides an artifact's exit code from finding severity, not from
+    the wrapper's exit code, so pbir-a11y failing on a warning would
+    otherwise write a `failed` envelope that still exits 0. `tool_severity`
+    keeps what pbir-a11y said, so a raised warning stays recognizable.
+    """
+    if fail_on != "warn":
+        return findings
+    return [
+        {**f, "severity": "error", "tool_severity": "warning"} if f["severity"] == "warning" else f
+        for f in findings
+    ]
+
+
 def _write_a11y_failure(
     output_path: Path, artifact_path: Path, native_out: Path, message: str
 ) -> int:
@@ -332,7 +348,7 @@ def run_a11y(args: argparse.Namespace) -> int:
     native_out.write_text(proc.stdout or "", encoding="utf-8")
 
     parsed = parse_a11y_json(proc.stdout or "")
-    findings = extract_findings(parsed) if parsed else []
+    findings = apply_fail_on(extract_findings(parsed), fail_on) if parsed else []
     outcome = _classify_a11y_result(proc.returncode, findings)
 
     write_results(

@@ -21,6 +21,7 @@ import sys
 import pytest
 
 from fab_test.scripts import _feature_flags as flags
+from fab_test.scripts import _readiness as readiness
 from fab_test.scripts import fab_test_registry as registry
 from fab_test.scripts.fab_test_parser import build_parser
 
@@ -214,16 +215,16 @@ def _probe_calls(monkeypatch):
         calls.append(analyzer_name)
         return "x"
 
-    monkeypatch.setattr(registry, "probe_executable", _fake_probe)
-    monkeypatch.setattr(registry, "resolve_executable", _fake_resolve)
+    monkeypatch.setattr(readiness, "probe_executable", _fake_probe)
+    monkeypatch.setattr(readiness, "resolve_executable", _fake_resolve)
     return calls
 
 
 @pytest.mark.fab_test
 def test_disabled_data_agent_never_resolves_promptfoo(_probe_calls):
-    assert registry.resolve_tool("data_agent", argparse.Namespace()) is None
-    assert registry.preflight_error("data_agent", argparse.Namespace()) is None
-    assert registry.check_readiness("data_agent", None)["reason"] == "no external tool required"
+    assert readiness.resolve_tool("data_agent", argparse.Namespace()) is None
+    assert readiness.preflight_error("data_agent", argparse.Namespace()) is None
+    assert readiness.check_readiness("data_agent", None)["reason"] == "no external tool required"
     assert _probe_calls == []
 
 
@@ -231,7 +232,7 @@ def test_disabled_data_agent_never_resolves_promptfoo(_probe_calls):
 def test_enabled_data_agent_resolves_promptfoo(monkeypatch, _probe_calls):
     monkeypatch.setenv(flags.env_var("data_agent"), "1")
 
-    registry.resolve_tool("data_agent", argparse.Namespace())
-    registry.check_readiness("data_agent", None)
+    readiness.resolve_tool("data_agent", argparse.Namespace())
+    readiness.check_readiness("data_agent", None)
 
     assert _probe_calls == ["data_agent", "data_agent"]

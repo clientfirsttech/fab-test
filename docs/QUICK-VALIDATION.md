@@ -166,11 +166,11 @@ Not every analyzer accepts every form. `fab-test list` has a Scopes column; `bpa
 
 ```bash
 fab-test auth status                      # verified for real, unlike doctor
-fab-test auth status --workspace-id <id>  # also confirm that workspace is reachable
+fab-test auth status --workspace <name-or-id>  # also confirm that workspace is reachable
 fab-test auth login                       # delegates to `pql-test auth login`
 ```
 
-`fab-test` stores no credentials of its own. `auth status` exits `0` verified, `127` when nothing resolves, `1` when credentials work but the workspace is unreachable. `doctor` never acquires a token, so it reports an ambient `az login` credential as `unverified` and points here.
+`fab-test` stores no credentials of its own. `auth status` exits `0` verified, `127` when nothing resolves, `1` when credentials work but the workspace is unreachable. `doctor` never acquires a token, so it reports an ambient `az login` credential as `unverified` and points here. For `pql_test` it does compare the `az login` account (from `az account show`) with `pql-test auth status`, and reports ❌ when they differ -- the same mismatch a service-mode run stops on.
 
 ### Run the default analyzer set
 
@@ -195,7 +195,11 @@ Both are enforced, and both are ratchets — they move down, never up.
 
 ```bash
 pytest -q --cov                      # measure locally, no gate
-pytest -q --cov --cov-fail-under=80  # exactly what CI runs
+
+# exactly what CI runs: everything but playwright on every core, then the
+# browser renders serially (they fail under CPU contention), one coverage total
+pytest -q -n auto -m "not playwright" --cov
+pytest -q -m playwright --cov --cov-append --cov-fail-under=80
 ```
 
 The 80% floor is scoped to `src/fab_test` with tests excluded. One module is omitted by explicit path — `validate_fabric_service_client.py` — because it needs a live service to execute, so a unit test could only assert that its argument parser accepts flags. `eventhouse_logger.py` came off that list once its ingest was separable from the validators in front of it. `tests/test_coverage_config.py` fails if one of those entries goes stale or if a core CLI module is ever added to the list.
@@ -429,7 +433,7 @@ This is the case where uploading `run.json` alone still tells you what to fix. I
     path: fab-test-results/run.json
 ```
 
-To tune which rules gate the build, add a `rules.rdl` overlay in the committed `fab-test.yml` (`disable`/`severity` — see [Rule Overlays](../.github/skills/fab-test/references/configuration.md#rule-overlays)) rather than a CLI flag; there's no `--fail-on`-style flag here, since `rdl`'s severities are already the rule set's own High/Medium/Low, not a single runtime threshold.
+To tune which rules gate the build, add a `rules.rdl` overlay in the committed `fab-test.yml` (`disable`, with an optional reason; `severity`; or `rules.rdl.settings` for a threshold such as `{QRY-07: {max_lines: 80}}`, validated before the run starts — see [Rule Overlays](../.github/skills/fab-test/references/configuration.md#rule-overlays)) rather than a CLI flag; there's no `--fail-on`-style flag here, since `rdl`'s severities are already the rule set's own High/Medium/Low, not a single runtime threshold.
 
 ### Pipeline snippet: pbir-a11y accessibility checks (needs Node)
 

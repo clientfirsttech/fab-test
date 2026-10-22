@@ -19,17 +19,17 @@ omission; `none` means nothing does and you have to check it yourself.
 | `::error::`/`::warning::` on stderr; error envelope before exit 1 | none |
 | `native.<ext>` via `native_output_path`, recorded only if written | none |
 
-## Registration: `fab_test_registry.py`
+## Registration: `fab_test_registry.py`, `_command_builders.py` and `_readiness.py`
 
 | Item | Guard |
 |---|---|
 | `ANALYZER_REGISTRY[name] = (glob, description)`; the glob also drives type routing | `test_target.py` (glob is a known type) |
 | `ANALYZER_SCOPES[name]` | `test_target_scopes.py` (every analyzer declares scopes, accepts `path`, only API analyzers take `workspace`) |
 | `HIDDEN_ANALYZERS` if not advertised | `test_hidden_analyzers.py` |
-| `build_<name>_command` in `_COMMAND_BUILDERS`, writing to `output_dir/<key>/<stem>/envelope.json` | none for key parity |
-| Default tool path constant; `_BOOTSTRAPPED_ANALYZERS`, `_BOOTSTRAP_REGISTRY_NAME`, `_TOOL_FLAG_HINTS` | none for parity |
+| `build_<name>_command` in `_command_builders.py`'s `_COMMAND_BUILDERS`, writing to `output_dir/<key>/<stem>/envelope.json` | none for key parity |
+| Default tool path constant; `_BOOTSTRAPPED_ANALYZERS`, `_BOOTSTRAP_REGISTRY_NAME`; `_TOOL_FLAG_HINTS` (in `_readiness.py`) | none for parity |
 | `_CLOUD_ANALYZERS`, `_DESKTOP_CAPABLE_ANALYZERS`, `_REPOSITORY_SCOPED_ANALYZERS` | none |
-| Explicit-path branches in `resolve_tool` and `_readiness_without_version` | none |
+| Explicit-path branches in `_readiness.py`'s `resolve_tool` and `_readiness_without_version` | none |
 | `check_readiness` returns the common shape | `test_readiness.py` (iterates the registry) |
 | `_resolve_<name>_rules_path` if the analyzer has rules | none |
 
@@ -60,7 +60,7 @@ manifest, summary tables and the run index (`fab_test_summary.py`,
 | Item | Guard |
 |---|---|
 | Marker in `pytest.ini` and `tests/conftest.py` `_ANALYZER_MARKERS`/`_MARKER_SUFFIX` | none between the two |
-| `test_module_budget.py`: `fab_test_registry.py` and `fab_test_parser.py` sit at their exemption ceilings, so any new analyzer needs a split or a recorded exemption | the test |
+| `test_module_budget.py`: `fab_test_parser.py` sits at its exemption ceiling, so a new analyzer adds its subparser in its own module or records an exemption; `fab_test_registry.py` lost its exemption in the Core Module Split | the test |
 | Coverage floor 80% over `src/fab_test` | CI |
 
 ## Documentation

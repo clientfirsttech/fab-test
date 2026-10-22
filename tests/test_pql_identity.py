@@ -116,3 +116,64 @@ def test_auth_status_is_none_when_pql_test_cannot_start(monkeypatch, tmp_path):
         lambda command: [str(tmp_path / "no-such-pql-test")],
     )
     assert guard._pql_auth_status() is None
+
+
+# --------------------------------------------------------------------------- #
+# doctor's check: the az login account, read without acquiring a token
+# --------------------------------------------------------------------------- #
+
+
+def _print_as_az(monkeypatch, stdout: str, returncode: int = 0) -> None:
+    script = f"import sys; sys.stdout.write({stdout!r}); sys.exit({returncode})"
+    monkeypatch.setattr(guard.shutil, "which", lambda name: sys.executable)
+    monkeypatch.setattr(guard, "_AZ_ACCOUNT_ARGS", ["-c", script])
+
+
+def test_az_account_reads_the_signed_in_user(monkeypatch):
+    _print_as_az(monkeypatch, '{"name": "john@kerski.net", "type": "user"}')
+    assert guard.az_account() == "john@kerski.net"
+
+
+@pytest.mark.parametrize(
+    ("stdout", "returncode"),
+    [
+        ('{"name": "app-guid", "type": "servicePrincipal"}', 0),
+        ("", 1),  # not signed in
+        ("not json", 0),
+    ],
+)
+def test_az_account_is_empty_when_there_is_no_signed_in_user(monkeypatch, stdout, returncode):
+    _print_as_az(monkeypatch, stdout, returncode)
+    assert guard.az_account() == ""
+
+
+def test_az_account_is_empty_without_the_azure_cli(monkeypatch):
+    monkeypatch.setattr(guard.shutil, "which", lambda name: None)
+    assert guard.az_account() == ""
+
+
+def test_identity_check_names_both_accounts_when_they_differ(monkeypatch):
+    monkeypatch.setattr(guard, "az_account", lambda: "john@kerski.net")
+    _status(monkeypatch, Status="Authenticated", Method="interactive", Account="other@b.c")
+
+    account, mismatch = guard.identity_check()
+
+    assert account == "john@kerski.net"
+    assert "other@b.c" in mismatch
+
+
+def test_identity_check_has_no_mismatch_for_the_same_account(monkeypatch):
+    monkeypatch.setattr(guard, "az_account", lambda: "john@kerski.net")
+    _status(monkeypatch, Status="Authenticated", Method="interactive", Account="John@Kerski.net")
+
+    assert guard.identity_check() == ("john@kerski.net", None)
+
+
+@pytest.mark.parametrize("case", ["no az account", "pql-test cannot run", "PQL_* set"])
+def test_identity_check_is_none_when_it_cannot_compare(monkeypatch, case):
+    monkeypatch.setattr(guard, "az_account", lambda: "" if case == "no az account" else "a@b.c")
+    _status(monkeypatch, **({} if case == "pql-test cannot run" else {"Status": "Authenticated"}))
+    if case == "PQL_* set":
+        monkeypatch.setenv("PQL_CLIENT_ID", "x")
+
+    assert guard.identity_check() is None

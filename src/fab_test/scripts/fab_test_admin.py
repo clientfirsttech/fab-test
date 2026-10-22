@@ -1,4 +1,4 @@
-"""fab-test's admin/reporting subcommands: doctor, list, explain, config, init, auth.
+"""fab-test's admin/reporting subcommands: doctor, list, explain, config, auth.
 
 Extracted from fab_test.py (Fab-Test Module Split epic). Pure move -- no
 behavior change; `_ADMIN_COMMAND_HANDLERS` and `_dispatch_admin_command`
@@ -14,8 +14,10 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from ._cli_utils import narrate
-from ._config import CONFIG_FILENAME, resolve_setting, verbosity_level
+from ._command_builders import (
+    build_command as _build_command,
+)
+from ._config import resolve_setting, verbosity_level
 from ._credentials import SIGN_IN_REMEDIATION, probe_credentials
 from ._desktop import bridge_cli_path, detect_desktop_instances
 from ._fab_test_context import (
@@ -35,11 +37,18 @@ from ._metadata import (
 )
 from ._mode import ModeError, ResolvedMode, resolve_mode
 from ._pql_identity import token_account, token_tenant
+from ._readiness import (
+    check_readiness as _check_readiness,
+)
+from ._rule_overlay import overlay_rows
+from ._run_targets import (
+    _manifest_target,
+    _target_of,
+)
 from ._scan import find_skipped_checkouts as _find_skipped_checkouts
 from ._service_export import service_item_type, service_readiness
 from ._target import TargetError, select_target
 from ._telemetry import eventhouse_rows, lakehouse_rows
-from .fab_test_execution import _manifest_target, _target_of
 from .fab_test_local import _LOCAL_ANALYZERS, _local_readiness
 from .fab_test_parser import _aliases_for, _canonical_name
 from .fab_test_registry import (
@@ -52,12 +61,6 @@ from .fab_test_registry import (
 )
 from .fab_test_registry import (
     ANALYZER_SCOPES as _ANALYZER_SCOPES,
-)
-from .fab_test_registry import (
-    build_command as _build_command,
-)
-from .fab_test_registry import (
-    check_readiness as _check_readiness,
 )
 from .fab_test_registry import (
     discover_artifacts as _discover,
@@ -234,172 +237,10 @@ def _config_show(args: argparse.Namespace) -> int:
         display_value = "<redacted>" if _is_secret_key(key) else value
         rows.append({"key": key, "value": display_value, "origin": origin})
     rows.extend(_ruleset_rows())
+    rows.extend(overlay_rows(file_config.get("rules", {})))
     rows.extend(eventhouse_rows(file_config))
     rows.extend(lakehouse_rows(file_config))
     return _print_config_show(rows, output_format)
-
-
-_FAB_TEST_YML_TEMPLATE = """\
-# fab-test.yml -- optional config-file front door for the fab-test CLI.
-#
-# Every key below is entirely optional and commented out: an absent key
-# falls back to its environment variable (where one exists) and then its
-# packaged default. Uncomment and edit only the settings you want to pin.
-#
-# Precedence for every setting: CLI flag > environment variable >
-# this file > packaged default. Run `fab-test config --show` to see the
-# effective value and origin of each setting right now.
-
-# artifact_dir: fabric-artifacts   # root to discover artifacts (repo root for `fab-test local`)
-# output_dir: fab-test-results      # root for result envelopes and the run manifest
-# jobs: 1                          # artifacts to run in parallel for the same analyzer
-# format: text                     # text | json
-# timeout: 200                     # per-artifact subprocess timeout in seconds [env: ANALYZER_TIMEOUT]
-#                                   # (playwright scales this up on its own for a large matrix;
-#                                   # setting this overrides that)
-# verbosity: default               # summary | default | verbose | debug [env: ANALYZER_VERBOSITY]
-#                                   # summary = -q (one line per artifact); -q/-v flags override this
-# environment: DEV                 # default environment label [env: FABRIC_ENVIRONMENT]
-# workspace: Sales Dev             # default workspace name or GUID [env: FABRIC_WORKSPACE_ID]
-# playwright_user_name: analyst@contoso.com
-#                                  # effective-identity UPN for RLS embed tokens
-#                                  # [env: PLAYWRIGHT_USER_NAME]; only used for
-#                                  # cases that carry a discovered role
-# playwright_config: .fab-test/playwright.yml
-#                                  # optional local/Azure YAML [env: PLAYWRIGHT_CONFIG_PATH]
-
-# Rule overlays: deltas applied to a packaged ruleset instead of forking it.
-# rules:
-#   bpa:
-#     disable: [RULE_ID]                  # remove a rule from the effective ruleset
-#     severity: {RULE_ID: warning}        # info | warning | error
-#     extend: path/to/extra-rules.json    # append rules from another file
-#   pbir:
-#     disable: [RULE_ID]
-#     severity: {RULE_ID: warning}        # warning | error (PBIR Inspector has no "info" level)
-#   rdl:
-#     disable: [DS-02]
-#     severity: {QRY-07: info}            # info | warning | error
-
-# Ship analyzer telemetry to a Fabric Eventhouse and/or a Fabric Lakehouse.
-# A configured destination is the enablement -- there is no separate on/off
-# flag. Either, both, or neither section may be present.
-# telemetry:
-#   eventhouse:
-#     uri: https://<cluster>.kusto.fabric.microsoft.com       # [env: EVENTHOUSE_URI]
-#     database: <database-name>                               # [env: EVENTHOUSE_DATABASE]
-#   lakehouse:
-#     workspace: <workspace-name-or-guid>                     # [env: LAKEHOUSE_WORKSPACE]
-#     lakehouse: <lakehouse-name>                              # [env: LAKEHOUSE_NAME]
-"""
-
-_ENV_EXAMPLE_TEMPLATE = """\
-# .env.example -- copy to .fab-test/.env and fill in the values you need.
-# Search order: --env-file > PLAYWRIGHT_ENV_FILE > .fab-test/.env > ./.env.
-# Never commit the real .env -- .fab-test/.gitignore keeps this directory's
-# copy untracked even though .fab-test/metadata/ is meant to be checked in.
-
-# Service principal for Fabric/Power BI REST API access.
-# All three are optional for local use: leave them unset to fall back to
-# DefaultAzureCredential (az login, a managed identity, VS Code sign-in,
-# ...) for every command except `fab-test playwright`, which always needs
-# a full service principal to generate an embed token.
-FABRIC_TENANT_ID=
-FABRIC_CLIENT_ID=
-FABRIC_CLIENT_SECRET=
-
-# Playwright visual/error validation target. Only needed when not using
-# --artifact to resolve a report from a deployed workspace.
-PLAYWRIGHT_WORKSPACE_ID=
-PLAYWRIGHT_REPORT_ID=
-PLAYWRIGHT_REPORT_NAME=
-PLAYWRIGHT_DATASET_ID=
-
-# Effective-identity user (UPN) for models secured with row-level security.
-# Required to test RLS: without it fab-test never discovers the model's roles
-# or attaches an identity, and Power BI rejects the embed token with
-# "requires effective identity". Harmless for models without RLS -- only cases
-# that carry a discovered role use it. Can also be set as playwright_user_name
-# in fab-test.yml.
-# PLAYWRIGHT_USER_NAME=analyst@contoso.com
-
-# Optional Azure browsers: enable access-token authentication in the workspace.
-# Selected only by --playwright-config / PLAYWRIGHT_CONFIG_PATH / playwright_config.
-# Keep the access token here or in protected CI secrets, never in execution YAML.
-PLAYWRIGHT_SERVICE_URL=
-PLAYWRIGHT_SERVICE_ACCESS_TOKEN=
-
-# A paginated (RDL) report is validated with a different check than an
-# interactive one -- skips page/bookmark/role discovery and checks for an
-# error modal after a fixed wait rather than racing render events. With
-# --artifact, fab-test detects which kind a target is itself (tries Report,
-# then PaginatedReport) -- you should not normally need to set this. Set it
-# to "report"/"paginated" only to force the type, or if using the static IDs
-# above with no --artifact at all, where there is no name to detect from and
-# this becomes required. A paginated report's dataset is often not
-# auto-discoverable; set PLAYWRIGHT_DATASET_ID above if resolution reports
-# "At least one dataset is required".
-# PLAYWRIGHT_REPORT_TYPE=paginated
-# PLAYWRIGHT_RENDER_WAIT_SECONDS=20
-
-# Only needed when a report's dataset lives in a different workspace than the
-# report itself -- common practice for a dataset shared across several
-# reports. Leave unset when the dataset is in the report's own workspace.
-# PLAYWRIGHT_DATASET_WORKSPACE_ID=
-"""
-
-_FAB_TEST_GITIGNORE_TEMPLATE = """\
-# fab-test's own guard: .fab-test/metadata/ is meant to be checked in,
-# but a .env in this directory holds credentials and never should be.
-.env
-"""
-
-
-def _init(args: argparse.Namespace) -> int:
-    """Scaffold a commented fab-test.yml, .fab-test/.gitignore, and
-    .fab-test/.env.example.
-
-    Never overwrites an existing file -- each is reported and left
-    untouched instead. --dry-run reports what would be created without
-    writing anything. `.fab-test/.env.example` replaces the root
-    `.env.example` for new repositories: it lives beside the `.gitignore`
-    that makes a real `.env` in the same directory safe to keep, rather
-    than depending on a consumer's root `.gitignore` already covering it.
-    """
-    output_format = getattr(args, "output_format", "text")
-    dry_run = getattr(args, "dry_run", False)
-    fab_test_dir = REPO_ROOT / ".fab-test"
-    templates = {
-        REPO_ROOT / CONFIG_FILENAME: _FAB_TEST_YML_TEMPLATE,
-        fab_test_dir / ".gitignore": _FAB_TEST_GITIGNORE_TEMPLATE,
-        fab_test_dir / ".env.example": _ENV_EXAMPLE_TEMPLATE,
-    }
-
-    created = []
-    would_create = []
-    already_existed = []
-    for path, template in templates.items():
-        if path.exists():
-            already_existed.append(str(path))
-            narrate(
-                f"  • fab-test init: already exists, left untouched: {path}",
-                output_format=output_format,
-            )
-        elif dry_run:
-            would_create.append(str(path))
-            narrate(f"  fab-test init: would create {path}", output_format=output_format)
-        else:
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(template, encoding="utf-8")
-            created.append(str(path))
-            narrate(f"  ✓ fab-test init: created {path}", output_format=output_format)
-
-    if output_format == "json":
-        print(json.dumps(
-            {"created": created, "would_create": would_create, "already_existed": already_existed},
-            indent=2,
-        ))
-    return 0
 
 
 def _doctor_local(args: argparse.Namespace) -> int:
@@ -486,7 +327,7 @@ def _doctor(args: argparse.Namespace) -> int:
         # whether doctor passes: telemetry is optional, and a run that never
         # wanted it is not a broken installation.
         rows.extend(_telemetry_readiness_rows(args))
-    return _print_doctor(rows, output_format)
+    return _print_doctor(rows, output_format, strict=getattr(args, "strict", False))
 
 
 _TOOL_DISPLAY_NAMES = {
@@ -560,6 +401,7 @@ def _explain_mode(args: argparse.Namespace, name: str) -> ResolvedMode | int:
         print(f"  ✗ fab-test explain: {exc}", file=sys.stderr)
         return 2
     args.mode = resolved_mode.mode
+    args.resolved_mode = resolved_mode
     return resolved_mode
 
 
@@ -596,8 +438,13 @@ def _explain_analyzer(args: argparse.Namespace) -> int:
         # No real artifact to point at; show an illustrative command shape.
         artifact = matches[0] if matches else artifact_dir / f"<artifact>{glob.lstrip('*')}"
 
-    command = _build_command(name, artifact, args, output_dir)
     readiness = _check_readiness(name, args)
+    if readiness.get("resolved_path"):
+        # A real run resolves the tool before building its command; without
+        # this the command named the legacy default while Tool named the
+        # bootstrapped install.
+        args._resolved_tool_path = str(readiness["resolved_path"])
+    command = _build_command(name, artifact, args, output_dir)
     default_rules_path = {
         "bpa": _DEFAULT_BPA_RULES,
         "pbir": _DEFAULT_PBIR_RULES,
@@ -661,19 +508,18 @@ def _check_workspace_reachable(workspace_id: str, args: argparse.Namespace) -> b
 
     Moved here from the §7 probe, which must make no network call. Lists
     items rather than fetching the workspace so a permission that is
-    scoped to reading contents still reports reachable.
+    scoped to reading contents still reports reachable. A name is resolved
+    first, as every analyzer's --workspace takes one.
     """
-    from .playwright_validation.fabric_service_client import (
-        FabricServiceClientError,
-        build_fabric_service_client,
-    )
+    from .playwright_validation.fabric_service_client import FabricServiceClientError, build_fabric_service_client
+    from .playwright_validation.resolver import ServiceResolutionError, resolve_workspace_id
 
     try:
         client = build_fabric_service_client(
             env_file=getattr(args, "playwright_env_file", None)
         )
-        client.list_items(workspace_id, "SemanticModel")
-    except (FabricServiceClientError, OSError):
+        client.list_items(resolve_workspace_id(client, workspace_id), "SemanticModel")
+    except (FabricServiceClientError, ServiceResolutionError, OSError):
         return False
     return True
 

@@ -16,6 +16,15 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
 
+from ._rdl_checks_contrast import _check_acc06_text_contrast
+from ._rdl_checks_dataset import (
+    _check_ds03_static_parameter_lists,
+    _check_ds04_share_one_dataset,
+    _check_ds06_orphan_query_columns,
+    _check_prm02_parameter_types,
+    _check_prm07_multivalue_dax_filter,
+    _check_str03_friendly_field_names,
+)
 from ._rdl_checks_query import (
     _check_ds01_no_embedded_credentials,
     _check_ds02_unused_datasets,
@@ -167,9 +176,13 @@ def run_checks(root: ET.Element, namespace: str, catalog: list[dict[str, Any]]) 
 
 CHECKS.update({
     "STR-01": _check_str01_current_schema,
+    "STR-03": _check_str03_friendly_field_names,
     "DS-01": _check_ds01_no_embedded_credentials,
     "DS-02": _check_ds02_unused_datasets,
+    "DS-03": _check_ds03_static_parameter_lists,
+    "DS-04": _check_ds04_share_one_dataset,
     "DS-05": _check_ds05_no_select_star,
+    "DS-06": _check_ds06_orphan_query_columns,
     "DS-07": _check_ds07_prefer_stored_procedures,
     "QRY-01": _check_qry01_filter_in_query,
     "QRY-02": _check_qry02_no_calculated_fields,
@@ -179,9 +192,11 @@ CHECKS.update({
     "QRY-06": _check_qry06_join_in_query,
     "QRY-07": _check_qry07_move_complex_sql,
     "PRM-01": _check_prm01_default_value,
+    "PRM-02": _check_prm02_parameter_types,
     "PRM-03": _check_prm03_parameter_count,
     "PRM-04": _check_prm04_multivalue_nullable,
     "PRM-05": _check_prm05_show_parameter_values,
+    "PRM-07": _check_prm07_multivalue_dax_filter,
     "LAY-01": _check_lay01_body_fits_page,
     "LAY-02": _check_lay02_avoid_total_pages,
     "LAY-03": _check_lay03_sub01_subreport_in_tablix,
@@ -192,8 +207,15 @@ CHECKS.update({
     "ACC-01": _check_acc01_alt_text,
     "ACC-02": _check_acc02_chart_alt_text_quality,
     "ACC-03": _check_acc03_table_caption,
+    "ACC-06": _check_acc06_text_contrast,
     "ACC-08": _check_acc08_html_link_alt_text,
 })
+
+
+def implemented_rule_ids(catalog: list[dict[str, Any]]) -> set[str]:
+    """Rule IDs with a check: those in CHECKS plus the ``aliases`` they also
+    report under (SUB-01 runs through LAY-03's check)."""
+    return set(CHECKS) | {alias for rule in catalog if rule["id"] in CHECKS for alias in rule.get("aliases", [])}
 
 
 def build_test_results(
@@ -235,5 +257,7 @@ def build_test_results(
             )
             continue
         status = "pass" if rule_id in implemented and not rule.get("disabled") else "skip"
-        rows.append({**base, "object": "", "message": rule.get("description", ""), "status": status, **urls})
+        reason = rule.get("disabled_reason") if rule.get("disabled") else None
+        message = f"disabled: {reason}" if reason else rule.get("description", "")
+        rows.append({**base, "object": "", "message": message, "status": status, **urls})
     return rows

@@ -276,14 +276,14 @@ def test_local_dry_run_never_spawns_a_subprocess(tmp_path, monkeypatch):
 @pytest.mark.fab_test
 def test_local_dry_run_never_detects_desktop_instances(tmp_path, monkeypatch):
     """--dry-run never touches Desktop detection."""
-    from fab_test.scripts import fab_test_registry
+    from fab_test.scripts import _command_builders
 
     _write_pbip_project(tmp_path, "SampleModel")
 
     def _fail_if_called(*_a, **_k):
         raise AssertionError("dry-run must never call detect_desktop_instances")
 
-    monkeypatch.setattr(fab_test_registry, "detect_desktop_instances", _fail_if_called)
+    monkeypatch.setattr(_command_builders, "detect_desktop_instances", _fail_if_called)
 
     args = _local_args(tmp_path, tmp_path / "results")
     args.dry_run = True

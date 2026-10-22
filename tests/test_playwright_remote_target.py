@@ -20,7 +20,7 @@ from pathlib import Path
 
 import pytest
 
-from fab_test.scripts.fab_test_execution import (
+from fab_test.scripts._run_targets import (
     _discover_for,
     _playwright_remote_target,
 )

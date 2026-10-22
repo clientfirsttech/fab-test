@@ -1,0 +1,784 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Report MustUnderstand="df" xmlns="http://schemas.microsoft.com/sqlserver/reporting/2016/01/reportdefinition" xmlns:rd="http://schemas.microsoft.com/SQLServer/reporting/reportdesigner" xmlns:cl="http://schemas.microsoft.com/sqlserver/reporting/2010/01/componentdefinition" xmlns:df="http://schemas.microsoft.com/sqlserver/reporting/2016/01/reportdefinition/defaultfontfamily" xmlns:am="http://schemas.microsoft.com/sqlserver/reporting/authoringmetadata">
+  <rd:ReportUnitType>Inch</rd:ReportUnitType>
+  <rd:ReportID>b5eeb668-788b-5daa-b6b6-c341a364e839</rd:ReportID>
+  <am:AuthoringMetadata>
+    <am:CreatedBy>
+      <am:Name>PBIRB</am:Name>
+      <am:Version>15.7.1814.616</am:Version>
+    </am:CreatedBy>
+    <am:UpdatedBy>
+      <am:Name>PBIRB</am:Name>
+      <am:Version>15.7.1814.616</am:Version>
+    </am:UpdatedBy>
+    <am:LastModifiedTimestamp>2026-09-30T21:56:40.2201592Z</am:LastModifiedTimestamp>
+  </am:AuthoringMetadata>
+  <df:DefaultFontFamily>Segoe UI</df:DefaultFontFamily>
+  <AutoRefresh>0</AutoRefresh>
+  <DataSources>
+    <DataSource Name="PowerQuery">
+      <rd:SecurityType>None</rd:SecurityType>
+      <ConnectionProperties>
+        <DataProvider>PQO</DataProvider>
+        <ConnectString />
+      </ConnectionProperties>
+      <rd:DataSourceID>01033876-89fe-43b2-8a3e-fd998af2e382</rd:DataSourceID>
+    </DataSource>
+  </DataSources>
+  <DataSets>
+    <DataSet Name="RawSourceExample">
+      <Query>
+        <DataSourceName>PowerQuery</DataSourceName>
+        <QueryParameters>
+          <QueryParameter Name="WORKSPACE_ID">
+            <rd:UserDefined>true</rd:UserDefined>
+            <Value>=Parameters!WORKSPACE_ID.Value</Value>
+          </QueryParameter>
+        </QueryParameters>
+        <CommandText>{"QueryName":"RawSourceExample","MashupDocument":"section Section1;\r\nshared WORKSPACE_ID = \"88b5780c-ab04-432a-8d14-e8c8a17c2e2e\" meta [IsParameterQuery = true, IsParameterQueryRequired = false, Type = type text];\r\nshared RawSourceExample = let\n  Source = PowerPlatform.Dataflows([]),\n  #\"Navigation 1\" = Source{[Id = \"Workspaces\"]}[Data],\n  #\"Navigation 2\" = #\"Navigation 1\"{[workspaceId = WORKSPACE_ID]}[Data],\n  #\"Navigation 3\" = #\"Navigation 2\"{[dataflowName = \"RawSourceExample\"]}[Data],\n  Navigation = #\"Navigation 3\"{[entity = \"MarvelSource\", version = \"\"]}[Data]\nin\n  Navigation;\r\n","ConnectionOverrides":[{"Path":"PowerPlatformDataflows","Kind":"PowerPlatformDataflows","Provider":"DmtsFabric","AuthenticationKind":null,"EnvironmentName":null,"ApiName":null,"ConnectionName":"{\"ClusterId\":\"0dea314d-3f99-4512-ac74-8774ddbafedb\",\"DatasourceId\":\"d02f72f4-85d2-4919-b1d9-1012c35a2eeb\"}","PrivacyGroup":"None","CredentialDetails":{},"Audience":null,"ConnectionParameters":{}}],"GatewayObjectId":null,"ParameterDefinitions":[{"Name":"WORKSPACE_ID","Type":"Text"}]}</CommandText>
+      </Query>
+      <Fields>
+        <Field Name="page_id">
+          <DataField>page_id</DataField>
+        </Field>
+        <Field Name="name">
+          <DataField>name</DataField>
+        </Field>
+        <Field Name="urlslug">
+          <DataField>urlslug</DataField>
+        </Field>
+        <Field Name="ID">
+          <DataField>ID</DataField>
+        </Field>
+        <Field Name="ALIGN">
+          <DataField>ALIGN</DataField>
+        </Field>
+        <Field Name="EYE">
+          <DataField>EYE</DataField>
+        </Field>
+        <Field Name="HAIR">
+          <DataField>HAIR</DataField>
+        </Field>
+        <Field Name="SEX">
+          <DataField>SEX</DataField>
+        </Field>
+        <Field Name="GSM">
+          <DataField>GSM</DataField>
+        </Field>
+        <Field Name="ALIVE">
+          <DataField>ALIVE</DataField>
+        </Field>
+        <Field Name="APPEARANCES">
+          <DataField>APPEARANCES</DataField>
+        </Field>
+        <Field Name="FIRSTAPPEARANCE">
+          <DataField>FIRST APPEARANCE</DataField>
+        </Field>
+        <Field Name="Year">
+          <DataField>Year</DataField>
+        </Field>
+      </Fields>
+    </DataSet>
+  </DataSets>
+  <ReportSections>
+    <ReportSection>
+      <Body>
+        <ReportItems>
+          <Textbox Name="ReportTitle">
+            <rd:WatermarkTextbox>Title</rd:WatermarkTextbox>
+            <rd:DefaultName>ReportTitle</rd:DefaultName>
+            <CanGrow>true</CanGrow>
+            <KeepTogether>true</KeepTogether>
+            <Paragraphs>
+              <Paragraph>
+                <TextRuns>
+                  <TextRun>
+                    <Value>Dev</Value>
+                    <Style>
+                      <FontFamily>Segoe UI Light</FontFamily>
+                      <FontSize>28pt</FontSize>
+                    </Style>
+                  </TextRun>
+                </TextRuns>
+                <Style />
+              </Paragraph>
+            </Paragraphs>
+            <Height>0.5in</Height>
+            <Width>5.5in</Width>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+              <PaddingLeft>2pt</PaddingLeft>
+              <PaddingRight>2pt</PaddingRight>
+              <PaddingTop>2pt</PaddingTop>
+              <PaddingBottom>2pt</PaddingBottom>
+            </Style>
+          </Textbox>
+          <Textbox Name="FirstCharacter">
+            <CanGrow>true</CanGrow>
+            <KeepTogether>true</KeepTogether>
+            <Paragraphs>
+              <Paragraph>
+                <TextRuns>
+                  <TextRun>
+                    <Value>=First(Fields!name.Value, "RawSourceExample")</Value>
+                    <Style />
+                  </TextRun>
+                </TextRuns>
+                <Style />
+              </Paragraph>
+            </Paragraphs>
+            <Top>0.5in</Top>
+            <Left>0in</Left>
+            <Height>0.25in</Height>
+            <Width>5.5in</Width>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+              <PaddingLeft>2pt</PaddingLeft>
+              <PaddingRight>2pt</PaddingRight>
+              <PaddingTop>2pt</PaddingTop>
+              <PaddingBottom>2pt</PaddingBottom>
+            </Style>
+          </Textbox>
+          <Subreport Name="Subreport0">
+            <ReportName>LAY-02</ReportName>
+            <Top>1.00in</Top>
+            <Height>0.25in</Height>
+            <Width>5.5in</Width>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Subreport>
+          <Subreport Name="Subreport1">
+            <ReportName>LAY-02</ReportName>
+            <Top>1.25in</Top>
+            <Height>0.25in</Height>
+            <Width>5.5in</Width>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Subreport>
+          <Subreport Name="Subreport2">
+            <ReportName>LAY-02</ReportName>
+            <Top>1.50in</Top>
+            <Height>0.25in</Height>
+            <Width>5.5in</Width>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Subreport>
+          <Subreport Name="Subreport3">
+            <ReportName>LAY-02</ReportName>
+            <Top>1.75in</Top>
+            <Height>0.25in</Height>
+            <Width>5.5in</Width>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Subreport>
+          <Subreport Name="Subreport4">
+            <ReportName>LAY-02</ReportName>
+            <Top>2.00in</Top>
+            <Height>0.25in</Height>
+            <Width>5.5in</Width>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Subreport>
+          <Subreport Name="Subreport5">
+            <ReportName>LAY-02</ReportName>
+            <Top>2.25in</Top>
+            <Height>0.25in</Height>
+            <Width>5.5in</Width>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Subreport>
+          <Subreport Name="Subreport6">
+            <ReportName>LAY-02</ReportName>
+            <Top>2.50in</Top>
+            <Height>0.25in</Height>
+            <Width>5.5in</Width>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Subreport>
+          <Subreport Name="Subreport7">
+            <ReportName>LAY-02</ReportName>
+            <Top>2.75in</Top>
+            <Height>0.25in</Height>
+            <Width>5.5in</Width>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Subreport>
+          <Subreport Name="Subreport8">
+            <ReportName>LAY-02</ReportName>
+            <Top>3.00in</Top>
+            <Height>0.25in</Height>
+            <Width>5.5in</Width>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Subreport>
+          <Subreport Name="Subreport9">
+            <ReportName>LAY-02</ReportName>
+            <Top>3.25in</Top>
+            <Height>0.25in</Height>
+            <Width>5.5in</Width>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Subreport>
+          <Subreport Name="Subreport10">
+            <ReportName>LAY-02</ReportName>
+            <Top>3.50in</Top>
+            <Height>0.25in</Height>
+            <Width>5.5in</Width>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Subreport>
+          <Subreport Name="Subreport11">
+            <ReportName>LAY-02</ReportName>
+            <Top>3.75in</Top>
+            <Height>0.25in</Height>
+            <Width>5.5in</Width>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Subreport>
+          <Subreport Name="Subreport12">
+            <ReportName>LAY-02</ReportName>
+            <Top>4.00in</Top>
+            <Height>0.25in</Height>
+            <Width>5.5in</Width>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Subreport>
+          <Subreport Name="Subreport13">
+            <ReportName>LAY-02</ReportName>
+            <Top>4.25in</Top>
+            <Height>0.25in</Height>
+            <Width>5.5in</Width>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Subreport>
+          <Subreport Name="Subreport14">
+            <ReportName>LAY-02</ReportName>
+            <Top>4.50in</Top>
+            <Height>0.25in</Height>
+            <Width>5.5in</Width>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Subreport>
+          <Subreport Name="Subreport15">
+            <ReportName>LAY-02</ReportName>
+            <Top>4.75in</Top>
+            <Height>0.25in</Height>
+            <Width>5.5in</Width>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Subreport>
+          <Subreport Name="Subreport16">
+            <ReportName>LAY-02</ReportName>
+            <Top>5.00in</Top>
+            <Height>0.25in</Height>
+            <Width>5.5in</Width>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Subreport>
+          <Subreport Name="Subreport17">
+            <ReportName>LAY-02</ReportName>
+            <Top>5.25in</Top>
+            <Height>0.25in</Height>
+            <Width>5.5in</Width>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Subreport>
+          <Subreport Name="Subreport18">
+            <ReportName>LAY-02</ReportName>
+            <Top>5.50in</Top>
+            <Height>0.25in</Height>
+            <Width>5.5in</Width>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Subreport>
+          <Subreport Name="Subreport19">
+            <ReportName>LAY-02</ReportName>
+            <Top>5.75in</Top>
+            <Height>0.25in</Height>
+            <Width>5.5in</Width>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Subreport>
+          <Subreport Name="Subreport20">
+            <ReportName>LAY-02</ReportName>
+            <Top>6.00in</Top>
+            <Height>0.25in</Height>
+            <Width>5.5in</Width>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Subreport>
+          <Subreport Name="Subreport21">
+            <ReportName>LAY-02</ReportName>
+            <Top>6.25in</Top>
+            <Height>0.25in</Height>
+            <Width>5.5in</Width>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Subreport>
+          <Subreport Name="Subreport22">
+            <ReportName>LAY-02</ReportName>
+            <Top>6.50in</Top>
+            <Height>0.25in</Height>
+            <Width>5.5in</Width>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Subreport>
+          <Subreport Name="Subreport23">
+            <ReportName>LAY-02</ReportName>
+            <Top>6.75in</Top>
+            <Height>0.25in</Height>
+            <Width>5.5in</Width>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Subreport>
+          <Subreport Name="Subreport24">
+            <ReportName>LAY-02</ReportName>
+            <Top>7.00in</Top>
+            <Height>0.25in</Height>
+            <Width>5.5in</Width>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Subreport>
+          <Subreport Name="Subreport25">
+            <ReportName>LAY-02</ReportName>
+            <Top>7.25in</Top>
+            <Height>0.25in</Height>
+            <Width>5.5in</Width>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Subreport>
+          <Subreport Name="Subreport26">
+            <ReportName>LAY-02</ReportName>
+            <Top>7.50in</Top>
+            <Height>0.25in</Height>
+            <Width>5.5in</Width>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Subreport>
+          <Subreport Name="Subreport27">
+            <ReportName>LAY-02</ReportName>
+            <Top>7.75in</Top>
+            <Height>0.25in</Height>
+            <Width>5.5in</Width>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Subreport>
+          <Subreport Name="Subreport28">
+            <ReportName>LAY-02</ReportName>
+            <Top>8.00in</Top>
+            <Height>0.25in</Height>
+            <Width>5.5in</Width>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Subreport>
+          <Subreport Name="Subreport29">
+            <ReportName>LAY-02</ReportName>
+            <Top>8.25in</Top>
+            <Height>0.25in</Height>
+            <Width>5.5in</Width>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Subreport>
+          <Subreport Name="Subreport30">
+            <ReportName>LAY-02</ReportName>
+            <Top>8.50in</Top>
+            <Height>0.25in</Height>
+            <Width>5.5in</Width>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Subreport>
+          <Subreport Name="Subreport31">
+            <ReportName>LAY-02</ReportName>
+            <Top>8.75in</Top>
+            <Height>0.25in</Height>
+            <Width>5.5in</Width>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Subreport>
+          <Subreport Name="Subreport32">
+            <ReportName>LAY-02</ReportName>
+            <Top>9.00in</Top>
+            <Height>0.25in</Height>
+            <Width>5.5in</Width>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Subreport>
+          <Subreport Name="Subreport33">
+            <ReportName>LAY-02</ReportName>
+            <Top>9.25in</Top>
+            <Height>0.25in</Height>
+            <Width>5.5in</Width>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Subreport>
+          <Subreport Name="Subreport34">
+            <ReportName>LAY-02</ReportName>
+            <Top>9.50in</Top>
+            <Height>0.25in</Height>
+            <Width>5.5in</Width>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Subreport>
+          <Subreport Name="Subreport35">
+            <ReportName>LAY-02</ReportName>
+            <Top>9.75in</Top>
+            <Height>0.25in</Height>
+            <Width>5.5in</Width>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Subreport>
+          <Subreport Name="Subreport36">
+            <ReportName>LAY-02</ReportName>
+            <Top>10.00in</Top>
+            <Height>0.25in</Height>
+            <Width>5.5in</Width>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Subreport>
+          <Subreport Name="Subreport37">
+            <ReportName>LAY-02</ReportName>
+            <Top>10.25in</Top>
+            <Height>0.25in</Height>
+            <Width>5.5in</Width>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Subreport>
+          <Subreport Name="Subreport38">
+            <ReportName>LAY-02</ReportName>
+            <Top>10.50in</Top>
+            <Height>0.25in</Height>
+            <Width>5.5in</Width>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Subreport>
+          <Subreport Name="Subreport39">
+            <ReportName>LAY-02</ReportName>
+            <Top>10.75in</Top>
+            <Height>0.25in</Height>
+            <Width>5.5in</Width>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Subreport>
+          <Subreport Name="Subreport40">
+            <ReportName>LAY-02</ReportName>
+            <Top>11.00in</Top>
+            <Height>0.25in</Height>
+            <Width>5.5in</Width>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Subreport>
+          <Subreport Name="Subreport41">
+            <ReportName>LAY-02</ReportName>
+            <Top>11.25in</Top>
+            <Height>0.25in</Height>
+            <Width>5.5in</Width>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Subreport>
+          <Subreport Name="Subreport42">
+            <ReportName>LAY-02</ReportName>
+            <Top>11.50in</Top>
+            <Height>0.25in</Height>
+            <Width>5.5in</Width>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Subreport>
+          <Subreport Name="Subreport43">
+            <ReportName>LAY-02</ReportName>
+            <Top>11.75in</Top>
+            <Height>0.25in</Height>
+            <Width>5.5in</Width>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Subreport>
+          <Subreport Name="Subreport44">
+            <ReportName>LAY-02</ReportName>
+            <Top>12.00in</Top>
+            <Height>0.25in</Height>
+            <Width>5.5in</Width>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Subreport>
+          <Subreport Name="Subreport45">
+            <ReportName>LAY-02</ReportName>
+            <Top>12.25in</Top>
+            <Height>0.25in</Height>
+            <Width>5.5in</Width>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Subreport>
+          <Subreport Name="Subreport46">
+            <ReportName>LAY-02</ReportName>
+            <Top>12.50in</Top>
+            <Height>0.25in</Height>
+            <Width>5.5in</Width>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Subreport>
+          <Subreport Name="Subreport47">
+            <ReportName>LAY-02</ReportName>
+            <Top>12.75in</Top>
+            <Height>0.25in</Height>
+            <Width>5.5in</Width>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Subreport>
+          <Subreport Name="Subreport48">
+            <ReportName>LAY-02</ReportName>
+            <Top>13.00in</Top>
+            <Height>0.25in</Height>
+            <Width>5.5in</Width>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Subreport>
+          <Subreport Name="Subreport49">
+            <ReportName>LAY-02</ReportName>
+            <Top>13.25in</Top>
+            <Height>0.25in</Height>
+            <Width>5.5in</Width>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Subreport>
+        </ReportItems>
+        <Height>14in</Height>
+        <Style>
+          <Border>
+            <Style>None</Style>
+          </Border>
+        </Style>
+      </Body>
+      <Width>6in</Width>
+      <Page>
+        <PageFooter>
+          <Height>0.45in</Height>
+          <PrintOnFirstPage>true</PrintOnFirstPage>
+          <PrintOnLastPage>true</PrintOnLastPage>
+          <ReportItems>
+            <Textbox Name="ExecutionTime">
+              <rd:DefaultName>ExecutionTime</rd:DefaultName>
+              <CanGrow>true</CanGrow>
+              <KeepTogether>true</KeepTogether>
+              <Paragraphs>
+                <Paragraph>
+                  <TextRuns>
+                    <TextRun>
+                      <Value>=Globals!ExecutionTime</Value>
+                      <Style />
+                    </TextRun>
+                  </TextRuns>
+                  <Style>
+                    <TextAlign>Right</TextAlign>
+                  </Style>
+                </Paragraph>
+              </Paragraphs>
+              <Top>0.2in</Top>
+              <Left>4in</Left>
+              <Height>0.25in</Height>
+              <Width>2in</Width>
+              <Style>
+                <Border>
+                  <Style>None</Style>
+                </Border>
+                <PaddingLeft>2pt</PaddingLeft>
+                <PaddingRight>2pt</PaddingRight>
+                <PaddingTop>2pt</PaddingTop>
+                <PaddingBottom>2pt</PaddingBottom>
+              </Style>
+            </Textbox>
+          </ReportItems>
+          <Style>
+            <Border>
+              <Style>None</Style>
+            </Border>
+          </Style>
+        </PageFooter>
+        <LeftMargin>1in</LeftMargin>
+        <RightMargin>1in</RightMargin>
+        <TopMargin>1in</TopMargin>
+        <BottomMargin>1in</BottomMargin>
+        <Style />
+      </Page>
+    </ReportSection>
+  </ReportSections>
+  <ReportParameters>
+    <ReportParameter Name="WORKSPACE_ID">
+      <DataType>String</DataType>
+      <DefaultValue>
+        <Values>
+          <Value>88b5780c-ab04-432a-8d14-e8c8a17c2e2e</Value>
+        </Values>
+      </DefaultValue>
+      <Prompt>WORKSPACE_ID</Prompt>
+      <cl:ComponentMetadata>
+        <cl:HideUpdateNotifications>true</cl:HideUpdateNotifications>
+      </cl:ComponentMetadata>
+    </ReportParameter>
+  </ReportParameters>
+  <ReportParametersLayout>
+    <GridLayoutDefinition>
+      <NumberOfColumns>4</NumberOfColumns>
+      <NumberOfRows>2</NumberOfRows>
+      <CellDefinitions>
+        <CellDefinition>
+          <ColumnIndex>0</ColumnIndex>
+          <RowIndex>0</RowIndex>
+          <ParameterName>WORKSPACE_ID</ParameterName>
+        </CellDefinition>
+      </CellDefinitions>
+    </GridLayoutDefinition>
+  </ReportParametersLayout>
+</Report>

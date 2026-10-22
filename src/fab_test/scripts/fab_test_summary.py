@@ -99,6 +99,11 @@ def _status_label(status: str) -> str:
     }.get(status, status)
 
 
+# A `local/NAME` target selects the `desktop` scope, a name kept in run.json
+# and `--format json`; the table uses the prefix a person types.
+_SCOPE_LABELS = {"desktop": "local"}
+
+
 def _print_list(
     rows: list[dict[str, Any]],
     output_format: str = "text",
@@ -129,7 +134,7 @@ def _print_list(
             r["glob"] or "(repository)",
             str(r["matched_artifacts"]),
             r["required_tool"] or "(none)",
-            ", ".join(r.get("scopes", ())) or "-",
+            ", ".join(sorted(_SCOPE_LABELS.get(s, s) for s in r.get("scopes", ()))) or "-",
         )
         for r in rows
     ]
@@ -188,38 +193,38 @@ def _print_auth_status(
     return exit_code
 
 
-def _print_doctor(rows: list[dict[str, Any]], output_format: str = "text") -> int:
+def _print_doctor(rows: list[dict[str, Any]], output_format: str = "text", strict: bool = False) -> int:
     """Print the `fab-test doctor` readiness report.
 
-    Returns 0 if at least one analyzer is ready, else 1.
-
-    ``ready`` is tri-state. None means "not applicable, or not verifiable
-    from here" and is neither a pass nor a failure: it neither satisfies the
-    at-least-one-ready condition nor prevents it. Telemetry uses it, because
-    an optional feature nobody configured must not report a broken install,
-    and a credential that resolves is not proof it may ingest.
+    Returns 1 on any ``error`` row (with ``strict``, a ``warning`` too). A row
+    without ``status`` (telemetry's) derives it from ``ready``, None being
+    ``info``: an unconfigured optional feature is not a broken install.
     """
-    any_ready = any(r["ready"] is True for r in rows)
-    blocking = [r for r in rows if r["ready"] is False]
+    for r in rows:
+        r.setdefault("status", {True: "ready", None: "info"}.get(r["ready"], "error"))
+    failing = {"error", "warning"} if strict else {"error"}
+    exit_code = 1 if any(r["status"] in failing for r in rows) else 0
 
     if output_format == "json":
         print(json.dumps({"analyzers": rows}, indent=2))
-        return 0 if any_ready or not blocking else 1
+        return exit_code
 
     paint = color_enabled()
     for r in rows:
-        icon = {True: "✅", False: "❌", None: "ℹ"}[r["ready"]]
+        icon, colour = _DOCTOR_MARKS[r["status"]]
         location = f" — {r['resolved_path']}" if r["resolved_path"] else ""
-        colour = {True: "green", False: "red", None: "yellow"}[r["ready"]]
         reason = _paint(r["reason"], colour, enabled=paint)
         print(f"{icon} {r['analyzer']}: {reason}{location}")
         if r.get("service"):
             print(f"   {r['service']}")
-        if r["ready"] is not True and r["remediation"]:
+        if r["status"] != "ready" and r["remediation"]:
             # Yellow, not red: this is the actionable half, and colouring it
             # the same as the failure would flatten the distinction.
             print(_paint(f"   → {r['remediation']}", "yellow", enabled=paint))
-    return 0 if any_ready or not blocking else 1
+    return exit_code
+
+
+_DOCTOR_MARKS = {"ready": ("✅", "green"), "warning": ("⚠", "yellow"), "info": ("ℹ", "yellow"), "error": ("❌", "red")}
 
 
 def _print_config_show(rows: list[dict[str, Any]], output_format: str = "text") -> int:

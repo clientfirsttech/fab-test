@@ -10,6 +10,8 @@ fab-test config --show             # every effective setting, its value, and whe
 fab-test config --validate         # confirm the config file's keys and types are valid
 ```
 
+`init` also keeps `.fab-test-tools/` (downloaded tools) and `fab-test-results/` (run output) out of Git: it creates the root `.gitignore` if there is none, and otherwise only appends the lines it lacks, in the file's own line endings. A line it already has in another spelling (`/fab-test-results`, `.fab-test-tools/**`) counts. `--format json` reports this as `gitignore: {path, added, would_add}`.
+
 ## Precedence
 
 | Priority | Source | Example |
@@ -159,13 +161,15 @@ rules:
     disable: [REMOVE_CUSTOM_VISUALS_NOT_USED]
     severity: {SOME_RULE_ID: warning}            # warning | error (PBIR Inspector has no "info" level)
   rdl:
-    disable: [DS-02]
+    disable: {LAY-04: "interactive sort is a product requirement"}   # or a list: [DS-02]
     severity: {QRY-07: info}                     # info | warning | error
+    settings:
+      QRY-07: {max_lines: 80}                    # thresholds; see docs/RDL-RULES.md for each range
 ```
 
 An overlay naming a rule ID that doesn't exist upstream exits `2` listing every unmatched ID. When any overlay is configured, the resolved ruleset is written to `<output_dir>/{bpa,pbir,rdl}/_resolved-rules.json` and passed to the tool; the envelope's `rules_file` field always names whichever rules file was actually used, so a finding is traceable back to the resolved ruleset it came from. Passing `--bpa-rules-path`/`--rules-path` explicitly bypasses the overlay entirely — that file is used verbatim; for `rdl` the equivalent explicit override is `--rdl-rules-path` specifically, not `--rules-path` — `rdl` needed its own flag name because `fab-test all` already dedicates `--rules-path` to `pbir` (the same reason `bpa` has its own `--bpa-rules-path`).
 
-Two of `rdl`'s rules read a threshold from their own catalog entry instead of a fixed constant — `QRY-07.max_lines` (default `50`, long `CommandText`) and `SUB-02.max_subreports` (default `49`, so `50` fails per the rule's own name). Neither `disable`/`severity`/`extend` can change one (`extend` only appends new rule objects, it never replaces an existing ID's fields) — to change a threshold, pass `--rdl-rules-path` at a fully custom copy of the catalog with that one field edited; there's no config-file way to override just the threshold today.
+`rdl` differs from `bpa`/`pbir` in three ways. `rules.rdl.settings` overrides a threshold the catalog declares (QRY-07 `max_lines`, PRM-03 `max_parameters`, SUB-02 `max_subreports`, DS-04 `min_similarity`, ACC-06 `min_contrast`/`min_contrast_large`); only a finite number of the declared type inside the declared range is accepted, never a string, boolean, list or NaN, and nothing is coerced or evaluated. `disable` may map a rule ID to a reason (one printable line, at most 200 characters), which the rule's `skip` row reports as `disabled: <reason>`. `extend` is refused, since every RDL check is built in. Any overlay error (an unknown section, key, rule or setting, or a bad value) stops the run before analysis with one line and exit `2`. `fab-test init` writes the `rdl` block from the catalog with every setting commented out at its default, and `fab-test config --show` lists each overlay delta with its origin.
 
 **Writing a PBIR Inspector rule** -- in an `extend` file or a fully custom `--rules-path` file -- has two traps, both found in fab-test's own filter-pane rules and invisible until the rule runs:
 

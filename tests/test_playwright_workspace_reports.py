@@ -19,14 +19,19 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from fab_test.scripts._command_builders import build_playwright_command
 from fab_test.scripts._playwright_dataset_target import (
     DatasetTargetExit,
     resolve_workspace_reports,
     workspace_reports_requested,
 )
-from fab_test.scripts.fab_test_execution import _discover_for, _run_analyzer
+from fab_test.scripts._run_targets import (
+    _discover_for,
+)
+from fab_test.scripts.fab_test_execution import (
+    _run_analyzer,
+)
 from fab_test.scripts.fab_test_parser import build_parser
-from fab_test.scripts.fab_test_registry import build_playwright_command
 
 WORKSPACE = "c4698d28-b05c-40bc-926c-707563ac85e7"
 

@@ -745,10 +745,11 @@ def _add_auth_subparser(subs: argparse._SubParsersAction) -> None:
         help="Show which identity fab-test would use, verifying it for real",
     )
     auth_status_p.add_argument(
+        "--workspace",
         "--workspace-id",
         default="",
         dest="workspace_id",
-        metavar="ID",
+        metavar="NAME_OR_ID",
         help="Check whether this workspace is reachable [env: FABRIC_WORKSPACE_ID]",
     )
     auth_status_p.add_argument(
@@ -847,6 +848,17 @@ def _add_doctor_subparser(subs: argparse._SubParsersAction) -> None:
         "--local",
         action="store_true",
         help="Check prerequisites for the local Desktop workflow (fab-test local)",
+    )
+    doctor_p.add_argument(
+        "--workspace",
+        "--workspace-id",
+        default="",
+        dest="workspace_id",
+        metavar="NAME_OR_ID",
+        help="Check service readiness against this workspace [env: FABRIC_WORKSPACE_ID]",
+    )
+    doctor_p.add_argument(
+        "--strict", action="store_true", help="Exit 1 on a warning as well as an error"
     )
 
 def _add_config_subparser(subs: argparse._SubParsersAction) -> None:

@@ -1,6 +1,6 @@
 ---
 name: fab-test
-description: fab-test CLI reference for running Fabric artifact analyzers locally (fab-test 1.9.0b10). Covers all subcommands, flags, artifact isolation, result locations, and how fab-test differs from pytest. Use when invoking, troubleshooting, or extending local artifact validation.
+description: fab-test CLI reference for running Fabric artifact analyzers locally (fab-test 1.9.0b11). Covers all subcommands, flags, artifact isolation, result locations, and how fab-test differs from pytest. Use when invoking, troubleshooting, or extending local artifact validation.
 ---
 
 # fab-test
@@ -44,7 +44,7 @@ From PyPI — the package is **`cft-fab-test`** (the command is still
 pre-releases unless you pass `--pre` or name the version exactly:
 
 ```bash
-pip install "cft-fab-test==1.9.0b10"     # or: pip install --pre cft-fab-test
+pip install "cft-fab-test==1.9.0b11"     # or: pip install --pre cft-fab-test
 ```
 
 `fab-test playwright` has its own install path. It runs its render spec as a
@@ -183,6 +183,10 @@ Discoverability {
 Constraints {
   doctor and list both support --format json
   doctor --analyzer NAME checks exactly one analyzer
+  doctor --workspace NAME_OR_ID checks service readiness against that workspace, as FABRIC_WORKSPACE_ID would
+  doctor marks each row ✅ ready, ⚠ warning (one setting away, e.g. credentials but no workspace), ℹ info (not set up, or a tool fetched on first run), or ❌ error (set up, and the run would fail); JSON rows carry it as `status`
+  doctor exits 1 on any ❌ (--strict: any ⚠ too), else 0 -- a CI gate for one analyzer uses doctor --analyzer NAME
+  doctor compares the az login account with `pql-test auth status` for pql_test (❌ when they differ, as the run would refuse)
   list's matched-artifact counts respect --artifact-dir
   explain ANALYZER never spawns a subprocess — it only shows the resolved command, tool path, rules path, and output path
 }
@@ -191,6 +195,7 @@ Constraints {
 ```bash
 fab-test doctor                       # is each analyzer's tool/credential ready?
 fab-test doctor --local               # readiness for the local Desktop workflow specifically
+fab-test doctor --workspace "Sales Dev"  # readiness for a service run against this workspace
 fab-test list                         # what subcommands exist, and how many artifacts match?
 fab-test explain bpa                  # what command would `fab-test bpa` actually run?
 ```
@@ -390,7 +395,7 @@ The case a pipeline meets most is a `detail` populated on an aborted run: `fab-t
  fab-test explain ANALYZER — Show the resolved command for one analyzer without running it
  fab-test config --show    — Print every effective setting with its value and origin
  fab-test config --validate — Confirm fab-test.yml's keys and types are valid
- fab-test init             — Scaffold fab-test.yml, .fab-test/.gitignore, and .fab-test/.env.example
+ fab-test init             — Scaffold fab-test.yml, .fab-test/.gitignore, and .fab-test/.env.example; append .fab-test-tools/ and fab-test-results/ to the root .gitignore
  fab-test auth status      — Show which identity fab-test would use, verified for real
  fab-test auth login       — Delegate sign-in to the tool that owns the credential
  fab-test clean-tools      — Remove or inspect the .fab-test-tools downloaded-binary cache

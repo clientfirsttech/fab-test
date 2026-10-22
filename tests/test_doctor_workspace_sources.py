@@ -18,7 +18,7 @@ import argparse
 
 import pytest
 
-from fab_test.scripts.fab_test_registry import check_readiness
+from fab_test.scripts._readiness import check_readiness
 
 _WS = "798dfd00-0081-45d3-a7a7-f74f62e57277"
 
@@ -66,7 +66,7 @@ def test_playwright_workspace_id_in_the_env_file_makes_the_playwright_family_rea
 def test_playwright_workspace_id_does_not_count_for_pql_test(_service_principal_only, monkeypatch):
     """pql_test's run never reads PLAYWRIGHT_WORKSPACE_ID, so doctor must not
     call it ready on that basis."""
-    monkeypatch.setattr("fab_test.scripts.fab_test_registry.desktop_ports", list)
+    monkeypatch.setattr("fab_test.scripts._readiness.desktop_ports", list)
     _service_principal_only.write_text(f"PLAYWRIGHT_WORKSPACE_ID={_WS}\n", encoding="utf-8")
     result = check_readiness("pql_test", _args())
     assert result["ready"] is False
@@ -76,3 +76,14 @@ def test_no_workspace_anywhere_is_still_not_ready():
     result = check_readiness("playwright", _args())
     assert result["ready"] is False
     assert "FABRIC_WORKSPACE_ID" in result["remediation"]
+
+
+@pytest.mark.parametrize("flag", ["--workspace", "--workspace-id"])
+def test_doctor_takes_the_workspace_flag_the_analyzers_take(flag):
+    """Given `doctor --workspace NAME`, should check readiness against that
+    workspace, as the run that flag belongs to would."""
+    from fab_test.scripts.fab_test_parser import build_parser
+
+    args = build_parser().parse_args(["doctor", flag, "Sales Dev", "--analyzer", "pql_test"])
+
+    assert check_readiness("pql_test", _args(workspace_id=args.workspace_id))["ready"] is True

@@ -292,18 +292,16 @@ def test_apply_rdl_overlay_accepts_info_severity_label(tmp_path):
 
 
 @pytest.mark.fab_test
-def test_apply_rdl_overlay_extends_with_additional_rules(tmp_path):
-    """Rules from the extend file are appended."""
+def test_apply_rdl_overlay_refuses_extend(tmp_path):
+    """RDL checks are built in: an extended rule would be a duplicate or have
+    no check, and would show skip forever (RDL Rule Settings epic)."""
     upstream = tmp_path / "rules.json"
     _write_rdl_rules(upstream, [_RDL_RULE_A])
     extra = tmp_path / "extra.json"
-    extra_rule = {"id": "CUSTOM", "name": "Custom", "disabled": False, "severity": "warning"}
-    _write_rdl_rules(extra, [extra_rule])
+    _write_rdl_rules(extra, [{"id": "CUSTOM", "name": "Custom", "disabled": False, "severity": "warning"}])
 
-    resolved = apply_rdl_overlay(upstream, {"extend": str(extra)})
-
-    ids = {r["id"] for r in resolved["rules"]}
-    assert ids == {"DS-02", "CUSTOM"}
+    with pytest.raises(RuleOverlayError, match="settings, severity or disable"):
+        apply_rdl_overlay(upstream, {"extend": str(extra)})
 
 
 @pytest.mark.fab_test

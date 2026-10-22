@@ -48,6 +48,7 @@ Source: rule set by John K, 2026-09-24. 44 rules checkable against a `.rdl` file
 | PRM-04 | No MultiValue + Nullable | `MultiValue = true` with `Nullable = true` isn't supported. | High | A | MS Learn: Power BI Report Builder |
 | PRM-05 | Show selected parameter values on the report | Each parameter appears as `Parameters!Name.Value`/`.Label` in a `Textbox`. | Low | A | MSSQLTips #4006 |
 | PRM-06 | Choose filter vs query parameter deliberately | Parameter in `DataSet/Filters` vs `Query/QueryParameters`. | Medium | B | MS Learn: Data retrieval |
+| PRM-07 | Multi-value parameters reach DAX through RSCustomDaxFilter | A `PBIDATASET` dataset's `QueryParameter` is `=Parameters!X.Value` for a `MultiValue` X, and its `CommandText` has no `RSCustomDaxFilter(@Name,Condition,[Table].[Column]` written without spaces (spaces there fail to render). | High | A | Chris Webb, [Power BI Report Builder And RSCustomDaxFilter](https://blog.crossjoin.co.uk/2019/11/03/power-bi-report-builder-and-rscustomdaxfilter/) |
 
 ## Layout and rendering
 

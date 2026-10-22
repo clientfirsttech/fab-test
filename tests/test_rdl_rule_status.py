@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from fab_test.scripts._rdl_lint import CHECKS, build_test_results, parse_rdl, run_checks
+from fab_test.scripts._rdl_lint import CHECKS, build_test_results, implemented_rule_ids, parse_rdl, run_checks
 
 pytestmark = [pytest.mark.rdl, pytest.mark.analyzers]
 
@@ -60,6 +60,13 @@ class TestEngine:
 
         assert [r["rule"] for r in rows] == ["FAKE-01"]
 
+    def test_an_alias_of_a_checked_rule_passes_when_clean(self):
+        catalog = [{**_rule("LAY-03", "active"), "aliases": ["SUB-01"]}, _rule("SUB-01", "active")]
+
+        rows = build_test_results(catalog, [], implemented=implemented_rule_ids(catalog))
+
+        assert {r["rule"]: r["status"] for r in rows} == {"LAY-03": "pass", "SUB-01": "pass"}
+
 
 class TestPackagedCatalog:
     def test_every_rule_declares_a_status(self):
@@ -71,8 +78,17 @@ class TestPackagedCatalog:
     @pytest.mark.parametrize("rule", _ACTIVE, ids=lambda r: r["id"])
     def test_an_active_rule_has_a_check_and_a_fixture_that_trips_it(self, rule):
         fixture = _fixture_path(rule["id"])
-        assert rule["id"] in CHECKS, f"{rule['id']} is active but has no check"
+        assert rule["id"] in implemented_rule_ids(_RULES), f"{rule['id']} is active but has no check"
         assert fixture.exists(), f"{rule['id']} is active but has no real fixture {fixture.name}"
         root, ns = parse_rdl(fixture)
         fired = {r for f in run_checks(root, ns, _RULES) for r in f["rule"].split("/")}
         assert rule["id"] in fired
+
+    @pytest.mark.parametrize("rule", _ACTIVE, ids=lambda r: r["id"])
+    def test_an_active_rule_has_a_pass_fixture_it_does_not_trip(self, rule):
+        """The near-miss: the remediated form, or a threshold just short of firing."""
+        fixture = _fixture_path(f"{rule['id']}-Pass")
+        assert fixture.exists(), f"{rule['id']} is active but has no near-miss fixture {fixture.name}"
+        root, ns = parse_rdl(fixture)
+        fired = {r for f in run_checks(root, ns, _RULES) for r in f["rule"].split("/")}
+        assert rule["id"] not in fired

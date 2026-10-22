@@ -5,7 +5,7 @@ epic) so a consumer's harness config can never drift from the installed
 CLI version by hand-copying a stale file. The resource is a directory --
 a main `SKILL.md` plus `references/*.md` (fab-test Skill Componentization
 epic split the original single 1065-line file, too many tokens to load
-for one subcommand's flags). Follows `fab_test_admin._init`'s "idempotent,
+for one subcommand's flags). Follows `fab_test_init._init`'s "idempotent,
 never clobber a differing local copy without --force, --dry-run reports
 the plan" pattern rather than inventing a new one.
 """

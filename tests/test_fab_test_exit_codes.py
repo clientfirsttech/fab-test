@@ -16,9 +16,10 @@ from pathlib import Path
 
 import pytest
 
+from fab_test.scripts import _readiness as readiness
 from fab_test.scripts._analyzer_tool_bootstrap import UnsupportedPlatformError
+from fab_test.scripts._readiness import preflight_error
 from fab_test.scripts.fab_test import _artifact_exit_code, _run_analyzer
-from fab_test.scripts.fab_test_registry import preflight_error
 from tests.conftest import _RunAnalyzerArgs
 
 # --------------------------------------------------------------------------- #
@@ -88,14 +89,13 @@ def test_cli_invalid_argument_exits_with_code_2():
 @pytest.mark.fab_test
 def test_preflight_error_platform_mismatch_returns_exit_code_126(monkeypatch):
     """A platform-only analyzer on an unsupported OS reports exit code 126."""
-    from fab_test.scripts import fab_test_registry as registry
 
     def _raise_unsupported(*_args, **_kwargs):
         raise UnsupportedPlatformError(
             "Analyzer 'bpa' is not supported on linux. Supported platform: win32."
         )
 
-    monkeypatch.setattr(registry, "resolve_tool", _raise_unsupported)
+    monkeypatch.setattr(readiness, "resolve_tool", _raise_unsupported)
     message, code = preflight_error("bpa", argparse.Namespace())
     assert code == 126
     assert "not supported on linux" in message
@@ -104,12 +104,11 @@ def test_preflight_error_platform_mismatch_returns_exit_code_126(monkeypatch):
 @pytest.mark.fab_test
 def test_preflight_error_other_runtime_error_returns_exit_code_127(monkeypatch):
     """A non-platform tool-resolution failure exits 127 (tool not found)."""
-    from fab_test.scripts import fab_test_registry as registry
 
     def _raise_generic(*_args, **_kwargs):
         raise RuntimeError("could not download TabularEditor.exe")
 
-    monkeypatch.setattr(registry, "resolve_tool", _raise_generic)
+    monkeypatch.setattr(readiness, "resolve_tool", _raise_generic)
     message, code = preflight_error("bpa", argparse.Namespace())
     assert code == 127
     assert "could not download" in message
@@ -118,7 +117,6 @@ def test_preflight_error_other_runtime_error_returns_exit_code_127(monkeypatch):
 @pytest.mark.fab_test
 def test_preflight_error_names_cli_flag_env_var_and_config_key(monkeypatch):
     """The missing-tool message names the CLI flag alongside env var/config key."""
-    from fab_test.scripts import fab_test_registry as registry
 
     def _raise_generic(*_args, **_kwargs):
         raise RuntimeError(
@@ -127,7 +125,7 @@ def test_preflight_error_names_cli_flag_env_var_and_config_key(monkeypatch):
             "  Or set tool_install.install_url in analyzers.json to a zip URL."
         )
 
-    monkeypatch.setattr(registry, "resolve_tool", _raise_generic)
+    monkeypatch.setattr(readiness, "resolve_tool", _raise_generic)
     message, code = preflight_error("bpa", argparse.Namespace())
     assert code == 127
     assert "--tabular-editor-path" in message
@@ -138,12 +136,11 @@ def test_preflight_error_names_cli_flag_env_var_and_config_key(monkeypatch):
 @pytest.mark.fab_test
 def test_preflight_error_pbir_names_inspector_path_flag(monkeypatch):
     """The pbir missing-tool message names --inspector-path."""
-    from fab_test.scripts import fab_test_registry as registry
 
     def _raise_generic(*_args, **_kwargs):
         raise RuntimeError("Could not resolve executable for analyzer 'pbir_inspector'.")
 
-    monkeypatch.setattr(registry, "resolve_tool", _raise_generic)
+    monkeypatch.setattr(readiness, "resolve_tool", _raise_generic)
     message, code = preflight_error("pbir", argparse.Namespace())
     assert code == 127
     assert "--inspector-path" in message
@@ -152,9 +149,8 @@ def test_preflight_error_pbir_names_inspector_path_flag(monkeypatch):
 @pytest.mark.fab_test
 def test_preflight_error_none_when_tool_resolves(monkeypatch):
     """No preflight error is returned when the tool resolves successfully."""
-    from fab_test.scripts import fab_test_registry as registry
 
-    monkeypatch.setattr(registry, "resolve_tool", lambda *a, **k: Path("/tmp/te.exe"))
+    monkeypatch.setattr(readiness, "resolve_tool", lambda *a, **k: Path("/tmp/te.exe"))
     assert preflight_error("bpa", argparse.Namespace()) is None
 
 

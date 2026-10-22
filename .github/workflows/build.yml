@@ -102,8 +102,14 @@ jobs:
       # token-saving constraint in vision.md that makes those runs useful.
       # The floor is a ratchet — raise it as coverage improves, never lower
       # it to accommodate a regression.
+      #
+      # Everything but playwright runs on every core; the playwright tests
+      # render real reports and turn correct renders into failures under CPU
+      # contention, so they run serially and append to the same coverage data.
       - name: Pytest
-        run: pytest -q --cov --cov-fail-under=80
+        run: |
+          pytest -q -n auto -m "not playwright" --cov
+          pytest -q -m playwright --cov --cov-append --cov-fail-under=80
 
   build:
     runs-on: ubuntu-latest

@@ -195,7 +195,9 @@ def _check_lay05_large_reports_page_breaks(
     findings: list[Finding] = []
     for tablix in root.iter("Tablix"):
         groups = list(tablix.iter("Group"))
-        if not groups:
+        # A Group with no GroupExpressions is the Details group every table gets;
+        # it alone is not a grouped report to break.
+        if not any(group.find("GroupExpressions") is not None for group in groups):
             continue
         has_page_break = any(group.find("PageBreak/BreakLocation") is not None for group in groups)
         if not has_page_break:

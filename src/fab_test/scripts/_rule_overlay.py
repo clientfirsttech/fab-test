@@ -31,6 +31,7 @@ do all three:
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 from typing import Any
 
@@ -39,8 +40,75 @@ _SEVERITY_LABELS: dict[str, int] = {"info": 1, "warning": 2, "error": 3}
 
 class RuleOverlayError(Exception):
     """Raised when an overlay names a rule ID that doesn't exist upstream,
-    or an unrecognized severity label.
+    an unrecognized severity label, or a setting that isn't a declared,
+    in-range number.
     """
+
+
+def _quote(value: Any) -> str:
+    """A config value as repr(), cut short: safe to echo to a terminal,
+    since repr escapes control characters."""
+    text = repr(value)
+    return text if len(text) <= 60 else text[:57] + "..."
+
+
+def _validated_setting(label: str, value: Any, spec: dict[str, Any]) -> int | float:
+    """Return ``value`` if it is a finite number of the declared type inside
+    the declared range. Never coerces: "80" and True are refused, not read
+    as 80 and 1."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+        raise RuleOverlayError(f"rules.rdl.settings.{label} must be a finite number, got {_quote(value)}")
+    if spec["type"] == "integer" and not isinstance(value, int):
+        raise RuleOverlayError(f"rules.rdl.settings.{label} must be a whole number, got {_quote(value)}")
+    if not spec["min"] <= value <= spec["max"]:
+        raise RuleOverlayError(
+            f"rules.rdl.settings.{label} must be between {spec['min']} and {spec['max']}, got {_quote(value)}"
+        )
+    return value
+
+
+_MAX_REASON_LENGTH = 200
+
+
+def _validated_reasons(disable: Any) -> dict[str, str]:
+    """``{rule ID: reason}`` from a disable map; {} for the plain list form.
+    A reason is shown in reports and telemetry, so it must be one short line
+    of printable text."""
+    if not isinstance(disable, dict):
+        return {}
+    for rule_id, reason in disable.items():
+        if not isinstance(reason, str) or not reason.strip():
+            raise RuleOverlayError(f"rules.rdl.disable.{rule_id}: the reason must be text, got {_quote(reason)}")
+        if len(reason) > _MAX_REASON_LENGTH or not reason.isprintable():
+            raise RuleOverlayError(
+                f"rules.rdl.disable.{rule_id}: the reason must be one line of at most "
+                f"{_MAX_REASON_LENGTH} printable characters, got {_quote(reason)}"
+            )
+    return {rule_id: reason.strip() for rule_id, reason in disable.items()}
+
+
+def _apply_rdl_settings(rules: list[dict[str, Any]], settings: Any) -> None:
+    """Set each overridden parameter on its (already copied) rule, in place."""
+    if not isinstance(settings, dict) or not all(isinstance(v, dict) for v in settings.values()):
+        raise RuleOverlayError(
+            "rules.rdl.settings must map a rule ID to {setting: number}, e.g. {QRY-07: {max_lines: 80}}"
+        )
+    tunable = {rule["id"]: rule for rule in rules if rule.get("settings")}
+    for rule_id, values in settings.items():
+        rule = tunable.get(rule_id)
+        if rule is None:
+            raise RuleOverlayError(
+                f"rules.rdl.settings: {_quote(rule_id)} has nothing to tune; "
+                f"tunable rules: {', '.join(sorted(tunable))}"
+            )
+        for name, value in values.items():
+            spec = rule["settings"].get(name)
+            if spec is None:
+                raise RuleOverlayError(
+                    f"rules.rdl.settings.{rule_id}: unknown setting {_quote(name)}; "
+                    f"valid settings: {', '.join(sorted(rule['settings']))}"
+                )
+            rule[name] = _validated_setting(f"{rule_id}.{name}", value, spec)
 
 
 def _load_rules(path: Path) -> list[dict[str, Any]]:
@@ -144,11 +212,12 @@ def apply_rdl_overlay(upstream_path: Path, overlay: dict[str, Any]) -> dict[str,
     (``{"rules": [...]}``), returning the resolved document. Never mutates
     or rewrites ``upstream_path``.
 
-    Same ``overlay`` keys and disable convention as ``apply_pbir_overlay``,
-    but ``severity`` sets the catalog's own ``"severity"`` field directly,
-    and accepts any of the envelope's three labels
-    (``"error"``/``"warning"``/``"info"``) -- the RDL catalog has no
-    PBIR-style restriction to rule out ``"info"``.
+    Same disable convention as ``apply_pbir_overlay``, but ``severity`` sets
+    the catalog's own ``"severity"`` field directly and accepts any of the
+    envelope's three labels (``"error"``/``"warning"``/``"info"``). Unlike
+    BPA and PBIR, ``disable`` may map an ID to a reason, ``settings``
+    overrides a declared threshold (validated, never coerced), and
+    ``extend`` is refused: the checks are built in.
     """
     data = json.loads(upstream_path.read_text(encoding="utf-8"))
     rules = data.get("rules", [])
@@ -162,12 +231,15 @@ def apply_rdl_overlay(upstream_path: Path, overlay: dict[str, Any]) -> dict[str,
             f"overlay names rule ID(s) not found in {upstream_path.name}: "
             f"{', '.join(unmatched)}"
         )
+    reasons = _validated_reasons(overlay.get("disable"))
 
     resolved_rules = []
     for original_rule in rules:
         rule = dict(original_rule)
         if rule["id"] in disable_ids:
             rule["disabled"] = True
+            if rule["id"] in reasons:
+                rule["disabled_reason"] = reasons[rule["id"]]
         label = severity_map.get(rule["id"])
         if label is not None:
             if label not in _SEVERITY_LABELS:
@@ -178,9 +250,75 @@ def apply_rdl_overlay(upstream_path: Path, overlay: dict[str, Any]) -> dict[str,
             rule["severity"] = label
         resolved_rules.append(rule)
 
-    extend_path = overlay.get("extend")
-    if extend_path:
-        extra = json.loads(Path(extend_path).read_text(encoding="utf-8"))
-        resolved_rules.extend(extra.get("rules", []) if isinstance(extra, dict) else extra)
+    if "settings" in overlay:
+        _apply_rdl_settings(resolved_rules, overlay["settings"])
+
+    if "extend" in overlay:
+        raise RuleOverlayError(
+            "rules.rdl.extend isn't supported: RDL checks are built in, so an added rule would have no check. "
+            "Tune the built-in rules with settings, severity or disable"
+        )
 
     return {**data, "rules": resolved_rules}
+
+
+
+_APPLY = {"bpa": apply_overlay, "pbir": apply_pbir_overlay, "rdl": apply_rdl_overlay}
+
+
+def validate_rule_overlays(rules: dict[str, Any], rule_files: dict[str, Path]) -> None:
+    """Apply each configured overlay once to its packaged file (``rule_files``,
+    keyed bpa/pbir/rdl) so a bad rule ID, label, setting or extend file stops
+    the run before anything starts, not mid-run. Section and key names are
+    already checked by ``_config.validate_config``. Raises RuleOverlayError.
+    """
+    for section, overlay in rules.items():
+        try:
+            _APPLY[section](rule_files[section], overlay)
+        except (OSError, ValueError) as exc:
+            raise RuleOverlayError(f"rules.{section}.extend could not be read: {exc}") from exc
+
+
+def _range_text(spec: dict[str, Any]) -> str:
+    kind = "whole number" if spec["type"] == "integer" else "number"
+    return f"{kind} {spec['min']}-{spec['max']}"
+
+
+def rdl_overlay_template(catalog_path: Path) -> str:
+    """The commented `rules.rdl` block `fab-test init` writes, built from the
+    catalog so every declared setting appears at its default, with its range."""
+    rules = json.loads(catalog_path.read_text(encoding="utf-8"))["rules"]
+    lines = [
+        "#   rdl:",
+        '#     disable: {LAY-04: "why it does not apply here"}   # or a list: [LAY-04]',
+        "#     severity: {QRY-07: info}            # info | warning | error",
+        "#     settings:                           # thresholds; each is checked against its range",
+    ]
+    for rule in (r for r in rules if r.get("settings")):
+        values = ", ".join(f"{name}: {json.dumps(rule[name])}" for name in rule["settings"])
+        specs = rule["settings"]
+        ranges = ", ".join((f"{name} " if len(specs) > 1 else "") + _range_text(spec) for name, spec in specs.items())
+        lines.append(f"#       {rule['id']}: {{{values}}}".ljust(44) + f"  # {ranges}; {rule['name']}")
+    return "\n".join(lines)
+
+
+def overlay_rows(rules: dict[str, Any]) -> list[dict[str, Any]]:
+    """`config --show` rows for each rule overlay delta (disabled rules, with
+    their reason; severity overrides; RDL settings), each naming its origin.
+    Expects a config already checked by validate_config."""
+    rows = []
+    for section in sorted(rules):
+        overlay, origin = rules[section], f"fab-test.yml:rules.{section}"
+        disable = overlay.get("disable", [])
+        reasons = disable if isinstance(disable, dict) else dict.fromkeys(disable)
+        for rule_id, reason in reasons.items():
+            value = f"disabled: {reason}" if reason else "disabled"
+            rows.append({"key": f"rules.{section}.disable.{rule_id}", "value": value, "origin": f"{origin}.disable"})
+        for rule_id, label in overlay.get("severity", {}).items():
+            rows.append({"key": f"rules.{section}.severity.{rule_id}", "value": label, "origin": f"{origin}.severity"})
+        for rule_id, values in overlay.get("settings", {}).items():
+            rows.extend(
+                {"key": f"rules.{section}.settings.{rule_id}.{name}", "value": value, "origin": f"{origin}.settings"}
+                for name, value in values.items()
+            )
+    return rows

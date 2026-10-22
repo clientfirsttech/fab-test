@@ -5,6 +5,11 @@ env/
 venv/
 ENV/
 
+# Node dependencies. The Rayfin fixtures under fabric-artifacts/ carry their
+# own .gitignore, but it exists only on branches that have the fixtures, so
+# switching away leaves their installed node_modules showing as untracked.
+node_modules/
+
 # Python build artifacts
 build/
 dist/

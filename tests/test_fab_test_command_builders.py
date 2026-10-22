@@ -16,16 +16,18 @@ from pathlib import Path
 
 import pytest
 
-from fab_test.scripts.fab_test_registry import (
-    _DEFAULT_A11Y_PATH,
-    _DEFAULT_BPA_RULES,
-    _DEFAULT_PBIR_RULES,
-    _DEFAULT_RDL_RULES,
+from fab_test.scripts._command_builders import (
     build_a11y_command,
     build_bpa_command,
     build_pbir_command,
     build_pql_test_command,
     build_rdl_command,
+)
+from fab_test.scripts.fab_test_registry import (
+    _DEFAULT_A11Y_PATH,
+    _DEFAULT_BPA_RULES,
+    _DEFAULT_PBIR_RULES,
+    _DEFAULT_RDL_RULES,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -55,13 +57,13 @@ def _pbip_project_dir(tmp_path, name):
 @pytest.mark.fab_test
 def test_build_pql_test_command_adds_desktop_flags_when_instance_matches(tmp_path, monkeypatch):
     """A matched Desktop instance's port and model name are added to the command."""
-    from fab_test.scripts import fab_test_registry
+    from fab_test.scripts import _command_builders
     from fab_test.scripts._desktop import DesktopInstance
 
     model_dir = _pbip_project_dir(tmp_path, "SampleModel")
     pbip_path = (tmp_path / "SampleModel.pbip").resolve()
     monkeypatch.setattr(
-        fab_test_registry,
+        _command_builders,
         "detect_desktop_instances",
         lambda: [DesktopInstance(port=51234, open_file_path=pbip_path)],
     )
@@ -78,14 +80,14 @@ def test_build_pql_test_command_adds_desktop_flags_when_instance_matches(tmp_pat
 @pytest.mark.fab_test
 def test_build_pql_test_command_skips_detection_when_workspace_id_given(tmp_path, monkeypatch):
     """--workspace-id skips Desktop detection entirely, even if a match exists."""
-    from fab_test.scripts import fab_test_registry
+    from fab_test.scripts import _command_builders
 
     model_dir = _pbip_project_dir(tmp_path, "SampleModel")
 
     def _fail_if_called():
         raise AssertionError("detect_desktop_instances must not be called with --workspace-id")
 
-    monkeypatch.setattr(fab_test_registry, "detect_desktop_instances", _fail_if_called)
+    monkeypatch.setattr(_command_builders, "detect_desktop_instances", _fail_if_called)
 
     args = argparse.Namespace(workspace_id="workspace-123", environment="")
     cmd = build_pql_test_command(model_dir, args, REPO_ROOT / "fab-test-results")
@@ -97,10 +99,10 @@ def test_build_pql_test_command_skips_detection_when_workspace_id_given(tmp_path
 @pytest.mark.fab_test
 def test_build_pql_test_command_omits_desktop_flags_when_no_instance_running(tmp_path, monkeypatch):
     """No running Desktop instance leaves the command unchanged from today."""
-    from fab_test.scripts import fab_test_registry
+    from fab_test.scripts import _command_builders
 
     model_dir = _pbip_project_dir(tmp_path, "SampleModel")
-    monkeypatch.setattr(fab_test_registry, "detect_desktop_instances", list)
+    monkeypatch.setattr(_command_builders, "detect_desktop_instances", list)
 
     args = argparse.Namespace(workspace_id="", environment="")
     cmd = build_pql_test_command(model_dir, args, REPO_ROOT / "fab-test-results")
@@ -112,13 +114,13 @@ def test_build_pql_test_command_omits_desktop_flags_when_no_instance_running(tmp
 @pytest.mark.fab_test
 def test_build_pql_test_command_omits_desktop_flags_when_artifact_has_no_pbip(tmp_path, monkeypatch):
     """An artifact with no paired .pbip never attempts Desktop matching."""
-    from fab_test.scripts import fab_test_registry
+    from fab_test.scripts import _command_builders
     from fab_test.scripts._desktop import DesktopInstance
 
     model_dir = tmp_path / "Orphan.SemanticModel"
     model_dir.mkdir(parents=True)
     monkeypatch.setattr(
-        fab_test_registry,
+        _command_builders,
         "detect_desktop_instances",
         lambda: [DesktopInstance(port=1, open_file_path=tmp_path / "Orphan.pbip")],
     )

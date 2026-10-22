@@ -13,8 +13,9 @@ from pathlib import Path
 
 import pytest
 
+from fab_test.scripts import _readiness as readiness
 from fab_test.scripts._analyzer_tool_bootstrap import probe_executable
-from fab_test.scripts.fab_test_registry import check_readiness
+from fab_test.scripts._readiness import check_readiness
 
 # A path guaranteed not to exist, so credential/env-file resolution in this
 # module never picks up a real `.fab-test/.env` or `.env` a developer keeps
@@ -181,8 +182,8 @@ def test_check_readiness_bpa_delegates_to_probe(tmp_path, monkeypatch):
     class _Args:
         tabular_editor_path = str(existing)
 
-    monkeypatch.setattr(registry, "ANALYZERS_JSON", registry.ANALYZERS_JSON)
-    result = registry.check_readiness("bpa", _Args())
+    monkeypatch.setattr(readiness, "ANALYZERS_JSON", registry.ANALYZERS_JSON)
+    result = readiness.check_readiness("bpa", _Args())
 
     assert result["ready"] is True
     assert result["resolved_path"] == str(existing.resolve())
@@ -191,7 +192,6 @@ def test_check_readiness_bpa_delegates_to_probe(tmp_path, monkeypatch):
 @pytest.mark.fab_test
 def test_check_readiness_a11y_delegates_to_probe_via_its_own_flag(tmp_path):
     """check_readiness('a11y', args) resolves via --a11y-path like bpa/pbir do."""
-    from fab_test.scripts import fab_test_registry as registry
 
     existing = tmp_path / "cli.js"
     existing.write_text("// built", encoding="utf-8")
@@ -199,7 +199,7 @@ def test_check_readiness_a11y_delegates_to_probe_via_its_own_flag(tmp_path):
     class _Args:
         a11y_path = str(existing)
 
-    result = registry.check_readiness("a11y", _Args())
+    result = readiness.check_readiness("a11y", _Args())
 
     assert result["ready"] is True
     assert result["resolved_path"] == str(existing.resolve())
@@ -221,7 +221,7 @@ def test_a11y_is_a_fully_advertised_analyzer():
     assert "a11y" not in HIDDEN_ANALYZERS
     assert "a11y" in visible_analyzers()
     result = check_readiness("a11y", None)
-    assert set(result.keys()) == {"ready", "resolved_path", "reason", "remediation", "version"}
+    assert set(result.keys()) == {"ready", "resolved_path", "reason", "remediation", "version", "status"}
 
 
 @pytest.mark.fab_test
@@ -241,10 +241,10 @@ def test_check_readiness_non_bootstrapped_analyzer_is_always_ready():
 
 @pytest.mark.fab_test
 def test_check_readiness_returns_same_shape_for_every_analyzer():
-    """Every analyzer's readiness dict has the same five keys (stable for `doctor`)."""
+    """Every analyzer's readiness dict has the same six keys (stable for `doctor`)."""
     from fab_test.scripts.fab_test_registry import ANALYZER_REGISTRY
 
-    expected_keys = {"ready", "resolved_path", "reason", "remediation", "version"}
+    expected_keys = {"ready", "resolved_path", "reason", "remediation", "version", "status"}
     for name in ANALYZER_REGISTRY:
         result = check_readiness(name, None)
         assert set(result.keys()) == expected_keys, f"{name} readiness shape mismatch"
@@ -289,27 +289,29 @@ def _set_service_principal(monkeypatch):
 
 @pytest.mark.fab_test
 def test_cloud_analyzer_not_ready_without_workspace_credentials_or_desktop(monkeypatch):
-    """pql_test with nothing configured is not ready -- the false green this fixes."""
-    from fab_test.scripts import fab_test_registry as registry
+    """pql_test with nothing configured is not ready -- the false green this fixes.
+
+    Not configured is info, not an error (Doctor Severity epic).
+    """
 
     _clear_cloud_env(monkeypatch)
-    monkeypatch.setattr(registry, "desktop_ports", list)  # no instance running
+    monkeypatch.setattr(readiness, "desktop_ports", list)  # no instance running
 
-    result = registry.check_readiness("pql_test", None)
+    result = readiness.check_readiness("pql_test", None)
 
-    assert result["ready"] is False
+    assert result["ready"] is not True
+    assert result["status"] == "info"
     assert result["remediation"] is not None
 
 
 @pytest.mark.fab_test
 def test_cloud_analyzer_remediation_names_every_accepted_source(monkeypatch):
     """Not-ready remediation names the workspace variable, the credentials, and Desktop."""
-    from fab_test.scripts import fab_test_registry as registry
 
     _clear_cloud_env(monkeypatch)
-    monkeypatch.setattr(registry, "desktop_ports", list)  # no instance running
+    monkeypatch.setattr(readiness, "desktop_ports", list)  # no instance running
 
-    remediation = registry.check_readiness("pql_test", None)["remediation"]
+    remediation = readiness.check_readiness("pql_test", None)["remediation"]
 
     assert "FABRIC_WORKSPACE_ID" in remediation
     assert "FABRIC_SERVICE_PRINCIPAL_ID" in remediation
@@ -319,13 +321,12 @@ def test_cloud_analyzer_remediation_names_every_accepted_source(monkeypatch):
 @pytest.mark.fab_test
 def test_cloud_analyzer_ready_with_workspace_and_service_principal(monkeypatch):
     """A workspace plus resolvable credentials reports ready and names the source."""
-    from fab_test.scripts import fab_test_registry as registry
 
     _clear_cloud_env(monkeypatch)
     monkeypatch.setenv("FABRIC_WORKSPACE_ID", "33333333-3333-3333-3333-333333333333")
     _set_service_principal(monkeypatch)
 
-    result = registry.check_readiness("playwright", None)
+    result = readiness.check_readiness("playwright", None)
 
     assert result["ready"] is True
     assert "workspace" in result["reason"].lower()
@@ -342,14 +343,13 @@ def test_cloud_analyzer_with_workspace_but_no_credentials_is_not_ready(monkeypat
     tests/test_credentials.py for the ambient path itself.
     """
     from fab_test.scripts import _credentials
-    from fab_test.scripts import fab_test_registry as registry
 
     _clear_cloud_env(monkeypatch)
     monkeypatch.setenv("FABRIC_WORKSPACE_ID", "33333333-3333-3333-3333-333333333333")
-    monkeypatch.setattr(registry, "desktop_ports", list)  # no instance running
+    monkeypatch.setattr(readiness, "desktop_ports", list)  # no instance running
     monkeypatch.setattr(_credentials, "ambient_credential_available", lambda: False)
 
-    result = registry.check_readiness("pql_test", None)
+    result = readiness.check_readiness("pql_test", None)
 
     assert result["ready"] is False
     assert "FABRIC_SERVICE_PRINCIPAL_ID" in result["remediation"]
@@ -360,13 +360,13 @@ def test_cloud_analyzer_with_workspace_but_no_credentials_is_not_ready(monkeypat
 def test_workspace_plus_ambient_credential_is_ready_but_flagged_unverified(monkeypatch):
     """An az-logged-in developer is not reported red, but the reason says unproven."""
     from fab_test.scripts import _credentials
-    from fab_test.scripts import fab_test_registry as registry
 
     _clear_cloud_env(monkeypatch)
     monkeypatch.setenv("FABRIC_WORKSPACE_ID", "33333333-3333-3333-3333-333333333333")
     monkeypatch.setattr(_credentials, "ambient_credential_available", lambda: True)
+    monkeypatch.setattr("fab_test.scripts._pql_identity.identity_check", lambda: None)
 
-    result = registry.check_readiness("pql_test", None)
+    result = readiness.check_readiness("pql_test", None)
 
     assert result["ready"] is True
     assert "unverified" in result["reason"]
@@ -376,12 +376,11 @@ def test_workspace_plus_ambient_credential_is_ready_but_flagged_unverified(monke
 @pytest.mark.fab_test
 def test_pql_test_is_ready_via_a_running_desktop_instance(monkeypatch):
     """A running Desktop instance makes pql_test ready with no workspace at all."""
-    from fab_test.scripts import fab_test_registry as registry
 
     _clear_cloud_env(monkeypatch)
-    monkeypatch.setattr(registry, "desktop_ports", lambda: [51001])
+    monkeypatch.setattr(readiness, "desktop_ports", lambda: [51001])
 
-    result = registry.check_readiness("pql_test", None)
+    result = readiness.check_readiness("pql_test", None)
 
     assert result["ready"] is True
     assert "desktop" in result["reason"].lower()
@@ -390,14 +389,14 @@ def test_pql_test_is_ready_via_a_running_desktop_instance(monkeypatch):
 @pytest.mark.fab_test
 def test_playwright_does_not_fall_back_to_desktop(monkeypatch):
     """Only pql_test binds to Desktop; playwright needs a real workspace."""
-    from fab_test.scripts import fab_test_registry as registry
 
     _clear_cloud_env(monkeypatch)
-    monkeypatch.setattr(registry, "desktop_ports", lambda: [51001])
+    monkeypatch.setattr(readiness, "desktop_ports", lambda: [51001])
 
-    result = registry.check_readiness("playwright", None)
+    result = readiness.check_readiness("playwright", None)
 
-    assert result["ready"] is False
+    assert result["ready"] is not True
+    assert result["status"] != "ready"
 
 
 @pytest.mark.fab_test
@@ -411,13 +410,12 @@ def test_playwright_ambient_credential_is_not_ready(monkeypatch):
     traceback on the one command that cannot use their sign-in.
     """
     from fab_test.scripts import _credentials
-    from fab_test.scripts import fab_test_registry as registry
 
     _clear_cloud_env(monkeypatch)
     monkeypatch.setenv("FABRIC_WORKSPACE_ID", "33333333-3333-3333-3333-333333333333")
     monkeypatch.setattr(_credentials, "ambient_credential_available", lambda: True)
 
-    result = registry.check_readiness("playwright", None)
+    result = readiness.check_readiness("playwright", None)
 
     assert result["ready"] is False
     assert result["remediation"] is not None
@@ -426,7 +424,6 @@ def test_playwright_ambient_credential_is_not_ready(monkeypatch):
 @pytest.mark.fab_test
 def test_explicit_workspace_id_argument_is_honored(monkeypatch):
     """--workspace-id counts as a resolved workspace even with no env var set."""
-    from fab_test.scripts import fab_test_registry as registry
 
     class _CloudArgs:
         workspace_id = "44444444-4444-4444-4444-444444444444"
@@ -434,7 +431,7 @@ def test_explicit_workspace_id_argument_is_honored(monkeypatch):
     _clear_cloud_env(monkeypatch)
     _set_service_principal(monkeypatch)
 
-    result = registry.check_readiness("pql_test", _CloudArgs())
+    result = readiness.check_readiness("pql_test", _CloudArgs())
 
     assert result["ready"] is True
 
@@ -453,28 +450,26 @@ def test_file_only_analyzer_stays_ready_without_any_credentials(monkeypatch):
 @pytest.mark.fab_test
 def test_readiness_never_echoes_a_credential_value(monkeypatch):
     """The secrets constraint: no probe output ever contains the secret itself."""
-    from fab_test.scripts import fab_test_registry as registry
 
     _clear_cloud_env(monkeypatch)
     monkeypatch.setenv("FABRIC_WORKSPACE_ID", "33333333-3333-3333-3333-333333333333")
     _set_service_principal(monkeypatch)
 
-    result = registry.check_readiness("pql_test", None)
+    result = readiness.check_readiness("pql_test", None)
 
     assert "s3cr3t-do-not-print" not in json.dumps(result)
 
 
 @pytest.mark.fab_test
-def test_cloud_analyzer_readiness_keeps_the_stable_five_keys(monkeypatch):
+def test_cloud_analyzer_readiness_keeps_the_stable_keys(monkeypatch):
     """A not-ready cloud row has the same shape as every other row (JSON consumers)."""
-    from fab_test.scripts import fab_test_registry as registry
 
     _clear_cloud_env(monkeypatch)
-    monkeypatch.setattr(registry, "desktop_ports", list)  # no instance running
+    monkeypatch.setattr(readiness, "desktop_ports", list)  # no instance running
 
-    result = registry.check_readiness("pql_test", None)
+    result = readiness.check_readiness("pql_test", None)
 
-    assert set(result.keys()) == {"ready", "resolved_path", "reason", "remediation", "version"}
+    assert set(result.keys()) == {"ready", "resolved_path", "reason", "remediation", "version", "status"}
 
 
 @pytest.mark.fab_test
@@ -482,7 +477,6 @@ def test_readiness_probe_spawns_no_subprocess_for_a_cloud_analyzer(monkeypatch):
     """The probe stays cheap: no subprocess, per check_readiness's contract."""
     import subprocess
 
-    from fab_test.scripts import fab_test_registry as registry
 
     _clear_cloud_env(monkeypatch)
 
@@ -492,4 +486,4 @@ def test_readiness_probe_spawns_no_subprocess_for_a_cloud_analyzer(monkeypatch):
     monkeypatch.setattr(subprocess, "run", _fail)
     monkeypatch.setattr(subprocess, "Popen", _fail)
 
-    registry.check_readiness("pql_test", None)
+    readiness.check_readiness("pql_test", None)

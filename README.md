@@ -16,7 +16,7 @@ every command in this README are unchanged.
 
 ### From PyPI (beta)
 
-The current release is the beta `1.9.0b10`. pip skips pre-releases unless you
+The current release is the beta `1.9.0b11`. pip skips pre-releases unless you
 pass `--pre` or name the version, so a bare `pip install cft-fab-test` finds
 nothing until the first final release.
 
@@ -24,7 +24,7 @@ nothing until the first final release.
 python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
 
-pip install --pre cft-fab-test          # or pin it: "cft-fab-test==1.9.0b10"
+pip install --pre cft-fab-test          # or pin it: "cft-fab-test==1.9.0b11"
 
 fab-test --version
 ```
@@ -61,7 +61,7 @@ holds per-contributor values, such as the UPN `fab-test playwright` uses for
 RLS embed tokens, that must never be committed.
 
 ```bash
-fab-test init            # scaffolds a commented fab-test.yml (and .fab-test/.env.example)
+fab-test init            # scaffolds a commented fab-test.yml (and .fab-test/.env.example), and gitignores .fab-test-tools/ and fab-test-results/
 ```
 
 Uncomment only what you need. For the Playwright RLS tests, set
@@ -586,6 +586,7 @@ Status and non-zero counts are coloured in a terminal. Colour is off when output
 
 ```bash
 fab-test doctor --format json          # 1. is each analyzer's tool/credential ready?
+                                       #    (add --workspace NAME for a service run)
 fab-test list --format json            # 2. what subcommands exist, and how many artifacts match?
 fab-test bpa --format json             # 3. run it; stdout is exactly one JSON document
 cat fab-test-results/run.json          # 4. read the manifest instead of globbing result dirs
@@ -602,7 +603,7 @@ See [`docs/QUICK-VALIDATION.md`](https://github.com/clientfirsttech/fab-test/blo
 `fab-test.yml` at the repository root is an entirely optional config-file front door; no file at all means every setting behaves exactly as it always has.
 
 ```bash
-fab-test init                # scaffold a commented fab-test.yml and .env.example
+fab-test init                # scaffold a commented fab-test.yml and .env.example; append fab-test's folders to .gitignore
 fab-test config --show       # every effective setting, its value, and where it came from
 fab-test config --validate   # confirm the config file's keys and types are valid
 ```

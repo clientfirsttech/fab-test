@@ -3,7 +3,10 @@
 | File | Purpose |
 |------|---------|
 | `scripts/fab_test.py` | CLI entry point — argument parser, artifact discovery, subprocess dispatch |
-| `scripts/fab_test_registry.py` | Analyzer registry, artifact discovery, and command builders |
+| `scripts/fab_test_registry.py` | Analyzer registry tables, scopes, and artifact discovery |
+| `scripts/_run_targets.py` | Target resolution for a run: workspace and `WS.Workspace/NAME` targets, `--from-workspace` reports, and the target recorded in `run.json` |
+| `scripts/_readiness.py` | Tool resolution and readiness: `resolve_tool`, `preflight_error`, `check_readiness` (what `doctor`, `explain` and every run consult) |
+| `scripts/_command_builders.py` | Per-analyzer command builders (`build_<name>_command`, `_COMMAND_BUILDERS`, `build_command`) and the rule-overlay path resolvers |
 | `scripts/invoke_tabular_editor_bpa.py` | BPA subprocess wrapper |
 | `scripts/invoke_pbir_inspector.py` | PBIR Inspector subprocess wrapper |
 | `scripts/invoke_pql_test.py` | pql-test subprocess wrapper (venv-aware lookup, native JSON parsing) |

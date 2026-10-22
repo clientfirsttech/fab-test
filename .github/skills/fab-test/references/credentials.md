@@ -9,7 +9,7 @@ Reports which identity would be used, and unlike `doctor` it verifies for real â
 ```bash
 fab-test auth status                      # readable table
 fab-test auth status --format json        # one JSON document on stdout
-fab-test auth status --workspace-id <id>  # also check that workspace is reachable
+fab-test auth status --workspace <name-or-id>  # also check that workspace is reachable
 ```
 
 | Code | Meaning |

@@ -363,6 +363,7 @@ def _probe_pending_install(
                 "reason": "not yet installed",
                 "remediation": f"Would npm install {install_url} on first run.",
                 "version": None,
+                "status": "info",  # fetched on first run, not broken
             }
         action = f"build version {pinned_version} from source at" if pinned_version else "build from source at"
     else:
@@ -377,6 +378,7 @@ def _probe_pending_install(
         "reason": "not yet built" if archive_type == "npm_build" else "not yet downloaded",
         "remediation": remediation,
         "version": None,
+        "status": "info",
     }
 
 

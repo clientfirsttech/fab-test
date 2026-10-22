@@ -90,10 +90,13 @@ class TestQry02NoCalculatedFields:
         assert _check_qry02_no_calculated_fields(root, namespace, {}) == []
 
 
+_SALES = "<DataSets>" + dataset("Sales", "DS1", "SELECT Amount FROM Sales") + "</DataSets>"
+
+
 class TestQry03AggregateInQuery:
     def test_flags_an_aggregate_scoped_to_a_whole_dataset(self, tmp_path):
         xml = report(
-            '<Body><ReportItems><Textbox Name="Tb1"><Value>'
+            _SALES + '<Body><ReportItems><Textbox Name="Tb1"><Value>'
             '=Sum(Fields!Amount.Value, "Sales")'
             "</Value></Textbox></ReportItems></Body>"
         )
@@ -118,7 +121,7 @@ class TestQry03AggregateInQuery:
 
     def test_deduplicates_the_same_dataset_scoped_aggregate(self, tmp_path):
         xml = report(
-            '<Body><ReportItems>'
+            _SALES + '<Body><ReportItems>'
             '<Textbox Name="Tb1"><Value>=Sum(Fields!Amount.Value, "Sales")</Value></Textbox>'
             '<Textbox Name="Tb2"><Value>=Sum(Fields!Amount.Value, "Sales")</Value></Textbox>'
             "</ReportItems></Body>"
@@ -127,6 +130,29 @@ class TestQry03AggregateInQuery:
 
         assert len(_check_qry03_aggregate_in_query(root, namespace, {})) == 1
 
+
+    def test_an_aggregate_scoped_to_a_group_is_not_flagged(self, tmp_path):
+        """A quoted scope naming a tablix group is a group subtotal, not a whole-dataset aggregate."""
+        xml = report(
+            _SALES + '<Body><ReportItems><Textbox Name="Tb1"><Value>'
+            '=Sum(Fields!Amount.Value, "Region")'
+            "</Value></Textbox></ReportItems></Body>"
+        )
+        root, namespace = parse(tmp_path, xml)
+
+        assert _check_qry03_aggregate_in_query(root, namespace, {}) == []
+
+    def test_flags_a_dataset_scoped_aggregate_over_a_nested_call(self, tmp_path):
+        xml = report(
+            _SALES + '<Body><ReportItems><Textbox Name="Tb1"><Value>'
+            '=Sum(CDec(Fields!Amount.Value), "Sales")'
+            "</Value></Textbox></ReportItems></Body>"
+        )
+        root, namespace = parse(tmp_path, xml)
+
+        findings = _check_qry03_aggregate_in_query(root, namespace, {})
+
+        assert [f["object"] for f in findings] == ["Sales"]
 
 class TestQry04SortInQuery:
     def test_flags_an_explicit_group_sort(self, tmp_path):
