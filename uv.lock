@@ -253,7 +253,7 @@ requires-dist = [
     { name = "azure-kusto-ingest", marker = "extra == 'telemetry'" },
     { name = "azure-storage-file-datalake", marker = "extra == 'telemetry-lakehouse'", specifier = "==12.25.0" },
     { name = "playwright" },
-    { name = "pql-test", specifier = "==0.1.19" },
+    { name = "pql-test", specifier = "==0.1.20" },
     { name = "pre-commit", marker = "extra == 'dev'" },
     { name = "pytest", marker = "extra == 'dev'" },
     { name = "pytest", marker = "extra == 'playwright'" },
@@ -1055,10 +1055,11 @@ wheels = [
 
 [[package]]
 name = "pql-test"
-version = "0.1.19"
+version = "0.1.20"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "azure-identity" },
+    { name = "certifi" },
     { name = "click" },
     { name = "keyring" },
     { name = "msal" },
@@ -1066,9 +1067,9 @@ dependencies = [
     { name = "pyadomd" },
     { name = "python-dotenv" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/e1/a1/0ed5c05290e19e7b637d1bd9b64b4210d6ba3782725d379c0261becf486f/pql_test-0.1.19.tar.gz", hash = "sha256:ebb32baffb19f111ef1c983c5e2bccf4ec64cc74aff1cc117e867e33f0ea8fa0", size = 199324, upload-time = "2026-10-05T17:45:47.183Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/15/b3/63914d79b8ab2d578bc5914f9d62e1fb48987103581a95a9eb0e71f872db/pql_test-0.1.20.tar.gz", hash = "sha256:a793e3c9e502f8aa70d3cf7e2d89dfece8bf2e94995576087270f7418c1d4d85", size = 199513, upload-time = "2026-10-22T18:14:34.013Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/2a/5f/4d98b86db0e8578e4a2be765dacfb7a6078269b2dc112a3689cdb826e0f4/pql_test-0.1.19-py3-none-any.whl", hash = "sha256:e67080cae20594657cfdd89adaf88a7642d7544195d984dc1d9c7445b957392e", size = 110642, upload-time = "2026-10-05T17:45:45.402Z" },
+    { url = "https://files.pythonhosted.org/packages/0a/e7/9abd1dfe693cf928801a7c29ab0021b289ca2d1b76109a37282cabdcd600/pql_test-0.1.20-py3-none-any.whl", hash = "sha256:c1973691da17a56c53156f2d97dfe1aaf0f301832b885352fb75b792849ba201", size = 110652, upload-time = "2026-10-22T18:14:32.367Z" },
 ]
 
 [[package]]

@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-10-22
+
+- 📦 - `pql-test` Pin `0.1.20` - Up from `0.1.19`; it adds `certifi>=2026.10.19` as a dependency, same Python range.
+
 ## 2026-10-10
 
 - ✨ - `fab-test init` Gitignores fab-test's Folders - A run creates `.fab-test-tools/` (downloaded tools, hundreds of MB) and `fab-test-results/` at the repository root, and nothing kept them out of Git. `init` now creates the root `.gitignore` with both if there is none, or appends only the missing lines to an existing one, in its own line endings; it never rewrites what is there, and an equivalent spelling (`/fab-test-results`, `.fab-test-tools/**`) counts. `--dry-run` reports what it would add; `--format json` adds a `gitignore` object. `init` moved to `fab_test_init.py`.
