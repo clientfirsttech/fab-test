@@ -204,6 +204,33 @@ def _is_violation(finding: dict[str, Any]) -> bool:
     return _is_error_finding(finding) or _is_warning_finding(finding)
 
 
+def _visual_page_names(artifact_path: Path) -> dict[str, str]:
+    """Map each visual id to its page's display name.
+
+    Report-scoped rules (``part: Report``) that test visuals by mapping
+    over them -- e.g. the filter-pane rules -- get ``ParentDisplayName:
+    "N/A"`` from PBIR Inspector, because the rule itself isn't attached
+    to any one page. ``_normalize_finding`` uses this map to recover
+    which page(s) the named visuals actually live on.
+    """
+    names: dict[str, str] = {}
+    pages_dir = artifact_path / "definition" / "pages"
+    if not pages_dir.is_dir():
+        return names
+    for page_dir in pages_dir.iterdir():
+        if not page_dir.is_dir():
+            continue
+        display_name = page_dir.name
+        page_json = page_dir / "page.json"
+        if page_json.is_file():
+            with contextlib.suppress(OSError, ValueError):
+                display_name = json.loads(page_json.read_text(encoding="utf-8-sig")).get("displayName") or display_name
+        for visual_dir in (page_dir / "visuals").glob("*"):
+            if visual_dir.is_dir():
+                names[visual_dir.name] = display_name
+    return names
+
+
 def _page_name(finding: dict[str, Any]) -> str:
     """Extract a page name from a PBIR finding."""
     parent = finding.get("ParentDisplayName") or ""
@@ -248,7 +275,21 @@ def _pbir_rule_id(finding: dict[str, Any]) -> str:
     )
 
 
-def _normalize_finding(finding: dict[str, Any]) -> dict[str, Any]:
+def _report_scoped_object(finding: dict[str, Any], page_names: dict[str, str]) -> str:
+    """Resolve the page(s) a report-scoped, per-visual finding actually names.
+
+    Only applies when PBIR Inspector left ``ParentDisplayName`` empty or
+    ``"N/A"`` (no single page owns the rule) and ``Actual`` is the list of
+    offending visual ids these rules return.
+    """
+    actual = finding.get("Actual")
+    if not isinstance(actual, list):
+        return ""
+    pages = sorted({page_names[visual_id] for visual_id in actual if visual_id in page_names})
+    return ", ".join(pages)
+
+
+def _normalize_finding(finding: dict[str, Any], page_names: dict[str, str] | None = None) -> dict[str, Any]:
     """Translate a PBIR Inspector result into the shared finding schema.
 
     The shared schema expects ``rule``, ``severity``, ``object``, and
@@ -258,10 +299,13 @@ def _normalize_finding(finding: dict[str, Any]) -> dict[str, Any]:
     immediately actionable.
     """
     severity = "error" if _is_error_finding(finding) else "warning"
+    object_name = finding.get("ParentDisplayName") or ""
+    if page_names and object_name in ("", "N/A"):
+        object_name = _report_scoped_object(finding, page_names) or object_name
     return {
         "rule": _pbir_rule_id(finding),
         "severity": severity,
-        "object": finding.get("ParentDisplayName") or "",
+        "object": object_name,
         "message": finding.get("Message") or "",
     }
 
@@ -275,7 +319,9 @@ def _pbir_status(finding: dict[str, Any]) -> str:
     return "pass"
 
 
-def _pbir_test_results(raw_findings: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _pbir_test_results(
+    raw_findings: list[dict[str, Any]], page_names: dict[str, str] | None = None
+) -> list[dict[str, Any]]:
     """Return one row per rule result PBIR Inspector evaluated, passed or failed.
 
     ``findings`` stays violations-only for the callers already reading
@@ -283,7 +329,7 @@ def _pbir_test_results(raw_findings: list[dict[str, Any]]) -> list[dict[str, Any
     additive, same as BPA's ``_bpa_test_results`` -- so telemetry can see
     what ran even on a run with nothing to report.
     """
-    return [{**_normalize_finding(f), "status": _pbir_status(f)} for f in raw_findings]
+    return [{**_normalize_finding(f, page_names), "status": _pbir_status(f)} for f in raw_findings]
 
 
 def _print_findings_table(findings: list[dict[str, Any]]) -> None:
@@ -563,8 +609,9 @@ def run_inspector(args: argparse.Namespace) -> int:
 
     raw_text = _read_native_output(native_out, proc.stdout)
     raw_findings = parse_findings(raw_text)
-    findings = [_normalize_finding(f) for f in raw_findings if _is_violation(f)]
-    test_results = _pbir_test_results(raw_findings)
+    page_names = _visual_page_names(artifact_path)
+    findings = [_normalize_finding(f, page_names) for f in raw_findings if _is_violation(f)]
+    test_results = _pbir_test_results(raw_findings, page_names)
     native_html_out = _locate_native_html(native_out, emit_html, inspector_path)
 
     outcome = _classify_inspector_result(findings, proc.returncode, has_output=bool(raw_findings))
