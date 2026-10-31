@@ -102,6 +102,19 @@ def test_given_the_filter_pane_disabled_should_name_no_visual(inspector, tmp_pat
     assert _flagged(report, tmp_path) == {VISIBLE: set(), UNLOCKED: set()}
 
 
+def test_given_a_hidden_visual_with_a_noncompliant_filter_should_not_be_flagged(inspector, tmp_path):
+    """PBIR Visual Filter Panel Double-Count epic: a hidden visual's filter is unreachable either way."""
+    report = _copy_report(tmp_path, "HiddenVisual")
+    # df89... has one filter that is neither hidden nor locked -- it trips
+    # both rules today (see NOT_HIDDEN/NOT_LOCKED above). Hiding the visual
+    # itself should drop it from both, regardless of the filter's own state.
+    [visual] = report.glob("definition/pages/*/visuals/df89a190bca70b12b743/visual.json")
+    _edit_json(visual, lambda data: data.update(isHidden=True))
+    flagged = _flagged(report, tmp_path)
+    assert flagged[VISIBLE] == NOT_HIDDEN - {"df89a190bca70b12b743"}
+    assert flagged[UNLOCKED] == NOT_LOCKED - {"df89a190bca70b12b743"}
+
+
 def test_given_visible_unlocked_page_and_report_filters_should_flag_only_visual_filters(inspector, tmp_path):
     report = _copy_report(tmp_path, "ConsumerFilters")
     [visual] = report.glob("definition/pages/*/visuals/df89a190bca70b12b743/visual.json")

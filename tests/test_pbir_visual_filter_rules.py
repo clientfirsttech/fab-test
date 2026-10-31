@@ -64,6 +64,29 @@ def test_visual_filter_rules_are_enabled_errors_scoped_to_visible_filter_panes(
     assert '"false"' in rule_json
 
 
+@pytest.mark.parametrize(
+    "rule_id",
+    [
+        "NO_VISUAL_LEVEL_FILTERS_VISIBLE_IN_FILTER_PANEL",
+        "NO_VISUAL_LEVEL_FILTERS_UNLOCKED_IN_FILTER_PANEL",
+    ],
+)
+def test_visual_filter_rules_exclude_a_visual_that_is_itself_hidden(rule_id):
+    """Given a hidden visual, should never name it: nothing can show its filter if it never renders.
+
+    PBIR Visual Filter Panel Double-Count epic. Reuses `isHidden`, the same
+    field `REDUCE_VISIBLE_VISUALS_ON_PAGE` already reads directly off a
+    `{"part": "Visuals"}` entry -- not a new field, and not a JSON-pointer
+    mapping (`isHidden` lives on the visual object itself).
+    """
+    rule = _rules_by_id()[rule_id]
+    logic, mapping, _expected = rule["test"]
+    rule_json = json.dumps(logic)
+
+    assert '"isHidden"' in rule_json
+    assert "isHidden" not in mapping
+
+
 def test_visual_filter_rules_do_not_traverse_page_or_report_filter_collections():
     """Given page/report filters are consumer controls, should inspect visual filters only."""
     rules = _rules_by_id()

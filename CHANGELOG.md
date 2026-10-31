@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-10-31
+
+- 🔄 - **Behavior change** - Filter-Panel Rules No Longer Flag A Hidden Visual's Filter - `NO_VISUAL_LEVEL_FILTERS_VISIBLE_IN_FILTER_PANEL` and `NO_VISUAL_LEVEL_FILTERS_UNLOCKED_IN_FILTER_PANEL` read only a filter's own `isHiddenInViewMode`/`isLockedInViewMode`, never whether the *visual* itself is hidden, so a dev-only visual parked off-canvas or behind a bookmark was flagged for a filter nothing could ever show. Both rules now also exclude a visual with `isHidden: true` (the same field `REDUCE_VISIBLE_VISUALS_ON_PAGE` already reads), proven against a copy of `ThinReport` with its `df89...` visual hidden: it drops out of both rules' results, every other visual unchanged. Investigated and closed as not-a-bug: a dev filter left both visible and unlocked correctly fails both rules once each (confirmed against the real `fab-test pbir` output, not just the test harness) -- two distinct, separately-actionable findings naming the same visual, not the same thing counted twice. Documented in the fab-test skill's filter-pane rule guidance.
+
 ## 2026-10-30
 
 - 🐛 - `doctor` Never Checked For The Azure CLI - With a workspace, no service principal, and `az` not installed, `pql_test`/`dependencies` readiness showed ✅ *unverified* anyway, because nothing probed for the binary `DefaultAzureCredential`'s ambient path (`az login`) needs. It now shows ❌ *the Azure CLI (`az`) is not installed*, naming the install step. `pbir`/`rdl`/`a11y`/`bpa` with `--workspace` resolve credentials the same way but don't carry a credential-based status at all (their row reflects tool availability); their service-mode info line now names a missing `az` too, but this does not change their exit code -- a workspace `pbir`/`rdl`/`a11y`/`bpa` run can still fail on a missing Azure CLI that `doctor` did not turn red for.
