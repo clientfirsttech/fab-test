@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-10-30
+
+- 🐛 - `doctor` Never Checked For The Azure CLI - With a workspace, no service principal, and `az` not installed, `pql_test`/`dependencies` readiness showed ✅ *unverified* anyway, because nothing probed for the binary `DefaultAzureCredential`'s ambient path (`az login`) needs. It now shows ❌ *the Azure CLI (`az`) is not installed*, naming the install step. `pbir`/`rdl`/`a11y`/`bpa` with `--workspace` resolve credentials the same way but don't carry a credential-based status at all (their row reflects tool availability); their service-mode info line now names a missing `az` too, but this does not change their exit code -- a workspace `pbir`/`rdl`/`a11y`/`bpa` run can still fail on a missing Azure CLI that `doctor` did not turn red for.
+
 ## 2026-10-22
 
 - 📦 - `pql-test` Pin `0.1.20` - Up from `0.1.19`; it adds `certifi>=2026.10.19` as a dependency, same Python range.

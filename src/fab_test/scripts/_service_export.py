@@ -27,7 +27,9 @@ from typing import Any
 
 from ._cli_utils import narrate
 from ._credentials import (
+    AMBIENT_SOURCE,
     IncompleteServicePrincipalError,
+    az_cli_available,
     probe_credentials,
     redact_secrets,
     resolve_service_principal,
@@ -118,11 +120,20 @@ def interactive_refusal(args: argparse.Namespace) -> str | None:
 
 
 def service_readiness(args: argparse.Namespace) -> str:
-    """One `doctor` line on service-mode readiness; never acquires a token."""
+    """One `doctor` line on service-mode readiness; never acquires a token.
+
+    Informational only -- it never changes the row's status or doctor's exit
+    code, even when it names the Azure CLI as missing below: a service-mode
+    export only needs a credential when a workspace is actually targeted,
+    which this line cannot tell without the same network call `doctor` is
+    forbidden from making (Doctor Az Detection epic).
+    """
     status = probe_credentials(getattr(args, "playwright_env_file", None))
     detail = redact_secrets(status.detail or "")
     if status.verified:
         return f"service mode: {detail} (unverified until a run; see `fab-test auth status`)"
+    if status.source == AMBIENT_SOURCE and not az_cli_available():
+        detail += "; the Azure CLI (`az`) is not installed, so `az login` is not available here"
     fix = redact_secrets(status.remediation or "")
     interactive = "" if interactive_refusal(_probe_args(args)) else "; or pass --interactive"
     return f"service mode: {'. '.join(filter(None, (detail, fix)))}{interactive}"

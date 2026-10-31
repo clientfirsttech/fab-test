@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import importlib.util
 import os
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -94,6 +95,17 @@ def ambient_credential_available() -> bool:
     -- that is the unverified part.
     """
     return importlib.util.find_spec("azure.identity") is not None
+
+
+def az_cli_available() -> bool:
+    """Whether the Azure CLI (``az``) binary is on PATH.
+
+    A PATH lookup, not a subprocess, matching `ambient_credential_available`'s
+    cost. ``DefaultAzureCredential``'s most common ambient path on a developer
+    machine is ``az login`` via `AzureCliCredential`; without the binary that
+    path cannot work, so a ready-unverified row must not claim it would.
+    """
+    return shutil.which("az") is not None
 
 
 def redact_secrets(text: str) -> str:

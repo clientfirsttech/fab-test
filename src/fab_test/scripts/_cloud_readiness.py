@@ -16,7 +16,13 @@ from collections.abc import Callable
 from typing import Any
 
 from . import _pql_identity
-from ._credentials import SIGN_IN_REMEDIATION, configured_workspace, probe_credentials
+from ._credentials import SIGN_IN_REMEDIATION, az_cli_available, configured_workspace, probe_credentials
+
+_AZ_CLI_REMEDIATION = (
+    "Install the Azure CLI (https://learn.microsoft.com/cli/azure/install-azure-cli), then run `az login`; "
+    "or set FABRIC_TENANT_ID, FABRIC_SERVICE_PRINCIPAL_ID, and FABRIC_SERVICE_PRINCIPAL_SECRET "
+    "(or put them in .fab-test/.env)"
+)
 
 # Playwright always calls MSAL with a service-principal secret to generate an
 # embed token, so an ambient credential (az login, managed identity) cannot
@@ -97,6 +103,12 @@ def _with_workspace(status: Any, needs_principal: bool) -> dict[str, Any]:
     if needs_principal and not status.verified:
         return _row("error", "workspace configured; playwright needs a service principal", _PLAYWRIGHT_CREDENTIALS)
     if status.resolved:
+        if not status.verified and not az_cli_available():
+            return _row(
+                "error",
+                "workspace configured; no service principal set, and the Azure CLI (`az`) is not installed",
+                _AZ_CLI_REMEDIATION,
+            )
         reason = (
             f"workspace configured, credentials from {status.source}"
             if status.verified
