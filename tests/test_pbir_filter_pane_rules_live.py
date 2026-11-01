@@ -5,13 +5,14 @@ certain strings, which is how both rules shipped wrong in every report: they
 flagged every visual (a boolean test against an expected `[]`), an override
 expecting `true` passed every visual, and the "filter pane disabled"
 exemption never applied (PBIR Inspector Filter Pane Rules epic). These run
-the real tool on `ThinReport`, whose five visuals cover the permutations:
+the real tool on `ThinReport`, whose visuals cover the permutations:
 
-    2524...  one filter, locked but not hidden
-    4230...  four filters, neither hidden nor locked
-    7a1f...  no filters
-    ae85...  one filter, hidden but not locked
-    df89...  one filter, neither
+    2524...  Page 1, one filter, locked but not hidden
+    4230...  Page 1, four filters, neither hidden nor locked
+    7a1f...  Page 1, no filters
+    ae85...  Page 1, one filter, hidden but not locked
+    df89...  Page 1, one filter, neither
+    bce4...  Page 2, one filter, neither
 """
 
 import argparse
@@ -31,8 +32,8 @@ ROOT = Path(__file__).resolve().parents[1]
 THIN = ROOT / "fabric-artifacts" / "ThinReport.Report"
 VISIBLE = "NO_VISUAL_LEVEL_FILTERS_VISIBLE_IN_FILTER_PANEL"
 UNLOCKED = "NO_VISUAL_LEVEL_FILTERS_UNLOCKED_IN_FILTER_PANEL"
-NOT_HIDDEN = {"2524761709751832a270", "42303637da18cab42c69", "df89a190bca70b12b743"}
-NOT_LOCKED = {"42303637da18cab42c69", "ae854917b1805e46dc69", "df89a190bca70b12b743"}
+NOT_HIDDEN = {"2524761709751832a270", "42303637da18cab42c69", "df89a190bca70b12b743", "bce4d7a0c0826ba2b322"}
+NOT_LOCKED = {"42303637da18cab42c69", "ae854917b1805e46dc69", "df89a190bca70b12b743", "bce4d7a0c0826ba2b322"}
 
 
 @pytest.fixture(scope="module")
@@ -121,7 +122,7 @@ def test_given_visible_unlocked_page_and_report_filters_should_flag_only_visual_
     consumer_filter = copy.deepcopy(json.loads(visual.read_text(encoding="utf-8"))["filterConfig"]["filters"][0])
     consumer_filter.update(isHiddenInViewMode=False, isLockedInViewMode=False)
     add = lambda data: data.setdefault("filterConfig", {}).setdefault("filters", []).append(consumer_filter)  # noqa: E731
-    [page] = report.glob("definition/pages/*/page.json")
+    page = visual.parents[2] / "page.json"  # df89...'s own page, not ThinReport's other page
     _edit_json(page, add)
     _edit_json(report / "definition" / "report.json", add)
     flagged = _flagged(report, tmp_path)
