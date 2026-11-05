@@ -22,7 +22,7 @@ The live run that prompted this (2026-10-09, `visual-error-testing`, 12 reports)
 
 ## Task 1: Measure before building
 
-Depends on the [Run Timing](run-timing-epic.md) epic, so the numbers come from `run.json` rather than a stopwatch.
+Depends on the [Run Timing](archive/2026-10-09-run-timing.md) epic, so the numbers come from `run.json` rather than a stopwatch.
 
 **Baseline recorded 2026-10-09** (Run Timing task 4, same verdicts in every run): Azure `jobs 1` 6m22s, Azure `jobs 4, workers 8` 1m54s, local `jobs 1` 6m18s, local `jobs 4` 2m53s. Discovery and embed tokens sum to about 1m45s per run, once per report, and pooling does not reduce that; `jobs` already overlaps it. The pooled session can only beat `jobs 4` on the render phase (4m20s summed on Azure), so the remaining requirement is the hand-pooled run.
 

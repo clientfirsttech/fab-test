@@ -17,7 +17,7 @@ On a machine without `az` installed, `doctor` reported the ambient-credential pa
 Decisions to approve:
 
 1. **Where the check lives**: add `shutil.which("az")` to the shared ambient-credential branch in `_cloud_readiness.py` (the one at :69-74), not just the `pql_test` identity branch, so it covers `pbir`, `rdl`, and playwright readiness rows alike. `shutil.which` stays a free PATH lookup, consistent with doctor's no-subprocess contract.
-2. **New status, not a reused one**: per the severity table in [tasks/doctor-severity-epic.md](tasks/doctor-severity-epic.md), "ambient credential expected but `az` is not even installed" is a ❌ error (you configured a workspace; the run will fail), distinct from today's ℹ/⚠ "ambient, unverified" state when `az` *is* present but not confirmed logged in.
+2. **New status, not a reused one**: per the severity table in [archive/2026-10-10-doctor-severity.md](archive/2026-10-10-doctor-severity.md), "ambient credential expected but `az` is not even installed" is a ❌ error (you configured a workspace; the run will fail), distinct from today's ℹ/⚠ "ambient, unverified" state when `az` *is* present but not confirmed logged in.
 3. **Remediation text**: name installing the Azure CLI (with a link) as the fix, not "run `az login`" — that would be wrong advice when the binary isn't there.
 4. **Service principal present**: when SP env vars are fully set, skip the `az`-presence check entirely — the run doesn't need `az` at all in that case, matching current behavior.
 
