@@ -17,6 +17,7 @@ from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
 
 from ._analyzer_envelope import _is_error_severity, _is_warning_severity
+from ._results_stem import results_stem
 
 
 def _env(name: str, default: str = "") -> str:
@@ -131,7 +132,7 @@ def emit_pr_review_comments(
         return
 
     analyzer = envelope.get("analyzer", "analyzer")
-    artifact = Path(artifact_path).stem if artifact_path else "artifact"
+    artifact = results_stem(Path(artifact_path)) if artifact_path else "artifact"
     warnings = [
         f for f in envelope.get("findings", [])
         if _is_warning_severity(f.get("severity") or f.get("Severity"))

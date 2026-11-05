@@ -258,6 +258,14 @@ class _TimeoutArgs:
         self.timeout = timeout
 
 
+@pytest.fixture(autouse=True)
+def _reset_results_stems():
+    """Discovery records which stems collide in a process-global map; start every test clean."""
+    from fab_test.scripts._results_stem import _SUFFIXED
+
+    _SUFFIXED.clear()
+
+
 def _clear_github_env(monkeypatch):
     """Remove every GitHub-Actions env var a git-context test might inherit."""
     for name in (

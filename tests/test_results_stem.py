@@ -15,9 +15,11 @@ from pathlib import Path
 
 import pytest
 
-from fab_test.scripts._results_stem import results_stem
+from fab_test.scripts import _analyzer_annotations
+from fab_test.scripts._results_stem import _SUFFIXED, results_stem
 from fab_test.scripts._target import parse_target
 from fab_test.scripts.fab_test_registry import discover_artifacts
+from fab_test.scripts.fab_test_telemetry import _build_telemetry_payload
 
 pytestmark = [pytest.mark.rdl, pytest.mark.analyzers]
 
@@ -89,6 +91,38 @@ def test_a_narrowed_discovery_assigns_the_same_stems_as_the_full_one(tmp_path):
     assert [results_stem(a) for a in narrowed] == ["Other"]
     assert {a: results_stem(a) for a in both}.items() <= full.items(), "narrowing must not rename a collider"
     assert all(results_stem(a).startswith("R-") for a in both)
+
+
+def test_telemetry_names_each_collided_artifact_by_its_own_folder(tmp_path):
+    _tree(tmp_path, "ACC-03.rdl", "ACC-03.PaginatedReport/ACC-03.rdl", "Solo.rdl")
+    found = discover_artifacts(tmp_path, "*.rdl", None)
+    envelope = {"status": "passed", "findings": []}
+
+    names = {a.name: _build_telemetry_payload("rdl", a, envelope, "DEV")["artifact_name"] for a in found}
+
+    assert names["Solo.rdl"] == "Solo", "an unshared stem keeps the name telemetry already recorded"
+    collided = [_build_telemetry_payload("rdl", a, envelope, "DEV")["artifact_name"] for a in found if "ACC" in a.name]
+    assert len(set(collided)) == 2 and all(n.startswith("ACC-03-") for n in collided)
+
+
+def test_pr_comments_name_a_collided_artifact_by_its_own_folder(tmp_path, monkeypatch):
+    _tree(tmp_path, "ACC-03.rdl", "sub/ACC-03.rdl")
+    first = discover_artifacts(tmp_path, "*.rdl", None)[0]
+    posted = []
+    monkeypatch.setattr(_analyzer_annotations, "_pr_context", lambda: {"pr": "1"})
+    monkeypatch.setattr(_analyzer_annotations, "_post_pr_review_comment", lambda _ctx, body: posted.append(body))
+
+    _analyzer_annotations.emit_pr_review_comments(
+        {"analyzer": "rdl", "findings": [{"severity": "warning", "message": "m"}]}, str(first)
+    )
+
+    assert f"`{results_stem(first)}`" in posted[0]
+    assert results_stem(first) != "ACC-03"
+
+
+def test_results_stems_do_not_leak_between_tests():
+    """conftest clears the registry before every test, so one test's collisions cannot rename another's."""
+    assert _SUFFIXED == {}
 
 
 def test_cli_run_over_same_named_artifacts_writes_one_envelope_each(tmp_path):

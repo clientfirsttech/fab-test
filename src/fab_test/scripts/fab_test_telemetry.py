@@ -20,6 +20,7 @@ from ._analyzer_envelope import severity_counts
 from ._cli_utils import narrate
 from ._fab_test_context import REPO_ROOT
 from ._git_context import git_command_output, git_context
+from ._results_stem import results_stem
 from ._telemetry import TelemetryDecision, telemetry_decision
 from .eventhouse_logger import EventhouseSink, publish_analyzer_telemetry
 from .lakehouse_logger import LakehouseSink
@@ -427,7 +428,7 @@ def _build_telemetry_payload(
     ctx = _git_context()
     payload = {
         "timestamp": datetime.now(UTC).isoformat(),
-        "artifact_name": artifact.stem,
+        "artifact_name": results_stem(artifact),
         "artifact_type": _FLAT_FILE_ARTIFACT_TYPES.get(
             artifact.suffix.lstrip("."), artifact.suffix.lstrip(".")
         ),
@@ -527,6 +528,6 @@ def _send_telemetry(
         publish_analyzer_telemetry(table, validated, force=True)
     except Exception as exc:  # noqa: BLE001 - boundary: telemetry never fails a run
         narrate(
-            f"::warning::Telemetry failed for {artifact.stem}: {exc}",
+            f"::warning::Telemetry failed for {results_stem(artifact)}: {exc}",
             output_format=output_format,
         )
