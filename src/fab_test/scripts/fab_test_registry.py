@@ -17,6 +17,7 @@ from ._artifact_types import load_artifact_map
 from ._feature_flags import disabled_analyzers, is_enabled
 from ._metadata import ANALYZERS, BPA_RULES, PBIR_RULES, RDL_RULES, default_repo_root, metadata_path
 from ._pbip_discovery import discover_pbip_projects
+from ._results_stem import register_stems
 from ._scan import find_artifact_dirs, find_files_by_suffix
 from ._target import ResolvedTarget
 
@@ -288,7 +289,9 @@ def discover_artifacts(
     if target is not None and target.path is not None:
         resolved = target.path.resolve()
         matches_shape = resolved.is_dir() if is_folder_suffix else resolved.is_file()
-        return [resolved] if matches_shape and resolved.name.endswith(suffix) else []
+        selected = [resolved] if matches_shape and resolved.name.endswith(suffix) else []
+        register_stems(selected, artifact_dir)
+        return selected
 
     if not artifact_dir.exists():
         return []
@@ -298,15 +301,15 @@ def discover_artifacts(
         if is_folder_suffix
         else find_files_by_suffix(artifact_dir, suffix, excluded_paths=excluded_paths)
     )
-    if target is None:
-        return artifacts
-
-    if target.type is not None and not suffix.endswith(target.type):
-        # The target names a type this analyzer does not read at all.
-        return []
-    # Accept either the artifact stem or the full artifact name
-    # (e.g. "SampleModel-PQLAssert" or "SampleModel-PQLAssert.SemanticModel").
-    return [a for a in artifacts if a.stem == target.name or a.name == target.name]
+    if target is not None:
+        if target.type is not None and not suffix.endswith(target.type):
+            # The target names a type this analyzer does not read at all.
+            return []
+        # Accept either the artifact stem or the full artifact name
+        # (e.g. "SampleModel-PQLAssert" or "SampleModel-PQLAssert.SemanticModel").
+        artifacts = [a for a in artifacts if a.stem == target.name or a.name == target.name]
+    register_stems(artifacts, artifact_dir)
+    return artifacts
 
 
 # Analyzers that operate on a repository-level artifact path rather than a

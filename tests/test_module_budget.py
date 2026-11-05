@@ -108,48 +108,6 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
             "Report Flag epic, Task 1)."
         ),
     ),
-    "src/fab_test/scripts/fab_test_summary.py": (
-        958,
-        (
-            "2026-10-10: +2 net lines labelling the `desktop` scope `local` in the list table "
-            "(Service-mode polish). "
-            "2026-10-03: +2 lines printing the per-analyzer service-readiness line in doctor "
-            "(Service Targeting epic). "
-            "2026-10-01: +6 lines (_WRAPPER_PRINTS_FINDINGS) so the verbose summary does not repeat "
-            "the findings table the rdl wrapper already printed (RDL review). "
-            "2026-09-01: +5 net lines teaching the summary that an analyzer can "
-            "exit 0 and still be warning us -- _artifact_status now reads a "
-            "`warning` envelope as a warning instead of falling through to "
-            "passed, and _artifact_summary_prefix takes the status so such a "
-            "run gets its own icon rather than a green check (pql-test "
-            "Connection-Failure Reporting epic, Task 4). Net of deleting "
-            "_pql_test_status, a byte-identical twin of _analyzer_envelope's "
-            "finding_status that the one-definition guard missed because the "
-            "copy had been renamed. "
-            "2026-08-23: 12 lines over hard, from unrelated feature work landing "
-            "since this file was last at 793; not yet worth a forced split for "
-            "12 lines. Revisit if it keeps growing. "
-            "2026-08-31: +71 lines wiring --open-report into _print_all_summary "
-            "(open the run index once) and _print_summary (open a single "
-            "analyzer's sole report, or note when there are several with "
-            "nothing single to open) -- Open Report Flag epic, Task 3. Split "
-            "into _write_and_open_index/_open_single_analyzer_report to keep "
-            "both callers under the branch budget (net new lines, not "
-            "shrinkage, since the decision logic itself is unchanged). "
-            "2026-08-31: +36 lines making _open_single_analyzer_report build and "
-            "open a per-run index for a single analyzer's several artifacts, "
-            "the same way _write_and_open_index does for `fab-test all` -- was "
-            "printing a warning and opening nothing, which was the inconsistency "
-            "reported for `fab-test a11y` with multiple artifacts. New "
-            "_index_row_fields factors out the envelope-reading rules shared "
-            "with build_all_summary_rows so both index shapes classify status "
-            "identically. "
-            "2026-09-29: +23 lines adding _print_quiet_summary and the -q "
-            "branch in `all`'s aggregate summary (Terse CLI Output epic); the "
-            "loop is its own function because inlining it pushed "
-            "_print_summary over the branch budget."
-        ),
-    ),
     "src/fab_test/scripts/invoke_playwright.py": (
         1049,
         (

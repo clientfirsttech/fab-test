@@ -20,6 +20,7 @@ from ._desktop import (
     match_instance_to_artifact,
 )
 from ._report_html import resolve_report
+from ._results_stem import results_stem
 from ._rule_overlay import apply_overlay, apply_pbir_overlay, apply_rdl_overlay
 from .fab_test_registry import (
     _DEFAULT_A11Y_PATH,
@@ -105,7 +106,7 @@ def build_rdl_command(
     other in-process report already goes through.
     """
     rules_path = _resolve_rdl_rules_path(args, output_dir)
-    output = output_dir / "rdl" / artifact.stem / "envelope.json"
+    output = output_dir / "rdl" / results_stem(artifact) / "envelope.json"
     return [
         sys.executable,
         "-m",
@@ -129,7 +130,7 @@ def build_bpa_command(
         getattr(args, "tabular_editor_path", None) or _env("TABULAR_EDITOR_PATH", _DEFAULT_TE_PATH)
     )
     rules_path = _resolve_bpa_rules_path(args, output_dir)
-    output = output_dir / "bpa" / artifact.stem / "envelope.json"
+    output = output_dir / "bpa" / results_stem(artifact) / "envelope.json"
     return [
         sys.executable,
         "-m",
@@ -155,7 +156,7 @@ def build_pbir_command(
         getattr(args, "inspector_path", None) or _env("PBIR_INSPECTOR_PATH", _DEFAULT_INSPECTOR_PATH)
     )
     rules_path = _resolve_pbir_rules_path(args, output_dir)
-    output = output_dir / "pbir" / artifact.stem / "envelope.json"
+    output = output_dir / "pbir" / results_stem(artifact) / "envelope.json"
     command = [
         sys.executable,
         "-m",
@@ -195,7 +196,7 @@ def build_a11y_command(
     a11y_path = getattr(args, "_resolved_tool_path", None) or (
         getattr(args, "a11y_path", None) or _env("PBIR_A11Y_PATH", _DEFAULT_A11Y_PATH)
     )
-    output = output_dir / "a11y" / artifact.stem / "envelope.json"
+    output = output_dir / "a11y" / results_stem(artifact) / "envelope.json"
     command = [
         sys.executable,
         "-m",
@@ -252,7 +253,7 @@ def build_pql_test_command(
     caller stated the scope, and honoring it is the whole point of saying
     so rather than relying on a variable being unset.
     """
-    output = output_dir / "pql_test" / artifact.stem / "envelope.json"
+    output = output_dir / "pql_test" / results_stem(artifact) / "envelope.json"
     cmd = [
         sys.executable,
         "-m",
@@ -288,7 +289,7 @@ def build_pql_lint_command(
     output_dir: Path,
 ) -> list[str]:
     """Build the pqlint command for ``artifact``."""
-    output = output_dir / "pql_lint" / artifact.stem / "envelope.json"
+    output = output_dir / "pql_lint" / results_stem(artifact) / "envelope.json"
     return [
         sys.executable,
         "-m",
@@ -311,7 +312,7 @@ def playwright_test_cases_dir(output_dir: Path, artifact: Path) -> Path:
     `fab_test_execution.py`'s case-count-scaled timeout polls the same path
     to learn how many cases were generated, without duplicating the string.
     """
-    return output_dir / "playwright" / artifact.stem / "test-cases"
+    return output_dir / "playwright" / results_stem(artifact) / "test-cases"
 
 
 _LOCAL_SUFFIX_TO_REPORT_TYPE = {
@@ -395,7 +396,7 @@ def build_playwright_command(
     output_dir: Path,
 ) -> list[str]:
     """Build the Playwright validation command for ``artifact``."""
-    output = output_dir / "playwright" / artifact.stem / "envelope.json"
+    output = output_dir / "playwright" / results_stem(artifact) / "envelope.json"
     # A dataset-targeted run disambiguates two dependent reports that share a
     # display name (different IDs, different workspaces) by giving the
     # synthetic Path its own unique stem; the real name Fabric knows the

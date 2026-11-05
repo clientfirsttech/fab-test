@@ -49,6 +49,7 @@ from ._readiness import (
     preflight_error as _preflight_error,
 )
 from ._report_html import resolve_report
+from ._results_stem import results_stem
 from ._run_manifest import RunManifest
 from ._run_targets import (
     _discover_for,
@@ -353,7 +354,7 @@ def _load_artifact_envelope(
     analyzer produced no envelope and no clean exit -- its stderr is then
     the only record of why.
     """
-    envelope = _read_artifact_envelope(output_dir, name, artifact.stem)
+    envelope = _read_artifact_envelope(output_dir, name, results_stem(artifact))
     if envelope is not None:
         return envelope, False
     if returncode == 0:
@@ -380,7 +381,7 @@ def _stamp_mode(
         return
     envelope["mode"] = resolved.mode
     envelope["source"] = resolved.source
-    path = output_dir / name / artifact.stem / "envelope.json"
+    path = output_dir / name / results_stem(artifact) / "envelope.json"
     if path.exists():
         with contextlib.suppress(OSError):
             path.write_text(json.dumps(envelope, indent=2), encoding="utf-8")
@@ -412,10 +413,10 @@ def _finalize_artifact_run(
     _send_telemetry(name, artifact, envelope, args, ctx.telemetry)
 
     if ctx.manifest is not None:
-        envelope_path = output_dir / name / artifact.stem / "envelope.json"
+        envelope_path = output_dir / name / results_stem(artifact) / "envelope.json"
         ctx.manifest.record_artifact(
             name,
-            artifact.stem,
+            results_stem(artifact),
             envelope.get("status", "unknown"),
             str(envelope_path) if envelope_path.exists() else None,
             errors,
@@ -438,7 +439,7 @@ def _run_one_artifact(
 ) -> tuple[str, int]:
     """Run one analyzer against one artifact. Returns (stem, exit_code)."""
     output_format = getattr(args, "output_format", "text")
-    display_name = "." if _is_repository_scoped(name) else artifact.stem
+    display_name = "." if _is_repository_scoped(name) else results_stem(artifact)
     quiet = getattr(args, "quiet", False)
     if not quiet:
         _announce_artifact_run(name, display_name, index, total, ctx, output_format)
@@ -458,7 +459,7 @@ def _run_one_artifact(
         # the flat outer timeout unchanged.
         test_cases_path = _playwright_test_cases_dir(output_dir, artifact) / "test-cases.json"
 
-    envelope_file = output_dir / name / artifact.stem / "envelope.json"
+    envelope_file = output_dir / name / results_stem(artifact) / "envelope.json"
     with contextlib.suppress(OSError):  # an aborted run must not inherit (and re-stamp) an earlier envelope
         envelope_file.unlink(missing_ok=True)
 
@@ -481,7 +482,7 @@ def _run_one_artifact(
     )
     outcome = (aborted, int((time.monotonic() - started) * 1000))
     artifact_code = _finalize_artifact_run(name, artifact, args, ctx, proc, envelope, outcome, output_dir)
-    return (artifact.stem, artifact_code)
+    return (results_stem(artifact), artifact_code)
 
 
 def _report_no_artifacts(name: str, glob: str, args: argparse.Namespace, *, emit_own_json: bool) -> int:

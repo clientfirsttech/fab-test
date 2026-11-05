@@ -17,7 +17,7 @@ import pytest
 
 from fab_test.scripts import _credentials
 from fab_test.scripts import _readiness as readiness
-from fab_test.scripts.fab_test_summary import _print_doctor
+from fab_test.scripts._admin_output import _print_doctor
 
 _WS = "798dfd00-0081-45d3-a7a7-f74f62e57277"
 _STATUSES = {"ready", "warning", "info", "error"}

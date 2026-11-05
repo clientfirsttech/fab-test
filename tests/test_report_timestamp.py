@@ -137,7 +137,7 @@ def test_rendering_stays_deterministic_with_a_timestamp():
 @pytest.mark.fab_test
 def test_summary_tables_use_the_boxed_style():
     """Boxed borders make column boundaries unambiguous."""
-    from fab_test.scripts.fab_test_summary import _print_list
+    from fab_test.scripts._admin_output import _print_list
 
     rows = [{
         "analyzer": "bpa", "aliases": (), "glob": "*.SemanticModel",

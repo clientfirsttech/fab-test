@@ -16,7 +16,7 @@ every command in this README are unchanged.
 
 ### From PyPI (beta)
 
-The current release is the beta `1.9.0b11`. pip skips pre-releases unless you
+The current release is the beta `1.9.0b12`. pip skips pre-releases unless you
 pass `--pre` or name the version, so a bare `pip install cft-fab-test` finds
 nothing until the first final release.
 
@@ -24,7 +24,7 @@ nothing until the first final release.
 python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
 
-pip install --pre cft-fab-test          # or pin it: "cft-fab-test==1.9.0b11"
+pip install --pre cft-fab-test          # or pin it: "cft-fab-test==1.9.0b12"
 
 fab-test --version
 ```
@@ -259,6 +259,8 @@ rdl failed e=3 w=3 fab-test-results/rdl/QRY-02/envelope.json
 ```
 
 One line per artifact: `<analyzer> <status> e=<errors> w=<warnings> <where>`, where `<where>` is the envelope with the findings. Exit codes and every file under `fab-test-results/` are unchanged, and a failure still says why: a missing credential, a timeout, or a crash prints its message above the lines.
+
+Two artifacts that share a name, such as `ACC-03.rdl` beside `ACC-03.PaginatedReport/ACC-03.rdl`, cannot share a results folder. Each gets `<name>-<8 hex digits>`, the same in CI as locally, and the summary shows that folder name. A name nobody else shares keeps its plain path.
 
 | Command | Before | Default now | `-q` |
 |---------|-------:|------------:|-----:|
