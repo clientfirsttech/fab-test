@@ -289,9 +289,7 @@ def discover_artifacts(
     if target is not None and target.path is not None:
         resolved = target.path.resolve()
         matches_shape = resolved.is_dir() if is_folder_suffix else resolved.is_file()
-        selected = [resolved] if matches_shape and resolved.name.endswith(suffix) else []
-        register_stems(selected, artifact_dir)
-        return selected
+        return [resolved] if matches_shape and resolved.name.endswith(suffix) else []
 
     if not artifact_dir.exists():
         return []
@@ -301,6 +299,9 @@ def discover_artifacts(
         if is_folder_suffix
         else find_files_by_suffix(artifact_dir, suffix, excluded_paths=excluded_paths)
     )
+    # Collisions are judged over everything the scan found, before any target narrows it, so the
+    # stems do not depend on which analyzer's discovery ran last.
+    register_stems(artifacts, artifact_dir)
     if target is not None:
         if target.type is not None and not suffix.endswith(target.type):
             # The target names a type this analyzer does not read at all.
@@ -308,7 +309,6 @@ def discover_artifacts(
         # Accept either the artifact stem or the full artifact name
         # (e.g. "SampleModel-PQLAssert" or "SampleModel-PQLAssert.SemanticModel").
         artifacts = [a for a in artifacts if a.stem == target.name or a.name == target.name]
-    register_stems(artifacts, artifact_dir)
     return artifacts
 
 

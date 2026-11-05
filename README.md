@@ -260,7 +260,7 @@ rdl failed e=3 w=3 fab-test-results/rdl/QRY-02/envelope.json
 
 One line per artifact: `<analyzer> <status> e=<errors> w=<warnings> <where>`, where `<where>` is the envelope with the findings. Exit codes and every file under `fab-test-results/` are unchanged, and a failure still says why: a missing credential, a timeout, or a crash prints its message above the lines.
 
-Two artifacts that share a name, such as `ACC-03.rdl` beside `ACC-03.PaginatedReport/ACC-03.rdl`, cannot share a results folder. Each gets `<name>-<8 hex digits>`, the same in CI as locally, and the summary shows that folder name. A name nobody else shares keeps its plain path.
+Two artifacts under `--artifact-dir` that share a name, such as `ACC-03.rdl` beside `ACC-03.PaginatedReport/ACC-03.rdl`, cannot share a results folder. Each gets `<name>-<8 hex digits>`, the same in CI as locally, and the summary shows that folder name. A name nobody else shares keeps its plain path.
 
 | Command | Before | Default now | `-q` |
 |---------|-------:|------------:|-----:|

@@ -16,6 +16,7 @@ from pathlib import Path
 import pytest
 
 from fab_test.scripts._results_stem import results_stem
+from fab_test.scripts._target import parse_target
 from fab_test.scripts.fab_test_registry import discover_artifacts
 
 pytestmark = [pytest.mark.rdl, pytest.mark.analyzers]
@@ -77,6 +78,19 @@ def test_a_stem_stops_being_suffixed_once_its_twin_is_out_of_the_run(tmp_path):
     assert [results_stem(a) for a in only] == ["R"]
 
 
+def test_a_narrowed_discovery_assigns_the_same_stems_as_the_full_one(tmp_path):
+    """`all` discovers per analyzer with different narrowing; the last call must not move a folder."""
+    _tree(tmp_path, "R.rdl", "sub/R.rdl", "Other.rdl")
+    full = {a: results_stem(a) for a in discover_artifacts(tmp_path, "*.rdl", None)}
+
+    narrowed = discover_artifacts(tmp_path, "*.rdl", parse_target("Other"))
+    both = discover_artifacts(tmp_path, "*.rdl", parse_target("R"))
+
+    assert [results_stem(a) for a in narrowed] == ["Other"]
+    assert {a: results_stem(a) for a in both}.items() <= full.items(), "narrowing must not rename a collider"
+    assert all(results_stem(a).startswith("R-") for a in both)
+
+
 def test_cli_run_over_same_named_artifacts_writes_one_envelope_each(tmp_path):
     artifacts = _tree(tmp_path / "artifacts", "ACC-03.rdl", "ACC-03.PaginatedReport/ACC-03.rdl")
     out = tmp_path / "out"
@@ -100,3 +114,13 @@ def test_cli_run_over_same_named_artifacts_writes_one_envelope_each(tmp_path):
     assert any(envelopes[0].parent.name in ln for ln in lines) and any(
         envelopes[1].parent.name in ln for ln in lines
     ), "the summary must name each artifact's own results folder, not one twice"
+
+
+def test_a_path_targeted_discovery_does_not_rename_a_stem_a_full_scan_assigned(tmp_path):
+    _tree(tmp_path, "R.rdl", "sub/R.rdl")
+    full = {a: results_stem(a) for a in discover_artifacts(tmp_path, "*.rdl", None)}
+
+    by_path = discover_artifacts(tmp_path, "*.rdl", parse_target(str(tmp_path / "sub" / "R.rdl")))
+
+    assert [results_stem(a) for a in by_path] == [full[by_path[0]]]
+    assert full[by_path[0]] != "R"

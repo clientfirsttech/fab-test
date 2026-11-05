@@ -2,8 +2,9 @@
 
 Results live in ``<output-dir>/<analyzer>/<stem>/``, and a stem is only unique
 by luck: ``ACC-03.rdl`` beside ``ACC-03.PaginatedReport/ACC-03.rdl`` share one.
-Discovery records the artifacts whose stem collides with another's in the same
-run, and everything that builds or reads a results path asks ``results_stem``
+Discovery records the artifacts whose stem collides with another's anywhere in
+the scan (not only in the narrowed selection, so it cannot differ between
+analyzers), and everything that builds or reads a results path asks ``results_stem``
 instead of reading ``.stem``. A stem nobody else shares keeps the plain name,
 so every path that worked before still does.
 """
@@ -28,7 +29,7 @@ def _disambiguator(artifact: Path, root: Path) -> str:
 
 
 def register_stems(artifacts: Iterable[Path], root: Path) -> None:
-    """Record which of ``artifacts`` share a stem. Idempotent: the latest run wins."""
+    """Record which of ``artifacts`` share a stem. Pass the whole scan, never a narrowed subset."""
     found = list(artifacts)
     counts = Counter(a.stem for a in found)
     for artifact in found:

@@ -2,7 +2,7 @@
 
 ## 2026-11-05
 
-- 🐛 - Same-Named Artifacts Shared One Results Folder - Results go to `<output-dir>/<analyzer>/<artifact stem>/`, so `ACC-03.rdl` and `ACC-03.PaginatedReport/ACC-03.rdl` overwrote each other's envelope, the summary named the survivor twice, and under `--jobs` they raced. Artifacts whose stem collides in a run now get `<stem>-<8 hex digits>` (from the path relative to `--artifact-dir`, so CI and a laptop agree); a stem nobody shares keeps its plain path. Every consumer of a results path (the command builders, envelope reads, the manifest, `explain`, the summary) asks `_results_stem.py` instead of reading `.stem`.
+- 🐛 - Same-Named Artifacts Shared One Results Folder - Results go to `<output-dir>/<analyzer>/<artifact stem>/`, so `ACC-03.rdl` and `ACC-03.PaginatedReport/ACC-03.rdl` overwrote each other's envelope, the summary named the survivor twice, and under `--jobs` they raced. Artifacts whose stem collides in the scan (judged before any `--artifact` narrowing, so every analyzer agrees) now get `<stem>-<8 hex digits>` (from the path relative to `--artifact-dir`, so CI and a laptop agree); a stem nobody shares keeps its plain path. Every consumer of a results path (the command builders, envelope reads, the manifest, `explain`, the summary) asks `_results_stem.py` instead of reading `.stem`.
 - ♻️ - Admin Printers Moved Out Of The Summary Module - `list`, `auth status`, `doctor`, `doctor --local` and `config --show` print from `_admin_output.py`; `fab_test_summary.py` drops under the 800-line budget and its exemption is deleted (Core Module Split). Output is unchanged.
 - 📦 - Version `1.9.0b12`. `1.9.0b11` is tagged, so these changes ship in the next beta.
 
