@@ -70,7 +70,7 @@ telemetry = [
 # fail to resolve. 12.21.0 needs only azure-storage-blob>=12.26.0, which the
 # Kusto pin satisfies exactly.
 telemetry-lakehouse = [
-    "azure-storage-file-datalake==12.26.0",
+    "azure-storage-file-datalake==12.26.1",
 ]
 # What `fab-test playwright` launches: it runs its render spec as a
 # `python -m pytest` child with `--html` and xdist workers. Not base
