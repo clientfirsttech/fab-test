@@ -1,6 +1,6 @@
 # pql-test 0.2.0 Update Epic
 
-**Status**: ✅ IMPLEMENTED 2026-11-05, 5/5 tasks. The serial Playwright half of the gate was not run (nothing in this epic touches it).
+**Status**: ✅ IMPLEMENTED 2026-11-05, 5/5 tasks.
 **Goal**: fab-test requires `pql-test==0.2.0` and every document that restates the pin, the license, or the dependency set says so.
 
 ## Overview
@@ -61,4 +61,4 @@ Always last; nothing follows it.
 **Requirements**:
 - Given the finished epic, should pass `ruff check .` over the whole repo, the complexity and module-budget ratchets, and the coverage floor on the full suite, run as CI runs them (vision.md, Definition of Done)
 
-**Result**: `ruff check .` clean; `pytest -n auto -m "not playwright"` 3007 passed, 2 skipped (includes the complexity and module-budget ratchets); `pip-audit` on the new lock found nothing. Not run: the serial `-m playwright --cov-fail-under=80` half, so the coverage floor was not re-measured.
+**Result**: `ruff check .` clean; `pytest -n auto -m "not playwright"` 3007 passed, 2 skipped (includes the complexity and module-budget ratchets); `pytest -m playwright --cov --cov-append --cov-fail-under=80` 217 passed, floor held (exit 0); `pip-audit` on the new lock found nothing.
