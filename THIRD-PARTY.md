@@ -23,7 +23,7 @@ one tool in this file that actually reaches every installer's environment.
 | [fab-inspector](https://github.com/NatVanG/fab-inspector) (PBIR Inspector) | `pbir` | MIT | [NatVanG/fab-inspector license](https://github.com/NatVanG/fab-inspector/blob/main/LICENSE) |
 | [pbir-a11y](https://github.com/Juls-BI/pbir-a11y) | `a11y` | PolyForm Shield 1.0.0 | [Juls-BI/pbir-a11y license](https://github.com/Juls-BI/pbir-a11y/blob/main/LICENSE) |
 | [promptfoo](https://github.com/promptfoo/promptfoo) | `data_agent` | MIT | [promptfoo/promptfoo license](https://github.com/promptfoo/promptfoo/blob/main/LICENSE) |
-| [pql-test](https://pypi.org/project/pql-test/) | `pql_test` | Business Source License 1.1 | Bundled at `pql_test-<version>.dist-info/licenses/LICENSE.txt` in any `fab-test` install |
+| [pql-test](https://pypi.org/project/pql-test/) | `pql_test` | GNU Affero General Public License v3.0 only (AGPL-3.0-only) | Bundled at `pql_test-<version>.dist-info/licenses/LICENSE.txt` in any `fab-test` install |
 
 ## pbir-a11y: PolyForm Shield 1.0.0
 
@@ -38,26 +38,26 @@ spawns its built CLI as a subprocess) and does not redistribute it: nothing
 under this license is vendored into the `fab-test` wheel, checked into this
 repository, or shipped to anyone who installs `fab-test`.
 
-## pql-test: Business Source License 1.1
+## pql-test: GNU Affero General Public License v3.0 only
 
-pql-test's [LICENSE.txt](https://pypi.org/project/pql-test/) (bundled at
-`pql_test-<version>.dist-info/licenses/LICENSE.txt` in any `fab-test`
-install) names Client First Technologies as Licensor and states:
+From `0.2.0`, pql-test is licensed AGPL-3.0-only (SPDX `AGPL-3.0-only`); through
+`0.1.20` it was Business Source License 1.1. Its
+[LICENSE.txt](https://pypi.org/project/pql-test/) and a `NOTICE` file (bundled
+at `pql_test-<version>.dist-info/licenses/` in any `fab-test` install) name
+Client First Technologies as copyright holder, give the full
+[GNU Affero General Public License, version 3](https://www.gnu.org/licenses/agpl-3.0.html)
+text, and list the third-party material pql-test carries (the Open Data
+Contract Standard JSON schemas, Apache-2.0, and a note on PQL.Assert, MIT).
 
-- **Additional Use Grant:** None
-- **Change Date:** four years from the date each version is first published
-- **Change License:** GNU Affero General Public License v3.0
+The full license text governs what those terms mean. Unlike the other tools in
+this file's first three rows, pql-test is installed as a regular pinned `pip`
+dependency in `pyproject.toml`, not fetched on demand by
+`_analyzer_tool_bootstrap.py` — it is present in every `fab-test` install.
+`invoke_pql_test.py` still calls its installed console-script entry point
+(`pql-test.exe`) as an external process rather than importing its code.
 
-The full [Business Source License 1.1](https://mariadb.com/bsl11/) text
-governs what those terms mean. Unlike the other three tools in this file,
-pql-test is installed as a regular pinned `pip` dependency in
-`pyproject.toml`, not fetched on demand by `_analyzer_tool_bootstrap.py` —
-it is present in every `fab-test` install. `invoke_pql_test.py` still calls
-its installed console-script entry point (`pql-test.exe`) as an external
-process rather than importing its code.
-
-Questions about what either license permits for a specific use are a legal
-question for that license's text and your own counsel, not something this
+Questions about what any of these licenses permits for a specific use are a
+legal question for that license's text and your own counsel, not something this
 file interprets.
 
 ## Recording a newly wrapped tool

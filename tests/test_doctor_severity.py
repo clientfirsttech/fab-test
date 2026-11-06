@@ -17,7 +17,7 @@ import pytest
 
 from fab_test.scripts import _credentials
 from fab_test.scripts import _readiness as readiness
-from fab_test.scripts.fab_test_summary import _print_doctor
+from fab_test.scripts._admin_output import _print_doctor
 
 _WS = "798dfd00-0081-45d3-a7a7-f74f62e57277"
 _STATUSES = {"ready", "warning", "info", "error"}
@@ -43,8 +43,11 @@ def _clean(monkeypatch, tmp_path):
     monkeypatch.setenv("PLAYWRIGHT_ENV_FILE", str(tmp_path / "none.env"))
     monkeypatch.setattr(readiness, "desktop_ports", list)
     monkeypatch.setattr(_credentials, "ambient_credential_available", lambda: True)
-    from fab_test.scripts import _pql_identity
+    monkeypatch.setattr(_credentials, "az_cli_available", lambda: True)
+    from fab_test.scripts import _cloud_readiness, _pql_identity, _service_export
 
+    monkeypatch.setattr(_cloud_readiness, "az_cli_available", lambda: True)
+    monkeypatch.setattr(_service_export, "az_cli_available", lambda: True)
     monkeypatch.setattr(_pql_identity, "identity_check", lambda: None)  # no az / pql-test subprocess
 
 
@@ -172,6 +175,71 @@ def test_every_readiness_row_carries_a_status(analyzer):
 
 
 # --------------------------------------------------------------------------- #
+# Azure CLI presence (Doctor Az Detection epic)
+# --------------------------------------------------------------------------- #
+
+
+def test_a_workspace_with_ambient_credentials_and_no_az_cli_is_an_error(monkeypatch):
+    from fab_test.scripts import _cloud_readiness
+
+    monkeypatch.setattr(_cloud_readiness, "az_cli_available", lambda: False)
+
+    result = readiness.check_readiness("pql_test", _args(workspace_id=_WS))
+
+    assert result["status"] == "error"
+    assert result["ready"] is False
+    assert "Azure CLI" in result["reason"]
+    assert "not installed" in result["reason"]
+    assert "Install the Azure CLI" in result["remediation"]
+
+
+def test_a_workspace_with_ambient_credentials_and_az_cli_present_is_still_ready(monkeypatch):
+    from fab_test.scripts import _cloud_readiness
+
+    monkeypatch.setattr(_cloud_readiness, "az_cli_available", lambda: True)
+
+    result = readiness.check_readiness("pql_test", _args(workspace_id=_WS))
+
+    assert result["status"] == "ready"
+
+
+def test_a_service_principal_is_unaffected_by_a_missing_az_cli(monkeypatch):
+    from fab_test.scripts import _cloud_readiness
+
+    _service_principal(monkeypatch)
+    monkeypatch.setattr(_cloud_readiness, "az_cli_available", lambda: False)
+
+    # "dependencies", not "playwright": this assertion is about the az-presence
+    # branch, not about whether the playwright runner extra is installed here.
+    assert readiness.check_readiness("dependencies", _args(workspace_id=_WS))["status"] == "ready"
+
+
+def test_no_workspace_never_probes_the_az_cli(monkeypatch):
+    from fab_test.scripts import _cloud_readiness
+
+    def _boom():
+        raise AssertionError("az_cli_available must not be called without a workspace")
+
+    monkeypatch.setattr(_cloud_readiness, "az_cli_available", _boom)
+
+    result = readiness.check_readiness("pql_test", _args())
+
+    assert result["status"] == "info"
+
+
+def test_a_missing_az_cli_is_reported_before_the_pql_test_identity_check(monkeypatch):
+    from fab_test.scripts import _cloud_readiness
+
+    _identity(monkeypatch, None)  # az not found: identity_check cannot compare
+    monkeypatch.setattr(_cloud_readiness, "az_cli_available", lambda: False)
+
+    result = readiness.check_readiness("pql_test", _args(workspace_id=_WS))
+
+    assert result["status"] == "error"
+    assert "Azure CLI" in result["reason"]
+
+
+# --------------------------------------------------------------------------- #
 # Output and exit code
 # --------------------------------------------------------------------------- #
 
@@ -255,6 +323,40 @@ def test_the_service_line_offers_no_interactive_sign_in_in_ci(monkeypatch):
     line = service_readiness(_args())
 
     assert "--interactive" not in line
+
+
+def test_the_service_line_names_a_missing_az_cli(monkeypatch):
+    """Given an ambient credential and no `az`, should say so (Doctor Az Detection epic)."""
+    from fab_test.scripts import _service_export
+    from fab_test.scripts._service_export import service_readiness
+
+    monkeypatch.setattr(_service_export, "az_cli_available", lambda: False)
+
+    line = service_readiness(_args())
+
+    assert "Azure CLI" in line
+    assert "not installed" in line
+
+
+def test_the_service_line_is_silent_about_az_when_it_is_present():
+    from fab_test.scripts._service_export import service_readiness
+
+    line = service_readiness(_args())
+
+    assert "Azure CLI" not in line
+
+
+def test_the_service_line_does_not_mention_az_for_a_service_principal(monkeypatch):
+    """A configured service principal never needs `az`, missing or not."""
+    from fab_test.scripts import _service_export
+    from fab_test.scripts._service_export import service_readiness
+
+    _service_principal(monkeypatch)
+    monkeypatch.setattr(_service_export, "az_cli_available", lambda: False)
+
+    line = service_readiness(_args())
+
+    assert "Azure CLI" not in line
 
 
 # --------------------------------------------------------------------------- #

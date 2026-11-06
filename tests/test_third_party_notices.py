@@ -69,14 +69,19 @@ def test_every_non_permissive_pip_dependency_is_named_in_third_party_md():
 
 
 @pytest.mark.fab_test
-def test_pql_test_license_states_its_key_terms_as_written():
-    """Business Source License 1.1 terms must be stated as written (name,
-    Additional Use Grant, Change Date/License) -- no interpretation of what
-    they permit, which is a legal question for the license text itself."""
+def test_pql_test_license_is_named_as_written_and_its_source_is_pointed_to():
+    """pql-test 0.2.0 is AGPL-3.0-only (it was Business Source License 1.1
+    through 0.1.20). The notice names the license and where the text lives --
+    no interpretation of what it permits, which is a legal question for the
+    license text itself."""
     text = _THIRD_PARTY.read_text(encoding="utf-8")
-    assert "Business Source License" in text or "BUSL" in text
-    assert "Additional Use Grant" in text
-    assert "Change Date" in text
+    assert "AGPL-3.0-only" in text
+    assert "GNU Affero General Public License" in text
+    assert "NOTICE" in text
+    # The old terms must not linger as if they still applied.
+    assert "Additional Use Grant" not in text
+    assert "Change Date" not in text
+    assert "Business Source License 1.1 |" not in text
 
 
 @pytest.mark.fab_test

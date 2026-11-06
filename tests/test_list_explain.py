@@ -39,7 +39,7 @@ def test_list_text_shows_every_analyzer_with_glob_and_tool():
 def test_list_table_names_the_local_scope_by_its_target_prefix(capsys):
     """Given a scope a `local/NAME` target selects, the human table says `local`,
     the mode's name; JSON keeps `desktop`, the scope run.json records."""
-    from fab_test.scripts.fab_test_summary import _print_list
+    from fab_test.scripts._admin_output import _print_list
 
     row = {"analyzer": "bpa", "glob": "*.SemanticModel", "matched_artifacts": 1, "required_tool": None,
            "scopes": ["desktop", "path", "workspace"]}
@@ -345,7 +345,7 @@ def test_print_list_json_payload_shape(tmp_path, capsys):
     Exercised in-process because every other `list` test shells out, which
     leaves this branch uncovered however green the suite looks.
     """
-    from fab_test.scripts.fab_test_summary import _print_list
+    from fab_test.scripts._admin_output import _print_list
 
     row = {
         "analyzer": "bpa",
@@ -367,7 +367,7 @@ def test_print_list_json_payload_shape(tmp_path, capsys):
 @pytest.mark.fab_test
 def test_print_list_json_payload_omits_remediation_when_nothing_was_pruned(capsys):
     """Given nothing was pruned, there is nothing to remediate."""
-    from fab_test.scripts.fab_test_summary import _print_list
+    from fab_test.scripts._admin_output import _print_list
 
     assert _print_list([], "json") == 0
     payload = json.loads(capsys.readouterr().out)

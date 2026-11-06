@@ -96,6 +96,8 @@ fab-test-results/
         results.xml
 ```
 
+Two artifacts under `--artifact-dir` that share a stem (`ACC-03.rdl` beside `ACC-03.PaginatedReport/ACC-03.rdl`) cannot share a folder, so each gets `<stem>-<8 hex digits>`, derived from its path relative to `--artifact-dir` so it is the same in CI as on a laptop. The summary, `run.json` and `-q` lines name that folder. A stem nobody else shares keeps its plain name, so existing paths are unchanged. A target that names a path (`--artifact ./x/ACC-03.rdl`) does not scan, so it keeps the plain name.
+
 `envelope.json` required keys: `schema_version`, `analyzer`, `artifact_path`, `status`, `message`, `findings`, `native_output_path`, `duration_ms`.
 
 Optional keys — **absent, never null**, so a consumer tests presence:

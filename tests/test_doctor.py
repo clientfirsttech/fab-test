@@ -16,8 +16,8 @@ import subprocess
 
 import pytest
 
+from fab_test.scripts._admin_output import _print_doctor
 from fab_test.scripts.fab_test_registry import visible_analyzers
-from fab_test.scripts.fab_test_summary import _print_doctor
 
 _DOCTOR_KEYS = {"analyzer", "ready", "reason", "resolved_path", "remediation", "version", "status"}
 

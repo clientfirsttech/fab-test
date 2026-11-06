@@ -50,7 +50,7 @@ cd <your-power-bi-repo>
 python -m venv .venv
 source .venv/bin/activate            # PowerShell: .venv\Scripts\Activate.ps1
 
-pip install "cft-fab-test==1.9.0b11"  # or: pip install --pre cft-fab-test
+pip install "cft-fab-test==1.9.0b12"  # or: pip install --pre cft-fab-test
 ```
 
 Playwright needs a browser and some pytest plugins. The plugins come with the `playwright` extra; the browser is a separate download:
@@ -355,6 +355,7 @@ If the model uses RLS, set `PLAYWRIGHT_USER_NAME` (or `playwright_user_name` in 
 | `401` / `403` in `console.json` | A tenant setting hasn't applied, or the service principal has no workspace role | [Step 4](#4-allow-service-principals-in-the-tenant), [step 5](#5-add-the-service-principal-to-your-workspaces) |
 | `doctor`: ⚠ *credentials from .fab-test/.env; no workspace set* | No workspace in this shell (`FABRIC_WORKSPACE_ID`, `PLAYWRIGHT_WORKSPACE_ID`, or `workspace:` in fab-test.yml) | [Step 6](#6-run-playwright-from-the-console) |
 | `doctor`: ❌ *playwright needs a service principal* | Only `az login` is available; Playwright's embed token needs a service principal | [Step 3c](#3c-create-a-client-secret-and-save-it-to-fab-testenv) |
+| `doctor`: ❌ *the Azure CLI (`az`) is not installed* | No service principal is set, and `az` isn't on PATH, so `az login` cannot run either | Install the Azure CLI ([step 3](#3-create-the-service-principal-azure-cli)'s prerequisite), then `az login`; or set a service principal |
 | *No environment given...* | `FABRIC_ENVIRONMENT` isn't set and `--env` wasn't passed | [Step 6](#6-run-playwright-from-the-console) |
 | *No Report matching '...'* | The report isn't published, or it has a different name | Publish it, or use the name the error suggests |
 | Only one case ran | Page or role discovery is missing a permission (a warning was logged) | Recheck 3b consent and the step 5 role |

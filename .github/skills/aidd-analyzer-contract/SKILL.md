@@ -37,6 +37,7 @@ Envelope {
 Constraints {
   // Output — what every caller reads
   Write the envelope to <output_dir>/<registry key>/<artifact stem>/envelope.json with write_envelope
+  The <artifact stem> is results_stem(artifact) from _results_stem.py, never artifact.stem: two artifacts that share a stem get a suffixed folder, and every builder, reader, name in telemetry or a PR comment, and summary row must agree on it
   (the run fails for any reason) => still write an error envelope before exiting 1
   Exit 0 for pass or warnings only; exit 1 for any error finding or tool failure
   (a wrapper-level threshold like --fail-on) => express it as finding severity, since

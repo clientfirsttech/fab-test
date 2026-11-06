@@ -178,6 +178,8 @@ An overlay naming a rule ID that doesn't exist upstream exits `2` listing every 
 
 A JSON pointer in the mapping resolves against the rule's `part`: `/objects/outspacePane/...` (the filter pane) exists in `report.json`, so a rule needing it uses `"part": "Report"` and reaches visuals through a nested `{"part": "Visuals"}`, as `NO_VISUAL_LEVEL_FILTERS_VISIBLE_IN_FILTER_PANEL` does. Check a new rule against a fixture with PBIR Inspector before relying on it: `fab-test pbir REPORT --rules-path my-rules.json`, then read `native.json/*.json` for each result's `Actual`.
 
+`NO_VISUAL_LEVEL_FILTERS_VISIBLE_IN_FILTER_PANEL` and `NO_VISUAL_LEVEL_FILTERS_UNLOCKED_IN_FILTER_PANEL` are independent on purpose: a dev filter left both visible and unlocked (the common case) fails both, so one filter you forgot to clean up shows as two findings naming the same visual -- that is two distinct, separately-actionable problems, not the same thing counted twice. Both rules skip a visual that is itself hidden (`isHidden` in `visual.json`): nothing in the filter panel can show a filter belonging to a visual that never renders (PBIR Visual Filter Panel Double-Count epic).
+
 The full schema ships with the package at `schemas/fab-test.schema.json` (draft 2020-12) for editor completion.
 
 ## Metadata files and where they come from

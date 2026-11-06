@@ -12,40 +12,37 @@ TESTS_DIR = REPO_ROOT / "tests"
 
 
 @pytest.mark.integration
-@pytest.mark.skipif(
-    not (REPO_ROOT / "fabric-artifacts").exists(),
-    reason="Requires fabric-artifacts directory to exist",
-)
 def test_zero_semantic_model_artifacts_fails_bpa(tmp_path: Path, monkeypatch):
-    """Given no *.SemanticModel artifacts, pytest -m bpa must exit non-zero."""
-    artifacts_dir = REPO_ROOT / "fabric-artifacts"
-    backups: list[tuple[Path, Path]] = []
+    """Given no *.SemanticModel artifacts, pytest -m bpa must exit non-zero.
 
-    # Temporarily move all .SemanticModel artifacts out of the repo.
-    semantic_models = list(artifacts_dir.glob("*.SemanticModel"))
-    for src in semantic_models:
-        dst = tmp_path / src.name
-        shutil.move(str(src), str(dst))
-        backups.append((dst, src))
+    Runs the real ``conftest.py`` in a sandbox with an empty ``fabric-artifacts``.
+    It used to move the repository's own semantic models away for the duration,
+    which made any test scanning the repo fail whenever xdist scheduled it
+    alongside this one.
+    """
+    sandbox_tests = tmp_path / "tests"
+    sandbox_tests.mkdir()
+    (tmp_path / "fabric-artifacts").mkdir()
+    shutil.copy(TESTS_DIR / "conftest.py", sandbox_tests / "conftest.py")
+    shutil.copy(REPO_ROOT / "pytest.ini", tmp_path / "pytest.ini")
+    (sandbox_tests / "test_probe.py").write_text(
+        "import pytest\n\n\n@pytest.mark.bpa\ndef test_contract():\n    pass\n", encoding="utf-8"
+    )
 
     monkeypatch.setenv("ANALYZER_ARTIFACTS", "")
 
-    try:
-        result = subprocess.run(
-            [sys.executable, "-m", "pytest", "-m", "bpa", "--tb=short"],
-            cwd=REPO_ROOT,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        # The session must fail even though the contract tests themselves pass.
-        assert result.returncode != 0, (
-            f"Expected non-zero exit when no artifacts exist.\n"
-            f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
-        )
-        assert "No artifacts matched '*.SemanticModel'" in result.stderr, (
-            f"Expected clear zero-artifact message. stderr:\n{result.stderr}"
-        )
-    finally:
-        for dst, src in backups:
-            shutil.move(str(dst), str(src))
+    result = subprocess.run(
+        [sys.executable, "-m", "pytest", "-m", "bpa", "--tb=short", "-p", "no:cacheprovider"],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        check=False,
+    )
+    # The session must fail even though the contract test itself passes.
+    assert result.returncode != 0, (
+        f"Expected non-zero exit when no artifacts exist.\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
+    )
+    assert "No artifacts matched '*.SemanticModel'" in result.stderr, (
+        f"Expected clear zero-artifact message. stderr:\n{result.stderr}"
+    )

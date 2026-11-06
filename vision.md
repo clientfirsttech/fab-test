@@ -98,6 +98,7 @@ The callers worth enumerating for the surfaces that keep biting:
 | Artifact discovery | `_run_analyzer`, `list`, `explain`, the aggregate summary |
 | Table widths | the summary, the findings tables, the analyzer wrappers |
 | Envelope writing | every `invoke_*` wrapper |
+| Results folder name (`results_stem`) | every command builder, envelope read, the run manifest, `explain`, the summary and index, telemetry's `artifact_name`, PR comment headings |
 
 Before editing one of these, list its callers. After editing, run each. "It worked for
 the command I was asked about" is the failure mode, not the verification.

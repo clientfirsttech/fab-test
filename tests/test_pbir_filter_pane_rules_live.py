@@ -5,13 +5,14 @@ certain strings, which is how both rules shipped wrong in every report: they
 flagged every visual (a boolean test against an expected `[]`), an override
 expecting `true` passed every visual, and the "filter pane disabled"
 exemption never applied (PBIR Inspector Filter Pane Rules epic). These run
-the real tool on `ThinReport`, whose five visuals cover the permutations:
+the real tool on `ThinReport`, whose visuals cover the permutations:
 
-    2524...  one filter, locked but not hidden
-    4230...  four filters, neither hidden nor locked
-    7a1f...  no filters
-    ae85...  one filter, hidden but not locked
-    df89...  one filter, neither
+    2524...  Page 1, one filter, locked but not hidden
+    4230...  Page 1, four filters, neither hidden nor locked
+    7a1f...  Page 1, no filters
+    ae85...  Page 1, one filter, hidden but not locked
+    df89...  Page 1, one filter, neither
+    bce4...  Page 2, one filter, neither
 """
 
 import argparse
@@ -31,8 +32,8 @@ ROOT = Path(__file__).resolve().parents[1]
 THIN = ROOT / "fabric-artifacts" / "ThinReport.Report"
 VISIBLE = "NO_VISUAL_LEVEL_FILTERS_VISIBLE_IN_FILTER_PANEL"
 UNLOCKED = "NO_VISUAL_LEVEL_FILTERS_UNLOCKED_IN_FILTER_PANEL"
-NOT_HIDDEN = {"2524761709751832a270", "42303637da18cab42c69", "df89a190bca70b12b743"}
-NOT_LOCKED = {"42303637da18cab42c69", "ae854917b1805e46dc69", "df89a190bca70b12b743"}
+NOT_HIDDEN = {"2524761709751832a270", "42303637da18cab42c69", "df89a190bca70b12b743", "bce4d7a0c0826ba2b322"}
+NOT_LOCKED = {"42303637da18cab42c69", "ae854917b1805e46dc69", "df89a190bca70b12b743", "bce4d7a0c0826ba2b322"}
 
 
 @pytest.fixture(scope="module")
@@ -102,13 +103,26 @@ def test_given_the_filter_pane_disabled_should_name_no_visual(inspector, tmp_pat
     assert _flagged(report, tmp_path) == {VISIBLE: set(), UNLOCKED: set()}
 
 
+def test_given_a_hidden_visual_with_a_noncompliant_filter_should_not_be_flagged(inspector, tmp_path):
+    """PBIR Visual Filter Panel Double-Count epic: a hidden visual's filter is unreachable either way."""
+    report = _copy_report(tmp_path, "HiddenVisual")
+    # df89... has one filter that is neither hidden nor locked -- it trips
+    # both rules today (see NOT_HIDDEN/NOT_LOCKED above). Hiding the visual
+    # itself should drop it from both, regardless of the filter's own state.
+    [visual] = report.glob("definition/pages/*/visuals/df89a190bca70b12b743/visual.json")
+    _edit_json(visual, lambda data: data.update(isHidden=True))
+    flagged = _flagged(report, tmp_path)
+    assert flagged[VISIBLE] == NOT_HIDDEN - {"df89a190bca70b12b743"}
+    assert flagged[UNLOCKED] == NOT_LOCKED - {"df89a190bca70b12b743"}
+
+
 def test_given_visible_unlocked_page_and_report_filters_should_flag_only_visual_filters(inspector, tmp_path):
     report = _copy_report(tmp_path, "ConsumerFilters")
     [visual] = report.glob("definition/pages/*/visuals/df89a190bca70b12b743/visual.json")
     consumer_filter = copy.deepcopy(json.loads(visual.read_text(encoding="utf-8"))["filterConfig"]["filters"][0])
     consumer_filter.update(isHiddenInViewMode=False, isLockedInViewMode=False)
     add = lambda data: data.setdefault("filterConfig", {}).setdefault("filters", []).append(consumer_filter)  # noqa: E731
-    [page] = report.glob("definition/pages/*/page.json")
+    page = visual.parents[2] / "page.json"  # df89...'s own page, not ThinReport's other page
     _edit_json(page, add)
     _edit_json(report / "definition" / "report.json", add)
     flagged = _flagged(report, tmp_path)

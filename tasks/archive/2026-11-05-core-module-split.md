@@ -1,6 +1,6 @@
 # Core Module Split Epic
 
-**Status**: 🔄 IN PROGRESS (3/5 tasks)
+**Status**: ✅ IMPLEMENTED 2026-11-05 (5/5 tasks, gates passed: ruff clean, ratchets with the exemptions removed, full suite **3,001 passed, coverage 90.22%**)
 **Goal**: `fab_test_registry.py`, `fab_test_execution.py` and `fab_test_summary.py` each fall under the 800-line hard budget, and their `test_module_budget.py` exemptions are deleted.
 
 ## Overview
@@ -37,7 +37,7 @@ Workspace and target resolution (`_manifest_target` through `_discover_for`) mov
 
 ---
 
-## Split the admin printers out of the summary
+## Split the admin printers out of the summary ✅
 
 `_print_list`, `_print_auth_status`, `_print_doctor`, `_print_config_show` and `_print_local_doctor` move to `_admin_output.py`.
 
@@ -46,7 +46,7 @@ Workspace and target resolution (`_manifest_target` through `_discover_for`) mov
 
 ---
 
-## Quality gates
+## Quality gates ✅
 
 Always last; nothing follows it.
 

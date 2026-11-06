@@ -14,6 +14,13 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from ._admin_output import (
+    _print_auth_status,
+    _print_config_show,
+    _print_doctor,
+    _print_list,
+    _print_local_doctor,
+)
 from ._command_builders import (
     build_command as _build_command,
 )
@@ -40,6 +47,7 @@ from ._pql_identity import token_account, token_tenant
 from ._readiness import (
     check_readiness as _check_readiness,
 )
+from ._results_stem import results_stem
 from ._rule_overlay import overlay_rows
 from ._run_targets import (
     _manifest_target,
@@ -79,13 +87,6 @@ from .fab_test_registry import (
 )
 from .fab_test_registry import (
     visible_analyzers as _visible_analyzers,
-)
-from .fab_test_summary import (
-    _print_auth_status,
-    _print_config_show,
-    _print_doctor,
-    _print_list,
-    _print_local_doctor,
 )
 from .fab_test_telemetry import _telemetry_readiness_rows
 
@@ -465,7 +466,7 @@ def _explain_analyzer(args: argparse.Namespace) -> int:
         "command": command,
         "tool_path": readiness.get("resolved_path"),
         "rules_path": rules_path,
-        "output_path": str(output_dir / name / artifact.stem / "envelope.json"),
+        "output_path": str(output_dir / name / results_stem(artifact) / "envelope.json"),
     }
 
     if output_format == "json":
