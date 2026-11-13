@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-11-13
+
+- 📦 - Version `1.10.0b1` - User-requested minor bump from `1.9.0b12`, retaining public beta status; installation examples and both fab-test skill copies name the new version.
+- 📦 - `pql-test` Pin `0.2.1` - Up from `0.2.0`; improves Power BI Desktop process discovery without changing dependencies, Python support, or license. Live standalone and aggregate runs against `SampleModel-PQLAssert` in fab-test [Dev] preserve the native JSON keys, 86/78/8/0 counts, and eight failing tests; no wrapper change.
+
 ## 2026-11-05
 
 - 📦 - `pql-test` Pin `0.2.0` - Up from `0.1.20`. **License changes from Business Source License 1.1 to AGPL-3.0-only**; `THIRD-PARTY.md` and its test now say so. Adds `cryptography`, `requests`, `urllib3`, `PyYAML` and `jsonschema` as dependencies and makes `pyadomd` Windows-only; the Python floor moves from 3.9 to 3.10 (fab-test needs 3.12). `run-tests`, `retrieve-tests` against a live model and `code-coverage` now stop with one clear message off Windows. Checked live against `SampleModel-PQLAssert` in fab-test [Dev]: the native JSON keys, the 86/78/8/0 counts and the eight failing tests are identical to `0.1.20`, so the wrapper is unchanged.
