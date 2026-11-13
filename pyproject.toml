@@ -43,7 +43,7 @@ classifiers = [
 ]
 dependencies = [
     "tabulate",
-    "pql-test==0.2.0",
+    "pql-test==0.2.1",
     "playwright",
     "pyyaml",
     "azure-identity",

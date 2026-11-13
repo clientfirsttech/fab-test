@@ -1,3 +1,3 @@
 """Fabric CI/CD DataOps package."""
 
-__version__ = "1.9.0b12"
+__version__ = "1.10.0b1"

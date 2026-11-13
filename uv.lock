@@ -262,7 +262,7 @@ requires-dist = [
     { name = "azure-kusto-ingest", marker = "extra == 'telemetry'" },
     { name = "azure-storage-file-datalake", marker = "extra == 'telemetry-lakehouse'", specifier = "==12.25.0" },
     { name = "playwright" },
-    { name = "pql-test", specifier = "==0.2.0" },
+    { name = "pql-test", specifier = "==0.2.1" },
     { name = "pre-commit", marker = "extra == 'dev'" },
     { name = "pytest", marker = "extra == 'dev'" },
     { name = "pytest", marker = "extra == 'playwright'" },
@@ -1091,7 +1091,7 @@ wheels = [
 
 [[package]]
 name = "pql-test"
-version = "0.2.0"
+version = "0.2.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "azure-identity" },
@@ -1108,9 +1108,9 @@ dependencies = [
     { name = "requests" },
     { name = "urllib3" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/5c/f2/b5d97c5df8720b8e9dc3cb2a615388ba8983fd998a4b3da71878e0473e62/pql_test-0.2.0.tar.gz", hash = "sha256:8ef64024e3d80131604990944bf6f517c09d299982bcc4576751b4e8c4452d4d", size = 353859, upload-time = "2026-11-05T23:50:54.348Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/2f/71/549f617dbce0f6658f312a106c4ec941884a479c7daa25d014c9e0d9ef60/pql_test-0.2.1.tar.gz", hash = "sha256:c0ff61ef460adaa16f8dfd215b6364fcaa4c5b40e6318d6b65c0a93dcdde7ef2", size = 354949, upload-time = "2026-11-13T16:17:11.106Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/db/a7/d00fa8867ddb3b00a666d79d276b4e040567ca090a6f475b4448692b424e/pql_test-0.2.0-py3-none-any.whl", hash = "sha256:33268a8bde89b514159adce21b17d8ea4cf4d1d9f5df7b8a26f1e0b706e20182", size = 256972, upload-time = "2026-11-05T23:50:52.727Z" },
+    { url = "https://files.pythonhosted.org/packages/72/c2/915e5d19811dc6d864c7479f7aebb39a005c3853b2225c183695af786557/pql_test-0.2.1-py3-none-any.whl", hash = "sha256:eb122855ddcd9bdad49209ade204aa0dfb82e7c0ccbc24907ed9878041d4fe0a", size = 257180, upload-time = "2026-11-13T16:17:09.139Z" },
 ]
 
 [[package]]
