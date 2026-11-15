@@ -104,7 +104,8 @@ def test_given_unknown_fields_should_name_every_rule_and_field_and_list_the_vali
 
 
 @pytest.mark.pbir
-@pytest.mark.parametrize("text", ["{year.__class__}", "{year[0]}", "{year!r}", "{month:{year}}", "{}", "FY{year"])
+@pytest.mark.parametrize("text", ["{year.__class__}", "{year[0]}", "{year!r}", "{month:{year}}", "{}", "FY{year",
+                                  "{year:999999999}"])
 def test_given_anything_but_a_plain_field_should_refuse_to_evaluate_it(text):
     with pytest.raises(CalendarError):
         resolve_contract(_contract(text), datetime.date(2026, 11, 14))

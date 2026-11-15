@@ -457,7 +457,7 @@ fab-test pbir contract init fabric-artifacts/SampleModel-DefaultState.Report
 fab-test pbir --artifact SampleModel-DefaultState --as-of 2027-01-15
 ```
 
-See [docs/SLICER-CONTRACTS.md](docs/SLICER-CONTRACTS.md).
+See [docs/SLICER-CONTRACTS.md](https://github.com/clientfirsttech/fab-test/blob/main/docs/SLICER-CONTRACTS.md).
 
 ### Validating a paginated (RDL) report
 

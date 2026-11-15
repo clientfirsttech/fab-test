@@ -36,6 +36,8 @@ Every selection below was last saved by Power BI Desktop (2026-11-14), so each s
 | Date Picker | `77017c2b4495f8869386` | `slicer` RelativeDatePicker | 1939-10-01 to 1951-08-27, picked on the calendar |
 | Input Slicer | `4939c433554061c20080` | `textSlicer`, Contains any | Character name contains "Wolverine" |
 
+Its contract, `SampleModel-DefaultState.Report.odcs.yaml`, fails on purpose: `half-year-current` expects the current half while the slicer holds `2025 H2`. From 2027-01-01 `fiscal-semester-current` fails too (it will expect `FY27-S2`). Pass `--as-of 2026-11-14` to see the results the tests pin.
+
 ### Selection shapes Desktop writes
 
 - **Value slicers** store `In` with one `[[{"Literal": ...}]]` row per selected value, as DAX literals (`'Bad'`, `1940L`).

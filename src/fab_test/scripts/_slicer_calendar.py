@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import dataclasses
 import datetime
+import re
 import string
 from typing import Any
 
@@ -24,6 +25,14 @@ FIELDS = (
 _CALENDAR_KEYS = ("fiscal_year_start_month", "fiscal_year_named_by")
 _NAMINGS = ("start", "end")
 _RESOLVED_CHECKS = ("selected", "contains")
+
+
+_MAX_SPEC_NUMBER = 99  # a width such as {year:999999999} would allocate a gigabyte
+
+
+def today() -> datetime.date:
+    """The local date, the default as-of date."""
+    return datetime.datetime.now(datetime.UTC).astimezone().date()
 
 
 class CalendarError(Exception):
@@ -104,7 +113,8 @@ def _format(text: str, fields: dict, rule_id: str, errors: list[str]) -> Any:
         out.append(literal)
         if name is None:
             continue
-        if conversion or (spec and "{" in spec) or name not in FIELDS:
+        oversized = spec and any(int(n) > _MAX_SPEC_NUMBER for n in re.findall(r"\d+", spec))
+        if conversion or (spec and "{" in spec) or oversized or name not in FIELDS:
             plain = name.isidentifier() and not conversion and not spec
             what = "unknown calendar field" if plain else "only a plain field name is allowed, not"
             errors.append(f"{rule_id}: {what} {name!r} in {text!r}")

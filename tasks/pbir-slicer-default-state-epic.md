@@ -1,12 +1,12 @@
 # PBIR Slicer Default State Epic
 
-**Status**: 🔄 IN PROGRESS on `feature/pbir-slicer-default-state` — discovery decisions recorded 2026-11-14; Test Bed, Contract Format and Calendar Resolution done 2026-11-14; Contract To JSON Logic next.
+**Status**: 🔄 IN PROGRESS on `feature/pbir-slicer-default-state` — every task through Callers done 2026-11-14 and the AIDD review's findings fixed; Quality Gates last.
 **Goal**: `fab-test pbir` checks the values a report's slicers open with, from a per-report ODCS contract that `fab-test pbir contract init` builds with the developer or their agent.
 
 **Decisions** (recorded 2026-11-14 at discovery review, journey [pbir-slicer-default-state.yaml](../plan/story-map/pbir-slicer-default-state.yaml)):
 
 1. ✅ **Scope** is the values preselected in a slicer (`visual.objects.general[].properties.filter`): the standard `slicer` (field parameters included), date slicers (Between, Relative, Date picker) and the input slicer (`textSlicer`). The bookmark navigator default and bookmark/visibility sync are later stories in the journey.
-2. ✅ **Tests are a per-report ODCS v3.1 contract**: `type: custom`, `engine: fab-test` quality rules on the slicer's column, with page, expected values and calendar in `implementation`, validated by a fab-test JSON Schema. pql-test already skips other engines' custom rules, so one file can carry both.
+2. ✅ **Tests are a per-report ODCS v3.1 contract**: `type: custom`, `engine: fab-test` quality rules on the slicer's column, with page, expected values and calendar in `implementation`. Amended at review: fab-test's own reader validates it, naming each error by JSON path; a shipped JSON Schema would have been a second, unused copy of those rules, so there is none. pql-test already skips other engines' custom rules, so one file can carry both.
 3. ✅ **Building**: `fab-test pbir contract init` finds the slicers and their current selections and asks how to check each. Its questions are data: `--questions --format json` prints them with suggested answers, `--answers FILE` applies them, and it prompts only on a terminal. It creates or appends, supports `--dry-run`, and never overwrites a hand edit without `--force`. `contract` becomes a reserved word in pbir's TARGET position.
 4. ✅ **Running**: `fab-test pbir` compiles a report's paired contract into JSON Logic for that report only; `--contract FILE` names one explicitly and `--as-of DATE` fixes the calendar date. The envelope records the date and every resolved value.
 5. ✅ **Calendar values** are format strings over named fields (`{fiscal_year_short}`, `{fiscal_semester}`, ...) resolved from the contract's own calendar (fiscal-year start month, named by start or end year). Nothing is evaluated.

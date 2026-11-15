@@ -17,6 +17,7 @@ import argparse
 import contextlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -292,6 +293,11 @@ def _report_scoped_object(finding: dict[str, Any], page_names: dict[str, str]) -
     return ", ".join(pages)
 
 
+def _unescape(message: str) -> str:
+    """PBIR Inspector JSON-escapes the result it quotes (an apostrophe arrives as backslash-u0027); show it."""
+    return re.sub(r"\\u([0-9a-fA-F]{4})", lambda m: chr(int(m.group(1), 16)), message)
+
+
 def _normalize_finding(finding: dict[str, Any], page_names: dict[str, str] | None = None) -> dict[str, Any]:
     """Translate a PBIR Inspector result into the shared finding schema.
 
@@ -309,7 +315,7 @@ def _normalize_finding(finding: dict[str, Any], page_names: dict[str, str] | Non
         "rule": _pbir_rule_id(finding),
         "severity": severity,
         "object": object_name,
-        "message": finding.get("Message") or "",
+        "message": _unescape(finding.get("Message") or ""),
     }
 
 

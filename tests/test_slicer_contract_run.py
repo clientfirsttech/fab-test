@@ -100,7 +100,7 @@ def test_given_a_pql_test_only_contract_should_not_read_it(tmp_path):
 @pytest.mark.parametrize("files, message", [
     ({"a.odcs.yaml": _contract(), "b.odcs.yaml": _contract()}, "both pair with report"),
     ({"a.odcs.yaml": _contract(selected=["{nope}"])}, "'nope'"),
-    ({"a.odcs.yaml": "schema: [unclosed"}, "a.odcs.yaml"),
+    ({"a.odcs.yaml": "engine: fab-test schema: [unclosed"}, "a.odcs.yaml"),
 ])
 def test_given_a_contract_problem_should_exit_2_naming_it(tmp_path, capsys, files, message):
     for name, document in files.items():
@@ -115,3 +115,12 @@ def test_given_an_analyzer_that_never_runs_pbir_should_not_read_contracts(tmp_pa
     _write(tmp_path / "a.odcs.yaml", "schema: [unclosed")
 
     assert prepare_contracts(_args(tmp_path, analyzer="bpa")) is None
+
+
+@pytest.mark.pbir
+def test_given_broken_yaml_with_no_fab_test_rules_should_warn_and_skip_it(tmp_path, capsys):
+    _write(tmp_path / "Model.odcs.yaml", "schema: [unclosed")
+    args = _args(tmp_path)
+
+    assert prepare_contracts(args) is None
+    assert args.slicer_contracts == {} and "skipped" in capsys.readouterr().err

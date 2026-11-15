@@ -8,7 +8,7 @@ slicer opens with, as one of:
 - `selected`: values or field-parameter display names; `[]` means no selection
 - `range`: `{from, to}` dates, `to` inclusive, either bound may be left open
 - `relative`: `{range, duration, period}` as the Relative slicer shows it
-- `contains`: the text an input slicer holds
+- `contains`: the text an input slicer holds; `[]` means nothing typed
 
 Rules for other engines (pql-test's, ODCS library metrics) are left alone.
 Every mistake is collected and reported at once, each named by its JSON path.
@@ -17,6 +17,7 @@ Every mistake is collected and reported at once, each named by its JSON path.
 from __future__ import annotations
 
 import datetime
+import decimal
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -25,9 +26,11 @@ import yaml
 
 ENGINE = "fab-test"
 CHECKS = ("selected", "range", "relative", "contains")
+RESERVED_PREFIX = "page."  # the compiled page-existence rules use CONTRACT.page.<name>
 _RELATIVE_RANGES = ("Last", "Next", "This")
 _RELATIVE_PERIODS = ("Days", "Weeks", "Calendar Weeks", "Months", "Calendar Months", "Years", "Calendar Years")
 _SEVERITIES = ("error", "warning")
+_SCALARS = (str, int, float, bool, datetime.date, type(None))
 _REPORT_PROPERTY = "fabTestReport"
 _CALENDAR_PROPERTY = "fabTestCalendar"
 
@@ -57,17 +60,24 @@ class SlicerContract:
 
 def dax_literal(value: Any) -> str:
     """The DAX literal Power BI Desktop writes for a value as the user sees it."""
-    if isinstance(value, bool):
-        return "true" if value else "false"
-    if isinstance(value, int):
-        return f"{value}L"
-    if isinstance(value, float):
-        return f"{value}D"
-    if isinstance(value, datetime.datetime):
-        return f"datetime'{value.replace(microsecond=0).isoformat()}'"
-    if isinstance(value, datetime.date):
-        return f"datetime'{value.isoformat()}T00:00:00'"
+    for kind, encode in _ENCODERS:  # order matters: bool is an int, datetime is a date
+        if isinstance(value, kind):
+            return encode(value)
     return "'" + str(value).replace("'", "''") + "'"
+
+
+def _float_literal(value: float) -> str:
+    return f"{int(value)}D" if value.is_integer() else f"{decimal.Decimal(repr(value)):f}D"
+
+
+_ENCODERS: tuple = (
+    (type(None), lambda _: "null"),
+    (bool, lambda v: "true" if v else "false"),
+    (int, lambda v: f"{v}L"),
+    (float, _float_literal),
+    (datetime.datetime, lambda v: f"datetime'{v.replace(microsecond=0).isoformat()}'"),
+    (datetime.date, lambda v: f"datetime'{v.isoformat()}T00:00:00'"),
+)
 
 
 def load_contract(path: Path) -> SlicerContract:
@@ -75,18 +85,24 @@ def load_contract(path: Path) -> SlicerContract:
         document = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
     except (OSError, yaml.YAMLError) as exc:
         raise ContractError(f"{path}: {exc}") from exc
-    errors: list[str] = []
+    return parse_contract(document, Path(path))
+
+
+def parse_contract(document: Any, path: Path) -> SlicerContract:
+    """Validate an already-loaded contract document; ``path`` only names it in messages."""
     if not isinstance(document, dict):
         raise ContractError(f"{path}: an ODCS contract is a YAML mapping")
+    errors: list[str] = []
     _check_envelope(document, errors)
     properties = _custom_properties(document)
     report = properties.get(_REPORT_PROPERTY)
     if not isinstance(report, str) or not report:
         errors.append(f"customProperties.{_REPORT_PROPERTY}: required, the report's .platform logicalId")
     expectations = list(_expectations(document, errors))
+    _check_ids(expectations, errors)
     if errors:
         raise ContractError(f"{path} is not a valid slicer contract:\n" + "\n".join(f"  {e}" for e in errors))
-    return SlicerContract(Path(path), report, properties.get(_CALENDAR_PROPERTY), expectations)
+    return SlicerContract(path, report, properties.get(_CALENDAR_PROPERTY), expectations)
 
 
 def _check_envelope(document: dict, errors: list[str]) -> None:
@@ -100,23 +116,54 @@ def _check_envelope(document: dict, errors: list[str]) -> None:
 
 
 def _custom_properties(element: dict) -> dict[str, Any]:
-    return {p.get("property"): p.get("value") for p in element.get("customProperties") or [] if isinstance(p, dict)}
+    items = element.get("customProperties")
+    return {p.get("property"): p.get("value") for p in items if isinstance(p, dict)} if isinstance(items, list) else {}
+
+
+def _mappings(items: Any, where: str, errors: list[str]):
+    """(index, item) for each mapping in a list, reporting anything else by path."""
+    if items is None:
+        return
+    if not isinstance(items, list):
+        errors.append(f"{where}: must be a list")
+        return
+    for i, item in enumerate(items):
+        if isinstance(item, dict):
+            yield i, item
+        else:
+            errors.append(f"{where}[{i}]: must be a mapping, got {item!r}")
 
 
 def _expectations(document: dict, errors: list[str]):
-    for t, table in enumerate(document.get("schema") or []):
-        for c, column in enumerate(table.get("properties") or []):
-            for q, rule in enumerate(column.get("quality") or []):
-                if rule.get("type") == "custom" and str(rule.get("engine", "")).lower() == ENGINE:
-                    where = f"schema[{t}].properties[{c}].quality[{q}]"
-                    expectation = _expectation(rule, table.get("name"), column.get("name"), where, errors)
-                    if expectation:
-                        yield expectation
+    schema = document.get("schema") if isinstance(document.get("schema"), list) else None
+    for t, table in _mappings(schema, "schema", errors):
+        for c, column in _mappings(table.get("properties"), f"schema[{t}].properties", errors):
+            where = f"schema[{t}].properties[{c}].quality"
+            for q, rule in _mappings(column.get("quality"), where, errors):
+                if str(rule.get("engine", "")).lower() != ENGINE:
+                    continue
+                if rule.get("type") != "custom":
+                    errors.append(f"{where}[{q}].type: an engine: {ENGINE} rule must be type: custom, "
+                                  f"got {rule.get('type')!r}")
+                    continue
+                expectation = _expectation(rule, table.get("name"), column.get("name"), f"{where}[{q}]", errors)
+                if expectation:
+                    yield expectation
+
+
+def _check_ids(expectations: list[SlicerExpectation], errors: list[str]) -> None:
+    seen: set[str] = set()
+    for e in expectations:
+        if e.rule_id in seen:
+            errors.append(f"id {e.rule_id!r}: used by more than one rule; findings are named by it")
+        if e.rule_id.startswith(RESERVED_PREFIX):
+            errors.append(f"id {e.rule_id!r}: ids starting {RESERVED_PREFIX!r} are reserved for page checks")
+        seen.add(e.rule_id)
 
 
 def _expectation(rule: dict, table: str, column: str, where: str, errors: list[str]) -> SlicerExpectation | None:
     before = len(errors)
-    if not rule.get("id"):
+    if not isinstance(rule.get("id"), str) or not rule["id"]:
         errors.append(f"{where}.id: required; findings are named by it")
     severity = rule.get("severity", "error")
     if severity not in _SEVERITIES:
@@ -145,21 +192,23 @@ def _check_implementation(implementation: dict, where: str, errors: list[str]) -
 
 
 def _validate_selected(value: Any, where: str, errors: list[str]) -> None:
-    if not isinstance(value, list):
-        errors.append(f"{where}: must be a list of values; [] means no selection")
+    if not isinstance(value, list) or not all(isinstance(v, _SCALARS) for v in value):
+        errors.append(f"{where}: must be a list of plain values; [] means no selection")
 
 
 def _validate_contains(value: Any, where: str, errors: list[str]) -> None:
-    if not isinstance(value, list) or not value or not all(isinstance(v, str) and v for v in value):
-        errors.append(f"{where}: must be a non-empty list of text")
+    if not isinstance(value, list) or not all(isinstance(v, str) and v for v in value):
+        errors.append(f"{where}: must be a list of text; [] means nothing typed")
 
 
 def _validate_range(value: Any, where: str, errors: list[str]) -> None:
     if not isinstance(value, dict) or not value.keys() & {"from", "to"} or value.keys() - {"from", "to"}:
         errors.append(f"{where}: must have from, to or both")
         return
-    errors.extend(f"{where}.{key}: must be a date such as 2026-10-28, got {bound!r}"
-                  for key, bound in value.items() if not isinstance(bound, datetime.date))
+    bad = [key for key, bound in value.items() if not isinstance(bound, datetime.date)]
+    errors.extend(f"{where}.{key}: must be a date such as 2026-10-28, got {value[key]!r}" for key in bad)
+    if not bad and "from" in value and "to" in value and value["from"] > value["to"]:
+        errors.append(f"{where}: from {value['from']} is after to {value['to']}")
 
 
 def _validate_relative(value: Any, where: str, errors: list[str]) -> None:

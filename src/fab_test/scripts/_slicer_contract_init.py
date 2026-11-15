@@ -2,18 +2,20 @@
 
 The questions are data, so all three callers get the same ones:
 
-- a human on a terminal is asked each in turn; Enter takes the suggestion
+- a human on a terminal is asked each in turn (on stderr); Enter takes the suggestion
 - an agent runs `--questions --format json`, asks the human what it can't
   decide, and applies the answers with `--answers FILE`
 - with no terminal and no answers the command exits 2 and never waits
 
 Per slicer the answer is `keep` (check today's selection), `calendar` (follow
 the calendar, with the suggested format) or `{"calendar": "<format>"}`, or
-`skip`. A missing answer takes the suggestion. The contract is written beside
-the report as `<Report>.Report.odcs.yaml`; an existing one gains rules for
-slicers it doesn't cover, keeps every rule it has, and changes one only with
---force. PyYAML drops comments, so a commented contract is rewritten only
-with --force.
+`skip`; a slicer whose selection a rule can't check is offered only `skip`. A
+missing answer takes the suggestion. The contract is written beside the report
+as `<Report>.Report.odcs.yaml`, and only after it reads back the way
+`fab-test pbir` will read it. An existing contract gains rules for slicers it
+doesn't cover; an existing rule's `implementation` changes only with --force,
+and anything else in it (severity, description) is kept. PyYAML drops comments,
+so a contract containing `#` is rewritten only with --force.
 """
 
 from __future__ import annotations
@@ -29,13 +31,15 @@ from typing import Any
 import yaml
 
 from ._pbir_slicers import Slicer, read_slicers
-from ._slicer_calendar import FIELDS, CalendarError, calendar_fields, validate_calendar
-from ._slicer_contract import ENGINE
+from ._scan import find_artifact_dirs
+from ._slicer_calendar import FIELDS, CalendarError, calendar_fields, resolve_contract, today, validate_calendar
+from ._slicer_contract import ENGINE, ContractError, parse_contract
 from ._slicer_contract_run import CONTRACT_SUFFIX, report_logical_id
 
 CHOICES = ("keep", "calendar", "skip")
 _START = "calendar.fiscal_year_start_month"
 _NAMED_BY = "calendar.fiscal_year_named_by"
+_CALENDAR_PROPERTY = "fabTestCalendar"
 _START_PREFERENCE = (1, 7, 10, 4, 2, 3, 5, 6, 8, 9, 11, 12)
 _FORMATS = (
     "FY{fiscal_year_short}-S{fiscal_semester}", "FY{fiscal_year_short} S{fiscal_semester}",
@@ -54,13 +58,13 @@ def contract_main(argv: list[str]) -> int:
     args = _parser().parse_args(argv)
     try:
         report = _report(args)
-        questions = build_questions(report, args.as_of or datetime.datetime.now(datetime.UTC).astimezone().date())
+        questions = build_questions(report, args.as_of or today())
         if args.questions:
             _print(args, questions, _questions_text)
             return 0
         answers = _answers(args, questions)
         return _write(args, report, questions, answers)
-    except (InitError, CalendarError) as exc:
+    except (InitError, CalendarError, ContractError) as exc:
         print(f"  ✗ fab-test pbir contract: {exc}", file=sys.stderr)
         return 2
 
@@ -90,7 +94,10 @@ def _report(args: argparse.Namespace) -> Path:
         report = Path(args.target)
     elif args.artifact:
         name = args.artifact if args.artifact.endswith(".Report") else f"{args.artifact}.Report"
-        found = sorted(Path(args.artifact_dir).rglob(name))
+        found = [p for p in find_artifact_dirs(Path(args.artifact_dir), [".Report"]) if p.name == name]
+        if len(found) > 1:
+            raise InitError(f"--artifact {args.artifact} matches {len(found)} reports; pass the path to one: "
+                            + ", ".join(map(str, found)))
         report = found[0] if found else Path(args.artifact_dir) / name
     else:
         raise InitError("name the report: a path to its .Report folder, or --artifact NAME")
@@ -100,8 +107,12 @@ def _report(args: argparse.Namespace) -> Path:
 
 
 def build_questions(report: Path, as_of: datetime.date) -> dict[str, Any]:
-    slicers = read_slicers(report)
-    questions = [_slicer_question(s, _rule_id(s, slicers[:i]), as_of) for i, s in enumerate(slicers)]
+    try:
+        slicers = _one_per_column(read_slicers(report))
+    except (OSError, ValueError) as exc:
+        raise InitError(f"{report}: a page or visual file can't be read ({exc})") from exc
+    used: set[str] = set()
+    questions = [_slicer_question(s, _rule_id(s, i, used), as_of) for i, s in enumerate(slicers)]
     starts = [q.pop("_starts") for q in questions if q.get("_starts")]
     reproduces = sorted(set.intersection(*map(set, starts))) if starts else list(range(1, 13))
     suggested_start = next((m for m in _START_PREFERENCE if m in reproduces), 1)
@@ -109,24 +120,47 @@ def build_questions(report: Path, as_of: datetime.date) -> dict[str, Any]:
                       "suggested": suggested_start, "reproduces": reproduces, "needs_human": bool(starts)})
     questions.append({"id": _NAMED_BY, "prompt": "Is a fiscal year named by the calendar year it starts or ends in?",
                       "choices": ["end", "start"], "suggested": "end", "needs_human": bool(starts)})
-    for q in questions:
-        q.pop("_starts", None)
     return {"report": str(report), "contract": str(_contract_path(report)), "as_of": as_of.isoformat(),
             "questions": questions}
 
 
-def _rule_id(slicer: Slicer, earlier: list[Slicer]) -> str:
-    base = re.sub(r"[^a-z0-9]+", "-", f"{slicer.page} {slicer.column}".lower()).strip("-")
-    taken = sum(1 for s in earlier if (s.page, s.column) == (slicer.page, slicer.column))
-    return f"{base}-{taken + 1}" if taken else base
+def _one_per_column(slicers: list[Slicer]) -> list[Slicer]:
+    """One slicer per (page, field): a rule matches every slicer on its column, so two with different
+    selections can't both be checked; the same selection twice needs one rule."""
+    groups: dict[tuple, list[Slicer]] = {}
+    for s in slicers:
+        groups.setdefault((s.page, s.table, s.column), []).append(s)
+    result = []
+    for group in groups.values():
+        first = group[0]
+        if any(s.current != first.current for s in group):
+            reason = f"{len(group)} slicers on this page share this column with different selections"
+            first = Slicer(first.page, first.table, first.column, {"unsupported": reason})
+        result.append(first)
+    return result
+
+
+def _rule_id(slicer: Slicer, index: int, used: set[str]) -> str:
+    base = re.sub(r"[^a-z0-9]+", "-", f"{slicer.page} {slicer.column}".lower()).strip("-") or f"slicer-{index + 1}"
+    rule_id, n = base, 1
+    while rule_id in used or rule_id.startswith("page."):
+        n += 1
+        rule_id = f"{base}-{n}"
+    used.add(rule_id)
+    return rule_id
 
 
 def _slicer_question(slicer: Slicer, rule_id: str, as_of: datetime.date) -> dict[str, Any]:
+    field = f"'{slicer.table}'[{slicer.column}]"
     question = {"id": rule_id, "page": slicer.page, "table": slicer.table, "column": slicer.column,
-                "field": f"'{slicer.table}'[{slicer.column}]", "current": slicer.current,
-                "prompt": f"{slicer.page}: '{slicer.table}'[{slicer.column}] opens with {_show(slicer.current)}. "
-                          "Keep checking that, follow the calendar, or skip it?",
-                "choices": list(CHOICES), "suggested": "keep", "needs_human": False}
+                "field": field, "current": slicer.current}
+    if "unsupported" in slicer.current:
+        return {**question, "prompt": f"{slicer.page}: {field} opens with {slicer.current['unsupported']}, "
+                                      "which a contract can't check. Skip it?",
+                "choices": ["skip"], "suggested": "skip", "needs_human": False}
+    question.update(prompt=f"{slicer.page}: {field} opens with {_show(slicer.current)}. "
+                           "Keep checking that, follow the calendar, or skip it?",
+                    choices=list(CHOICES), suggested="keep", needs_human=False)
     suggestion = _calendar_suggestion(slicer.current, as_of)
     if suggestion:
         question.update(suggested="calendar", calendar_format=suggestion[0], needs_human=True, _starts=suggestion[1])
@@ -135,8 +169,9 @@ def _slicer_question(slicer: Slicer, rule_id: str, as_of: datetime.date) -> dict
 
 def _show(current: dict) -> str:
     [(check, value)] = current.items()
-    return json.dumps(value, default=str) if check != "selected" else (
-        ", ".join(map(str, value)) or "no selection")
+    if check in ("selected", "contains"):
+        return ", ".join(map(str, value)) or ("no selection" if check == "selected" else "nothing typed")
+    return json.dumps(value, default=str)
 
 
 def _calendar_suggestion(current: dict, as_of: datetime.date) -> tuple[str, list[int]] | None:
@@ -163,6 +198,8 @@ def _answers(args: argparse.Namespace, questions: dict) -> dict[str, Any]:
             given = json.loads(Path(args.answers).read_text(encoding="utf-8"))
         except (OSError, ValueError) as exc:
             raise InitError(f"--answers {args.answers}: {exc}") from exc
+        if not isinstance(given, dict):
+            raise InitError(f"--answers {args.answers}: must be a JSON object of question id -> answer")
     elif sys.stdin.isatty():
         given = _ask(questions["questions"])
     else:
@@ -176,46 +213,67 @@ def _answers(args: argparse.Namespace, questions: dict) -> dict[str, Any]:
 
 
 def _ask(questions: list[dict]) -> dict[str, Any]:
+    """Ask on stderr, so stdout stays one document under --format json; re-ask until an answer is valid."""
     answers: dict[str, Any] = {}
     for q in questions:
         if q["id"] in (_START, _NAMED_BY) and "calendar" not in answers.values():
             continue
         hint = f" (format {q['calendar_format']})" if q.get("calendar_format") else ""
-        choices = "/".join(map(str, q.get("choices", []))) or "number"
-        print(f"{q['prompt']}{hint}\n  [{choices}] default {q['suggested']}: ", end="")
-        try:
-            typed = input().strip()
-        except EOFError:
-            typed = ""
+        valid = [str(c) for c in q.get("choices", range(1, 13))]
+        while True:
+            print(f"{q['prompt']}{hint}\n  [{'/'.join(valid)}] default {q['suggested']}: ", end="", file=sys.stderr)
+            try:
+                typed = input().strip()
+            except EOFError:
+                typed = ""
+            if not typed or typed in valid:
+                break
+            print(f"  '{typed}' isn't one of {', '.join(valid)}", file=sys.stderr)
         answers[q["id"]] = (int(typed) if typed.isdigit() else typed) if typed else q["suggested"]
     return answers
 
 
-def _rule(q: dict, answer: Any) -> dict[str, Any] | None:
+def _rule(q: dict, answer: Any) -> tuple[dict[str, Any] | None, bool]:
+    """(the rule for this answer, or None to skip; whether it follows the calendar)."""
     if answer == "skip":
-        return None
-    implementation: dict[str, Any] = {"page": q["page"], **q["current"]}
+        return None, False
+    if "unsupported" in q["current"]:
+        raise InitError(f"{q['id']}: {q['current']['unsupported']}; the only answer is skip")
     if answer == "calendar" or isinstance(answer, dict):
         text = answer.get("calendar") if isinstance(answer, dict) else q.get("calendar_format")
-        if not text:
+        if not isinstance(text, str) or not text:
             raise InitError(f"{q['id']}: no calendar format reproduces {_show(q['current'])} today; "
                             'answer {"calendar": "<format>"} to name one')
         implementation = {"page": q["page"], "selected": [text]}
-    elif answer != "keep":
+        calendar = True
+    elif answer == "keep":
+        [(check, value)] = q["current"].items()
+        implementation = {"page": q["page"], check: _escaped(value) if check in ("selected", "contains") else value}
+        calendar = False
+    else:
         raise InitError(f"{q['id']}: answer must be keep, calendar, skip or {{\"calendar\": \"<format>\"}}, "
                         f"got {answer!r}")
-    return {"id": q["id"], "type": "custom", "engine": ENGINE, "implementation": implementation}
+    return {"id": q["id"], "type": "custom", "engine": ENGINE, "implementation": implementation}, calendar
+
+
+def _escaped(values: list) -> list:
+    """A kept value is literal text, so its braces mustn't read as calendar fields."""
+    return [v.replace("{", "{{").replace("}", "}}") if isinstance(v, str) else v for v in values]
 
 
 def _write(args: argparse.Namespace, report: Path, questions: dict, answers: dict) -> int:
-    slicer_questions = [q for q in questions["questions"] if "page" in q]
-    rules = [(q, r) for q in slicer_questions if (r := _rule(q, answers[q["id"]]))]
+    built = [(q, *_rule(q, answers[q["id"]])) for q in questions["questions"] if "page" in q]
+    rules = [(q, rule) for q, rule, _ in built if rule]
     calendar = None
-    if any(r["implementation"].get("selected") and _is_calendar(r) for _, r in rules):
+    if any(follows for _, rule, follows in built if rule):
         calendar = {"fiscal_year_start_month": answers[_START], "fiscal_year_named_by": answers[_NAMED_BY]}
         validate_calendar(calendar)
     path = _contract_path(report)
     document, summary = _merge(path, report, rules, calendar, args.force)
+    try:  # the file must read back exactly as `fab-test pbir` will read it
+        resolve_contract(parse_contract(document, path), datetime.date.fromisoformat(questions["as_of"]))
+    except (ContractError, CalendarError) as exc:
+        raise InitError(f"the contract wouldn't be valid, so nothing was written:\n{exc}") from exc
     text = yaml.safe_dump(document, sort_keys=False, allow_unicode=True)
     if not args.dry_run:
         path.write_text(text, encoding="utf-8")
@@ -225,45 +283,61 @@ def _write(args: argparse.Namespace, report: Path, questions: dict, answers: dic
     return 0
 
 
-def _is_calendar(rule: dict) -> bool:
-    return any(isinstance(v, str) and "{" in v for v in rule["implementation"].get("selected", []))
-
-
 def _merge(path: Path, report: Path, rules: list, calendar: dict | None, force: bool):
-    summary: dict[str, list[str]] = {"added": [], "kept": [], "replaced": [], "unchanged": []}
+    summary: dict[str, Any] = {"added": [], "kept": [], "replaced": [], "unchanged": [], "calendar": None}
     if path.exists():
         text = path.read_text(encoding="utf-8")
-        if any(line.lstrip().startswith("#") for line in text.splitlines()) and not force:
-            raise InitError(f"{path} has comments, which rewriting would drop; edit it by hand, "
+        if "#" in text and not force:
+            raise InitError(f"{path} contains '#' (a comment), which rewriting would drop; edit it by hand, "
                             "or pass --force to rewrite it (see the result first with --dry-run)")
-        document = yaml.safe_load(text) or {}
+        document = yaml.safe_load(text)
+        if not isinstance(document, dict):
+            raise InitError(f"{path} isn't a contract (not a YAML mapping); move it aside or fix it")
     else:
         document = _new_document(report)
-    properties = document.setdefault("customProperties", [])
-    if calendar and not any(p.get("property") == "fabTestCalendar" for p in properties):
-        properties.append({"property": "fabTestCalendar", "value": calendar})
+    summary["calendar"] = _merge_calendar(document, calendar, force)
     for q, rule in rules:
         quality = _column(document, q["table"], q["column"])
-        existing = next((i for i, r in enumerate(quality) if r.get("id") == rule["id"]), None)
+        existing = next((r for r in quality if isinstance(r, dict) and r.get("id") == rule["id"]), None)
         if existing is None:
             quality.append(rule)
             summary["added"].append(rule["id"])
-        elif quality[existing] == rule:
+        elif existing.get("implementation") == rule["implementation"]:
             summary["unchanged"].append(rule["id"])
         elif force:
-            quality[existing] = rule
+            existing["implementation"] = rule["implementation"]
             summary["replaced"].append(rule["id"])
         else:
             summary["kept"].append(rule["id"])
     return document, summary
 
 
+def _merge_calendar(document: dict, calendar: dict | None, force: bool) -> str | None:
+    if not calendar:
+        return None
+    properties = document.setdefault("customProperties", [])
+    existing = next((p for p in properties if isinstance(p, dict) and p.get("property") == _CALENDAR_PROPERTY), None)
+    if existing is None:
+        properties.append({"property": _CALENDAR_PROPERTY, "value": calendar})
+        return "added"
+    if existing.get("value") == calendar:
+        return "unchanged"
+    if force:
+        existing["value"] = calendar
+        return "replaced"
+    return "kept"
+
+
 def _new_document(report: Path) -> dict[str, Any]:
+    logical_id = report_logical_id(report)
+    if not logical_id:
+        raise InitError(f"{report} has no .platform logicalId, which a contract pairs by; "
+                        "save the report from Power BI Desktop or Fabric to create it")
     name = report.name.removesuffix(".Report")
     return {"apiVersion": "v3.1.0", "kind": "DataContract",
-            "id": re.sub(r"[^a-z0-9]+", "-", f"{name} slicer defaults".lower()).strip("-"),
+            "id": re.sub(r"[^a-z0-9]+", "-", f"{name} slicer defaults".lower()).strip("-") or "slicer-defaults",
             "name": f"{name} slicer defaults", "version": "1.0.0", "status": "active",
-            "customProperties": [{"property": "fabTestReport", "value": report_logical_id(report)}], "schema": []}
+            "customProperties": [{"property": "fabTestReport", "value": logical_id}], "schema": []}
 
 
 def _column(document: dict, table: str, column: str) -> list:
@@ -274,7 +348,7 @@ def _column(document: dict, table: str, column: str) -> list:
 
 def _named(items: list, name: str) -> dict:
     for item in items:
-        if item.get("name") == name:
+        if isinstance(item, dict) and item.get("name") == name:
             return item
     items.append({"name": name})
     return items[-1]
@@ -300,5 +374,7 @@ def _summary_text(summary: dict) -> str:
     lines = [f"  ✓ {summary['contract']}"]
     lines += [f"    {key}: {', '.join(ids)}" for key, ids in summary.items() if isinstance(ids, list) and ids]
     if summary["kept"]:
-        lines.append("    (kept rules differ from the report today; --force replaces them)")
+        lines.append("    kept: their checks differ from the report today; --force replaces them")
+    if summary["calendar"] == "kept":
+        lines.append("    the contract's fabTestCalendar differs from your answers and was kept; --force replaces it")
     return "\n".join(lines)

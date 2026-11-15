@@ -62,3 +62,13 @@ def test_given_a_rule_file_should_be_plain_json():
     rules = compile_rules([_expectation(check="range", expected={"to": datetime.date(2026, 10, 28)})])
 
     assert json.loads(json.dumps(rules)) == rules
+
+
+@pytest.mark.pbir
+def test_given_an_inspector_message_with_escaped_quotes_should_show_the_quotes():
+    from fab_test.scripts.invoke_pbir_inspector import _normalize_finding
+
+    finding = {"RuleId": "CONTRACT.r1", "LogType": 0, "Pass": False,
+               "Message": 'FAILED with result: ["\u0027T\u0027[C] opens with [\u0027Bad\u0027]"]'}
+
+    assert _normalize_finding(finding)["message"] == "FAILED with result: [\"'T'[C] opens with ['Bad']\"]"

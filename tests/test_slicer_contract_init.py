@@ -128,12 +128,14 @@ def test_given_no_terminal_and_no_answers_should_exit_2_naming_both_flags(tmp_pa
 def test_given_a_terminal_should_ask_and_take_the_suggestion_on_enter(tmp_path, capsys, monkeypatch):
     report = _bed(tmp_path)
 
-    code, out, _err = _run(report, capsys, monkeypatch=monkeypatch, tty=True, typed="skip\n" + "\n" * 40)
+    code, out, err = _run(report, capsys, "--format", "json", monkeypatch=monkeypatch, tty=True,
+                          typed="maybe\nskip\n" + "\n" * 40)
 
     assert code == 0
     ids = {e.rule_id for e in load_contract(_contract_path(report)).expectations}
-    assert len(ids) == 9  # the first slicer asked was skipped
-    assert "keep" in out and "calendar" in out
+    assert len(ids) == 9  # the first slicer asked was skipped, after one invalid answer was re-asked
+    assert "keep" in err and "'maybe' isn't one of" in err
+    assert json.loads(out)["written"] is True  # prompts on stderr keep stdout one JSON document
 
 
 @pytest.mark.pbir
@@ -201,3 +203,137 @@ def test_given_an_unknown_answer_should_exit_2_naming_it(tmp_path, capsys):
     code, _out, err = _run(report, capsys, "--answers", _answers(tmp_path, {"standard-slicers-alignment": "maybe"}))
 
     assert code == 2 and "standard-slicers-alignment" in err and "maybe" in err
+
+
+def _set_selection(report: Path, visual_id: str, condition) -> None:
+    [path] = report.glob(f"definition/pages/*/visuals/{visual_id}/visual.json")
+    data = json.loads(path.read_text(encoding="utf-8-sig"))
+    general = data["visual"]["objects"]["general"][0]["properties"]
+    if condition is None:
+        general.clear()
+    else:
+        general["filter"]["filter"]["Where"] = [{"Condition": condition}]
+    path.write_text(json.dumps(data), encoding="utf-8")
+
+
+def _alignment_in(literal: str) -> dict:
+    column = {"Column": {"Expression": {"SourceRef": {"Source": "a"}}, "Property": "Alignment"}}
+    return {"In": {"Expressions": [column], "Values": [[{"Literal": {"Value": literal}}]]}}
+
+
+@pytest.mark.pbir
+def test_given_a_kept_value_with_braces_or_an_empty_input_slicer_should_write_a_valid_contract(tmp_path, capsys):
+    report = _bed(tmp_path)
+    _set_selection(report, "ce885ceced4291ade64c", _alignment_in("'A}B {year}'"))
+    _set_selection(report, "4939c433554061c20080", None)
+
+    code, _out, err = _run(report, capsys, "--answers", _answers(tmp_path, {}))
+
+    resolved = {e.rule_id: e.expected for e in resolve_contract(load_contract(_contract_path(report)),
+                                                                datetime.date(2026, 11, 14))}
+    assert code == 0, err
+    assert resolved["standard-slicers-alignment"] == ["A}B {year}"]
+    assert resolved["input-slicer-name"] == []
+
+
+@pytest.mark.pbir
+def test_given_an_all_except_selection_should_offer_only_skip(tmp_path, capsys):
+    report = _bed(tmp_path)
+    _set_selection(report, "ce885ceced4291ade64c", {"Not": {"Expression": _alignment_in("'Bad'")}})
+
+    questions = {q["id"]: q for q in _questions(report, capsys)["questions"]}
+    code, _out, err = _run(report, capsys, "--answers", _answers(tmp_path, {"standard-slicers-alignment": "keep"}))
+
+    assert questions["standard-slicers-alignment"]["choices"] == ["skip"]
+    assert code == 2 and "the only answer is skip" in err
+
+
+@pytest.mark.pbir
+def test_given_a_report_without_a_logical_id_should_exit_2_and_say_why(tmp_path, capsys):
+    report = _bed(tmp_path)
+    (report / ".platform").unlink()
+
+    code, _out, err = _run(report, capsys, "--answers", _answers(tmp_path, {}))
+
+    assert code == 2 and "logicalId" in err and not _contract_path(report).exists()
+
+
+@pytest.mark.pbir
+@pytest.mark.parametrize("answers", ['["keep"]', '"keep"'])
+def test_given_answers_that_arent_an_object_should_exit_2(tmp_path, capsys, answers):
+    report = _bed(tmp_path)
+    path = tmp_path / "answers.json"
+    path.write_text(answers, encoding="utf-8")
+
+    code, _out, err = _run(report, capsys, "--answers", str(path))
+
+    assert code == 2 and "JSON object" in err
+
+
+@pytest.mark.pbir
+def test_given_an_unreadable_visual_should_exit_2_naming_the_report(tmp_path, capsys):
+    report = _bed(tmp_path)
+    [visual] = report.glob("definition/pages/*/visuals/ce885ceced4291ade64c/visual.json")
+    visual.write_text("{not json", encoding="utf-8")
+
+    code, _out, err = _run(report, capsys, "--questions")
+
+    assert code == 2 and "can't be read" in err
+
+
+@pytest.mark.pbir
+def test_given_force_should_replace_only_the_check_and_keep_a_hand_set_severity(tmp_path, capsys):
+    report = _bed(tmp_path)
+    _run(report, capsys, "--answers", _answers(tmp_path, {}))
+    document = yaml.safe_load(_contract_path(report).read_text(encoding="utf-8"))
+    for table in document["schema"]:
+        for column in table["properties"]:
+            for rule in column["quality"]:
+                if rule["id"] == "standard-slicers-alignment":
+                    rule["severity"] = "warning"
+                    rule["implementation"]["selected"] = ["Good"]
+    _contract_path(report).write_text(yaml.safe_dump(document, sort_keys=False), encoding="utf-8")
+
+    _run(report, capsys, "--answers", _answers(tmp_path, {}), "--force")
+
+    [rule] = [e for e in load_contract(_contract_path(report)).expectations
+              if e.rule_id == "standard-slicers-alignment"]
+    assert (rule.expected, rule.severity) == (["Bad"], "warning")
+
+
+@pytest.mark.pbir
+def test_given_a_trailing_comment_should_refuse_to_rewrite(tmp_path, capsys):
+    report = _bed(tmp_path)
+    _run(report, capsys, "--answers", _answers(tmp_path, {"standard-slicers-eye-color": "skip"}))
+    text = _contract_path(report).read_text(encoding="utf-8").replace("status: active", "status: active  # agreed")
+    _contract_path(report).write_text(text, encoding="utf-8")
+
+    code, _out, err = _run(report, capsys, "--answers", _answers(tmp_path, {}))
+
+    assert code == 2 and "comment" in err
+
+
+@pytest.mark.pbir
+def test_given_calendar_answers_that_differ_from_the_contract_should_keep_its_calendar_and_say_so(tmp_path, capsys):
+    report = _bed(tmp_path)
+    _run(report, capsys, "--answers", _answers(tmp_path, {}))
+
+    code, out, _err = _run(report, capsys, "--format", "json",
+                           "--answers", _answers(tmp_path, {"calendar.fiscal_year_start_month": 8}))
+
+    assert code == 0 and json.loads(out)["calendar"] == "kept"
+    assert load_contract(_contract_path(report)).calendar["fiscal_year_start_month"] == 7
+
+
+@pytest.mark.pbir
+def test_given_two_slicers_on_one_column_should_ask_once_or_offer_skip_when_they_differ(tmp_path, capsys):
+    report = _bed(tmp_path)
+    [original] = report.glob("definition/pages/*/visuals/ce885ceced4291ade64c")
+    shutil.copytree(original, original.parent / "0000000000000000twin")
+
+    same = {q["id"]: q for q in _questions(report, capsys)["questions"]}
+    _set_selection(report, "0000000000000000twin", _alignment_in("'Good'"))
+    differ = {q["id"]: q for q in _questions(report, capsys)["questions"]}
+
+    assert "standard-slicers-alignment-2" not in same and same["standard-slicers-alignment"]["choices"][0] == "keep"
+    assert differ["standard-slicers-alignment"]["choices"] == ["skip"]

@@ -38,9 +38,13 @@ schema:
 | `selected` | value slicers and field parameters (by display name); `[]` means no selection | `[Bad]`, `[1940]`, `[Number of Characters]` |
 | `range` | Between, or a date picker range picked on the calendar; `to` is inclusive; either bound may be left open | `{from: 1939-10-01, to: 1951-08-27}` |
 | `relative` | Relative date slicer | `{range: Last, duration: 20, period: Calendar Months}` |
-| `contains` | input slicer (`textSlicer`) | `[Wolverine]` |
+| `contains` | input slicer (`textSlicer`); `[]` means nothing typed | `[Wolverine]` |
 
-pql-test reads the same file and skips `engine: fab-test` rules; fab-test skips everyone else's. fab-test never calls pql-test.
+A check reads one shape: a plain list of values on one column, an input slicer's text, a from/to date range, or a relative period. A slicer whose selection is in any other shape ("Select all" then untick, several columns, a hierarchy) fails its check with "a selection this check can't read" rather than passing, and `init` offers it only `skip`. A rule matches every slicer on its column on its page, so two slicers there with different selections can't be checked (`init` offers `skip`).
+
+Rule ids must be unique, and `page.` is reserved. An `engine: fab-test` rule must be `type: custom`. A fixed value containing `{` or `}` is written `{{` / `}}`, since braces mark calendar fields (`init` escapes them for you).
+
+pql-test reads the same file and skips `engine: fab-test` rules; fab-test skips everyone else's. fab-test never calls pql-test. A `*.odcs.yaml` that isn't valid YAML and mentions no `fab-test` rule is skipped with a warning.
 
 ## Calendar-driven values
 
@@ -72,8 +76,11 @@ ContractInit {
   (no terminal and no --answers) => exit 2 naming --questions and --answers   // never waits for input
   answer per slicer = keep | calendar | skip | {"calendar": "<format>"}
   answer for calendar.fiscal_year_start_month = 1..12; calendar.fiscal_year_named_by = start | end
-  (an existing contract) => adds rules for uncovered slicers; keeps every rule it has; --force replaces one that differs
-  (the contract has comments) => exit 2 unless --force, because rewriting drops them
+  (an existing contract) => adds rules for uncovered slicers; keeps every rule it has; --force replaces a differing rule's implementation only (severity and other keys stay)
+  (its fabTestCalendar differs from the answers) => kept and reported (`calendar: kept`); --force replaces it
+  (the contract contains '#') => exit 2 unless --force, because rewriting drops comments
+  (the result wouldn't read back as fab-test pbir reads it, or the report has no .platform logicalId) => exit 2; nothing written
+  (on a terminal) => prompts go to stderr, so --format json stdout stays one document
 }
 ```
 

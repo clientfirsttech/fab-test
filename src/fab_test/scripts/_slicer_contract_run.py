@@ -25,7 +25,7 @@ import yaml
 
 from ._results_stem import results_stem
 from ._scan import find_files_by_suffix
-from ._slicer_calendar import CalendarError, resolve_contract
+from ._slicer_calendar import CalendarError, resolve_contract, today
 from ._slicer_contract import ENGINE, ContractError, SlicerExpectation, load_contract
 from ._slicer_rules import compile_rules
 
@@ -58,7 +58,7 @@ def prepare_contracts(args: argparse.Namespace) -> int | None:
     explaining = args.analyzer == "explain" and getattr(args, "analyzer_name", None) == "pbir"
     if args.analyzer not in _ANALYZERS and not explaining:
         return None
-    as_of = getattr(args, "as_of", None) or datetime.datetime.now(datetime.UTC).astimezone().date()
+    as_of = getattr(args, "as_of", None) or today()
     try:
         if getattr(args, "contract", None):
             args.explicit_contract = _resolve(Path(args.contract), as_of)
@@ -86,9 +86,15 @@ def _contract_files(args: argparse.Namespace) -> list[Path]:
 def _has_slicer_rules(path: Path) -> bool:
     """True for a contract fab-test should read: one carrying an engine: fab-test rule."""
     try:
-        document = yaml.safe_load(path.read_text(encoding="utf-8"))
-    except (OSError, yaml.YAMLError):
+        text = path.read_text(encoding="utf-8")
+        document = yaml.safe_load(text)
+    except (OSError, UnicodeDecodeError):
         return True  # let load_contract report it
+    except yaml.YAMLError:
+        if ENGINE in text:
+            return True  # ours, so a broken one is an error load_contract reports
+        print(f"  ⚠ fab-test: skipped {path}: not valid YAML, and no {ENGINE} rules in it", file=sys.stderr)
+        return False
     tables = document.get("schema") if isinstance(document, dict) else None
     return any(
         isinstance(rule, dict) and str(rule.get("engine", "")).lower() == ENGINE

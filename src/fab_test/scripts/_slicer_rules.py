@@ -23,10 +23,11 @@ from __future__ import annotations
 import datetime
 from typing import Any
 
+from ._pbir_slicers import RELATIVE_MODES, SLICER_TYPES
 from ._slicer_contract import SlicerExpectation, dax_literal
 
 RULE_PREFIX = "CONTRACT."
-_SLICER_TYPES = ["slicer", "textSlicer", "listSlicer", "advancedSlicerVisual"]
+_UNREADABLE = "a selection this check can't read"
 _FILTER = "$.visual.objects.general[0].properties.filter.filter"
 _DATA = "visual.objects.data.0.properties."
 
@@ -67,7 +68,7 @@ def _describe_expected(e: SlicerExpectation) -> str:
 def _slicer_rule(e: SlicerExpectation) -> dict[str, Any]:
     bound = "visual.query.queryState.Values.projections.0.field.Column."
     slicers = {"filter": [{"part": "Visuals"}, {"and": [
-        {"in": [{"var": "visual.visualType"}, _SLICER_TYPES]},
+        {"in": [{"var": "visual.visualType"}, list(SLICER_TYPES)]},
         {"==": [{"var": bound + "Expression.SourceRef.Entity"}, e.table]},
         {"==": [{"var": bound + "Property"}, e.column]},
     ]}]}
@@ -98,26 +99,52 @@ def _slicer_rule(e: SlicerExpectation) -> dict[str, Any]:
 
 
 def _comparison(e: SlicerExpectation) -> tuple[dict, dict]:
-    """(what the slicer opens with, as text; whether it matches) as JSON Logic."""
+    """(what the slicer opens with, as text; whether it matches) as JSON Logic.
+
+    Every check requires the one filter row shape it reads, so a selection in
+    any other shape ("all except", several columns) is a mismatch reported as
+    unreadable -- never an empty list that happens to equal ``[]``.
+    """
     tokens = expected_tokens(e)
+    rows = {"count": [{"path": f"{_FILTER}.Where[*]"}]}
+    no_rows = {"==": [rows, 0]}
+    one_row = {"==": [rows, 1]}
     if e.check == "relative":
         actual = {"cat": [{"var": _DATA + "relativeRange.expr.Literal.Value"}, "|",
                           {"var": _DATA + "relativeDuration.expr.Literal.Value"}, "|",
                           {"var": _DATA + "relativePeriod.expr.Literal.Value"}]}
-        return actual, {"==": [actual, tokens[0]]}
+        relative = {"and": [{"in": [{"var": _DATA + "mode.expr.Literal.Value"}, list(RELATIVE_MODES)]}, one_row,
+                            {">": [{"count": [{"path": f"{_FILTER}..DateSpan"}]}, 0]}]}
+        shown = {"if": [no_rows, "no selection", relative, actual, _UNREADABLE]}
+        return shown, {"and": [relative, {"==": [actual, tokens[0]]}]}
     if e.check == "range":
         pairs = {"map": [{"path": f"{_FILTER}..Comparison"},
                          {"cat": [{"var": "ComparisonKind"}, "|", {"var": "Right.Literal.Value"}]}]}
-        return {"strjoin": [pairs, ", "]}, {"equalsets": [pairs, tokens]}
+        return _shown(no_rows, {"strjoin": [pairs, ", "]}), {"and": [one_row, {"equalsets": [pairs, tokens]}]}
     if e.check == "contains":
         values = {"path": f"{_FILTER}..Contains.Right.Literal.Value"}
-        return {"strjoin": [values, ", "]}, {"equalsets": [values, tokens]}
+        return _shown(no_rows, {"strjoin": [values, ", "]}), _either_empty(tokens, no_rows, {
+            "and": [one_row, {"equalsets": [values, tokens]}]})
+    plain = {"and": [one_row,
+                     {"==": [{"count": [{"path": f"{_FILTER}.Where[*].Condition.In"}]}, 1]},
+                     {"==": [{"count": [{"path": f"{_FILTER}.Where[*].Condition.In.Expressions[*]"}]}, 1]}]}
     literals = {"path": f"{_FILTER}.Where[*].Condition.In.Values[*][0].Literal.Value"}
     names = {"path": f"{_FILTER}.Where[*].Annotations.filterExpressionMetadata.valueMap[*]['0']"}
     is_parameter = {">": [{"count": [names]}, 0]}
-    actual = {"if": [is_parameter, {"strjoin": [names, ", "]}, {"strjoin": [literals, ", "]}]}
+    values = {"if": [is_parameter, {"strjoin": [names, ", "]}, {"strjoin": [literals, ", "]}]}
+    shown = {"if": [no_rows, "no selection", plain, values, _UNREADABLE]}
     display = [str(v) for v in e.expected]
-    return actual, {"if": [is_parameter, {"equalsets": [names, display]}, {"equalsets": [literals, tokens]}]}
+    same = {"if": [is_parameter, {"equalsets": [names, display]}, {"equalsets": [literals, tokens]}]}
+    return shown, _either_empty(tokens, no_rows, {"and": [plain, same]})
+
+
+def _shown(no_rows: dict, values: dict) -> dict:
+    return {"if": [no_rows, "no selection", values]}
+
+
+def _either_empty(tokens: list[str], no_rows: dict, matches: dict) -> dict:
+    """An empty expectation means the slicer has no filter at all, whatever shape it would take."""
+    return no_rows if not tokens else matches
 
 
 def _page_rule(page: str) -> dict[str, Any]:

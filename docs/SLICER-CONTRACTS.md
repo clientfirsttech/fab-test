@@ -6,7 +6,7 @@ This guide uses the test bed in `fabric-artifacts/`: `SampleModel-DefaultState.R
 
 ## 1. Build the contract
 
-From the folder that holds the report:
+From the repository root:
 
 ```bash
 fab-test pbir contract init fabric-artifacts/SampleModel-DefaultState.Report
@@ -29,7 +29,9 @@ Calendar answers also ask when your fiscal year starts and whether it is named b
 
 Enter takes the suggestion. The contract is written beside the report, never inside it: Fabric deletes files inside a report folder that aren't part of the report.
 
-Run `init` again after adding slicers: it adds rules for the new ones and leaves yours alone. `--dry-run` shows the file without writing it.
+Run `init` again after adding slicers: it adds rules for the new ones and leaves yours alone (`--force` replaces a rule's check, keeping anything else you added to it). `--dry-run` shows the file without writing it, and nothing is written unless the result is a contract `fab-test pbir` accepts.
+
+Some selections can't be checked, and `init` only offers to skip them: "Select all" then untick some values, a hierarchy slicer, or two slicers on one page bound to the same column with different selections.
 
 ## 2. Check it
 
@@ -65,7 +67,7 @@ The contract is plain YAML. Each rule sits on the slicer's column and names its 
 
 The other checks are `range: {from: 2026-01-01, to: 2026-06-30}` (Between slicers and date pickers), `relative: {range: Last, duration: 20, period: Calendar Months}` and `contains: [Wolverine]` (input slicers). `selected: []` means the slicer should open with nothing selected. The fields a calendar value can use are `year`, `year_short`, `half`, `quarter`, `month`, `fiscal_year`, `fiscal_year_short`, `fiscal_semester`, `fiscal_quarter` and `fiscal_month`.
 
-A comment in the file is yours to keep: `init` won't rewrite a commented contract without `--force`.
+A fixed value containing `{` or `}` is written `{{` or `}}`, because braces mark calendar fields. A comment in the file is yours to keep: `init` won't rewrite a contract containing `#` without `--force`.
 
 ## 4. Catch the rollover on a schedule
 

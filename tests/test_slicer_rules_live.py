@@ -174,3 +174,47 @@ def test_given_a_contract_built_by_init_should_pass_the_report_it_came_from(insp
 
     assert result.returncode == 0, result.stdout + result.stderr
     assert _failed(root) == set()
+
+
+def _visual(root: Path, visual_id: str) -> Path:
+    [path] = (root / TEST_BED.name).glob(f"definition/pages/*/visuals/{visual_id}/visual.json")
+    return path
+
+
+def _edit_visual(root: Path, visual_id: str, change) -> None:
+    path = _visual(root, visual_id)
+    data = json.loads(path.read_text(encoding="utf-8-sig"))
+    change(data["visual"]["objects"])
+    path.write_text(json.dumps(data), encoding="utf-8")
+
+
+def test_given_selections_in_shapes_a_check_cant_read_should_fail_rather_than_pass(inspector, tmp_path):
+    document = _contract()
+    for rule in _rules(document):
+        if rule["id"] == "fiscal-semester-current":
+            rule["implementation"]["selected"] = []
+    root = _bed(tmp_path, document)
+
+    def all_except(objects):  # Alignment: "Select all", then untick Bad
+        where = objects["general"][0]["properties"]["filter"]["filter"]["Where"][0]
+        where["Condition"] = {"Not": {"Expression": where["Condition"]}}
+
+    def cleared(objects):  # Fiscal Semester, cleared the way Desktop saves it
+        objects["general"] = [{"properties": {}}]
+
+    def switched_to_between(objects):  # Relative: mode changed, relative settings left behind
+        objects["data"][0]["properties"]["mode"]["expr"]["Literal"]["Value"] = "'Between'"
+        objects["general"][0]["properties"]["filter"]["filter"]["Where"] = [{"Condition": {"Comparison": {
+            "ComparisonKind": 3, "Left": {"Column": {"Expression": {"SourceRef": {"Source": "d"}}, "Property": "Date"}},
+            "Right": {"Literal": {"Value": "datetime'2000-01-01T00:00:00'"}}}}}]
+
+    _edit_visual(root, "ce885ceced4291ade64c", all_except)
+    _edit_visual(root, "012e790c5b0c7c36c739", cleared)
+    _edit_visual(root, "a60f5852c086b26d86a4", switched_to_between)
+
+    _run(root)
+
+    assert _failed(root) == {"CONTRACT.alignment-default", "CONTRACT.relative-date-default",
+                             "CONTRACT.half-year-current"}
+    messages = {f["rule"]: f["message"] for f in _envelope(root)["findings"]}
+    assert "can't read" in messages["CONTRACT.alignment-default"]

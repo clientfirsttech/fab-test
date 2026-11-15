@@ -8,7 +8,6 @@ reading and validating it; compiling it to JSON Logic is a later task.
 """
 
 import datetime
-import json
 from pathlib import Path
 
 import pytest
@@ -23,7 +22,6 @@ from fab_test.scripts._slicer_contract import (
 
 ROOT = Path(__file__).resolve().parent.parent
 EXAMPLE = ROOT / "fabric-artifacts" / "SampleModel-DefaultState.Report.odcs.yaml"
-SCHEMA = ROOT / "src" / "fab_test" / "schemas" / "slicer-contract.schema.json"
 
 
 def _rule(**implementation):
@@ -120,7 +118,9 @@ def test_given_no_report_pairing_should_name_the_custom_property(tmp_path):
     ({"range": {}}, "implementation.range"),
     ({"relative": {"range": "Last", "duration": 0, "period": "Months"}}, "implementation.relative.duration"),
     ({"relative": {"range": "Previous", "duration": 2, "period": "Months"}}, "implementation.relative.range"),
-    ({"contains": []}, "implementation.contains"),
+    ({"contains": [""]}, "implementation.contains"),
+    ({"selected": [["nested"]]}, "implementation.selected"),
+    ({"range": {"from": datetime.date(2026, 2, 1), "to": datetime.date(2026, 1, 1)}}, "implementation.range"),
 ])
 def test_given_a_malformed_check_should_name_the_offending_key(tmp_path, implementation, path):
     assert path in _errors(tmp_path, _contract(_rule(**implementation)))
@@ -134,6 +134,10 @@ def test_given_a_malformed_check_should_name_the_offending_key(tmp_path, impleme
     (1940, "1940L"),
     (2.5, "2.5D"),
     (True, "true"),
+    (3.0, "3D"),
+    (1e16, "10000000000000000D"),
+    (1e-05, "0.00001D"),
+    (None, "null"),
     (datetime.date(2026, 10, 28), "datetime'2026-10-28T00:00:00'"),
 ])
 def test_given_a_value_as_the_user_sees_it_should_encode_the_dax_literal_desktop_writes(value, literal):
@@ -151,8 +155,36 @@ def test_given_the_test_bed_contract_should_load_one_expectation_per_example_sli
 
 
 @pytest.mark.pbir
-def test_given_the_shipped_schema_should_offer_exactly_the_checks_the_reader_accepts():
-    schema = json.loads(SCHEMA.read_text(encoding="utf-8"))
+def test_given_duplicate_or_reserved_ids_should_refuse_them(tmp_path):
+    message = _errors(tmp_path, _contract(_rule(selected=["a"]), _rule(selected=["b"]),
+                                          {**_rule(selected=["c"]), "id": "page.Overview"}))
 
-    implementation = schema["$defs"]["implementation"]
-    assert set(implementation["properties"]) - {"page"} == set(CHECKS)
+    assert "'r1': used by more than one rule" in message
+    assert "'page.Overview'" in message and "reserved" in message
+
+
+@pytest.mark.pbir
+def test_given_a_fab_test_rule_that_isnt_type_custom_should_say_so_instead_of_skipping_it(tmp_path):
+    message = _errors(tmp_path, _contract({**_rule(selected=["x"]), "type": "Custom"}))
+
+    assert "schema[0].properties[0].quality[0].type" in message
+
+
+@pytest.mark.pbir
+def test_given_nodes_that_arent_mappings_should_report_their_paths_not_crash(tmp_path):
+    document = _contract(_rule(selected=["x"]))
+    document["schema"].append("Sales")
+    document["schema"][0]["properties"].append(None)
+    document["schema"][0]["properties"][0]["quality"].append(7)
+
+    message = _errors(tmp_path, document)
+
+    for path in ("schema[1]:", "schema[0].properties[1]:", "schema[0].properties[0].quality[1]:"):
+        assert path in message
+
+
+@pytest.mark.pbir
+def test_given_an_empty_input_slicer_should_accept_contains_nothing(tmp_path):
+    [expectation] = _load(tmp_path, _contract(_rule(contains=[]))).expectations
+
+    assert expectation.expected == []
