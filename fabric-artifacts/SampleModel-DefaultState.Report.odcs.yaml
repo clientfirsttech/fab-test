@@ -1,0 +1,112 @@
+# What SampleModel-DefaultState.Report's slicers open with (PBIR Slicer Default State epic).
+# It sits beside the report folder, not inside it: Fabric's Commit to Git deletes
+# files inside an item folder that aren't part of its definition.
+#
+# Each `engine: fab-test` rule sits on the column its slicer is bound to and names
+# the page; pql-test skips these rules, and fab-test skips everyone else's.
+# Calendar-driven values are format strings resolved against the as-of date and
+# fabTestCalendar below: on 2026-11-14 the Fiscal Semester rule expects FY27-S1
+# (the report holds it) and the Half Year rule expects 2026 H2 (the report still
+# holds 2025 H2, so it fails until someone moves it).
+apiVersion: v3.1.0
+kind: DataContract
+id: sampledefaultstate-slicer-defaults
+name: SampleModel-DefaultState slicer defaults
+version: 1.0.0
+status: active
+customProperties:
+  - property: fabTestReport
+    value: b3cba6e7-ddfc-4bcd-b4b1-5f2a3d5297fc
+  - property: fabTestCalendar
+    value:
+      fiscal_year_start_month: 7
+      fiscal_year_named_by: end
+schema:
+  - name: AlignmentDim
+    properties:
+      - name: Alignment
+        quality:
+          - id: alignment-default
+            type: custom
+            engine: fab-test
+            implementation:
+              page: Standard Slicers
+              selected: [Bad]
+  - name: EyeColorDim
+    properties:
+      - name: Eye Color
+        quality:
+          - id: eye-color-default
+            type: custom
+            engine: fab-test
+            implementation:
+              page: Standard Slicers
+              selected: [Black, Compound]
+  - name: Fiscal Calendar
+    properties:
+      - name: Fiscal Semester
+        quality:
+          - id: fiscal-semester-current
+            type: custom
+            engine: fab-test
+            implementation:
+              page: Standard Slicers
+              selected: ["FY{fiscal_year_short}-S{fiscal_semester}"]
+      - name: Half Year
+        quality:
+          - id: half-year-current
+            type: custom
+            engine: fab-test
+            implementation:
+              page: Standard Slicers
+              selected: ["{year} H{half}"]
+  - name: DateDim
+    properties:
+      - name: Year
+        quality:
+          - id: year-default
+            type: custom
+            engine: fab-test
+            implementation:
+              page: Standard Slicers
+              selected: [1940]
+      - name: Date
+        quality:
+          - id: first-appearance-range
+            type: custom
+            engine: fab-test
+            implementation:
+              page: Date Between
+              range: {to: 2026-10-28}
+          - id: relative-date-default
+            type: custom
+            engine: fab-test
+            implementation:
+              page: Date Relative
+              relative: {range: Last, duration: 20, period: Calendar Months}
+          - id: date-picker-default
+            type: custom
+            engine: fab-test
+            implementation:
+              page: Date Picker
+              range: {from: 1939-10-01, to: 1951-08-27}
+  - name: Chart Measure
+    properties:
+      - name: Chart Measure
+        quality:
+          - id: chart-measure-default
+            type: custom
+            engine: fab-test
+            implementation:
+              page: Standard Slicers
+              selected: [Number of Characters]
+  - name: MarvelFact
+    properties:
+      - name: Name
+        quality:
+          - id: character-name-default
+            type: custom
+            engine: fab-test
+            implementation:
+              page: Input Slicer
+              contains: [Wolverine]

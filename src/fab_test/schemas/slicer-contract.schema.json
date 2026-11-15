@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/clientfirsttech/fab-test/schemas/slicer-contract.schema.json",
+  "title": "fab-test slicer contract rule",
+  "description": "Editor completion for an ODCS quality rule with type: custom and engine: fab-test. fab-test validates contracts itself (_slicer_contract.py); this schema mirrors it.",
+  "type": "object",
+  "required": ["id", "type", "engine", "implementation"],
+  "properties": {
+    "id": {"type": "string", "minLength": 1, "description": "Names the rule in findings."},
+    "type": {"const": "custom"},
+    "engine": {"const": "fab-test"},
+    "severity": {"enum": ["error", "warning"], "default": "error"},
+    "implementation": {"$ref": "#/$defs/implementation"}
+  },
+  "$defs": {
+    "implementation": {
+      "type": "object",
+      "description": "The slicer on this column on the named page, and what it opens with: exactly one of selected, range, relative, contains.",
+      "required": ["page"],
+      "additionalProperties": false,
+      "minProperties": 2,
+      "maxProperties": 2,
+      "properties": {
+        "page": {"type": "string", "minLength": 1, "description": "The page's display name."},
+        "selected": {
+          "type": "array",
+          "description": "Values, or field-parameter display names, as the user sees them; [] means no selection. A string with {fields} follows the calendar."
+        },
+        "range": {
+          "type": "object",
+          "description": "Between or date picker range; to is inclusive; either bound may be left open.",
+          "additionalProperties": false,
+          "minProperties": 1,
+          "properties": {
+            "from": {"type": "string", "format": "date"},
+            "to": {"type": "string", "format": "date"}
+          }
+        },
+        "relative": {
+          "type": "object",
+          "required": ["range", "duration", "period"],
+          "additionalProperties": false,
+          "properties": {
+            "range": {"enum": ["Last", "Next", "This"]},
+            "duration": {"type": "integer", "minimum": 1},
+            "period": {"enum": ["Days", "Weeks", "Calendar Weeks", "Months", "Calendar Months", "Years", "Calendar Years"]}
+          }
+        },
+        "contains": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string", "minLength": 1},
+          "description": "Text an input slicer holds."
+        }
+      }
+    }
+  }
+}
