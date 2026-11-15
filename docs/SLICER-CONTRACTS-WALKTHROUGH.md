@@ -1,0 +1,194 @@
+# Walkthrough: setting up a slicer contract for your report
+
+This walks you from a Power BI report with no checks to a pipeline that fails when a slicer opens with the wrong selection. It takes about 15 minutes. [SLICER-CONTRACTS.md](SLICER-CONTRACTS.md) is the reference; this page is the first run.
+
+You will:
+
+1. Save the report the way the customer agreed it should open.
+2. Run `fab-test pbir contract init` to write that state down.
+3. Run `fab-test pbir` to check it, then break a slicer to see it caught.
+4. Commit the contract and run the check in CI, on a schedule too.
+
+## Before you start
+
+- **A Power BI Project in PBIR format.** In Power BI Desktop, *File → Save as → Power BI Project (.pbip)*, with the PBIR report format turned on. You should see a `<Name>.Report/definition/pages/` folder. A `.pbix`, or a `.Report` folder with only `report.json`, won't work.
+- **The project in a Git repository**, so the contract can travel with the report.
+- **Python 3.12 and fab-test:**
+
+  ```bash
+  pip install --pre cft-fab-test
+  fab-test doctor
+  ```
+
+  `doctor` may show PBIR Inspector as ℹ *fetched on first run*. That's fine; the first `fab-test pbir` downloads it.
+
+You don't need a Fabric workspace or credentials. Everything here reads the files on disk.
+
+## Step 1: Set the opening state in Desktop
+
+Open the `.pbip` and set every slicer to what the report should open with. Then **save**. fab-test reads the saved files, not what's on screen.
+
+Be deliberate about the two states that look alike:
+
+| On screen | What it means | In the contract |
+|---|---|---|
+| Nothing ticked | the slicer filters nothing | `selected: []` |
+| "Select all" ticked | every value ticked; also filters nothing | `selected: all` |
+| Some values ticked | filters to those values | `selected: [Bad, Good]` |
+
+"Nothing ticked" and "Select all" show the same rows, but the report looks different when it opens, so the contract keeps them apart. A report saved with "Select all" fails a contract that expects nothing ticked, and the other way round. Pick the one the customer agreed to.
+
+Avoid "Select all" and then unticking a few values. fab-test can't check that shape and only offers to skip it.
+
+## Step 2: Build the contract
+
+From the repository root, point `init` at the report folder:
+
+```bash
+fab-test pbir contract init "Sales.Report"
+```
+
+`init` lists every slicer, page by page, and asks one question each. Press Enter to take the default in brackets.
+
+```text
+Overview: 'Product'[Category] opens with Bikes. Keep checking that, follow the calendar, or skip it?
+  [keep/calendar/skip] default keep:
+Overview: 'Calendar'[Fiscal Semester] opens with FY27-S1. Keep checking that, follow the calendar, or skip it? (format FY{fiscal_year_short}-S{fiscal_semester})
+  [keep/calendar/skip] default calendar:
+Overview: 'Region'[Region] opens with Select all. Keep checking that or skip it?
+  [keep/skip] default keep:
+```
+
+How to answer:
+
+- **keep**: check that the slicer always opens with exactly this. Use it for fixed agreements ("Alignment = Bad", "Select all", "nothing ticked").
+- **calendar**: the value should move with the date ("the current semester"). `init` suggests a format when today's value matches one it knows. `FY27-S1` becomes `FY{fiscal_year_short}-S{fiscal_semester}`, so from January the check expects `FY27-S2`. If it suggests nothing, the value isn't the current period: either it's meant to be fixed (answer keep), or it's stale and should be fixed in Desktop first.
+- **skip**: don't check this slicer.
+
+Slicers with nothing ticked or "Select all" are offered only keep or skip, since they have no value to follow the calendar.
+
+If you answered **calendar** at least once, two more questions follow:
+
+```text
+Which month does the fiscal year start in (1-12)?
+  [1/2/3/4/5/6/7/8/9/10/11/12] default 7:
+Is a fiscal year named by the calendar year it starts or ends in?
+  [end/start] default end:
+```
+
+The suggested month is one that reproduces today's values, but several months often do. Answer with your company's real fiscal calendar, not the suggestion.
+
+`init` writes `Sales.Report.odcs.yaml` **beside** the report folder, never inside it: Fabric's Git sync deletes files inside a report folder that aren't part of the report. It pairs with the report through the `logicalId` in `Sales.Report/.platform`, so renaming the report folder doesn't break the pairing.
+
+Add `--dry-run` to see the file without writing it.
+
+### Letting an agent build it instead
+
+The questions are data, so a coding agent (or a script) can drive `init` without a terminal:
+
+```bash
+fab-test pbir contract init "Sales.Report" --questions --format json > questions.json
+# review questions.json; anything with "needs_human": true is a judgment call
+fab-test pbir contract init "Sales.Report" --answers answers.json
+```
+
+`answers.json` maps question ids to answers, for example `{"overview-category": "keep", "overview-fiscal-semester": "calendar", "calendar.fiscal_year_start_month": 7}`. Anything left out takes the suggestion. The fiscal-calendar questions are always marked `needs_human`, so make sure a person confirms them.
+
+## Step 3: Read what it wrote
+
+Open `Sales.Report.odcs.yaml`. Each rule sits under the table and column its slicer is bound to and names the page by its display name:
+
+```yaml
+customProperties:
+  - property: fabTestReport
+    value: 3f1c...            # the report's logicalId; this is the pairing
+  - property: fabTestCalendar
+    value: {fiscal_year_start_month: 7, fiscal_year_named_by: end}
+schema:
+  - name: Product
+    properties:
+      - name: Category
+        quality:
+          - id: overview-category
+            type: custom
+            engine: fab-test
+            implementation:
+              page: Overview
+              selected: [Bikes]
+  - name: Region
+    properties:
+      - name: Region
+        quality:
+          - id: overview-region
+            type: custom
+            engine: fab-test
+            implementation:
+              page: Overview
+              selected: all
+```
+
+Things you can change by hand:
+
+- `severity: warning` on a rule makes a mismatch a warning instead of an error.
+- Comments (`# agreed with Finance, 2026-11`) are kept: `init` won't rewrite a file containing `#` unless you pass `--force`.
+- The other check shapes are listed in [SLICER-CONTRACTS.md §3](SLICER-CONTRACTS.md#3-edit-the-contract-by-hand).
+
+## Step 4: Run the check
+
+```bash
+fab-test pbir --artifact Sales
+```
+
+On a report saved straight after `init`, every `CONTRACT.*` rule passes. Other PBIR rules may still report findings; those are unrelated to the contract.
+
+## Step 5: Prove it catches a mistake
+
+Don't trust a check you haven't seen fail. In Desktop, change one slicer (tick an extra value, or clear the "Select all" one), save, and run the check again:
+
+```text
+CONTRACT.overview-region  error  Overview  'Region'[Region] opens with [no selection]; the contract expects Select all
+```
+
+Undo the change in Desktop and save. The check passes again.
+
+For calendar rules, look ahead instead of waiting for the rollover:
+
+```bash
+fab-test pbir --artifact Sales --as-of 2027-01-15
+```
+
+That run shows what fails on the first day of the next semester if nobody moves the slicer. It should fail until someone updates the report, which is the point.
+
+## Step 6: Commit and run it in CI
+
+Commit the report and its contract together:
+
+```bash
+git add "Sales.Report" "Sales.Report.odcs.yaml"
+git commit -m "Add slicer contract for Sales"
+```
+
+Then add a pipeline. Copy one of these into your repository:
+
+- GitHub Actions: [`examples/github-actions/slicer-defaults.yml`](examples/github-actions/slicer-defaults.yml)
+- Azure DevOps: [`examples/azure-devops/slicer-defaults.yml`](examples/azure-devops/slicer-defaults.yml)
+
+Both run on every change to a report or contract, **and on a weekly schedule**. Keep the schedule: a calendar-driven default goes stale at rollover with no commit, so a push-only pipeline never notices.
+
+`fab-test pbir` exits `1` when a contract rule fails and `2` when a contract can't be read (a typo in the YAML, an unknown calendar field), before any check runs.
+
+## Keeping it up to date
+
+- **Added a slicer?** Run `init` again. It asks about every slicer again but only adds rules for new ones; a rule already in the contract stays as it is unless you pass `--force`.
+- **The agreed default changed?** Change it in Desktop, save, and either edit the rule's value or run `init --force`, which replaces the check and keeps anything else you added to the rule.
+- **Renamed a page?** The rules on it fail, along with a `CONTRACT.page.<name>` finding, until you update `page:` in the contract. A rule never passes because its page or slicer went missing.
+
+## When something doesn't fit
+
+| You see | Why | What to do |
+|---|---|---|
+| `init` offers only `skip` | "Select all" with values unticked, a hierarchy slicer, or several columns | Save a plain selection, or leave it unchecked |
+| A finding saying "a selection this check can't read" | the slicer was changed to one of the shapes above | Re-save it as a plain selection |
+| Two slicers on one page bound to the same column | a rule checks every slicer on its column and page | Skip one, or give them identical selections |
+| `exit 2` naming a JSON path | the contract YAML doesn't validate | Fix the key it names; nothing ran |
+| No `CONTRACT.*` rules ran | the contract's `fabTestReport` doesn't match `.platform` | Re-run `init`, or pass `--contract FILE` |
