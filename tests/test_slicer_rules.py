@@ -36,11 +36,28 @@ def test_given_expectations_on_two_pages_should_add_one_page_existence_rule_per_
     assert page_rules == ["CONTRACT.page.A", "CONTRACT.page.B"]
 
 
-@pytest.mark.pbir
-def test_given_the_compiled_rules_should_name_no_visual_id():
-    text = json.dumps(compile_rules([_expectation()]))
+def _comparisons(node):
+    """Every {"==": [{"var": path}, value]} in a JSON Logic tree, as (path, value)."""
+    if isinstance(node, dict):
+        pair = node.get("==")
+        if isinstance(pair, list) and len(pair) == 2 and isinstance(pair[0], dict) and "var" in pair[0]:
+            yield pair[0]["var"], pair[1]
+        for child in node.values():
+            yield from _comparisons(child)
+    elif isinstance(node, list):
+        for child in node:
+            yield from _comparisons(child)
 
-    assert "visuals/" not in text and "ce885ceced4291ade64c" not in text
+
+@pytest.mark.pbir
+def test_given_a_rule_should_find_its_slicer_by_bound_column_never_by_visual_name():
+    [rule] = [r for r in compile_rules([_expectation()]) if r["id"] == "CONTRACT.r1"]
+    compared = dict(_comparisons(rule["test"]))
+
+    field = "visual.query.queryState.Values.projections.0.field.Column"
+    assert (compared[f"{field}.Expression.SourceRef.Entity"], compared[f"{field}.Property"]) == (
+        "AlignmentDim", "Alignment")
+    assert not [path for path in compared if path in ("name", "visual.name") or path.endswith(".name")]
 
 
 @pytest.mark.pbir

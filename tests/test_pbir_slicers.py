@@ -13,6 +13,7 @@ import pytest
 
 from fab_test.scripts._pbir_slicers import decode_literal, read_slicers
 
+NOT_PLAIN = "a selection that isn't a plain list of values (for example 'all except', or several columns)"
 COLUMN = {"Column": {"Expression": {"SourceRef": {"Source": "a"}}, "Property": "Alignment"}}
 
 
@@ -52,7 +53,9 @@ def _current(tmp_path, **kwargs):
     ("datetime'2026-10-28T13:45:00'", datetime.datetime.fromisoformat("2026-10-28T13:45:00")), ("2.5M", "2.5M"),
 ])
 def test_given_a_dax_literal_should_decode_what_the_user_sees(literal, value):
-    assert decode_literal(literal) == value
+    decoded = decode_literal(literal)
+
+    assert (type(decoded), decoded) == (type(value), value)  # 3 == 3.0 and True == 1, so pin the type too
 
 
 @pytest.mark.pbir
@@ -99,7 +102,7 @@ def test_given_inverted_mode_switched_off_should_read_nothing_selected(tmp_path)
 def test_given_select_all_then_one_value_unticked_should_call_it_unsupported(tmp_path):
     where = [{"Condition": {"Not": {"Expression": _in("'Bad'")}}}]
 
-    assert "unsupported" in _current(tmp_path, where=where, data=INVERTED)
+    assert _current(tmp_path, where=where, data=INVERTED) == {"unsupported": NOT_PLAIN}
 
 
 @pytest.mark.pbir
@@ -113,21 +116,24 @@ def test_given_the_test_bed_should_hold_a_cleared_slicer_and_a_select_all_slicer
 
 
 @pytest.mark.pbir
-@pytest.mark.parametrize("where", [
-    [{"Condition": {"Not": {"Expression": _in("'Bad'")}}}],                      # "all except Bad"
-    [{"Condition": {"Or": {"Left": _in("'Bad'"), "Right": _in("'Good'")}}}],
-    [{"Condition": {"In": {"Expressions": [COLUMN, COLUMN], "Values": [[{"Literal": {"Value": "'a'"}}] * 2]}}}],
-    [{"Condition": _in("'Bad'")}, {"Condition": _in("'Good'")}],
-    [{"Condition": _in("2.5M")}],                                                # a decimal that wouldn't round-trip
-    [{"Condition": _comparison(0, "datetime'2026-01-01T00:00:00'")}],            # Equal, not a from/to bound
+@pytest.mark.parametrize("where, reason", [
+    ([{"Condition": {"Not": {"Expression": _in("'Bad'")}}}], NOT_PLAIN),          # "all except Bad"
+    ([{"Condition": {"Or": {"Left": _in("'Bad'"), "Right": _in("'Good'")}}}], NOT_PLAIN),
+    ([{"Condition": {"In": {"Expressions": [COLUMN, COLUMN], "Values": [[{"Literal": {"Value": "'a'"}}] * 2]}}}],
+     NOT_PLAIN),
+    ([{"Condition": _in("'Bad'")}, {"Condition": _in("'Good'")}], NOT_PLAIN),
+    ([{"Condition": _in("2.5M")}], "a value fab-test can't write back exactly (2.5M)"),
+    ([{"Condition": _comparison(0, "datetime'2026-01-01T00:00:00'")}], "a date range other than from/to"),
 ])
-def test_given_a_shape_the_rules_cant_check_should_call_it_unsupported(tmp_path, where):
-    assert "unsupported" in _current(tmp_path, where=where)
+def test_given_a_shape_the_rules_cant_check_should_say_why_its_unsupported(tmp_path, where, reason):
+    assert _current(tmp_path, where=where) == {"unsupported": reason}
 
 
 @pytest.mark.pbir
 def test_given_a_hierarchy_slicer_should_call_it_unsupported(tmp_path):
-    assert "unsupported" in _current(tmp_path, where=[{"Condition": _in("'Bad'")}], projections=2)
+    current = _current(tmp_path, where=[{"Condition": _in("'Bad'")}], projections=2)
+
+    assert current == {"unsupported": "a hierarchy or several fields"}
 
 
 @pytest.mark.pbir

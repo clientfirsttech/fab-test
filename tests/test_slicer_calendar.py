@@ -7,6 +7,7 @@ from an as-of date and the contract's own calendar. Nothing is evaluated.
 """
 
 import datetime
+import re
 from pathlib import Path
 
 import pytest
@@ -39,7 +40,8 @@ def _contract(*selected, calendar=None, check="selected"):
     (datetime.date(2026, 6, 30), (2026, 2, 4, 12)),   # last day of FY26
     (datetime.date(2026, 7, 1), (2027, 1, 1, 1)),     # first day of FY27
     (datetime.date(2026, 11, 14), (2027, 1, 2, 5)),
-    (datetime.date(2027, 1, 1), (2027, 2, 3, 7)),     # calendar year turns, fiscal year doesn't
+    (datetime.date(2026, 12, 31), (2027, 1, 2, 6)),   # last day of S1: fiscal month 6
+    (datetime.date(2027, 1, 1), (2027, 2, 3, 7)),     # first day of S2; calendar year turns, fiscal year doesn't
 ])
 def test_given_a_july_fiscal_year_named_by_its_end_should_resolve_both_sides_of_each_boundary(day, expected):
     assert _fiscal(day, JULY_END) == expected
@@ -51,6 +53,17 @@ def test_given_a_fiscal_year_named_by_its_start_should_name_it_by_the_year_it_be
 
     assert _fiscal(datetime.date(2026, 7, 1), calendar)[0] == 2026
     assert _fiscal(datetime.date(2026, 6, 30), calendar)[0] == 2025
+
+
+@pytest.mark.pbir
+@pytest.mark.parametrize("day, half, quarter", [
+    (datetime.date(2026, 6, 30), 1, 2), (datetime.date(2026, 7, 1), 2, 3),
+    (datetime.date(2026, 3, 31), 1, 1), (datetime.date(2026, 4, 1), 1, 2),
+])
+def test_given_a_day_either_side_of_a_half_or_quarter_should_put_it_in_the_right_one(day, half, quarter):
+    fields = calendar_fields(day, None)
+
+    assert (fields["half"], fields["quarter"]) == (half, quarter)
 
 
 @pytest.mark.pbir
@@ -105,10 +118,13 @@ def test_given_unknown_fields_should_name_every_rule_and_field_and_list_the_vali
 
 
 @pytest.mark.pbir
-@pytest.mark.parametrize("text", ["{year.__class__}", "{year[0]}", "{year!r}", "{month:{year}}", "{}", "FY{year",
-                                  "{year:999999999}"])
-def test_given_anything_but_a_plain_field_should_refuse_to_evaluate_it(text):
-    with pytest.raises(CalendarError):
+@pytest.mark.parametrize("text, reason", [
+    *[(text, "only a plain field name is allowed")
+      for text in ("{year.__class__}", "{year[0]}", "{year!r}", "{month:{year}}", "{}", "{year:999999999}")],
+    ("FY{year", "is not a valid format string"),
+])
+def test_given_anything_but_a_plain_field_should_refuse_to_evaluate_it(text, reason):
+    with pytest.raises(CalendarError, match=re.escape(reason)):
         resolve_contract(_contract(text), datetime.date(2026, 11, 14))
 
 
@@ -116,6 +132,7 @@ def test_given_anything_but_a_plain_field_should_refuse_to_evaluate_it(text):
 @pytest.mark.parametrize("calendar, key", [
     ({"fiscal_year_start_month": 13}, "fiscal_year_start_month"),
     ({"fiscal_year_start_month": "7"}, "fiscal_year_start_month"),
+    ({"fiscal_year_start_month": True}, "fiscal_year_start_month"),     # a bool is an int in Python
     ({"fiscal_year_named_by": "middle"}, "fiscal_year_named_by"),
     ({"fiscal_start": 7}, "fiscal_start"),
 ])

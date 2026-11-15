@@ -176,10 +176,14 @@ def test_given_force_should_replace_an_edited_rule(tmp_path, capsys):
     text = _contract_path(report).read_text(encoding="utf-8").replace("- Bad", "- Good")
     _contract_path(report).write_text(text, encoding="utf-8")
 
+    def alignment():
+        return {e.rule_id: e.expected for e in load_contract(_contract_path(report)).expectations}[
+            "standard-slicers-alignment"]
+
+    assert alignment() == ["Good"]                     # the hand edit took, so --force has something to undo
     _run(report, capsys, "--answers", _answers(tmp_path, {}), "--force")
 
-    by_id = {e.rule_id: e.expected for e in load_contract(_contract_path(report)).expectations}
-    assert by_id["standard-slicers-alignment"] == ["Bad"]
+    assert alignment() == ["Bad"]
 
 
 @pytest.mark.pbir
