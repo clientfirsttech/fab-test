@@ -1,9 +1,9 @@
 # PBIR Slicer Default State Epic
 
-**Status**: 🔄 IN PROGRESS on `feature/pbir-slicer-default-state` — every task through Callers done 2026-11-14 and the AIDD review's findings fixed; Quality Gates last.
+**Status**: ✅ COMPLETED (2026-11-14) on `feature/pbir-slicer-default-state`, not yet merged. Every task done, the AIDD review's findings fixed, and the gates pass: ruff, both ratchets, 3130 + 217 tests, coverage 90.46%, no known vulnerabilities (the only failures are tests/test_rtk_hook_safety.py, from a locally deleted hook file).
 **Goal**: `fab-test pbir` checks the values a report's slicers open with, from a per-report ODCS contract that `fab-test pbir contract init` builds with the developer or their agent.
 
-**Decisions** (recorded 2026-11-14 at discovery review, journey [pbir-slicer-default-state.yaml](../plan/story-map/pbir-slicer-default-state.yaml)):
+**Decisions** (recorded 2026-11-14 at discovery review, journey [pbir-slicer-default-state.yaml](../../plan/story-map/pbir-slicer-default-state.yaml)):
 
 1. ✅ **Scope** is the values preselected in a slicer (`visual.objects.general[].properties.filter`): the standard `slicer` (field parameters included), date slicers (Between, Relative, Date picker) and the input slicer (`textSlicer`). The bookmark navigator default and bookmark/visibility sync are later stories in the journey.
 2. ✅ **Tests are a per-report ODCS v3.1 contract**: `type: custom`, `engine: fab-test` quality rules on the slicer's column, with page, expected values and calendar in `implementation`. Amended at review: fab-test's own reader validates it, naming each error by JSON path; a shipped JSON Schema would have been a second, unused copy of those rules, so there is none. pql-test already skips other engines' custom rules, so one file can carry both.
@@ -12,7 +12,7 @@
 5. ✅ **Calendar values** are format strings over named fields (`{fiscal_year_short}`, `{fiscal_semester}`, ...) resolved from the contract's own calendar (fiscal-year start month, named by start or end year). Nothing is evaluated.
 6. ✅ A stale calendar-driven default is an `error`.
 7. ✅ A contract lives **outside** the item folder (Fabric's Commit to Git deletes non-definition files inside it) and pairs with its report by the `.platform` `logicalId`.
-8. ✅ ODCS support for pql-test stays its own epic ([odcs-contract-analyzer-epic.md](odcs-contract-analyzer-epic.md)).
+8. ✅ ODCS support for pql-test stays its own epic ([odcs-contract-analyzer-epic.md](../odcs-contract-analyzer-epic.md)).
 9. ✅ fab-test (MIT) never imports pql-test (AGPL-3.0-only) code; anything it borrows from pql-test goes through the CLI.
 
 ## Overview

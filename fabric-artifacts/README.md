@@ -19,7 +19,7 @@ Each artifact is stored in its own subdirectory with a naming convention:
 
 ## SampleModel-DefaultState test bed
 
-`SampleModel-DefaultState.Report` binds to `SampleModel-PQLAssert.SemanticModel` and holds one preselected example per slicer kind for the [PBIR Slicer Default State epic](../tasks/pbir-slicer-default-state-epic.md). Each selection lives in `visual.objects.general[0].properties.filter` of the named `visual.json`. `Fiscal Calendar` (July fiscal years named by their end year) and the `Chart Measure` field parameter were added to the model for it; `Fiscal Calendar` is disconnected, so its slicers filter nothing.
+`SampleModel-DefaultState.Report` binds to `SampleModel-PQLAssert.SemanticModel` and holds one preselected example per slicer kind for the [PBIR Slicer Default State epic](../tasks/archive/2026-11-14-pbir-slicer-default-state.md). Each selection lives in `visual.objects.general[0].properties.filter` of the named `visual.json`. `Fiscal Calendar` (July fiscal years named by their end year) and the `Chart Measure` field parameter were added to the model for it; `Fiscal Calendar` is disconnected, so its slicers filter nothing.
 
 Every selection below was last saved by Power BI Desktop (2026-11-14), so each shape is what Desktop writes. Each rendered as listed in Desktop screenshots after a refresh.
 

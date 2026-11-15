@@ -2,7 +2,7 @@
 # Source: a report developer's request (2026-11-14). Customer-agreed slicer
 # defaults drift when the report is edited, and some defaults must follow the
 # calendar (the current semester) with nobody remembering to move them.
-# Epic: tasks/pbir-slicer-default-state-epic.md
+# Epic: tasks/archive/2026-11-14-pbir-slicer-default-state.md
 id: p5puo3stoc7jduf4ahxs857j
 name: PBIR Slicer Default State
 description: >
@@ -70,19 +70,19 @@ steps:
         story: As a Local Developer, I want the generator to find my slicers and their current selections and ask how to check each, so that I don't have to remember or hand-write the agreed defaults.
         painPoint: ii23bw9nwc0hg3dycmkyd9cb
         priority: 49
-        status: { state: backlog, comment: PBIR Slicer Default State epic }
+        status: { state: inProgress, comment: PBIR Slicer Default State epic, built 2026-11-14 on a feature branch }
       - id: dfnmbnh7glloruv2dmx8ua8o
         name: Answer through an agent
         story: As an AI Agent, I want the generator's questions as JSON with suggested answers and a flag that applies an answers file, so that I can build the contract with the developer without a terminal.
         painPoint: kww7g2t9eq1e013npfuoylyb
         priority: 48
-        status: { state: backlog, comment: PBIR Slicer Default State epic }
+        status: { state: inProgress, comment: PBIR Slicer Default State epic, built 2026-11-14 on a feature branch }
       - id: jczgz46g8wfqjbzng8ayu4oe
         name: Calendar-driven expectation
         story: As a Local Developer, I want an expected value written as a format over my report's own fiscal calendar, so that the check follows the semester without a rule edit.
         painPoint: evwql1r4acz7y4xvdzqfy5jf
         priority: 24
-        status: { state: backlog, comment: PBIR Slicer Default State epic }
+        status: { state: inProgress, comment: PBIR Slicer Default State epic, built 2026-11-14 on a feature branch }
   - id: lql9m2xys8zs1pb4z8x9t5kq
     name: Run the check
     description: >
@@ -94,25 +94,25 @@ steps:
         story: As a CI Pipeline, I want a contract compiled into rules for its own report only, so that one report's expectations never fail another.
         painPoint: kww7g2t9eq1e013npfuoylyb
         priority: 48
-        status: { state: backlog, comment: PBIR Slicer Default State epic }
+        status: { state: inProgress, comment: PBIR Slicer Default State epic, built 2026-11-14 on a feature branch }
       - id: fg5j37an00wph7x7n6pt3lo9
         name: Findings name page, field, expected and actual
         story: As a Local Developer, I want each finding to name the page, the slicer's field, the expected and the actual selection, so that I can fix it without opening JSON.
         painPoint: ii23bw9nwc0hg3dycmkyd9cb
         priority: 49
-        status: { state: backlog, comment: PBIR Slicer Default State epic }
+        status: { state: inProgress, comment: PBIR Slicer Default State epic, built 2026-11-14 on a feature branch }
       - id: vd7cll1ukzvyk6nex19sb0ue
         name: Field-parameter slicers
         story: As a Local Developer, I want a field-parameter slicer's starting selection checked like any other slicer, so that charts open on the agreed measure.
         painPoint: z4cdbpte7zzkk2xxz3lppewt
         priority: 25
-        status: { state: backlog, comment: PBIR Slicer Default State epic }
+        status: { state: inProgress, comment: PBIR Slicer Default State epic, built 2026-11-14 on a feature branch }
       - id: t8youxz52fhcuwlsntymd7fh
         name: Reproducible calendar date
         story: As a CI Pipeline, I want `--as-of DATE` and every resolved value recorded in the envelope, so that a calendar-driven failure can be reproduced on any day.
         painPoint: evwql1r4acz7y4xvdzqfy5jf
         priority: 24
-        status: { state: backlog, comment: PBIR Slicer Default State epic }
+        status: { state: inProgress, comment: PBIR Slicer Default State epic, built 2026-11-14 on a feature branch }
   - id: ii23bw9nwc0hg3dycmkyd9cc
     name: Catch the rollover
     description: A scheduled pipeline run fails when the calendar has moved past a default, with no commit needed.
@@ -122,7 +122,7 @@ steps:
         story: As a CI Pipeline, I want a documented scheduled workflow, so that a semester rollover fails a run even when nothing was committed.
         painPoint: evwql1r4acz7y4xvdzqfy5jf
         priority: 24
-        status: { state: backlog, comment: PBIR Slicer Default State epic }
+        status: { state: inProgress, comment: PBIR Slicer Default State epic, built 2026-11-14 on a feature branch }
   - id: evwql1r4acz7y4xvdzqfy5jg
     name: Remediate
     description: An agent fixes the slicer selection from the finding.
@@ -132,7 +132,7 @@ steps:
         story: As an AI Agent, I want each finding's expected value and the slicer's file path, so that I can update the selection in visual.json without guessing.
         painPoint: ii23bw9nwc0hg3dycmkyd9cb
         priority: 49
-        status: { state: backlog, comment: PBIR Slicer Default State epic }
+        status: { state: inProgress, comment: PBIR Slicer Default State epic, built 2026-11-14 on a feature branch }
   - id: qfu2h2to8zim4zpv6uneb249
     name: Bookmarks (later)
     description: Logged 2026-11-14 for a later epic; not in PBIR Slicer Default State.
