@@ -32,6 +32,8 @@ ref table AlignmentDim
 ref table DataTypes
 ref table _Measures
 ref table Timezone
+ref table 'Fiscal Calendar'
+ref table 'Chart Measure'
 
 ref cultureInfo en-US
 

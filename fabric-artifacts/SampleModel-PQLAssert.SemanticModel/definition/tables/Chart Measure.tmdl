@@ -1,0 +1,39 @@
+/// Field parameter for the SampleModel-DefaultState test bed (PBIR Slicer Default State epic).
+table 'Chart Measure'
+
+	column 'Chart Measure'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: [Value1]
+		sortByColumn: 'Chart Measure Order'
+
+		relatedColumnDetails
+			groupByColumn: 'Chart Measure Fields'
+
+	column 'Chart Measure Fields'
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: [Value2]
+		sortByColumn: 'Chart Measure Order'
+
+		extendedProperty ParameterMetadata =
+				{
+				  "version": 3,
+				  "kind": 2
+				}
+
+	column 'Chart Measure Order'
+		dataType: int64
+		isHidden
+		formatString: 0
+		summarizeBy: sum
+		sourceColumn: [Value3]
+
+	partition 'Chart Measure' = calculated
+		mode: import
+		source =
+				{
+				    ("Number of Characters", NAMEOF('MarvelFact'[Number of Characters]), 0),
+				    ("Running Total", NAMEOF('MarvelFact'[Running Total of Character Appearances]), 1)
+				}
