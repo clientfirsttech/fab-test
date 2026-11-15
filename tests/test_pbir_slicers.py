@@ -76,6 +76,19 @@ def test_given_select_all_with_nothing_unticked_should_read_all_not_nothing_sele
 
 
 @pytest.mark.pbir
+def test_given_the_select_all_flag_under_general_should_read_all(tmp_path):
+    report = _report(tmp_path, where=None)
+    [path] = report.glob("definition/pages/p1/visuals/v1/visual.json")
+    visual = json.loads(path.read_text(encoding="utf-8"))
+    visual["visual"]["objects"]["general"] = [{"properties": INVERTED}]
+    path.write_text(json.dumps(visual), encoding="utf-8")
+
+    [slicer] = read_slicers(report)
+
+    assert slicer.current == {"selected": "all"}
+
+
+@pytest.mark.pbir
 def test_given_inverted_mode_switched_off_should_read_nothing_selected(tmp_path):
     off = {"isInvertedSelectionMode": {"expr": {"Literal": {"Value": "false"}}}}
 

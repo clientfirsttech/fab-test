@@ -1,6 +1,6 @@
 # Walkthrough: setting up a slicer contract for your report
 
-This walks you from a Power BI report with no checks to a pipeline that fails when a slicer opens with the wrong selection, or a bookmark navigator opens on the wrong bookmark. It takes about 15 minutes. [SLICER-CONTRACTS.md](SLICER-CONTRACTS.md) is the reference; this page is the first run.
+This walks you from a Power BI report with no checks to a pipeline that fails when a slicer opens with the wrong selection, or a bookmark navigator highlights the wrong bookmark. It takes about 15 minutes. [SLICER-CONTRACTS.md](SLICER-CONTRACTS.md) is the reference; this page is the first run.
 
 You will:
 
@@ -149,7 +149,7 @@ Bookmark navigators are listed under `customProperties`, by the bookmark's displ
 Things you can change by hand:
 
 - `severity: warning` on a rule makes a mismatch a warning instead of an error.
-- Comments (`# agreed with Finance, 2026-11`) are kept: `init` won't rewrite a file containing `#` unless you pass `--force`.
+- Comments (`# agreed with Finance, 2026-11`) are safe from `init`: it won't rewrite a file containing `#` unless you pass `--force`, and `--force` drops them.
 - The other check shapes are listed in [SLICER-CONTRACTS.md §3](SLICER-CONTRACTS.md#3-edit-the-contract-by-hand).
 
 ## Step 4: Run the check
@@ -210,6 +210,7 @@ Both run on every change to a report or contract, **and on a weekly schedule**. 
 | A finding saying "a selection this check can't read" | the slicer was changed to one of the shapes above | Re-save it as a plain selection |
 | Two slicers on one page bound to the same column | a rule checks every slicer on its column and page | Skip one, or give them identical selections |
 | "the report has no bookmark by that name" | a bookmark was renamed or deleted | Update `selected:` to the new name, or restore the bookmark |
+| "bookmarks share that name", or `init` offers only `skip` | two bookmarks have the same display name | Rename one; a name has to say which bookmark |
 | Two bookmark navigators on one page, `init` offers only `skip` | they preselect different bookmarks | Make them agree, or leave the page unchecked |
 | `exit 2` naming a JSON path | the contract YAML doesn't validate | Fix the key it names; nothing ran |
 | No `CONTRACT.*` rules ran | the contract's `fabTestReport` doesn't match `.platform` | Re-run `init`, or pass `--contract FILE` |

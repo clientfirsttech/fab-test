@@ -136,24 +136,26 @@ def apply_slicer_contract(report: Path, args: argparse.Namespace, output_dir: Pa
     folder = output_dir / "pbir" / results_stem(report)
     folder.mkdir(parents=True, exist_ok=True)
     ruleset = json.loads(rules_path.read_text(encoding="utf-8-sig"))
+    bookmarks = read_bookmarks(report) if contract.navigators else {}
     rules = [*compile_rules(contract.expectations, tuple(n.page for n in contract.navigators)),
-             *compile_navigator_rules(contract.navigators, read_bookmarks(report))]
+             *compile_navigator_rules(contract.navigators, bookmarks)]
     ruleset = {**ruleset, "rules": [*ruleset.get("rules", []), *rules]}
     resolved = folder / "_resolved-rules.json"
     resolved.write_text(json.dumps(ruleset, indent=2), encoding="utf-8")
     summary = folder / "_contract.json"
-    summary.write_text(json.dumps(_summary(contract), indent=2, default=str), encoding="utf-8")
+    summary.write_text(json.dumps(_summary(contract, bookmarks), indent=2, default=str), encoding="utf-8")
     return resolved, summary
 
 
-def _summary(contract: ResolvedContract) -> dict[str, Any]:
+def _summary(contract: ResolvedContract, bookmarks: dict[str, str]) -> dict[str, Any]:
     return {
         "file": str(contract.path),
         "as_of": contract.as_of.isoformat(),
         "report_logical_id": contract.report_logical_id,
         "rules": [{"id": e.rule_id, "page": e.page, "field": f"'{e.table}'[{e.column}]", "check": e.check,
                    "expected": e.expected, "severity": e.severity} for e in contract.expectations],
-        "navigators": [{"id": n.rule_id, "page": n.page, "expected": n.selected, "severity": n.severity}
+        "navigators": [{"id": n.rule_id, "page": n.page, "expected": n.selected, "severity": n.severity,
+                        "bookmarks": sorted(k for k, v in bookmarks.items() if v == n.selected)}
                        for n in contract.navigators],
     }
 

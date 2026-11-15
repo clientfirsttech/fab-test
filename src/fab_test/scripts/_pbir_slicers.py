@@ -14,6 +14,7 @@ from __future__ import annotations
 import datetime
 import json
 import re
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -68,7 +69,7 @@ def read_slicers(report: Path) -> list[Slicer]:
     return [s for page, visuals in page_visuals(report) for s in (_slicer(page, v) for v in visuals) if s]
 
 
-def page_visuals(report: Path):
+def page_visuals(report: Path) -> Iterator[tuple[str, list[dict]]]:
     """(page display name, its visual containers top-to-bottom, left-to-right) in page order."""
     pages_dir = report / "definition" / "pages"
     for page_id in load_json(pages_dir / "pages.json").get("pageOrder", []):

@@ -1,6 +1,6 @@
 # Checking what a report's slicers open with
 
-A customer agrees what a report shows when it opens: which alignment, which eye colours, which semester. Every edit risks saving a working selection over that agreement, and a default that follows the calendar goes stale at rollover with no commit to notice it. A **slicer contract** writes the agreement down once, along with the bookmark each bookmark navigator opens on; `fab-test pbir` checks it on every run.
+A customer agrees what a report shows when it opens: which alignment, which eye colours, which semester. Every edit risks saving a working selection over that agreement, and a default that follows the calendar goes stale at rollover with no commit to notice it. A **slicer contract** writes the agreement down once, along with the bookmark each bookmark navigator highlights; `fab-test pbir` checks it on every run.
 
 Setting one up on your own report for the first time? Start with the [walkthrough](SLICER-CONTRACTS-WALKTHROUGH.md). This guide uses the test bed in `fabric-artifacts/`: `SampleModel-DefaultState.Report` and its contract, `SampleModel-DefaultState.Report.odcs.yaml`.
 

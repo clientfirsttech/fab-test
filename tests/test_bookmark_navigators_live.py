@@ -49,6 +49,7 @@ def test_given_the_test_bed_contract_should_pass_every_navigator(inspector, tmp_
     assert _failed(root) == STALE
     rules = {r["id"]: r for r in _envelope(root)["contract"]["navigators"]}
     assert rules["page-1-navigator"]["expected"] == "Bookmark 2"
+    assert rules["page-1-navigator"]["bookmarks"] == ["9c65f6aa324d70ac0e33"]  # what the name resolved to
     assert rules["navigator-nothing-preselected"]["expected"] is None
 
 

@@ -153,3 +153,72 @@ def test_given_nothing_preselected_expected_should_name_it():
     rule = _rule(NavigatorExpectation("n", "P", None, "error"))
 
     assert rule["name"] == "P: the bookmark navigator opens with no bookmark"
+
+
+def _bookmarks(report: Path, listed: list[str], files: dict[str, object]) -> None:
+    folder = report / "definition" / "bookmarks"
+    (folder / "bookmarks.json").write_text(json.dumps({"items": [{"name": n} for n in listed]}), encoding="utf-8")
+    for name, content in files.items():
+        text = content if isinstance(content, str) else json.dumps(content)
+        (folder / f"{name}.bookmark.json").write_text(text, encoding="utf-8")
+
+
+@pytest.mark.pbir
+def test_given_bookmark_files_bookmarks_json_doesnt_list_or_cant_read_should_treat_them_as_gone(tmp_path):
+    report = _report(tmp_path)
+    _bookmarks(report, ["b1", "broken", "listed"], {
+        "orphan": {"name": "orphan", "displayName": "Orphan"},           # left on disk, not in the report
+        "broken": "{not json", "listed": ["not", "an", "object"],
+        "b1": {"name": "b1", "displayName": "Home"}})
+
+    assert read_bookmarks(report) == {"b1": "Home"}
+
+
+@pytest.mark.pbir
+def test_given_a_grouped_bookmark_should_read_it_from_its_group(tmp_path):
+    report = _report(tmp_path)
+    folder = report / "definition" / "bookmarks"
+    (folder / "bookmarks.json").write_text(json.dumps({"items": [
+        {"name": "g1", "displayName": "Group", "children": ["b1"]}]}), encoding="utf-8")
+
+    assert read_bookmarks(report) == {"b1": "Home"}
+
+
+@pytest.mark.pbir
+def test_given_two_bookmarks_sharing_a_display_name_should_refuse_to_guess(tmp_path):
+    report = _report(tmp_path, "b1")
+    _bookmarks(report, ["b1", "b2"], {"b2": {"name": "b2", "displayName": "Home"}})
+
+    [navigator] = read_navigators(report)
+    rule = _rule(NavigatorExpectation("n", "Overview", "Home", "error"), read_bookmarks(report))
+
+    assert "2 bookmarks are named Home" in navigator.current["unsupported"]
+    assert "Home (2 bookmarks share that name)" in json.dumps(rule)
+    selected = "visual.objects.bookmarks.0.properties.selectedBookmark.expr.Literal.Value"
+    assert f'"in": [{{"var": "{selected}"}}, []]' in json.dumps(rule)  # matches neither, so both fail
+
+
+@pytest.mark.pbir
+@pytest.mark.parametrize("value", [None, "not a list"])
+def test_given_a_navigator_property_without_a_list_should_start_one_or_refuse(value):
+    from fab_test.scripts._bookmark_navigators import merge_navigators
+
+    document = {"customProperties": [{"property": "fabTestBookmarkNavigators", "value": value}]}
+    summary = {"added": [], "kept": [], "replaced": [], "unchanged": []}
+    entry = {"id": "n", "page": "P", "selected": None}
+
+    if value is None:
+        merge_navigators(document, [entry], False, summary)
+        assert document["customProperties"][0]["value"] == [entry] and summary["added"] == ["n"]
+    else:
+        with pytest.raises(ValueError, match="fabTestBookmarkNavigators"):
+            merge_navigators(document, [entry], False, summary)
+
+
+@pytest.mark.pbir
+def test_given_custom_properties_that_arent_a_list_should_refuse():
+    from fab_test.scripts._bookmark_navigators import merge_navigators
+
+    with pytest.raises(ValueError, match="customProperties"):
+        merge_navigators({"customProperties": {"a": 1}}, [{"id": "n", "page": "P", "selected": None}], False,
+                         {"added": [], "kept": [], "replaced": [], "unchanged": []})

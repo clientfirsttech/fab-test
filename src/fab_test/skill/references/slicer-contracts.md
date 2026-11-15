@@ -1,6 +1,6 @@
 # Slicer contracts (`fab-test pbir`)
 
-A slicer contract states what a PBIR report's slicers open with (the values preselected when the report loads) and which bookmark each bookmark navigator opens with. `fab-test pbir` checks it alongside the packaged PBIR Inspector rules; `fab-test pbir contract init` builds it. Read this when a user wants a report's landing state checked, a default that follows the calendar (the current semester or quarter), or a finding whose rule starts with `CONTRACT.`.
+A slicer contract states what a PBIR report's slicers open with (the values preselected when the report loads) and which bookmark each bookmark navigator highlights (its preselection; it doesn't apply that bookmark on open). `fab-test pbir` checks it alongside the packaged PBIR Inspector rules; `fab-test pbir contract init` builds it. Read this when a user wants a report's landing state checked, a default that follows the calendar (the current semester or quarter), or a finding whose rule starts with `CONTRACT.`.
 
 ## The file
 
@@ -51,7 +51,7 @@ pql-test reads the same file and skips `engine: fab-test` rules; fab-test skips 
 
 ## Bookmark navigators
 
-A navigator has no column, so it is an entry in `fabTestBookmarkNavigators`, not a quality rule: `id`, `page` (display name), `selected` (the bookmark's display name as the report shows it, or `null` for nothing preselected) and optional `severity`. Never a bookmark's internal name or a visual ID: fab-test looks the display name up in `definition/bookmarks/*.bookmark.json` when it compiles. An entry checks every navigator on its page. Ids are shared with slicer rules, so they must be unique across both. A contract with only navigator entries is still a fab-test contract.
+A navigator has no column, so it is an entry in `fabTestBookmarkNavigators`, not a quality rule: `id`, `page` (display name), `selected` (the bookmark's display name as the report shows it, or `null` for nothing preselected) and optional `severity`. Never a bookmark's internal name or a visual ID: fab-test looks the display name up in `definition/bookmarks/*.bookmark.json` when it compiles. An entry checks every navigator on its page. Ids are shared with slicer rules, so they must be unique across both. A contract with only navigator entries is still a fab-test contract. Only bookmarks listed in `bookmarks.json` count, and a display name two bookmarks share matches neither (`init` offers only `skip`), so a name always says which bookmark.
 
 It fails when the navigator preselects another bookmark, nothing (when one is expected), a bookmark since deleted, or anything (when `null` is expected); when the page has no navigator; and when the contract names a bookmark the report doesn't have (renamed or deleted).
 
@@ -98,7 +98,7 @@ Each question carries `current` (what the slicer opens with), `choices`, `sugges
 
 ## Findings and the envelope
 
-One rule per expectation (`CONTRACT.<id>`) and one per page (`CONTRACT.page.<display name>`), with the contract's severity. A finding's `object` is the page; its `message` names the field, what the slicer opens with and what the contract expects, e.g. `'Fiscal Calendar'[Half Year] opens with ['2025 H2']; the contract expects 2026 H2`, or for a navigator `the bookmark navigator opens with [Bookmark 2]; the contract expects Bookmark 1`. A missing slicer or a renamed page is a finding, never a silent pass. The envelope gains `contract`: `file`, `as_of`, `report_logical_id`, and each rule's resolved `expected`; `navigators` lists each navigator entry's `expected` bookmark.
+One rule per expectation (`CONTRACT.<id>`) and one per page (`CONTRACT.page.<display name>`), with the contract's severity. A finding's `object` is the page; its `message` names the field, what the slicer opens with and what the contract expects, e.g. `'Fiscal Calendar'[Half Year] opens with ['2025 H2']; the contract expects 2026 H2`, or for a navigator `the bookmark navigator opens with [Bookmark 2]; the contract expects Bookmark 1`. A missing slicer or a renamed page is a finding, never a silent pass. The envelope gains `contract`: `file`, `as_of`, `report_logical_id`, and each rule's resolved `expected`; `navigators` lists each navigator entry's `expected` bookmark and the internal `bookmarks` it resolved to.
 
 A malformed contract, an unknown calendar field, a bad calendar setting, or two contracts pairing with one report: exit `2` before any analyzer starts, one message naming each problem by its path in the file.
 
