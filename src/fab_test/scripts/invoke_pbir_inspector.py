@@ -121,6 +121,7 @@ def write_results(
     result: WrapperResult,
     rules_path: Path,
     native_html_out: "Path | None" = None,
+    contract_summary: "Path | None" = None,
 ) -> None:
     """Write standardized PBIR Inspector envelope JSON."""
     env = build_envelope(
@@ -138,6 +139,8 @@ def write_results(
     # `findings` stays violations-only for callers already reading that
     # meaning. Mirrors BPA's `test_results` (HTML Report Format epic).
     env["test_results"] = result.test_results or []
+    if contract_summary is not None:  # PBIR Slicer Default State: the contract, as-of date and resolved values
+        env["contract"] = json.loads(contract_summary.read_text(encoding="utf-8"))
     write_envelope(result.output_path, env)
 
 
@@ -628,6 +631,7 @@ def run_inspector(args: argparse.Namespace) -> int:
         ),
         rules_path,
         native_html_out=native_html_out,
+        contract_summary=Path(args.contract_summary) if getattr(args, "contract_summary", None) else None,
     )
     _log_inspector_outcome(outcome, findings, native_html_out, level)
 
@@ -669,6 +673,11 @@ def main() -> int:
             "Path where the PBIR Inspector envelope JSON will be written "
             "(default: fab-test-results/pbir/<stem>/envelope.json)"
         ),
+    )
+    parser.add_argument(
+        "--contract-summary",
+        default=None,
+        help="Slicer contract summary JSON (as-of date, resolved values) to copy into the envelope",
     )
     parser.add_argument(
         "--emit-html",

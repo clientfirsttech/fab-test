@@ -91,12 +91,14 @@ def _resolve_expectation(expectation: SlicerExpectation, fields: dict, errors: l
     return dataclasses.replace(expectation, expected=values)
 
 
-def _format(text: str, fields: dict, rule_id: str, errors: list[str]) -> str:
+def _format(text: str, fields: dict, rule_id: str, errors: list[str]) -> Any:
     try:
         parts = list(string.Formatter().parse(text))
     except ValueError as exc:
         errors.append(f"{rule_id}: {text!r} is not a valid format string ({exc})")
         return text
+    if len(parts) == 1 and not parts[0][0] and parts[0][1] in FIELDS and not parts[0][2] and not parts[0][3]:
+        return fields[parts[0][1]]  # "{year}" alone keeps its type, so it matches a numeric column's 2026L
     out = []
     for literal, name, spec, conversion in parts:
         out.append(literal)

@@ -122,3 +122,10 @@ def test_given_a_malformed_calendar_should_name_the_setting(calendar, key):
         resolve_contract(_contract("{year}", calendar=calendar), datetime.date(2026, 11, 14))
 
     assert f"fabTestCalendar.{key}" in str(caught.value)
+
+
+@pytest.mark.pbir
+def test_given_a_value_that_is_one_bare_field_should_keep_the_fields_type_for_numeric_columns():
+    resolved = resolve_contract(_contract("{year}", "FY{year}", "{fiscal_year_short}"), datetime.date(2026, 11, 14))
+
+    assert [e.expected[0] for e in resolved] == [2026, "FY2026", "26"]

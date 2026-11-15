@@ -59,6 +59,7 @@ from ._service_export import (
     service_item_type,
     service_target_refusal,
 )
+from ._slicer_contract_run import prepare_contracts
 from ._target import TargetError, select_target, workspace_conflict
 
 # Re-exported: `_dispatch_admin_command`'s handler table and `_prepare_target`
@@ -312,6 +313,7 @@ _PREPARE_STEPS: tuple[Callable[[argparse.Namespace], int | None], ...] = (
     _dispatch_admin_command,
     _prepare_target,
     _prepare_paths,
+    prepare_contracts,
 )
 
 
