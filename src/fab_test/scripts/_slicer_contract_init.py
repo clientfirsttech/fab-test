@@ -30,6 +30,7 @@ from typing import Any
 
 import yaml
 
+from ._bookmark_navigators import merge_navigators, navigator_entry, navigator_questions
 from ._pbir_slicers import Slicer, read_slicers
 from ._scan import find_artifact_dirs
 from ._slicer_calendar import FIELDS, CalendarError, calendar_fields, resolve_contract, today, validate_calendar
@@ -107,12 +108,13 @@ def _report(args: argparse.Namespace) -> Path:
 
 
 def build_questions(report: Path, as_of: datetime.date) -> dict[str, Any]:
+    used: set[str] = set()
     try:
         slicers = _one_per_column(read_slicers(report))
+        questions = [_slicer_question(s, _rule_id(f"{s.page} {s.column}", used), as_of) for s in slicers]
+        questions += navigator_questions(report, lambda text: _rule_id(text, used))
     except (OSError, ValueError) as exc:
         raise InitError(f"{report}: a page or visual file can't be read ({exc})") from exc
-    used: set[str] = set()
-    questions = [_slicer_question(s, _rule_id(s, i, used), as_of) for i, s in enumerate(slicers)]
     starts = [q.pop("_starts") for q in questions if q.get("_starts")]
     reproduces = sorted(set.intersection(*map(set, starts))) if starts else list(range(1, 13))
     suggested_start = next((m for m in _START_PREFERENCE if m in reproduces), 1)
@@ -140,8 +142,8 @@ def _one_per_column(slicers: list[Slicer]) -> list[Slicer]:
     return result
 
 
-def _rule_id(slicer: Slicer, index: int, used: set[str]) -> str:
-    base = re.sub(r"[^a-z0-9]+", "-", f"{slicer.page} {slicer.column}".lower()).strip("-") or f"slicer-{index + 1}"
+def _rule_id(text: str, used: set[str]) -> str:
+    base = re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-") or "rule"
     rule_id, n = base, 1
     while rule_id in used or rule_id.startswith("page."):
         n += 1
@@ -272,7 +274,12 @@ def _escaped(values: list | str) -> list | str:
 
 
 def _write(args: argparse.Namespace, report: Path, questions: dict, answers: dict) -> int:
-    built = [(q, *_rule(q, answers[q["id"]])) for q in questions["questions"] if "page" in q]
+    built = [(q, *_rule(q, answers[q["id"]])) for q in questions["questions"] if "column" in q]
+    try:
+        navigators = [navigator_entry(q, answers[q["id"]]) for q in questions["questions"] if "column" not in q
+                      and "page" in q]
+    except ValueError as exc:
+        raise InitError(str(exc)) from exc
     rules = [(q, rule) for q, rule, _ in built if rule]
     calendar = None
     if any(follows for _, rule, follows in built if rule):
@@ -280,6 +287,7 @@ def _write(args: argparse.Namespace, report: Path, questions: dict, answers: dic
         validate_calendar(calendar)
     path = _contract_path(report)
     document, summary = _merge(path, report, rules, calendar, args.force)
+    merge_navigators(document, [n for n in navigators if n], args.force, summary)
     try:  # the file must read back exactly as `fab-test pbir` will read it
         resolve_contract(parse_contract(document, path), datetime.date.fromisoformat(questions["as_of"]))
     except (ContractError, CalendarError) as exc:

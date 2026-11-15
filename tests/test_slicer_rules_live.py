@@ -75,7 +75,7 @@ def _run(root: Path, *extra: str) -> subprocess.CompletedProcess:
     return subprocess.run(
         [sys.executable, "-m", "fab_test.scripts.fab_test", "pbir", "--artifact", "SampleModel-DefaultState",
          "--artifact-dir", str(root), "--output-dir", str(root / "out"), "--as-of", "2026-11-14", *extra],
-        capture_output=True, text=True, check=False,
+        capture_output=True, text=True, encoding="utf-8", check=False,
         env={**os.environ, "PYTHONIOENCODING": "utf-8", "GITHUB_ACTIONS": "", "CI": ""},
     )
 

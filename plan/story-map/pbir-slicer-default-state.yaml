@@ -148,4 +148,4 @@ steps:
         story: As a Local Developer, I want the bookmark navigator's preselected bookmark in the contract, so that the report opens on the agreed view.
         painPoint: n7038p2ridpetd2t0sjidsq0
         priority: 20
-        status: { state: backlog, comment: Later story; navigator property shape unverified (no fixture) }
+        status: { state: inProgress, comment: PBIR Bookmark Navigator Default epic, 2026-11-15; Desktop-saved fixture in SampleModel-DefaultState }

@@ -65,18 +65,20 @@ def _decode_number(literal: str) -> Any:
 
 def read_slicers(report: Path) -> list[Slicer]:
     """Every slicer, in page order, then top-to-bottom, left-to-right. Raises OSError/ValueError on bad JSON."""
+    return [s for page, visuals in page_visuals(report) for s in (_slicer(page, v) for v in visuals) if s]
+
+
+def page_visuals(report: Path):
+    """(page display name, its visual containers top-to-bottom, left-to-right) in page order."""
     pages_dir = report / "definition" / "pages"
-    order = _load(pages_dir / "pages.json").get("pageOrder", [])
-    slicers = []
-    for page_id in order:
-        page = _load(pages_dir / page_id / "page.json").get("displayName", page_id)
-        visuals = [_load(p) for p in sorted((pages_dir / page_id / "visuals").glob("*/visual.json"))]
+    for page_id in load_json(pages_dir / "pages.json").get("pageOrder", []):
+        page = load_json(pages_dir / page_id / "page.json").get("displayName", page_id)
+        visuals = [load_json(p) for p in sorted((pages_dir / page_id / "visuals").glob("*/visual.json"))]
         visuals.sort(key=lambda v: (v.get("position", {}).get("y", 0), v.get("position", {}).get("x", 0)))
-        slicers.extend(s for s in (_slicer(page, v) for v in visuals) if s)
-    return slicers
+        yield page, visuals
 
 
-def _load(path: Path) -> dict:
+def load_json(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8-sig")) if path.is_file() else {}
 
 

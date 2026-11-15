@@ -51,9 +51,10 @@ def expected_tokens(expectation: SlicerExpectation) -> list[str]:
     return [dax_literal(value) for value in expected]
 
 
-def compile_rules(expectations: list[SlicerExpectation]) -> list[dict[str, Any]]:
-    """The PBIR Inspector rules for a contract's (already calendar-resolved) expectations."""
-    pages = sorted({e.page for e in expectations})
+def compile_rules(expectations: list[SlicerExpectation], other_pages: tuple[str, ...] = ()) -> list[dict[str, Any]]:
+    """The PBIR Inspector rules for a contract's (already calendar-resolved) expectations, plus one
+    page-existence rule per page they or ``other_pages`` (the contract's navigator pages) name."""
+    pages = sorted({e.page for e in expectations} | set(other_pages))
     return [_slicer_rule(e) for e in expectations] + [_page_rule(page) for page in pages]
 
 

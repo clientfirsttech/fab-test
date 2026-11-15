@@ -346,3 +346,50 @@ def test_given_two_slicers_on_one_column_should_ask_once_or_offer_skip_when_they
 
     assert "standard-slicers-alignment-2" not in same and same["standard-slicers-alignment"]["choices"][0] == "keep"
     assert differ["standard-slicers-alignment"]["choices"] == ["skip"]
+
+
+NAVIGATOR = "page-1-bookmark-navigator"
+
+
+@pytest.mark.pbir
+def test_given_bookmark_navigators_should_ask_keep_or_skip_naming_the_bookmark(tmp_path, capsys):
+    questions = {q["id"]: q for q in _questions(_bed(tmp_path), capsys)["questions"]}
+
+    assert questions[NAVIGATOR]["current"] == {"selected": "Bookmark 2"}
+    assert questions[NAVIGATOR]["prompt"] == ("Page 1: the bookmark navigator opens with Bookmark 2. "
+                                             "Keep checking that or skip it?")
+    assert questions["empty-and-all-bookmark-navigator"]["current"] == {"selected": None}
+    assert "opens with no bookmark." in questions["empty-and-all-bookmark-navigator"]["prompt"]
+    assert all(questions[i]["choices"] == ["keep", "skip"] and questions[i]["suggested"] == "keep"
+               for i in (NAVIGATOR, "page-2-bookmark-navigator", "empty-and-all-bookmark-navigator"))
+
+
+@pytest.mark.pbir
+def test_given_suggested_answers_should_write_every_navigator_and_skip_one_when_asked(tmp_path, capsys):
+    report = _bed(tmp_path)
+
+    code, _out, err = _run(report, capsys, "--answers", _answers(tmp_path, {"page-2-bookmark-navigator": "skip"}))
+
+    assert code == 0, err
+    navigators = {n.rule_id: (n.page, n.selected) for n in load_contract(_contract_path(report)).navigators}
+    assert navigators == {NAVIGATOR: ("Page 1", "Bookmark 2"),
+                          "empty-and-all-bookmark-navigator": ("Empty and All", None)}
+
+
+@pytest.mark.pbir
+def test_given_an_edited_navigator_entry_should_keep_it_unless_forced(tmp_path, capsys):
+    report = _bed(tmp_path)
+    _run(report, capsys, "--answers", _answers(tmp_path, {}))
+    document = yaml.safe_load(_contract_path(report).read_text(encoding="utf-8"))
+    [entries] = [p["value"] for p in document["customProperties"] if p["property"] == "fabTestBookmarkNavigators"]
+    next(e for e in entries if e["id"] == NAVIGATOR).update(selected="Bookmark 1", severity="warning")
+    _contract_path(report).write_text(yaml.safe_dump(document, sort_keys=False), encoding="utf-8")
+
+    _run(report, capsys, "--answers", _answers(tmp_path, {}), "--format", "json")
+    kept = {n.rule_id: n for n in load_contract(_contract_path(report)).navigators}
+    code, out, _err = _run(report, capsys, "--answers", _answers(tmp_path, {}), "--force", "--format", "json")
+    forced = {n.rule_id: n for n in load_contract(_contract_path(report)).navigators}
+
+    assert kept[NAVIGATOR].selected == "Bookmark 1"
+    assert (code, forced[NAVIGATOR].selected, forced[NAVIGATOR].severity) == (0, "Bookmark 2", "warning")
+    assert NAVIGATOR in json.loads(out)["replaced"]

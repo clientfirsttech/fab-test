@@ -12,19 +12,22 @@ slicer opens with, as one of:
 - `relative`: `{range, duration, period}` as the Relative slicer shows it
 - `contains`: the text an input slicer holds; `[]` means nothing typed
 
-Rules for other engines (pql-test's, ODCS library metrics) are left alone.
-Every mistake is collected and reported at once, each named by its JSON path.
+Bookmark navigators have no column, so they are listed in a custom property
+instead (see `_navigator_contract`). Rules for other engines (pql-test's, ODCS
+library metrics) are left alone. Every mistake is collected and reported at once, each named by its JSON path.
 """
 
 from __future__ import annotations
 
 import datetime
 import decimal
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 import yaml
+
+from ._navigator_contract import NAVIGATORS_PROPERTY, NavigatorExpectation, parse_navigators
 
 ENGINE = "fab-test"
 CHECKS = ("selected", "range", "relative", "contains")
@@ -59,6 +62,7 @@ class SlicerContract:
     report_logical_id: str
     calendar: dict[str, Any] | None
     expectations: list[SlicerExpectation]
+    navigators: list[NavigatorExpectation] = field(default_factory=list)
 
 
 def dax_literal(value: Any) -> str:
@@ -102,10 +106,11 @@ def parse_contract(document: Any, path: Path) -> SlicerContract:
     if not isinstance(report, str) or not report:
         errors.append(f"customProperties.{_REPORT_PROPERTY}: required, the report's .platform logicalId")
     expectations = list(_expectations(document, errors))
-    _check_ids(expectations, errors)
+    navigators = parse_navigators(properties.get(NAVIGATORS_PROPERTY), _SEVERITIES, errors)
+    _check_ids([*expectations, *navigators], errors)
     if errors:
         raise ContractError(f"{path} is not a valid slicer contract:\n" + "\n".join(f"  {e}" for e in errors))
-    return SlicerContract(path, report, properties.get(_CALENDAR_PROPERTY), expectations)
+    return SlicerContract(path, report, properties.get(_CALENDAR_PROPERTY), expectations, navigators)
 
 
 def _check_envelope(document: dict, errors: list[str]) -> None:
@@ -154,7 +159,7 @@ def _expectations(document: dict, errors: list[str]):
                     yield expectation
 
 
-def _check_ids(expectations: list[SlicerExpectation], errors: list[str]) -> None:
+def _check_ids(expectations: list[SlicerExpectation | NavigatorExpectation], errors: list[str]) -> None:
     seen: set[str] = set()
     for e in expectations:
         if e.rule_id in seen:

@@ -23,6 +23,8 @@ from typing import Any
 
 import yaml
 
+from ._bookmark_navigators import compile_navigator_rules, read_bookmarks
+from ._navigator_contract import NAVIGATORS_PROPERTY, NavigatorExpectation
 from ._results_stem import results_stem
 from ._scan import find_files_by_suffix
 from ._slicer_calendar import CalendarError, resolve_contract, today
@@ -39,6 +41,7 @@ class ResolvedContract:
     report_logical_id: str
     as_of: datetime.date
     expectations: list[SlicerExpectation]
+    navigators: list[NavigatorExpectation]
 
 
 def add_contract_flags(parser: argparse.ArgumentParser) -> None:
@@ -95,7 +98,13 @@ def _has_slicer_rules(path: Path) -> bool:
             return True  # ours, so a broken one is an error load_contract reports
         print(f"  ⚠ fab-test: skipped {path}: not valid YAML, and no {ENGINE} rules in it", file=sys.stderr)
         return False
-    tables = document.get("schema") if isinstance(document, dict) else None
+    if not isinstance(document, dict):
+        return False
+    properties = document.get("customProperties")
+    if isinstance(properties, list) and any(isinstance(p, dict) and p.get("property") == NAVIGATORS_PROPERTY
+                                            for p in properties):
+        return True
+    tables = document.get("schema")
     return any(
         isinstance(rule, dict) and str(rule.get("engine", "")).lower() == ENGINE
         for table in tables or [] if isinstance(table, dict)
@@ -106,7 +115,8 @@ def _has_slicer_rules(path: Path) -> bool:
 
 def _resolve(path: Path, as_of: datetime.date) -> ResolvedContract:
     contract = load_contract(path)
-    return ResolvedContract(path, contract.report_logical_id, as_of, resolve_contract(contract, as_of))
+    return ResolvedContract(path, contract.report_logical_id, as_of, resolve_contract(contract, as_of),
+                            contract.navigators)
 
 
 def report_logical_id(report: Path) -> str | None:
@@ -126,7 +136,9 @@ def apply_slicer_contract(report: Path, args: argparse.Namespace, output_dir: Pa
     folder = output_dir / "pbir" / results_stem(report)
     folder.mkdir(parents=True, exist_ok=True)
     ruleset = json.loads(rules_path.read_text(encoding="utf-8-sig"))
-    ruleset = {**ruleset, "rules": [*ruleset.get("rules", []), *compile_rules(contract.expectations)]}
+    rules = [*compile_rules(contract.expectations, tuple(n.page for n in contract.navigators)),
+             *compile_navigator_rules(contract.navigators, read_bookmarks(report))]
+    ruleset = {**ruleset, "rules": [*ruleset.get("rules", []), *rules]}
     resolved = folder / "_resolved-rules.json"
     resolved.write_text(json.dumps(ruleset, indent=2), encoding="utf-8")
     summary = folder / "_contract.json"
@@ -141,5 +153,7 @@ def _summary(contract: ResolvedContract) -> dict[str, Any]:
         "report_logical_id": contract.report_logical_id,
         "rules": [{"id": e.rule_id, "page": e.page, "field": f"'{e.table}'[{e.column}]", "check": e.check,
                    "expected": e.expected, "severity": e.severity} for e in contract.expectations],
+        "navigators": [{"id": n.rule_id, "page": n.page, "expected": n.selected, "severity": n.severity}
+                       for n in contract.navigators],
     }
 

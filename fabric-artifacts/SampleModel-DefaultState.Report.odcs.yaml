@@ -21,6 +21,19 @@ customProperties:
     value:
       fiscal_year_start_month: 7
       fiscal_year_named_by: end
+  # Which bookmark each bookmark navigator opens with, by display name; null is
+  # nothing preselected. Page 1's navigator points at a bookmark on Page 2.
+  - property: fabTestBookmarkNavigators
+    value:
+      - id: page-1-navigator
+        page: Page 1
+        selected: Bookmark 2
+      - id: page-2-navigator
+        page: Page 2
+        selected: Bookmark 1
+      - id: navigator-nothing-preselected
+        page: Empty and All
+        selected: null
 schema:
   - name: AlignmentDim
     properties:
