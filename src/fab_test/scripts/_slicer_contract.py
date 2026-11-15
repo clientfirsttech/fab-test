@@ -119,8 +119,7 @@ def _check_envelope(document: dict, errors: list[str]) -> None:
     if document.get("kind") != "DataContract":
         errors.append(f"kind: must be DataContract, got {document.get('kind')!r}")
     errors.extend(f"{key}: required" for key in ("id", "version", "status") if not document.get(key))
-    if not isinstance(document.get("schema"), list):
-        errors.append("schema: required, a list of tables")
+    # `schema` is optional, as in ODCS: a navigator-only contract has none. _expectations reports a non-list.
 
 
 def _custom_properties(element: dict) -> dict[str, Any]:
@@ -143,8 +142,7 @@ def _mappings(items: Any, where: str, errors: list[str]):
 
 
 def _expectations(document: dict, errors: list[str]):
-    schema = document.get("schema") if isinstance(document.get("schema"), list) else None
-    for t, table in _mappings(schema, "schema", errors):
+    for t, table in _mappings(document.get("schema"), "schema", errors):
         for c, column in _mappings(table.get("properties"), f"schema[{t}].properties", errors):
             where = f"schema[{t}].properties[{c}].quality"
             for q, rule in _mappings(column.get("quality"), where, errors):

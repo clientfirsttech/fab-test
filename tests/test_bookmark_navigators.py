@@ -126,6 +126,21 @@ def test_given_a_contract_with_only_navigators_should_be_found_as_a_fab_test_con
     assert _has_slicer_rules(path)
 
 
+@pytest.mark.pbir
+def test_given_a_navigator_only_contract_without_a_schema_should_read_it():
+    document = _document({"id": "n", "page": "P", "selected": None})
+    del document["schema"]                       # ODCS v3 doesn't require one
+
+    contract = parse_contract(document, Path("c.odcs.yaml"))
+
+    assert (contract.expectations, [n.rule_id for n in contract.navigators]) == ([], ["n"])
+
+
+@pytest.mark.pbir
+def test_given_a_schema_that_isnt_a_list_should_still_refuse_it():
+    assert "\n  schema: must be a list\n" in _errors(_document(schema="AlignmentDim")) + "\n"
+
+
 def _rule(expectation, bookmarks=None):
     rules = compile_navigator_rules([expectation], bookmarks or {BOOKMARK_1: "Bookmark 1", BOOKMARK_2: "Bookmark 2"})
     [rule] = rules

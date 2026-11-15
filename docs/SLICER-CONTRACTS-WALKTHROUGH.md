@@ -146,6 +146,15 @@ Bookmark navigators are listed under `customProperties`, by the bookmark's displ
         selected: Home
 ```
 
+The contract lists only the tables and columns your slicers use, not the whole model. A report with navigators but no slicers can leave `schema` out entirely.
+
+It's a standard ODCS contract, so pql-test (installed with fab-test) can lint it. Passing the semantic model checks that every table and column it names exists:
+
+```bash
+pql-test contract lint "Sales.Report.odcs.yaml" "Sales.SemanticModel"
+# Sales.Report.odcs.yaml: valid ODCS v3.1.0, ... rules, names resolve.
+```
+
 Things you can change by hand:
 
 - `severity: warning` on a rule makes a mismatch a warning instead of an error.

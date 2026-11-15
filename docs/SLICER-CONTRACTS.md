@@ -67,6 +67,8 @@ The contract is plain YAML. Each rule sits on the slicer's column and names its 
 
 The other checks are `range: {from: 2026-01-01, to: 2026-06-30}` (Between slicers and date pickers), `relative: {range: Last, duration: 20, period: Calendar Months}` and `contains: [Wolverine]` (input slicers). `selected: []` means the slicer should open with nothing ticked, and `selected: all` with "Select all" ticked. Both show every row, but they look different on open, so neither passes for the other. The fields a calendar value can use are `year`, `year_short`, `half`, `quarter`, `month`, `fiscal_year`, `fiscal_year_short`, `fiscal_semester`, `fiscal_quarter` and `fiscal_month`.
 
+`schema` lists only the tables and columns that have rules, never the whole model, and can be left out when there are none. `pql-test contract lint <contract> <model>` validates the file as ODCS and checks that every name resolves in the model.
+
 A fixed value containing `{` or `}` is written `{{` or `}}`, because braces mark calendar fields. A comment in the file is yours to keep: `init` won't rewrite a contract containing `#` without `--force`.
 
 ### Bookmark navigators

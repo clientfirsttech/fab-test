@@ -8,6 +8,10 @@ reading and validating it; compiling it to JSON Logic is a later task.
 """
 
 import datetime
+import json
+import shutil
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -198,3 +202,34 @@ def test_given_selected_all_should_accept_it_as_select_all_distinct_from_nothing
                                                       {**_rule(selected=[]), "id": "r2"})).expectations
 
     assert (everything.expected, nothing.expected) == ("all", [])
+
+
+MODEL = ROOT / "fabric-artifacts" / "SampleModel-PQLAssert.SemanticModel"   # the test bed's definition.pbir points here
+
+
+def _pql_lint(contract: Path) -> dict:
+    """Run the installed pql-test command, as a pipeline would; it ships with fab-test's environment."""
+    tool = shutil.which("pql-test", path=str(Path(sys.executable).parent))
+    assert tool, "pql-test isn't installed beside this Python"
+    result = subprocess.run([tool, "contract", "lint", str(contract), str(MODEL), "--format", "json"],
+                            capture_output=True, text=True, encoding="utf-8", check=False)
+    assert result.returncode == 0, result.stdout + result.stderr
+    return json.loads(result.stdout)
+
+
+@pytest.mark.pbir
+def test_given_the_example_contract_should_pass_pql_test_lint_against_its_model():
+    report = _pql_lint(EXAMPLE)
+
+    assert (report["ok"], report["problems"], report["apiVersion"]) == (True, [], "3.1.0")
+
+
+@pytest.mark.pbir
+def test_given_a_navigator_only_contract_without_a_schema_should_pass_both_readers(tmp_path):
+    document = yaml.safe_load(EXAMPLE.read_text(encoding="utf-8"))
+    del document["schema"]
+    path = tmp_path / "navigators.odcs.yaml"
+    path.write_text(yaml.safe_dump(document, sort_keys=False), encoding="utf-8")
+
+    assert _pql_lint(path)["ok"] is True
+    assert len(load_contract(path).navigators) == 3

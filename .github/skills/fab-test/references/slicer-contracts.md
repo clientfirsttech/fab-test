@@ -20,7 +20,7 @@ customProperties:
   - property: fabTestBookmarkNavigators      # only needed for bookmark navigators
     value:
       - {id: overview-navigator, page: Overview, selected: Home}   # bookmark display name; null = none
-schema:
+schema:                                      # only the tables your slicers use; omit when there are none
   - name: Fiscal Calendar                    # the slicer's table
     properties:
       - name: Fiscal Semester                # the slicer's column
@@ -33,6 +33,8 @@ schema:
               page: Overview                 # the page's display name, never a visual ID
               selected: ["FY{fiscal_year_short}-S{fiscal_semester}"]
 ```
+
+Validate the file as ODCS, and check its table and column names against the model, with `pql-test contract lint <contract> <Model>.SemanticModel` (exit 0, `names resolve`).
 
 `implementation` holds `page` and exactly one check:
 
