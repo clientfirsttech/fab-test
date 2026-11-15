@@ -1,6 +1,6 @@
 # PBIR Bookmark Navigator Default Epic
 
-**Status**: 🔄 IN PROGRESS (2026-11-15) on `feature/pbir-slicer-default-state`, built after the PBIR Slicer Default State epic.
+**Status**: ✅ IMPLEMENTED (2026-11-15) on `feature/pbir-slicer-default-state`, not merged or archived: the decisions below await the user's review, and the nothing-preselected navigator awaits a Desktop save. AIDD review done (no blocking findings; three should-fix and the nits fixed). Gates pass: ruff, both ratchets, 3175 + 217 tests, coverage 90.55%, CI-env run, no known vulnerabilities (the only failures are tests/test_rtk_hook_safety.py, from a locally deleted hook file).
 **Goal**: a report's slicer contract also says which bookmark each bookmark navigator opens with, and `fab-test pbir` fails when it drifts.
 
 **Decisions** (provisional, made 2026-11-15 while the user was away; review before merge. Journey story "Bookmark navigator default", [pbir-slicer-default-state.yaml](../plan/story-map/pbir-slicer-default-state.yaml)):
