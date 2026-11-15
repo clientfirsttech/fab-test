@@ -6,7 +6,9 @@ name matches, it finds the slicers bound to the contract's table and column
 against tokens in the exact form Power BI Desktop writes:
 
 - selected: the `In` literals, or for a field parameter the display names in
-  the filter's `valueMap` annotation (Desktop filters the hidden Fields column)
+  the filter's `valueMap` annotation (Desktop filters the hidden Fields column);
+  `all` is inverted selection mode with nothing unticked, and `[]` no filter
+  with that mode off -- the same rows, but neither passes for the other
 - contains: the input slicer's `Contains` literals
 - range: `ComparisonKind|literal` pairs (2 is >= from, 3 is < the day after to)
 - relative: `range|duration|period` from the slicer's data object
@@ -23,8 +25,8 @@ from __future__ import annotations
 import datetime
 from typing import Any
 
-from ._pbir_slicers import RELATIVE_MODES, SLICER_TYPES
-from ._slicer_contract import SlicerExpectation, dax_literal
+from ._pbir_slicers import INVERTED, RELATIVE_MODES, SLICER_TYPES
+from ._slicer_contract import SELECT_ALL, SlicerExpectation, dax_literal
 
 RULE_PREFIX = "CONTRACT."
 _UNREADABLE = "a selection this check can't read"
@@ -37,6 +39,8 @@ def expected_tokens(expectation: SlicerExpectation) -> list[str]:
     expected = expectation.expected
     if expectation.check == "relative":
         return [f"'{expected['range']}'|{expected['duration']}D|'{expected['period']}'"]
+    if expected == SELECT_ALL:
+        return []
     if expectation.check == "range":
         bounds = []
         if "from" in expected:
@@ -58,6 +62,8 @@ def _field(e: SlicerExpectation) -> str:
 
 
 def _describe_expected(e: SlicerExpectation) -> str:
+    if e.expected == SELECT_ALL:
+        return "Select all"
     if e.check in ("selected", "contains"):
         return ", ".join(str(v) for v in e.expected) or "no selection"
     if e.check == "range":
@@ -132,10 +138,25 @@ def _comparison(e: SlicerExpectation) -> tuple[dict, dict]:
     names = {"path": f"{_FILTER}.Where[*].Annotations.filterExpressionMetadata.valueMap[*]['0']"}
     is_parameter = {">": [{"count": [names]}, 0]}
     values = {"if": [is_parameter, {"strjoin": [names, ", "]}, {"strjoin": [literals, ", "]}]}
-    shown = {"if": [no_rows, "no selection", plain, values, _UNREADABLE]}
+    select_all = _select_all(no_rows, one_row)
+    shown = {"if": [select_all, "Select all", no_rows, "no selection", plain, values, _UNREADABLE]}
+    if e.expected == SELECT_ALL:
+        return shown, select_all
+    if not tokens:
+        return shown, {"and": [no_rows, {"!": [select_all]}]}
     display = [str(v) for v in e.expected]
     same = {"if": [is_parameter, {"equalsets": [names, display]}, {"equalsets": [literals, tokens]}]}
-    return shown, _either_empty(tokens, no_rows, {"and": [plain, same]})
+    return shown, {"and": [plain, same]}
+
+
+def _select_all(no_rows: dict, one_row: dict) -> dict:
+    """Inverted selection mode with no filter, or one that excludes nothing ("all except" [])."""
+    inverted = {"or": [{"==": [{"var": f"visual.objects.{part}.0.properties.{INVERTED}.expr.Literal.Value"}, "true"]}
+                       for part in ("data", "general")]}
+    excludes = f"{_FILTER}.Where[*].Condition.Not.Expression.In"
+    excludes_nothing = {"and": [one_row, {"==": [{"count": [{"path": excludes}]}, 1]},
+                                {"==": [{"count": [{"path": f"{excludes}.Values[*]"}]}, 0]}]}
+    return {"and": [inverted, {"or": [no_rows, excludes_nothing]}]}
 
 
 def _shown(no_rows: dict, values: dict) -> dict:

@@ -14,6 +14,7 @@
 7. ✅ A contract lives **outside** the item folder (Fabric's Commit to Git deletes non-definition files inside it) and pairs with its report by the `.platform` `logicalId`.
 8. ✅ ODCS support for pql-test stays its own epic ([odcs-contract-analyzer-epic.md](../odcs-contract-analyzer-epic.md)).
 9. ✅ fab-test (MIT) never imports pql-test (AGPL-3.0-only) code; anything it borrows from pql-test goes through the CLI.
+10. ✅ **Amended 2026-11-15**: "Select all" and nothing ticked are distinct checks (`selected: all` vs `selected: []`); each fails the other, and a values contract fails both. The test bed's Empty and All page holds one of each (hand-authored, pending a Desktop save to pin the shapes).
 
 ## Overview
 

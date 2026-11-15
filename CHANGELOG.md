@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-11-15
+
+- ✨ - Slicer Contracts Tell "Select all" From Nothing Ticked - Both show every row, so a contract couldn't say which one a report opens with: `init` read a "Select all" slicer as `selected: []`, and `selected: []` passed it. `selected: all` now expects "Select all" ticked (inverted selection mode with nothing unticked, whether Desktop writes no filter or `Not In []`), `selected: []` now also requires the mode off, and each fails the other with "opens with [Select all]" or "opens with [no selection]". `init` asks about a "Select all" slicer and writes `all`. Before, a contract that `init` built from a "Select all" slicer passed one that had been cleared.
+- 🧪 - Test Bed Near-Misses - SampleModel-DefaultState gains an Empty and All page: Alignment with nothing ticked and Eye Color with "Select all" ticked, both in the contract, plus live tests that a values contract fails both, each fails the other's check, and both "Select all" shapes pass. Hand-authored; a Desktop save will pin the shapes.
+
 ## 2026-11-14
 
 - 📦 - Version `1.10.0b2`. `1.10.0b1` is on PyPI, so these changes ship in the next beta. Install docs and the skill pin the new version.

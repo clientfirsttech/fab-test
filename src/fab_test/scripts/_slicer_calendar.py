@@ -93,8 +93,8 @@ def validate_calendar(calendar: Any) -> None:
 
 
 def _resolve_expectation(expectation: SlicerExpectation, fields: dict, errors: list[str]) -> SlicerExpectation:
-    if expectation.check not in _RESOLVED_CHECKS:
-        return expectation
+    if expectation.check not in _RESOLVED_CHECKS or not isinstance(expectation.expected, list):
+        return expectation  # `selected: all` has no values to resolve
     values = [_format(v, fields, expectation.rule_id, errors) if isinstance(v, str) else v
               for v in expectation.expected]
     return dataclasses.replace(expectation, expected=values)

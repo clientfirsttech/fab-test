@@ -5,7 +5,9 @@ quality rules sit on the column a slicer is bound to (schema object = table,
 property = column) and state, under `implementation`, the page and what the
 slicer opens with, as one of:
 
-- `selected`: values or field-parameter display names; `[]` means no selection
+- `selected`: values or field-parameter display names; `[]` means nothing
+  ticked, `all` means "Select all" ticked (the same rows, but not the same
+  slicer on open, so each is checked as itself)
 - `range`: `{from, to}` dates, `to` inclusive, either bound may be left open
 - `relative`: `{range, duration, period}` as the Relative slicer shows it
 - `contains`: the text an input slicer holds; `[]` means nothing typed
@@ -26,6 +28,7 @@ import yaml
 
 ENGINE = "fab-test"
 CHECKS = ("selected", "range", "relative", "contains")
+SELECT_ALL = "all"  # `selected: all`: "Select all" ticked, nothing unticked
 RESERVED_PREFIX = "page."  # the compiled page-existence rules use CONTRACT.page.<name>
 _RELATIVE_RANGES = ("Last", "Next", "This")
 _RELATIVE_PERIODS = ("Days", "Weeks", "Calendar Weeks", "Months", "Calendar Months", "Years", "Calendar Years")
@@ -192,8 +195,9 @@ def _check_implementation(implementation: dict, where: str, errors: list[str]) -
 
 
 def _validate_selected(value: Any, where: str, errors: list[str]) -> None:
-    if not isinstance(value, list) or not all(isinstance(v, _SCALARS) for v in value):
-        errors.append(f"{where}: must be a list of plain values; [] means no selection")
+    if value != SELECT_ALL and (not isinstance(value, list) or not all(isinstance(v, _SCALARS) for v in value)):
+        errors.append(f"{where}: must be a list of plain values ([] means nothing selected), "
+                      f"or {SELECT_ALL} for Select all")
 
 
 def _validate_contains(value: Any, where: str, errors: list[str]) -> None:

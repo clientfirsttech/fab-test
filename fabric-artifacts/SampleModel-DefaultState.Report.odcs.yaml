@@ -32,6 +32,14 @@ schema:
             implementation:
               page: Standard Slicers
               selected: [Bad]
+          # The near-misses: nothing ticked and "Select all" filter the same rows,
+          # but they open differently, so each is its own check.
+          - id: alignment-nothing-selected
+            type: custom
+            engine: fab-test
+            implementation:
+              page: Empty and All
+              selected: []
   - name: EyeColorDim
     properties:
       - name: Eye Color
@@ -42,6 +50,12 @@ schema:
             implementation:
               page: Standard Slicers
               selected: [Black, Compound]
+          - id: eye-color-select-all
+            type: custom
+            engine: fab-test
+            implementation:
+              page: Empty and All
+              selected: all
   - name: Fiscal Calendar
     properties:
       - name: Fiscal Semester

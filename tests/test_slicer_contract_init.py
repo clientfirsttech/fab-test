@@ -69,7 +69,14 @@ def test_given_questions_as_json_should_list_every_slicer_with_its_current_selec
         "relative": {"range": "Last", "duration": 20, "period": "Calendar Months"}}
     assert questions["date-picker-date"]["current"] == {"range": {"from": "1939-10-01", "to": "1951-08-27"}}
     assert questions["input-slicer-name"]["current"] == {"contains": ["Wolverine"]}
+    assert questions["empty-and-all-alignment"]["current"] == {"selected": []}
+    assert questions["empty-and-all-eye-color"]["current"] == {"selected": "all"}
+    assert "opens with Select all." in questions["empty-and-all-eye-color"]["prompt"]
+    assert "opens with no selection." in questions["empty-and-all-alignment"]["prompt"]
+    assert questions["empty-and-all-alignment"]["choices"] == ["keep", "skip"]  # no value to follow the calendar
+    assert questions["empty-and-all-eye-color"]["choices"] == ["keep", "skip"]
     assert all(q["choices"][0] == "keep" and q["suggested"] for q in questions.values() if "page" in q)
+    assert "Keep checking that or skip it?" in questions["empty-and-all-eye-color"]["prompt"]
 
 
 @pytest.mark.pbir
@@ -101,7 +108,9 @@ def test_given_suggested_answers_should_write_a_contract_the_reader_accepts_and_
     assert contract.calendar == {"fiscal_year_start_month": 7, "fiscal_year_named_by": "end"}
     assert resolved[SEMESTER].expected == ["FY27-S1"]
     assert resolved["date-between-date"].expected == {"to": datetime.date(2026, 10, 28)}
-    assert len(resolved) == 10
+    assert resolved["empty-and-all-eye-color"].expected == "all"
+    assert resolved["empty-and-all-alignment"].expected == []
+    assert len(resolved) == 12
 
 
 @pytest.mark.pbir
@@ -133,7 +142,7 @@ def test_given_a_terminal_should_ask_and_take_the_suggestion_on_enter(tmp_path, 
 
     assert code == 0
     ids = {e.rule_id for e in load_contract(_contract_path(report)).expectations}
-    assert len(ids) == 9  # the first slicer asked was skipped, after one invalid answer was re-asked
+    assert len(ids) == 11  # the first slicer asked was skipped, after one invalid answer was re-asked
     assert "keep" in err and "'maybe' isn't one of" in err
     assert json.loads(out)["written"] is True  # prompts on stderr keep stdout one JSON document
 

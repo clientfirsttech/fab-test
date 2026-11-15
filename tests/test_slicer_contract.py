@@ -120,6 +120,7 @@ def test_given_no_report_pairing_should_name_the_custom_property(tmp_path):
     ({"relative": {"range": "Previous", "duration": 2, "period": "Months"}}, "implementation.relative.range"),
     ({"contains": [""]}, "implementation.contains"),
     ({"selected": [["nested"]]}, "implementation.selected"),
+    ({"selected": "everything"}, "implementation.selected"),
     ({"range": {"from": datetime.date(2026, 2, 1), "to": datetime.date(2026, 1, 1)}}, "implementation.range"),
 ])
 def test_given_a_malformed_check_should_name_the_offending_key(tmp_path, implementation, path):
@@ -149,8 +150,9 @@ def test_given_the_test_bed_contract_should_load_one_expectation_per_example_sli
     contract = load_contract(EXAMPLE)
 
     pages = {e.page for e in contract.expectations}
-    assert len(contract.expectations) == 10
-    assert pages == {"Standard Slicers", "Date Between", "Date Relative", "Date Picker", "Input Slicer"}
+    assert len(contract.expectations) == 12
+    assert pages == {"Standard Slicers", "Date Between", "Date Relative", "Date Picker", "Input Slicer",
+                     "Empty and All"}
     assert {e.check for e in contract.expectations} == set(CHECKS)
 
 
@@ -188,3 +190,11 @@ def test_given_an_empty_input_slicer_should_accept_contains_nothing(tmp_path):
     [expectation] = _load(tmp_path, _contract(_rule(contains=[]))).expectations
 
     assert expectation.expected == []
+
+
+@pytest.mark.pbir
+def test_given_selected_all_should_accept_it_as_select_all_distinct_from_nothing(tmp_path):
+    [everything, nothing] = _load(tmp_path, _contract(_rule(selected="all"),
+                                                      {**_rule(selected=[]), "id": "r2"})).expectations
+
+    assert (everything.expected, nothing.expected) == ("all", [])

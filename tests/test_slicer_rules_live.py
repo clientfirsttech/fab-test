@@ -25,7 +25,8 @@ TEST_BED = ROOT / "fabric-artifacts" / "SampleModel-DefaultState.Report"
 CONTRACT = ROOT / "fabric-artifacts" / "SampleModel-DefaultState.Report.odcs.yaml"
 RULE_IDS = {"alignment-default", "eye-color-default", "fiscal-semester-current", "half-year-current",
             "year-default", "first-appearance-range", "relative-date-default", "date-picker-default",
-            "chart-measure-default", "character-name-default"}
+            "chart-measure-default", "character-name-default", "alignment-nothing-selected",
+            "eye-color-select-all"}
 # One value changed per rule; half-year-current already fails on 2026-11-14.
 ONE_VALUE_OFF = {
     "alignment-default": {"selected": ["Good"]},
@@ -37,6 +38,9 @@ ONE_VALUE_OFF = {
     "date-picker-default": {"range": {"from": datetime.date(1939, 10, 2), "to": datetime.date(1951, 8, 27)}},
     "chart-measure-default": {"selected": ["Running Total"]},
     "character-name-default": {"contains": ["Spider"]},
+    # Select all and nothing selected filter the same rows; each must still fail the other's check.
+    "alignment-nothing-selected": {"selected": "all"},
+    "eye-color-select-all": {"selected": []},
 }
 
 
@@ -218,3 +222,42 @@ def test_given_selections_in_shapes_a_check_cant_read_should_fail_rather_than_pa
                              "CONTRACT.half-year-current"}
     messages = {f["rule"]: f["message"] for f in _envelope(root)["findings"]}
     assert "can't read" in messages["CONTRACT.alignment-default"]
+
+
+def test_given_nothing_or_select_all_should_fail_a_contract_naming_values(inspector, tmp_path):
+    document = _contract()
+    for rule in _rules(document):
+        if rule["id"] == "alignment-nothing-selected":
+            rule["implementation"]["selected"] = ["Bad"]
+        if rule["id"] == "eye-color-select-all":
+            rule["implementation"]["selected"] = ["Black", "Compound"]
+    root = _bed(tmp_path, document)
+
+    _run(root)
+
+    assert _failed(root) == {"CONTRACT.alignment-nothing-selected", "CONTRACT.eye-color-select-all",
+                             "CONTRACT.half-year-current"}
+    messages = {f["rule"]: f["message"] for f in _envelope(root)["findings"]}
+    assert "opens with [no selection]" in messages["CONTRACT.alignment-nothing-selected"]
+    assert "opens with [Select all]" in messages["CONTRACT.eye-color-select-all"]
+
+
+def test_given_either_select_all_shape_or_a_switched_off_flag_should_pass(inspector, tmp_path):
+    root = _bed(tmp_path, _contract())
+    off = {"expr": {"Literal": {"Value": "false"}}}
+
+    def not_in_nothing(objects):  # Select all written as "all except []"
+        objects["general"] = [{"properties": {"filter": {"filter": {"Version": 2, "Where": [{"Condition": {
+            "Not": {"Expression": {"In": {"Expressions": [{"Column": {"Expression": {"SourceRef": {"Source": "e"}},
+                                                                       "Property": "Eye Color"}}],
+                                          "Values": []}}}}}]}}}}]
+
+    def flag_switched_off(objects):  # Select all ticked once, then cleared
+        objects["data"][0]["properties"]["isInvertedSelectionMode"] = off
+
+    _edit_visual(root, "a7d93b51e0c64f2b8d40", not_in_nothing)
+    _edit_visual(root, "5c2e8f0a7b3d41c69e17", flag_switched_off)
+
+    _run(root)
+
+    assert _failed(root) == {"CONTRACT.half-year-current"}

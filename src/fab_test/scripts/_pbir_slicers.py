@@ -2,8 +2,8 @@
 
 The inverse of `_slicer_rules`: it decodes the selection shapes Power BI
 Desktop writes (see fabric-artifacts/README.md) back into what the user
-sees, in the contract's own vocabulary -- `selected`, `contains`, `range`
-or `relative`. It reads exactly the shapes the compiled rules can check;
+sees, in the contract's own vocabulary -- `selected` (`all` for "Select
+all"), `contains`, `range` or `relative`. It reads exactly the shapes the compiled rules can check;
 anything else ("all except" selections, several columns, a hierarchy, a
 value that wouldn't round-trip) is `{"unsupported": reason}`, which
 `fab-test pbir contract init` offers only to skip.
@@ -18,10 +18,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from ._slicer_contract import dax_literal
+from ._slicer_contract import SELECT_ALL, dax_literal
 
 SLICER_TYPES = ("slicer", "textSlicer", "listSlicer", "advancedSlicerVisual")
 RELATIVE_MODES = ("'Relative'", "'RelativeDatePicker'")
+INVERTED = "isInvertedSelectionMode"  # "Select all" ticked; any filter then lists what is unticked
 _DATETIME = re.compile(r"^datetime'(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})'$")
 _NOT_PLAIN = "a selection that isn't a plain list of values (for example 'all except', or several columns)"
 
@@ -100,8 +101,9 @@ def _current(visual: dict) -> dict[str, Any]:
     if visual.get("visualType") == "textSlicer":
         values = [c["Right"]["Literal"]["Value"] for c in _find(rows, "Contains")]
         return _contains(values, rows)
-    if not rows:
-        return {"selected": []}
+    everything = _select_all(rows, data, general)
+    if everything or not rows:
+        return {"selected": SELECT_ALL if everything else []}
     if len(rows) > 1:
         return {"unsupported": _NOT_PLAIN}
     if _literal(data, "mode") in RELATIVE_MODES and "relativeRange" in data and list(_find(rows, "DateSpan")):
@@ -114,6 +116,16 @@ def _current(visual: dict) -> dict[str, Any]:
     if comparisons:
         return _range(comparisons)
     return _selected(rows[0])
+
+
+def _select_all(rows: list, data: dict, general: dict) -> bool:
+    """"Select all" with nothing unticked: inverted mode, and no filter or "all except" nothing."""
+    if "true" not in (_literal(data, INVERTED), _literal(general, INVERTED)):
+        return False
+    if not rows:
+        return True
+    inner = rows[0].get("Condition", {}).get("Not", {}).get("Expression", {}).get("In", {})
+    return len(rows) == 1 and bool(inner) and not inner.get("Values")
 
 
 def _contains(literals: list[str], rows: list) -> dict[str, Any]:

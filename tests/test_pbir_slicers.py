@@ -66,6 +66,39 @@ def test_given_no_selection_in_either_form_should_read_nothing_selected(tmp_path
     assert _current(tmp_path, where=where) == {"selected": []}
 
 
+INVERTED = {"isInvertedSelectionMode": {"expr": {"Literal": {"Value": "true"}}}}
+
+
+@pytest.mark.pbir
+@pytest.mark.parametrize("where", [None, [], [{"Condition": {"Not": {"Expression": _in()}}}]])
+def test_given_select_all_with_nothing_unticked_should_read_all_not_nothing_selected(tmp_path, where):
+    assert _current(tmp_path, where=where, data=INVERTED) == {"selected": "all"}
+
+
+@pytest.mark.pbir
+def test_given_inverted_mode_switched_off_should_read_nothing_selected(tmp_path):
+    off = {"isInvertedSelectionMode": {"expr": {"Literal": {"Value": "false"}}}}
+
+    assert _current(tmp_path, where=None, data=off) == {"selected": []}
+
+
+@pytest.mark.pbir
+def test_given_select_all_then_one_value_unticked_should_call_it_unsupported(tmp_path):
+    where = [{"Condition": {"Not": {"Expression": _in("'Bad'")}}}]
+
+    assert "unsupported" in _current(tmp_path, where=where, data=INVERTED)
+
+
+@pytest.mark.pbir
+def test_given_the_test_bed_should_hold_a_cleared_slicer_and_a_select_all_slicer():
+    root = Path(__file__).resolve().parents[1] / "fabric-artifacts" / "SampleModel-DefaultState.Report"
+
+    page = {(s.table, s.column): s.current for s in read_slicers(root) if s.page == "Empty and All"}
+
+    assert page == {("AlignmentDim", "Alignment"): {"selected": []},
+                    ("EyeColorDim", "Eye Color"): {"selected": "all"}}
+
+
 @pytest.mark.pbir
 @pytest.mark.parametrize("where", [
     [{"Condition": {"Not": {"Expression": _in("'Bad'")}}}],                      # "all except Bad"

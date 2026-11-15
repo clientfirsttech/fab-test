@@ -21,7 +21,7 @@ Each artifact is stored in its own subdirectory with a naming convention:
 
 `SampleModel-DefaultState.Report` binds to `SampleModel-PQLAssert.SemanticModel` and holds one preselected example per slicer kind for the [PBIR Slicer Default State epic](../tasks/archive/2026-11-14-pbir-slicer-default-state.md). Each selection lives in `visual.objects.general[0].properties.filter` of the named `visual.json`. `Fiscal Calendar` (July fiscal years named by their end year) and the `Chart Measure` field parameter were added to the model for it; `Fiscal Calendar` is disconnected, so its slicers filter nothing.
 
-Every selection below was last saved by Power BI Desktop (2026-11-14), so each shape is what Desktop writes. Each rendered as listed in Desktop screenshots after a refresh.
+Every selection below was last saved by Power BI Desktop (2026-11-14), so each shape is what Desktop writes, except the Empty and All page (hand-authored 2026-11-15, awaiting a Desktop save). Each rendered as listed in Desktop screenshots after a refresh.
 
 | Page | Visual | Kind | Saved selection |
 |---|---|---|---|
@@ -35,14 +35,17 @@ Every selection below was last saved by Power BI Desktop (2026-11-14), so each s
 | Date Relative | `a60f5852c086b26d86a4` | `slicer` Relative | Last 20 calendar months |
 | Date Picker | `77017c2b4495f8869386` | `slicer` RelativeDatePicker | 1939-10-01 to 1951-08-27, picked on the calendar |
 | Input Slicer | `4939c433554061c20080` | `textSlicer`, Contains any | Character name contains "Wolverine" |
+| Empty and All | `5c2e8f0a7b3d41c69e17` | `slicer` Basic | Alignment with nothing ticked (hand-authored) |
+| Empty and All | `a7d93b51e0c64f2b8d40` | `slicer` Basic, "Select all" shown | Eye Color with "Select all" ticked (hand-authored) |
 
-Its contract, `SampleModel-DefaultState.Report.odcs.yaml`, fails on purpose: `half-year-current` expects the current half while the slicer holds `2025 H2`. From 2027-01-01 `fiscal-semester-current` fails too (it will expect `FY27-S2`). Pass `--as-of 2026-11-14` to see the results the tests pin.
+Its contract, `SampleModel-DefaultState.Report.odcs.yaml`, fails on purpose: `half-year-current` expects the current half while the slicer holds `2025 H2`. From 2027-01-01 `fiscal-semester-current` fails too (it will expect `FY27-S2`). Pass `--as-of 2026-11-14` to see the results the tests pin. The Empty and All page holds the near-misses: nothing ticked and "Select all" filter the same rows, so each is checked as itself (`selected: []` and `selected: all`), and a contract naming values fails on both.
 
 ### Selection shapes Desktop writes
 
 - **Value slicers** store `In` with one `[[{"Literal": ...}]]` row per selected value, as DAX literals (`'Bad'`, `1940L`).
 - **A field parameter** stores `In` on the hidden `Chart Measure Fields` column with the field reference as the value (`'''MarvelFact''[Number of Characters]'`). The display name appears only in `Where[].Annotations.filterExpressionMetadata.valueMap`. A visual bound to the parameter keeps only the selected field in its projections (`fieldParameters[].length` follows the selection).
 - **No selection** has two forms: no `general` object at all (never set), or `general: [{"properties": {}}]` (cleared in Desktop).
+- **Select all** sets `isInvertedSelectionMode` to `true` (in `data`, per the authoring skill), and any filter then lists what is unticked as `Not In`. With nothing unticked the filter is absent, or possibly a `Not In` with no values; fab-test reads both as `selected: all`. Not yet confirmed by a Desktop save.
 - **Between** stores `data.startDate`/`data.endDate` and a filter of `>=` start and `<` end plus one day (`ComparisonKind` 2 and 3). A bound left at the column's earliest or latest date is dropped, so the filter can be a single comparison.
 - **Relative** stores a `Between` of `DateSpan(DateAdd(Now, n, TimeUnit))`; `TimeUnit` 0 is day, 2 is month, 3 is year. A calendar period ends at the previous whole period (`-1`).
 - **Date picker** (`RelativeDatePicker`) stores either the relative shape or, for a range picked on the calendar, the same `And` of `>=` / `<` as Between.

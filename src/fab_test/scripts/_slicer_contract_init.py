@@ -33,7 +33,7 @@ import yaml
 from ._pbir_slicers import Slicer, read_slicers
 from ._scan import find_artifact_dirs
 from ._slicer_calendar import FIELDS, CalendarError, calendar_fields, resolve_contract, today, validate_calendar
-from ._slicer_contract import ENGINE, ContractError, parse_contract
+from ._slicer_contract import ENGINE, SELECT_ALL, ContractError, parse_contract
 from ._slicer_contract_run import CONTRACT_SUFFIX, report_logical_id
 
 CHOICES = ("keep", "calendar", "skip")
@@ -158,6 +158,11 @@ def _slicer_question(slicer: Slicer, rule_id: str, as_of: datetime.date) -> dict
         return {**question, "prompt": f"{slicer.page}: {field} opens with {slicer.current['unsupported']}, "
                                       "which a contract can't check. Skip it?",
                 "choices": ["skip"], "suggested": "skip", "needs_human": False}
+    [value] = slicer.current.values()
+    if value in ([], SELECT_ALL):  # nothing to follow the calendar
+        return {**question, "prompt": f"{slicer.page}: {field} opens with {_show(slicer.current)}. "
+                                      "Keep checking that or skip it?",
+                "choices": ["keep", "skip"], "suggested": "keep", "needs_human": False}
     question.update(prompt=f"{slicer.page}: {field} opens with {_show(slicer.current)}. "
                            "Keep checking that, follow the calendar, or skip it?",
                     choices=list(CHOICES), suggested="keep", needs_human=False)
@@ -169,6 +174,8 @@ def _slicer_question(slicer: Slicer, rule_id: str, as_of: datetime.date) -> dict
 
 def _show(current: dict) -> str:
     [(check, value)] = current.items()
+    if value == SELECT_ALL:
+        return "Select all"
     if check in ("selected", "contains"):
         return ", ".join(map(str, value)) or ("no selection" if check == "selected" else "nothing typed")
     return json.dumps(value, default=str)
@@ -176,7 +183,8 @@ def _show(current: dict) -> str:
 
 def _calendar_suggestion(current: dict, as_of: datetime.date) -> tuple[str, list[int]] | None:
     """The first format that reproduces a single current value today, and the fiscal starts that do."""
-    values = current.get("selected") or []
+    values = current.get("selected")
+    values = values if isinstance(values, list) else []  # `all` names no value
     if len(values) != 1 or not isinstance(values[0], (str, int)) or isinstance(values[0], bool):
         return None
     for text in _FORMATS:
@@ -256,8 +264,10 @@ def _rule(q: dict, answer: Any) -> tuple[dict[str, Any] | None, bool]:
     return {"id": q["id"], "type": "custom", "engine": ENGINE, "implementation": implementation}, calendar
 
 
-def _escaped(values: list) -> list:
+def _escaped(values: list | str) -> list | str:
     """A kept value is literal text, so its braces mustn't read as calendar fields."""
+    if values == SELECT_ALL:
+        return values
     return [v.replace("{", "{{").replace("}", "}}") if isinstance(v, str) else v for v in values]
 
 

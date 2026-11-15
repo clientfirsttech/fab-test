@@ -47,6 +47,7 @@ def test_given_the_compiled_rules_should_name_no_visual_id():
 @pytest.mark.parametrize("check, expected, tokens", [
     ("selected", ["Bad", 1940], ["'Bad'", "1940L"]),
     ("selected", [], []),
+    ("selected", "all", []),
     ("contains", ["Wolverine"], ["'Wolverine'"]),
     ("range", {"from": datetime.date(1939, 10, 1), "to": datetime.date(1951, 8, 27)},
      ["2|datetime'1939-10-01T00:00:00'", "3|datetime'1951-08-28T00:00:00'"]),
@@ -72,3 +73,13 @@ def test_given_an_inspector_message_with_escaped_quotes_should_show_the_quotes()
                "Message": 'FAILED with result: ["\u0027T\u0027[C] opens with [\u0027Bad\u0027]"]'}
 
     assert _normalize_finding(finding)["message"] == "FAILED with result: [\"'T'[C] opens with ['Bad']\"]"
+
+
+@pytest.mark.pbir
+def test_given_select_all_and_nothing_selected_should_name_each_differently():
+    [everything] = [r for r in compile_rules([_expectation(expected="all")]) if r["id"] == "CONTRACT.r1"]
+    [nothing] = [r for r in compile_rules([SlicerExpectation("r1", "P", "T", "C", "selected", [], "error")])
+                 if r["id"] == "CONTRACT.r1"]
+
+    assert everything["name"].endswith("opens with Select all")
+    assert nothing["name"].endswith("opens with no selection")

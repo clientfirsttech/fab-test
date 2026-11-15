@@ -35,7 +35,7 @@ schema:
 
 | Check | Slicer | Example |
 |---|---|---|
-| `selected` | value slicers and field parameters (by display name); `[]` means no selection | `[Bad]`, `[1940]`, `[Number of Characters]` |
+| `selected` | value slicers and field parameters (by display name); `[]` means nothing ticked, `all` means "Select all" ticked (each fails the other) | `[Bad]`, `[1940]`, `[Number of Characters]`, `all` |
 | `range` | Between, or a date picker range picked on the calendar; `to` is inclusive; either bound may be left open | `{from: 1939-10-01, to: 1951-08-27}` |
 | `relative` | Relative date slicer | `{range: Last, duration: 20, period: Calendar Months}` |
 | `contains` | input slicer (`textSlicer`); `[]` means nothing typed | `[Wolverine]` |

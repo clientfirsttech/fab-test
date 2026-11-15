@@ -76,6 +76,7 @@ def test_given_the_test_bed_contract_should_resolve_its_calendar_rules_on_the_as
     assert by_id["fiscal-semester-current"] == ["FY27-S1"]
     assert by_id["half-year-current"] == ["2026 H2"]
     assert by_id["year-default"] == [1940]
+    assert by_id["eye-color-select-all"] == "all" and by_id["alignment-nothing-selected"] == []
 
 
 @pytest.mark.pbir
