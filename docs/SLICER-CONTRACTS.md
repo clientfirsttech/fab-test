@@ -1,6 +1,6 @@
 # Checking what a report's slicers open with
 
-A customer agrees what a report shows when it opens: which alignment, which eye colours, which semester. Every edit risks saving a working selection over that agreement, and a default that follows the calendar goes stale at rollover with no commit to notice it. A **slicer contract** writes the agreement down once; `fab-test pbir` checks it on every run.
+A customer agrees what a report shows when it opens: which alignment, which eye colours, which semester. Every edit risks saving a working selection over that agreement, and a default that follows the calendar goes stale at rollover with no commit to notice it. A **slicer contract** writes the agreement down once, along with the bookmark each bookmark navigator opens on; `fab-test pbir` checks it on every run.
 
 Setting one up on your own report for the first time? Start with the [walkthrough](SLICER-CONTRACTS-WALKTHROUGH.md). This guide uses the test bed in `fabric-artifacts/`: `SampleModel-DefaultState.Report` and its contract, `SampleModel-DefaultState.Report.odcs.yaml`.
 
@@ -68,6 +68,27 @@ The contract is plain YAML. Each rule sits on the slicer's column and names its 
 The other checks are `range: {from: 2026-01-01, to: 2026-06-30}` (Between slicers and date pickers), `relative: {range: Last, duration: 20, period: Calendar Months}` and `contains: [Wolverine]` (input slicers). `selected: []` means the slicer should open with nothing ticked, and `selected: all` with "Select all" ticked. Both show every row, but they look different on open, so neither passes for the other. The fields a calendar value can use are `year`, `year_short`, `half`, `quarter`, `month`, `fiscal_year`, `fiscal_year_short`, `fiscal_semester`, `fiscal_quarter` and `fiscal_month`.
 
 A fixed value containing `{` or `}` is written `{{` or `}}`, because braces mark calendar fields. A comment in the file is yours to keep: `init` won't rewrite a contract containing `#` without `--force`.
+
+### Bookmark navigators
+
+A bookmark navigator isn't bound to a column, so its entry sits in the contract's `customProperties`, named by page and by the bookmark's display name:
+
+```yaml
+customProperties:
+  - property: fabTestBookmarkNavigators
+    value:
+      - id: page-1-navigator
+        page: Page 1
+        selected: Bookmark 2     # null: nothing preselected
+```
+
+`init` asks about each page's navigator (keep or skip) and writes these for you. A navigator that drifted is a finding:
+
+```
+CONTRACT.page-1-navigator  error  Page 1  the bookmark navigator opens with [Bookmark 1]; the contract expects Bookmark 2
+```
+
+Renaming or deleting the bookmark fails too ("the report has no bookmark by that name"), and so does removing the navigator from the page.
 
 ## 4. Catch the rollover on a schedule
 

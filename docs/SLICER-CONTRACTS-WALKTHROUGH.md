@@ -1,6 +1,6 @@
 # Walkthrough: setting up a slicer contract for your report
 
-This walks you from a Power BI report with no checks to a pipeline that fails when a slicer opens with the wrong selection. It takes about 15 minutes. [SLICER-CONTRACTS.md](SLICER-CONTRACTS.md) is the reference; this page is the first run.
+This walks you from a Power BI report with no checks to a pipeline that fails when a slicer opens with the wrong selection, or a bookmark navigator opens on the wrong bookmark. It takes about 15 minutes. [SLICER-CONTRACTS.md](SLICER-CONTRACTS.md) is the reference; this page is the first run.
 
 You will:
 
@@ -40,6 +40,8 @@ Be deliberate about the two states that look alike:
 
 Avoid "Select all" and then unticking a few values. fab-test can't check that shape and only offers to skip it.
 
+If a page has a **bookmark navigator**, click the bookmark it should show as selected (or none) before you save; that highlight is what gets checked.
+
 ## Step 2: Build the contract
 
 From the repository root, point `init` at the report folder:
@@ -66,6 +68,13 @@ How to answer:
 - **skip**: don't check this slicer.
 
 Slicers with nothing ticked or "Select all" are offered only keep or skip, since they have no value to follow the calendar.
+
+Bookmark navigators come after the slicers, one question per page, also keep or skip:
+
+```text
+Overview: the bookmark navigator opens with Home. Keep checking that or skip it?
+  [keep/skip] default keep:
+```
 
 If you answered **calendar** at least once, two more questions follow:
 
@@ -125,6 +134,16 @@ schema:
             implementation:
               page: Overview
               selected: all
+```
+
+Bookmark navigators are listed under `customProperties`, by the bookmark's display name (`null` means nothing preselected):
+
+```yaml
+  - property: fabTestBookmarkNavigators
+    value:
+      - id: overview-bookmark-navigator
+        page: Overview
+        selected: Home
 ```
 
 Things you can change by hand:
@@ -190,5 +209,7 @@ Both run on every change to a report or contract, **and on a weekly schedule**. 
 | `init` offers only `skip` | "Select all" with values unticked, a hierarchy slicer, or several columns | Save a plain selection, or leave it unchecked |
 | A finding saying "a selection this check can't read" | the slicer was changed to one of the shapes above | Re-save it as a plain selection |
 | Two slicers on one page bound to the same column | a rule checks every slicer on its column and page | Skip one, or give them identical selections |
+| "the report has no bookmark by that name" | a bookmark was renamed or deleted | Update `selected:` to the new name, or restore the bookmark |
+| Two bookmark navigators on one page, `init` offers only `skip` | they preselect different bookmarks | Make them agree, or leave the page unchecked |
 | `exit 2` naming a JSON path | the contract YAML doesn't validate | Fix the key it names; nothing ran |
 | No `CONTRACT.*` rules ran | the contract's `fabTestReport` doesn't match `.platform` | Re-run `init`, or pass `--contract FILE` |
