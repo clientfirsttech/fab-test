@@ -1,12 +1,12 @@
 {
-  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.9.0/schema.json",
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.14.0/schema.json",
   "name": "b84126137973afa03196",
   "position": {
     "x": 288,
     "y": 24,
-    "width": 280,
-    "height": 136,
     "z": 6000,
+    "height": 136,
+    "width": 280,
     "tabOrder": 6000
   },
   "visual": {
@@ -27,7 +27,8 @@
                 }
               },
               "queryRef": "Chart Measure.Chart Measure",
-              "nativeQueryRef": "Chart Measure"
+              "nativeQueryRef": "Chart Measure",
+              "active": true
             }
           ]
         }
@@ -92,7 +93,7 @@
                                   "Source": "c"
                                 }
                               },
-                              "Property": "Chart Measure"
+                              "Property": "Chart Measure Fields"
                             }
                           }
                         ],
@@ -100,10 +101,60 @@
                           [
                             {
                               "Literal": {
-                                "Value": "'Running Total'"
+                                "Value": "'''MarvelFact''[Number of Characters]'"
                               }
                             }
                           ]
+                        ]
+                      }
+                    },
+                    "Annotations": {
+                      "filterExpressionMetadata": {
+                        "expressions": [
+                          {
+                            "Column": {
+                              "Expression": {
+                                "SourceRef": {
+                                  "Entity": "Chart Measure"
+                                }
+                              },
+                              "Property": "Chart Measure"
+                            }
+                          }
+                        ],
+                        "decomposedIdentities": {
+                          "values": [
+                            [
+                              {
+                                "0": [
+                                  {
+                                    "Literal": {
+                                      "Value": "'''MarvelFact''[Number of Characters]'"
+                                    }
+                                  }
+                                ]
+                              }
+                            ]
+                          ],
+                          "columns": [
+                            {
+                              "value": {
+                                "Column": {
+                                  "Expression": {
+                                    "SourceRef": {
+                                      "Entity": "Chart Measure"
+                                    }
+                                  },
+                                  "Property": "Chart Measure Fields"
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        "valueMap": [
+                          {
+                            "0": "Number of Characters"
+                          }
                         ]
                       }
                     }
@@ -197,5 +248,23 @@
         }
       ]
     }
+  },
+  "filterConfig": {
+    "filters": [
+      {
+        "name": "824a27f867c60bb421db",
+        "field": {
+          "Column": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "Chart Measure"
+              }
+            },
+            "Property": "Chart Measure"
+          }
+        },
+        "type": "Categorical"
+      }
+    ]
   }
 }

@@ -1,12 +1,12 @@
 {
-  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.9.0/schema.json",
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.14.0/schema.json",
   "name": "9eded2e3c22f3f38a082",
   "position": {
     "x": 24,
-    "width": 240,
     "y": 112,
-    "height": 232,
     "z": 2000,
+    "height": 232,
+    "width": 240,
     "tabOrder": 2000
   },
   "visual": {
@@ -27,7 +27,8 @@
                 }
               },
               "queryRef": "EyeColorDim.Eye Color",
-              "nativeQueryRef": "Eye Color"
+              "nativeQueryRef": "Eye Color",
+              "active": true
             }
           ]
         }
@@ -100,14 +101,14 @@
                           [
                             {
                               "Literal": {
-                                "Value": "'Blue'"
+                                "Value": "'Black'"
                               }
                             }
                           ],
                           [
                             {
                               "Literal": {
-                                "Value": "'Brown'"
+                                "Value": "'Compound'"
                               }
                             }
                           ]
@@ -204,5 +205,23 @@
         }
       ]
     }
+  },
+  "filterConfig": {
+    "filters": [
+      {
+        "name": "ef826126ced698bc05bb",
+        "field": {
+          "Column": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "EyeColorDim"
+              }
+            },
+            "Property": "Eye Color"
+          }
+        },
+        "type": "Categorical"
+      }
+    ]
   }
 }

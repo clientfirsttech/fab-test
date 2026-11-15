@@ -1,12 +1,12 @@
 {
-  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.9.0/schema.json",
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.14.0/schema.json",
   "name": "4939c433554061c20080",
   "position": {
     "x": 24,
     "y": 24,
-    "width": 280,
-    "height": 104,
     "z": 1000,
+    "height": 104,
+    "width": 280,
     "tabOrder": 1000
   },
   "visual": {
@@ -63,7 +63,7 @@
                         },
                         "Right": {
                           "Literal": {
-                            "Value": "'Spider'"
+                            "Value": "'Wolverine'"
                           }
                         }
                       }
@@ -171,5 +171,23 @@
         }
       ]
     }
+  },
+  "filterConfig": {
+    "filters": [
+      {
+        "name": "37f614d00536e8012c1d",
+        "field": {
+          "Column": {
+            "Expression": {
+              "SourceRef": {
+                "Entity": "MarvelFact"
+              }
+            },
+            "Property": "Name"
+          }
+        },
+        "type": "Categorical"
+      }
+    ]
   }
 }

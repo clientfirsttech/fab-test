@@ -1,6 +1,6 @@
 # PBIR Slicer Default State Epic
 
-**Status**: 📋 PLANNED — discovery decisions recorded 2026-11-14; Test Bed in progress on `feature/pbir-slicer-default-state`.
+**Status**: 🔄 IN PROGRESS on `feature/pbir-slicer-default-state` — discovery decisions recorded 2026-11-14; Test Bed done 2026-11-14 (every selection saved by Desktop), awaiting review; later tasks await approval.
 **Goal**: `fab-test pbir` checks the values a report's slicers open with, from a per-report ODCS contract that `fab-test pbir contract init` builds with the developer or their agent.
 
 **Decisions** (recorded 2026-11-14 at discovery review, journey [pbir-slicer-default-state.yaml](../plan/story-map/pbir-slicer-default-state.yaml)):

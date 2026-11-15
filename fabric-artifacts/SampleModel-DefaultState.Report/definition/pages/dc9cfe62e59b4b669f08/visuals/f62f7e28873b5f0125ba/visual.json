@@ -1,12 +1,12 @@
 {
-  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.9.0/schema.json",
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.14.0/schema.json",
   "name": "f62f7e28873b5f0125ba",
   "position": {
     "x": 288,
     "y": 144,
-    "width": 968,
-    "height": 552,
     "z": 7000,
+    "height": 552,
+    "width": 968,
     "tabOrder": 7000
   },
   "visual": {
@@ -27,7 +27,8 @@
                 }
               },
               "queryRef": "DateDim.Year",
-              "nativeQueryRef": "Year"
+              "nativeQueryRef": "Year",
+              "active": true
             }
           ]
         },
@@ -45,21 +46,8 @@
                 }
               },
               "queryRef": "MarvelFact.Number of Characters",
-              "nativeQueryRef": "Number of Characters"
-            },
-            {
-              "field": {
-                "Measure": {
-                  "Expression": {
-                    "SourceRef": {
-                      "Entity": "MarvelFact"
-                    }
-                  },
-                  "Property": "Running Total of Character Appearances"
-                }
-              },
-              "queryRef": "MarvelFact.Running Total of Character Appearances",
-              "nativeQueryRef": "Running Total of Character Appearances"
+              "nativeQueryRef": "Number of Characters",
+              "displayName": "Number of Characters"
             }
           ],
           "fieldParameters": [
@@ -75,10 +63,28 @@
                 }
               },
               "index": 0,
-              "length": 2
+              "length": 1
             }
           ]
         }
+      },
+      "sortDefinition": {
+        "sort": [
+          {
+            "field": {
+              "Measure": {
+                "Expression": {
+                  "SourceRef": {
+                    "Entity": "MarvelFact"
+                  }
+                },
+                "Property": "Number of Characters"
+              }
+            },
+            "direction": "Descending"
+          }
+        ],
+        "isDefaultSort": true
       }
     },
     "visualContainerObjects": {

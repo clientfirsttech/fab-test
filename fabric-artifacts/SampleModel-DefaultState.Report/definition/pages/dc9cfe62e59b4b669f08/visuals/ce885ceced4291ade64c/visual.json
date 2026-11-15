@@ -1,12 +1,12 @@
 {
-  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.9.0/schema.json",
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.14.0/schema.json",
   "name": "ce885ceced4291ade64c",
   "position": {
     "x": 24,
-    "width": 240,
     "y": 24,
-    "height": 80,
     "z": 1000,
+    "height": 80,
+    "width": 240,
     "tabOrder": 1000
   },
   "visual": {
@@ -27,7 +27,8 @@
                 }
               },
               "queryRef": "AlignmentDim.Alignment",
-              "nativeQueryRef": "Alignment"
+              "nativeQueryRef": "Alignment",
+              "active": true
             }
           ]
         }
@@ -100,7 +101,7 @@
                           [
                             {
                               "Literal": {
-                                "Value": "'Good'"
+                                "Value": "'Bad'"
                               }
                             }
                           ]

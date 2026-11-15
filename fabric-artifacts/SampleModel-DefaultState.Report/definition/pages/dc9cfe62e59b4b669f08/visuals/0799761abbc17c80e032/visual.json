@@ -1,12 +1,12 @@
 {
-  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.9.0/schema.json",
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.14.0/schema.json",
   "name": "0799761abbc17c80e032",
   "position": {
     "x": 24,
-    "width": 240,
     "y": 440,
-    "height": 80,
     "z": 4000,
+    "height": 80,
+    "width": 240,
     "tabOrder": 4000
   },
   "visual": {
@@ -27,7 +27,8 @@
                 }
               },
               "queryRef": "Fiscal Calendar.Half Year",
-              "nativeQueryRef": "Half Year"
+              "nativeQueryRef": "Half Year",
+              "active": true
             }
           ]
         }
@@ -100,7 +101,7 @@
                           [
                             {
                               "Literal": {
-                                "Value": "'2026 H2'"
+                                "Value": "'2025 H2'"
                               }
                             }
                           ]
