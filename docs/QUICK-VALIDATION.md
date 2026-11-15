@@ -147,6 +147,15 @@ fab-test bpa --open-report
 
 `--open-report` implies `--report` and opens the produced report (or, whenever more than one artifact ran — `fab-test all`, or one analyzer against several artifacts — the run's `index.html`) in your default browser once the run finishes — skip the "find it in Explorer, double-click" step. This is a local convenience only: it is automatically suppressed under CI (falls back to printing the path), so there is no reason to add it to a pipeline YAML.
 
+### Check slicer defaults
+
+A report with a slicer contract beside it (`<Report>.Report.odcs.yaml`) has its slicer defaults checked by every `fab-test pbir` run. Build one with `fab-test pbir contract init <path to .Report>`; see [SLICER-CONTRACTS.md](SLICER-CONTRACTS.md).
+
+```bash
+fab-test pbir --artifact SampleModel-DefaultState                 # CONTRACT.* findings name the page, field, actual and expected
+fab-test pbir --artifact SampleModel-DefaultState --as-of 2027-01-15   # what a calendar-driven default will expect then
+```
+
 ### Naming what to test
 
 Every analyzer subcommand takes an optional target. Omit it and `fab-test` discovers everything matching. The grammar matches `pql-test` and the Fabric CLI, so a target pasted from either works unchanged.

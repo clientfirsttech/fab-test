@@ -16,7 +16,7 @@ every command in this README are unchanged.
 
 ### From PyPI (beta)
 
-The current release is the beta `1.10.0b1`. pip skips pre-releases unless you
+The current release is the beta `1.10.0b2`. pip skips pre-releases unless you
 pass `--pre` or name the version, so a bare `pip install cft-fab-test` finds
 nothing until the first final release.
 
@@ -24,7 +24,7 @@ nothing until the first final release.
 python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
 
-pip install --pre cft-fab-test          # or pin it: "cft-fab-test==1.10.0b1"
+pip install --pre cft-fab-test          # or pin it: "cft-fab-test==1.10.0b2"
 
 fab-test --version
 ```
@@ -444,6 +444,20 @@ playwright_user_name: analyst@contoso.com
 With a user configured, an RLS-secured model's roles are discovered and tested
 under one embed token each. `PLAYWRIGHT_USER_NAME` still wins over the file, and
 a case with no role embeds with no identity at all.
+
+### Checking what a report's slicers open with
+
+A slicer contract (`<Report>.Report.odcs.yaml`, beside the report) states the
+values each slicer is preselected with, fixed or following the calendar (the
+current semester). `fab-test pbir` checks it with the packaged rules;
+`fab-test pbir contract init` builds it by asking about each slicer.
+
+```bash
+fab-test pbir contract init fabric-artifacts/SampleModel-DefaultState.Report
+fab-test pbir --artifact SampleModel-DefaultState --as-of 2027-01-15
+```
+
+See [docs/SLICER-CONTRACTS.md](docs/SLICER-CONTRACTS.md).
 
 ### Validating a paginated (RDL) report
 

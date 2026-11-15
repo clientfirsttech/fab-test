@@ -6,6 +6,12 @@
 | `scripts/fab_test_registry.py` | Analyzer registry tables, scopes, and artifact discovery |
 | `scripts/_run_targets.py` | Target resolution for a run: workspace and `WS.Workspace/NAME` targets, `--from-workspace` reports, and the target recorded in `run.json` |
 | `scripts/_readiness.py` | Tool resolution and readiness: `resolve_tool`, `preflight_error`, `check_readiness` (what `doctor`, `explain` and every run consult) |
+| `scripts/_slicer_contract.py` | Reads a slicer contract (ODCS `engine: fab-test` rules), reporting every mistake by JSON path; `dax_literal` |
+| `scripts/_slicer_calendar.py` | Resolves calendar-driven expected values from `--as-of` and the contract's `fabTestCalendar`; nothing is evaluated |
+| `scripts/_slicer_rules.py` | Compiles slicer expectations into page-scoped PBIR Inspector JSON Logic rules |
+| `scripts/_slicer_contract_run.py` | `--contract`/`--as-of`, the exit-2 prepare step, and pairing a report with its contract by logicalId |
+| `scripts/_slicer_contract_init.py` | `fab-test pbir contract init`: questions as data, `--answers`, create-or-append |
+| `scripts/_pbir_slicers.py` | Reads a PBIR report's slicers and decodes what each opens with |
 | `scripts/_command_builders.py` | Per-analyzer command builders (`build_<name>_command`, `_COMMAND_BUILDERS`, `build_command`) and the rule-overlay path resolvers |
 | `scripts/invoke_tabular_editor_bpa.py` | BPA subprocess wrapper |
 | `scripts/invoke_pbir_inspector.py` | PBIR Inspector subprocess wrapper |
