@@ -27,7 +27,7 @@ Every selection below was last saved by Power BI Desktop (2026-11-14), so each s
 |---|---|---|---|
 | Standard Slicers | `ce885ceced4291ade64c` | `slicer` Dropdown | Alignment = Bad |
 | Standard Slicers | `9eded2e3c22f3f38a082` | `slicer` Basic, multi-select | Eye Color = Black, Compound |
-| Standard Slicers | `012e790c5b0c7c36c739` | `slicer` Dropdown, calendar column | Fiscal Semester cleared (All) |
+| Standard Slicers | `012e790c5b0c7c36c739` | `slicer` Dropdown, calendar column | Fiscal Semester = FY27-S1, the current semester on 2026-11-14 |
 | Standard Slicers | `0799761abbc17c80e032` | `slicer` Dropdown, single select, calendar column | Half Year = 2025 H2, a year behind the current 2026 H2 |
 | Standard Slicers | `bfe1bd2eb570a144b258` | `slicer` Dropdown | Year = 1940 (its header still reads "no default") |
 | Standard Slicers | `b84126137973afa03196` | `slicer` Basic, field parameter | Chart Measure = Number of Characters |
@@ -45,7 +45,8 @@ Every selection below was last saved by Power BI Desktop (2026-11-14), so each s
 - **Relative** stores a `Between` of `DateSpan(DateAdd(Now, n, TimeUnit))`; `TimeUnit` 0 is day, 2 is month, 3 is year. A calendar period ends at the previous whole period (`-1`).
 - **Date picker** (`RelativeDatePicker`) stores either the relative shape or, for a range picked on the calendar, the same `And` of `>=` / `<` as Between.
 - **Input slicer** (`textSlicer`) stores `Contains` per typed value, with the operator in `dropdown.filterMode`; no `selectedValues`.
-- On save Desktop adds `"active": true` to slicer projections, and gives the list, date and input slicers an empty `Categorical` `filterConfig` entry for their own field. The packaged `NO_VISUAL_LEVEL_FILTERS_*` rules flag that entry (see plan.md).
+- On save Desktop adds `"active": true` to slicer projections, and gives the list, date and input slicers an empty `Categorical` `filterConfig` entry for their own field. The packaged `NO_VISUAL_LEVEL_FILTERS_*` rules flag that entry while the filter pane is visible, so the test bed hides the pane (`report.json` `outspacePane.visible: false`).
+- **Two slicers on one table filter each other.** Fiscal Semester and Half Year both read `Fiscal Calendar`, so without the page's `visualInteractions` (`NoFilter` both ways) each could only offer values consistent with the other's selection.
 
 ## Artifact Detection
 

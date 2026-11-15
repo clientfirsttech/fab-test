@@ -4,5 +4,17 @@
   "displayName": "Standard Slicers",
   "displayOption": "FitToPage",
   "height": 720,
-  "width": 1280
+  "width": 1280,
+  "visualInteractions": [
+    {
+      "source": "012e790c5b0c7c36c739",
+      "target": "0799761abbc17c80e032",
+      "type": "NoFilter"
+    },
+    {
+      "source": "0799761abbc17c80e032",
+      "target": "012e790c5b0c7c36c739",
+      "type": "NoFilter"
+    }
+  ]
 }
