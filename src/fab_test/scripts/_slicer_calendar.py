@@ -53,7 +53,7 @@ def calendar_fields(as_of: datetime.date, calendar: dict[str, Any] | None) -> di
 
 def resolve_contract(contract: SlicerContract, as_of: datetime.date) -> list[SlicerExpectation]:
     """The contract's expectations with every calendar format string filled in for ``as_of``."""
-    _validate_calendar(contract.calendar)
+    validate_calendar(contract.calendar)
     fields = calendar_fields(as_of, contract.calendar)
     errors: list[str] = []
     resolved = [_resolve_expectation(e, fields, errors) for e in contract.expectations]
@@ -66,7 +66,7 @@ def resolve_contract(contract: SlicerContract, as_of: datetime.date) -> list[Sli
     return resolved
 
 
-def _validate_calendar(calendar: Any) -> None:
+def validate_calendar(calendar: Any) -> None:
     if calendar is None:
         return
     if not isinstance(calendar, dict):

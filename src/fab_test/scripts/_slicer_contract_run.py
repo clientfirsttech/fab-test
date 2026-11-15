@@ -42,6 +42,8 @@ class ResolvedContract:
 
 
 def add_contract_flags(parser: argparse.ArgumentParser) -> None:
+    parser.epilog = ("Slicer defaults: a report pairs with the *.odcs.yaml beside it. "
+                     "Build one with `fab-test pbir contract init REPORT` (see its --help).")
     parser.add_argument("--contract", default=None, metavar="FILE",
                         help="Slicer contract to check every report in the run against, "
                              f"instead of pairing each report with a *{CONTRACT_SUFFIX} by its logicalId")
@@ -101,7 +103,7 @@ def _resolve(path: Path, as_of: datetime.date) -> ResolvedContract:
     return ResolvedContract(path, contract.report_logical_id, as_of, resolve_contract(contract, as_of))
 
 
-def _logical_id(report: Path) -> str | None:
+def report_logical_id(report: Path) -> str | None:
     try:
         return json.loads((report / ".platform").read_text(encoding="utf-8-sig"))["config"]["logicalId"]
     except (OSError, ValueError, KeyError, TypeError):
@@ -112,7 +114,7 @@ def apply_slicer_contract(report: Path, args: argparse.Namespace, output_dir: Pa
                           rules_path: Path) -> tuple[Path, Path | None]:
     """(rules file, contract summary file) for ``report``: unchanged when no contract pairs with it."""
     contract = getattr(args, "explicit_contract", None) or getattr(args, "slicer_contracts", {}).get(
-        _logical_id(report))
+        report_logical_id(report))
     if contract is None:
         return rules_path, None
     folder = output_dir / "pbir" / results_stem(report)

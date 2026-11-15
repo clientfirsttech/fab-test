@@ -156,3 +156,21 @@ def test_given_a_report_without_a_contract_should_run_unchanged(inspector, tmp_p
 
     assert "contract" not in _envelope(root)
     assert _failed(root) == set()
+
+
+def test_given_a_contract_built_by_init_should_pass_the_report_it_came_from(inspector, tmp_path):
+    root = _bed(tmp_path, None)
+    answers = tmp_path / "answers.json"
+    answers.write_text(json.dumps({"standard-slicers-fiscal-semester": "calendar"}), encoding="utf-8")
+    env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
+    init = subprocess.run(
+        [sys.executable, "-m", "fab_test.scripts.fab_test", "pbir", "contract", "init",
+         str(root / TEST_BED.name), "--as-of", "2026-11-14", "--answers", str(answers)],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert init.returncode == 0, init.stderr
+
+    result = _run(root)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert _failed(root) == set()
