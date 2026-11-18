@@ -92,6 +92,31 @@ CONTRACT.page-1-navigator  error  Page 1  the bookmark navigator opens with [Boo
 
 Renaming or deleting the bookmark fails too ("the report has no bookmark by that name"), and so does removing the navigator from the page.
 
+### How the contract maps to PBIR
+
+The contract names things the way Power BI shows them, not the way the saved files store them. Where PBIR has a readable name, the contract keeps it:
+
+| Contract | PBIR (enhanced report format) |
+|---|---|
+| `schema[].name`, `properties[].name` | the slicer's bound field: `SourceRef.Entity`, `Property` |
+| `relative: {range, duration, period}` | `relativeRange`, `relativeDuration`, `relativePeriod` |
+| `relative` values `Last`, `20`, `Calendar Months` | the same literals: `'Last'`, `20D`, `'Calendar Months'` |
+| `contains: [Wolverine]` | the input slicer's `Contains` condition |
+
+Where PBIR stores state as a filter expression or an internal id, the contract uses what's on screen:
+
+| Contract | PBIR stores | Why |
+|---|---|---|
+| `selected: [Bad]` | `filter.Where[].Condition.In.Values` (`'Bad'`) | a selection has no PBIR name, only an `In` filter |
+| `selected: all` | `isInvertedSelectionMode` `true`, with no filter or a `Not In []` | "Select all" is what you see |
+| `selected: []` | no `Where` rows | |
+| `range: {from, to}` | `Comparison`, `ComparisonKind` 2 (≥) and 3 (<) | `to` is **inclusive**, as Desktop shows it; PBIR stores the next day, exclusive |
+| field parameter `selected: [Number of Characters]` | the hidden Fields column's value; the name is in `filterExpressionMetadata.valueMap` | the name you see |
+| `page: Standard Slicers` | the page folder's id, with `displayName` in `page.json` | ids change when a page is copied |
+| navigator `selected: Bookmark 2` | `selectedBookmark` = `'9c65f6aa324d70ac0e33'`, the bookmark's `name` | display name, as for pages |
+
+The slicer's `mode` (`'Basic'`, `'Dropdown'`, `'Between'`, `'Relative'`, `'RelativeDatePicker'`) isn't in the contract: a dropdown and a list with the same selection open the same way, so they pass the same rule.
+
 ## 4. Catch the rollover on a schedule
 
 A semester changes with no commit, so a pipeline that only runs on push never notices. Run `fab-test pbir` on a schedule as well; see [`examples/github-actions/slicer-defaults.yml`](examples/github-actions/slicer-defaults.yml) and [`examples/azure-devops/slicer-defaults.yml`](examples/azure-devops/slicer-defaults.yml).

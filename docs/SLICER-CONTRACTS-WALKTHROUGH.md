@@ -9,6 +9,37 @@ You will:
 3. Run `fab-test pbir` to check it, then break a slicer to see it caught.
 4. Commit the contract and run the check in CI, on a schedule too.
 
+```mermaid
+flowchart TD
+    A["Step 1: set the opening state in Power BI Desktop<br/>slicers, and each bookmark navigator's highlight"] --> B["Save the .pbip (PBIR format)"]
+    B --> C{"Step 2: who answers?"}
+
+    C -->|"A person"| D["fab-test pbir contract init Sales.Report"]
+    C -->|"An agent or script"| E["init --questions --format json<br/>a person confirms anything needs_human"]
+    E --> F["init --answers answers.json"]
+
+    D --> G{"Each slicer: what does it open with?"}
+    F --> G
+    G -->|"A shape a rule can't check:<br/>Select all then untick, hierarchy, several columns"| H["skip"]
+    G -->|"Today's period, e.g. FY27-S1"| J["keep, current or skip"]
+    G -->|"Anything else: Bad, Select all,<br/>nothing ticked, a range, a stale period"| I["keep or skip"]
+    J -->|"current"| K["Fiscal year: start month and naming"]
+
+    H --> L{"Each page's bookmark navigator:<br/>does its bookmark resolve?"}
+    I --> L
+    J -->|"keep or skip"| L
+    K --> L
+    L -->|"Navigators differ, bookmark deleted,<br/>or a display name two bookmarks share"| M["skip"]
+    L -->|"Yes, or nothing preselected"| N["keep or skip"]
+
+    M --> O["Written only if it reads back as a valid contract:<br/>Sales.Report.odcs.yaml beside the report"]
+    N --> O
+    O --> P["Step 3: read it, and optionally<br/>pql-test contract lint Sales.Report.odcs.yaml Sales.SemanticModel"]
+    P --> Q["Step 4: fab-test pbir --artifact Sales<br/>every CONTRACT.* rule passes"]
+    Q --> R["Step 5: break a slicer in Desktop, save, re-run:<br/>a CONTRACT.* finding. Undo it."]
+    R --> S["Step 6: commit report and contract together;<br/>CI runs on every push and weekly"]
+```
+
 ## Before you start
 
 - **A Power BI Project in PBIR format.** In Power BI Desktop, *File → Save as → Power BI Project (.pbip)*, with the PBIR report format turned on. You should see a `<Name>.Report/definition/pages/` folder. A `.pbix`, or a `.Report` folder with only `report.json`, won't work.
