@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-11-17
+
+- 💄 - `contract init` Asks About The Current Period, Only When There Is One - Every slicer with ticked values was offered "follow the calendar", including ones like `Alignment = Bad` that no date can produce; answering it failed only after every question, and the word didn't say what it did. `current` ("follow the current period") is now offered only when a known period format reproduces today's value, and the prompt names the format it recognised; anything else gets keep or skip. Answers files can still say `calendar` or `{"calendar": "<format>"}`, and `{"current": "<format>"}` still names a format for a label `init` doesn't know. The contract YAML is unchanged.
+
 ## 2026-11-15
 
 - ✨ - Slicer Contracts Tell "Select all" From Nothing Ticked - Both show every row, so a contract couldn't say which one a report opens with: `init` read a "Select all" slicer as `selected: []`, and `selected: []` passed it. `selected: all` now expects "Select all" ticked (inverted selection mode with nothing unticked, whether Desktop writes no filter or `Not In []`), `selected: []` now also requires the mode off, and each fails the other with "opens with [Select all]" or "opens with [no selection]". `init` asks about a "Select all" slicer and writes `all`. Before, a contract that `init` built from a "Select all" slicer passed one that had been cleared.

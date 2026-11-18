@@ -85,7 +85,9 @@ ContractInit {
     4. fab-test pbir contract init REPORT --answers FILE [--dry-run]
   }
   (no terminal and no --answers) => exit 2 naming --questions and --answers   // never waits for input
-  answer per slicer = keep | calendar | skip | {"calendar": "<format>"}
+  answer per slicer = keep | current | skip | {"current": "<format>"}   // `calendar` still accepted for `current`
+  current is offered (choices) only when a known period format reproduces today's value; the question's
+  calendar_format names it. A label init doesn't recognise can still take {"current": "<format>"}
   answer per bookmark navigator (question has kind: navigator) = keep | skip   // skip only when two on a page differ or one preselects a deleted bookmark
   answer for calendar.fiscal_year_start_month = 1..12; calendar.fiscal_year_named_by = start | end
   (an existing contract) => adds rules for uncovered slicers; keeps every rule it has; --force replaces a differing rule's implementation only (severity and other keys stay)

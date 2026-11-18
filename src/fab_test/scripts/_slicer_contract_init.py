@@ -7,10 +7,11 @@ The questions are data, so all three callers get the same ones:
   decide, and applies the answers with `--answers FILE`
 - with no terminal and no answers the command exits 2 and never waits
 
-Per slicer the answer is `keep` (check today's selection), `calendar` (follow
-the calendar, with the suggested format) or `{"calendar": "<format>"}`, or
-`skip`; a slicer with nothing ticked or "Select all" is offered `keep`/`skip`,
-and one a rule can't check only `skip`. Each page's bookmark navigator (a
+Per slicer the answer is `keep` (check today's selection), `current` (follow
+the current period, with the format `init` recognised) or `{"current": "<format>"}`,
+or `skip`; `calendar` is accepted for `current`. `current` is offered only when a
+known period format reproduces today's value; otherwise `keep`/`skip`, and a
+selection a rule can't check only `skip`. Each page's bookmark navigator (a
 question with `kind: navigator`) is `keep` or `skip`. A missing answer takes
 the suggestion. The contract is written beside the report
 as `<Report>.Report.odcs.yaml`, and only after it reads back the way
@@ -39,7 +40,7 @@ from ._slicer_calendar import FIELDS, CalendarError, calendar_fields, resolve_co
 from ._slicer_contract import ENGINE, SELECT_ALL, ContractError, parse_contract
 from ._slicer_contract_run import CONTRACT_SUFFIX, report_logical_id
 
-CHOICES = ("keep", "calendar", "skip")
+_CURRENT = ("current", "calendar")  # `calendar` is the answer's first name, still accepted
 _START = "calendar.fiscal_year_start_month"
 _NAMED_BY = "calendar.fiscal_year_named_by"
 _CALENDAR_PROPERTY = "fabTestCalendar"
@@ -164,17 +165,15 @@ def _slicer_question(slicer: Slicer, rule_id: str, as_of: datetime.date) -> dict
                                       "which a contract can't check. Skip it?",
                 "choices": ["skip"], "suggested": "skip", "needs_human": False}
     [value] = slicer.current.values()
-    if value in ([], SELECT_ALL):  # nothing to follow the calendar
-        return {**question, "prompt": f"{slicer.page}: {field} opens with {_show(slicer.current)}. "
-                                      "Keep checking that or skip it?",
+    shown = _show(slicer.current)
+    suggestion = None if value in ([], SELECT_ALL) else _calendar_suggestion(slicer.current, as_of)
+    if not suggestion:  # not today's period, so only `keep` makes sense
+        return {**question, "prompt": f"{slicer.page}: {field} opens with {shown}. Keep checking that or skip it?",
                 "choices": ["keep", "skip"], "suggested": "keep", "needs_human": False}
-    question.update(prompt=f"{slicer.page}: {field} opens with {_show(slicer.current)}. "
-                           "Keep checking that, follow the calendar, or skip it?",
-                    choices=list(CHOICES), suggested="keep", needs_human=False)
-    suggestion = _calendar_suggestion(slicer.current, as_of)
-    if suggestion:
-        question.update(suggested="calendar", calendar_format=suggestion[0], needs_human=True, _starts=suggestion[1])
-    return question
+    return {**question, "prompt": f"{slicer.page}: {field} opens with {shown}, which looks like the current period "
+                                  f"({suggestion[0]}). Keep {shown} always, follow the current period, or skip it?",
+            "choices": ["keep", "current", "skip"], "suggested": "current", "needs_human": True,
+            "calendar_format": suggestion[0], "_starts": suggestion[1]}
 
 
 def _show(current: dict) -> str:
@@ -229,12 +228,11 @@ def _ask(questions: list[dict]) -> dict[str, Any]:
     """Ask on stderr, so stdout stays one document under --format json; re-ask until an answer is valid."""
     answers: dict[str, Any] = {}
     for q in questions:
-        if q["id"] in (_START, _NAMED_BY) and "calendar" not in answers.values():
+        if q["id"] in (_START, _NAMED_BY) and "current" not in answers.values():
             continue
-        hint = f" (format {q['calendar_format']})" if q.get("calendar_format") else ""
         valid = [str(c) for c in q.get("choices", range(1, 13))]
         while True:
-            print(f"{q['prompt']}{hint}\n  [{'/'.join(valid)}] default {q['suggested']}: ", end="", file=sys.stderr)
+            print(f"{q['prompt']}\n  [{'/'.join(valid)}] default {q['suggested']}: ", end="", file=sys.stderr)
             try:
                 typed = input().strip()
             except EOFError:
@@ -252,11 +250,12 @@ def _rule(q: dict, answer: Any) -> tuple[dict[str, Any] | None, bool]:
         return None, False
     if "unsupported" in q["current"]:
         raise InitError(f"{q['id']}: {q['current']['unsupported']}; the only answer is skip")
-    if answer == "calendar" or isinstance(answer, dict):
-        text = answer.get("calendar") if isinstance(answer, dict) else q.get("calendar_format")
+    if answer in _CURRENT or isinstance(answer, dict):
+        text = next((answer[k] for k in _CURRENT if k in answer), None) if isinstance(answer, dict) \
+            else q.get("calendar_format")
         if not isinstance(text, str) or not text:
-            raise InitError(f"{q['id']}: no calendar format reproduces {_show(q['current'])} today; "
-                            'answer {"calendar": "<format>"} to name one')
+            raise InitError(f"{q['id']}: no period format reproduces {_show(q['current'])} today; "
+                            'answer {"current": "<format>"} to name one')
         implementation = {"page": q["page"], "selected": [text]}
         calendar = True
     elif answer == "keep":
@@ -264,7 +263,7 @@ def _rule(q: dict, answer: Any) -> tuple[dict[str, Any] | None, bool]:
         implementation = {"page": q["page"], check: _escaped(value) if check in ("selected", "contains") else value}
         calendar = False
     else:
-        raise InitError(f"{q['id']}: answer must be keep, calendar, skip or {{\"calendar\": \"<format>\"}}, "
+        raise InitError(f"{q['id']}: answer must be keep, current, skip or {{\"current\": \"<format>\"}}, "
                         f"got {answer!r}")
     return {"id": q["id"], "type": "custom", "engine": ENGINE, "implementation": implementation}, calendar
 

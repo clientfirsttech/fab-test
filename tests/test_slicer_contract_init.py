@@ -73,7 +73,7 @@ def test_given_questions_as_json_should_list_every_slicer_with_its_current_selec
     assert questions["empty-and-all-eye-color"]["current"] == {"selected": "all"}
     assert "opens with Select all." in questions["empty-and-all-eye-color"]["prompt"]
     assert "opens with no selection." in questions["empty-and-all-alignment"]["prompt"]
-    assert questions["empty-and-all-alignment"]["choices"] == ["keep", "skip"]  # no value to follow the calendar
+    assert questions["empty-and-all-alignment"]["choices"] == ["keep", "skip"]  # no value to be a period
     assert questions["empty-and-all-eye-color"]["choices"] == ["keep", "skip"]
     assert all(q["choices"][0] == "keep" and q["suggested"] for q in questions.values() if "page" in q)
     assert "Keep checking that or skip it?" in questions["empty-and-all-eye-color"]["prompt"]
@@ -86,7 +86,7 @@ def test_given_a_current_calendar_value_should_suggest_a_format_and_a_calendar_t
     questions = {q["id"]: q for q in _questions(report, capsys)["questions"]}
 
     semester = questions[SEMESTER]
-    assert semester["suggested"] == "calendar" and semester["needs_human"] is True
+    assert semester["suggested"] == "current" and semester["needs_human"] is True
     assert semester["calendar_format"] == "FY{fiscal_year_short}-S{fiscal_semester}"
     start = questions["calendar.fiscal_year_start_month"]
     assert start["suggested"] == 7 and 7 in start["reproduces"] and start["needs_human"] is True
@@ -397,3 +397,49 @@ def test_given_an_edited_navigator_entry_should_keep_it_unless_forced(tmp_path, 
     assert kept[NAVIGATOR].selected == "Bookmark 1"
     assert (code, forced[NAVIGATOR].selected, forced[NAVIGATOR].severity) == (0, "Bookmark 2", "warning")
     assert NAVIGATOR in json.loads(out)["replaced"]
+
+
+@pytest.mark.pbir
+def test_given_a_current_period_should_offer_current_and_show_the_format_it_recognised(tmp_path, capsys):
+    semester = {q["id"]: q for q in _questions(_bed(tmp_path), capsys)["questions"]}[SEMESTER]
+
+    assert (semester["choices"], semester["suggested"]) == (["keep", "current", "skip"], "current")
+    assert semester["prompt"] == (
+        "Standard Slicers: 'Fiscal Calendar'[Fiscal Semester] opens with FY27-S1, which looks like the current "
+        "period (FY{fiscal_year_short}-S{fiscal_semester}). Keep FY27-S1 always, follow the current period, "
+        "or skip it?")
+
+
+@pytest.mark.pbir
+@pytest.mark.parametrize("rule_id", ["standard-slicers-alignment",   # Bad is no period
+                                     "standard-slicers-half-year"])  # 2025 H2 is a period, but not today's
+def test_given_a_value_that_isnt_todays_period_should_offer_only_keep_or_skip(tmp_path, capsys, rule_id):
+    question = {q["id"]: q for q in _questions(_bed(tmp_path), capsys)["questions"]}[rule_id]
+
+    assert (question["choices"], question["suggested"]) == (["keep", "skip"], "keep")
+    assert question["prompt"].endswith(". Keep checking that or skip it?") and "calendar_format" not in question
+
+
+@pytest.mark.pbir
+@pytest.mark.parametrize("answer", ["current", "calendar", {"current": "FY{fiscal_year_short}-S{fiscal_semester}"},
+                                    {"calendar": "FY{fiscal_year_short}-S{fiscal_semester}"}])
+def test_given_current_or_the_older_calendar_answer_should_follow_the_current_period(tmp_path, capsys, answer):
+    report = _bed(tmp_path)
+
+    code, _out, err = _run(report, capsys, "--answers", _answers(tmp_path, {SEMESTER: answer}))
+
+    assert code == 0, err
+    [rule] = [e for e in load_contract(_contract_path(report)).expectations if e.rule_id == SEMESTER]
+    assert rule.expected == ["FY{fiscal_year_short}-S{fiscal_semester}"]
+
+
+@pytest.mark.pbir
+def test_given_current_for_a_value_that_isnt_a_period_should_exit_2_saying_how_to_name_a_format(tmp_path, capsys):
+    report = _bed(tmp_path)
+
+    code, _out, err = _run(report, capsys, "--answers", _answers(tmp_path, {"standard-slicers-alignment": "current"}))
+
+    assert code == 2
+    assert ('standard-slicers-alignment: no period format reproduces Bad today; answer {"current": "<format>"} '
+            "to name one") in err
+    assert not _contract_path(report).exists()

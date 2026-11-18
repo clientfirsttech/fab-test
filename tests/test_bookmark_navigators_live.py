@@ -110,7 +110,7 @@ def test_given_a_preselection_added_where_none_was_agreed_should_fail(inspector,
 def test_given_a_contract_built_by_init_should_pass_every_navigator(inspector, tmp_path):  # noqa: F811
     root = _bed(tmp_path, None)
     answers = tmp_path / "answers.json"
-    answers.write_text(json.dumps({"standard-slicers-fiscal-semester": "calendar"}), encoding="utf-8")
+    answers.write_text(json.dumps({"standard-slicers-fiscal-semester": "current"}), encoding="utf-8")
     init = subprocess.run(
         [sys.executable, "-m", "fab_test.scripts.fab_test", "pbir", "contract", "init", str(root / TEST_BED.name),
          "--as-of", "2026-11-14", "--answers", str(answers)],

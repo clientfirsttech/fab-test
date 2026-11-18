@@ -53,10 +53,10 @@ fab-test pbir contract init "Sales.Report"
 `init` lists every slicer, page by page, and asks one question each. Press Enter to take the default in brackets.
 
 ```text
-Overview: 'Product'[Category] opens with Bikes. Keep checking that, follow the calendar, or skip it?
-  [keep/calendar/skip] default keep:
-Overview: 'Calendar'[Fiscal Semester] opens with FY27-S1. Keep checking that, follow the calendar, or skip it? (format FY{fiscal_year_short}-S{fiscal_semester})
-  [keep/calendar/skip] default calendar:
+Overview: 'Product'[Category] opens with Bikes. Keep checking that or skip it?
+  [keep/skip] default keep:
+Overview: 'Calendar'[Fiscal Semester] opens with FY27-S1, which looks like the current period (FY{fiscal_year_short}-S{fiscal_semester}). Keep FY27-S1 always, follow the current period, or skip it?
+  [keep/current/skip] default current:
 Overview: 'Region'[Region] opens with Select all. Keep checking that or skip it?
   [keep/skip] default keep:
 ```
@@ -64,10 +64,10 @@ Overview: 'Region'[Region] opens with Select all. Keep checking that or skip it?
 How to answer:
 
 - **keep**: check that the slicer always opens with exactly this. Use it for fixed agreements ("Alignment = Bad", "Select all", "nothing ticked").
-- **calendar**: the value should move with the date ("the current semester"). `init` suggests a format when today's value matches one it knows. `FY27-S1` becomes `FY{fiscal_year_short}-S{fiscal_semester}`, so from January the check expects `FY27-S2`. If it suggests nothing, the value isn't the current period: either it's meant to be fixed (answer keep), or it's stale and should be fixed in Desktop first.
+- **current**: the slicer should always open on the current period ("this semester"), so the expected value moves with the date. The contract stores a pattern, not the value: `FY27-S1` becomes `FY{fiscal_year_short}-S{fiscal_semester}`, so from January the check expects `FY27-S2`, and a report still on `FY27-S1` fails. With **keep** it would pass forever.
 - **skip**: don't check this slicer.
 
-Slicers with nothing ticked or "Select all" are offered only keep or skip, since they have no value to follow the calendar.
+**current** is offered only when `init` recognises the value as today's period. A value like `Bikes` or `Bad` isn't a period, so it gets keep or skip. Neither does a period label that's out of date (`2025 H2` in November 2026): if it's meant to follow the current period, fix it in Desktop first and run `init` again.
 
 Bookmark navigators come after the slicers, one question per page, also keep or skip:
 
@@ -76,7 +76,7 @@ Overview: the bookmark navigator opens with Home. Keep checking that or skip it?
   [keep/skip] default keep:
 ```
 
-If you answered **calendar** at least once, two more questions follow:
+If you answered **current** at least once, two more questions follow:
 
 ```text
 Which month does the fiscal year start in (1-12)?
@@ -101,7 +101,7 @@ fab-test pbir contract init "Sales.Report" --questions --format json > questions
 fab-test pbir contract init "Sales.Report" --answers answers.json
 ```
 
-`answers.json` maps question ids to answers, for example `{"overview-category": "keep", "overview-fiscal-semester": "calendar", "calendar.fiscal_year_start_month": 7}`. Anything left out takes the suggestion. The fiscal-calendar questions are always marked `needs_human`, so make sure a person confirms them.
+`answers.json` maps question ids to answers, for example `{"overview-category": "keep", "overview-fiscal-semester": "current", "calendar.fiscal_year_start_month": 7}`. Anything left out takes the suggestion. The fiscal-calendar questions are always marked `needs_human`, so make sure a person confirms them.
 
 ## Step 3: Read what it wrote
 

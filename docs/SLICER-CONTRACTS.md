@@ -15,17 +15,17 @@ fab-test pbir contract init fabric-artifacts/SampleModel-DefaultState.Report
 `init` finds every slicer, shows what it opens with today, and asks how to check it:
 
 ```
-Standard Slicers: 'AlignmentDim'[Alignment] opens with Bad. Keep checking that, follow the calendar, or skip it?
-  [keep/calendar/skip] default keep:
-Standard Slicers: 'Fiscal Calendar'[Fiscal Semester] opens with FY27-S1. ... (format FY{fiscal_year_short}-S{fiscal_semester})
-  [keep/calendar/skip] default calendar:
+Standard Slicers: 'AlignmentDim'[Alignment] opens with Bad. Keep checking that or skip it?
+  [keep/skip] default keep:
+Standard Slicers: 'Fiscal Calendar'[Fiscal Semester] opens with FY27-S1, which looks like the current period (FY{fiscal_year_short}-S{fiscal_semester}). Keep FY27-S1 always, follow the current period, or skip it?
+  [keep/current/skip] default current:
 ```
 
 - **keep** checks today's selection exactly.
-- **calendar** checks a value that follows the calendar. When the current value matches a known pattern for today, `init` suggests it: `FY27-S1` becomes `FY{fiscal_year_short}-S{fiscal_semester}`, which will expect `FY27-S2` from January.
+- **current** checks that the slicer opens on the current period, whatever the date. It's offered only when `init` recognises today's value as one: `FY27-S1` becomes `FY{fiscal_year_short}-S{fiscal_semester}`, which will expect `FY27-S2` from January. (`calendar`, its earlier name, is still accepted in an answers file.)
 - **skip** leaves the slicer out.
 
-Calendar answers also ask when your fiscal year starts and whether it is named by the year it starts or ends in. `init` suggests the answer that reproduces today's values; several months can, so check it.
+Answering current also asks when your fiscal year starts and whether it is named by the year it starts or ends in. `init` suggests the answer that reproduces today's values; several months can, so check it.
 
 Enter takes the suggestion. The contract is written beside the report, never inside it: Fabric deletes files inside a report folder that aren't part of the report.
 
