@@ -29,11 +29,11 @@ When the user invokes you with any of these phrases, execute the corresponding w
 | **help**, **list commands** | `aidd-please` | List all available AIDD commands |
 | **plan**, **what's next**, **priorities** | `aidd-please` | Review plan.md and suggest next steps |
 | **discover**, **user journey**, **user story** | `aidd-product-manager`, `aidd-please` | Interactive product discovery session |
-| **task**, **create epic**, **plan task** | `aidd-task-creator`, `aidd-please`, `aidd-tdd` | Plan and execute task epic with TDD |
+| **task**, **create epic**, **plan task** | `aidd-task-creator`, `aidd-please`, `aidd-tdd`, `aidd-python` | Plan and execute task epic with TDD |
 | **execute epic**, **run epic** | `aidd-task-creator`, `aidd-please` | Execute previously planned epic |
 | **review**, **code review** | `aidd-review`, `aidd-python`, `aidd-module-budgets`, `aidd-please` | Thorough code review |
 | **churn**, **hotspots**, **refactoring** | `aidd-churn`, `aidd-please` | Run hotspot analysis |
-| **fix bug**, **aidd fix** | `aidd-fix`, `aidd-please` | Fix bug with AIDD process |
+| **fix bug**, **aidd fix** | `aidd-fix`, `aidd-python`, `aidd-please` | Fix bug with AIDD process |
 | **user test**, **test script** | `aidd-user-testing`, `aidd-please` | Generate test scripts |
 | **run test**, **execute test** | `aidd-user-testing`, `aidd-please` | Execute AI agent test |
 | **log**, **log changes**, **changelog** | `aidd-log`, `aidd-please` | Document completed work |
