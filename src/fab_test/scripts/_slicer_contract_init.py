@@ -36,20 +36,20 @@ import yaml
 from ._bookmark_navigators import apply_navigator_answers, navigator_questions
 from ._pbir_slicers import Slicer, read_slicers
 from ._scan import find_artifact_dirs
-from ._slicer_calendar import FIELDS, CalendarError, calendar_fields, resolve_contract, today, validate_calendar
+from ._slicer_calendar import CalendarError, resolve_contract, today, validate_calendar
 from ._slicer_contract import ENGINE, SELECT_ALL, ContractError, parse_contract
 from ._slicer_contract_run import CONTRACT_SUFFIX, report_logical_id
-
-_START = "calendar.fiscal_year_start_month"
-_NAMED_BY = "calendar.fiscal_year_named_by"
-_CALENDAR_PROPERTY = "fabTestCalendar"
-_START_PREFERENCE = (1, 7, 10, 4, 2, 3, 5, 6, 8, 9, 11, 12)
-_FORMATS = (
-    "FY{fiscal_year_short}-S{fiscal_semester}", "FY{fiscal_year_short} S{fiscal_semester}",
-    "FY{fiscal_year_short}-Q{fiscal_quarter}", "FY{fiscal_year_short} Q{fiscal_quarter}",
-    "FY{fiscal_year}", "FY{fiscal_year_short}", "{year} H{half}", "{year}-H{half}", "H{half} {year}",
-    "{year} Q{quarter}", "{year}-Q{quarter}", "Q{quarter} {year}", "{year}-{month:02}",
-    "{year}", "{fiscal_year}",
+from ._slicer_init_calendar import (
+    NAMED_BY,
+    START,
+    existing_calendar,
+    fiscal_calendar,
+    fiscal_questions,
+    merge_calendar,
+    mismatch,
+    naming_prompt,
+    suggestion,
+    uses_fiscal,
 )
 
 
@@ -118,13 +118,9 @@ def build_questions(report: Path, as_of: datetime.date) -> dict[str, Any]:
         questions += navigator_questions(report, lambda text: _rule_id(text, used))
     except (OSError, ValueError) as exc:
         raise InitError(f"{report}: a page or visual file can't be read ({exc})") from exc
-    starts = [q.pop("_starts") for q in questions if q.get("_starts")]
-    reproduces = sorted(set.intersection(*map(set, starts))) if starts else list(range(1, 13))
-    suggested_start = next((m for m in _START_PREFERENCE if m in reproduces), 1)
-    questions.append({"id": _START, "prompt": "Which month does the fiscal year start in (1-12)?",
-                      "suggested": suggested_start, "reproduces": reproduces, "needs_human": bool(starts)})
-    questions.append({"id": _NAMED_BY, "prompt": "Is a fiscal year named by the calendar year it starts or ends in?",
-                      "choices": ["end", "start"], "suggested": "end", "needs_human": bool(starts)})
+    questions += fiscal_questions(questions, existing_calendar(_contract_path(report)))
+    for q in questions:
+        q.pop("_fits", None)
     return {"report": str(report), "contract": str(_contract_path(report)), "as_of": as_of.isoformat(),
             "questions": questions}
 
@@ -165,14 +161,14 @@ def _slicer_question(slicer: Slicer, rule_id: str, as_of: datetime.date) -> dict
                 "choices": ["skip"], "suggested": "skip", "needs_human": False}
     [value] = slicer.current.values()
     shown = _show(slicer.current)
-    suggestion = None if value in ([], SELECT_ALL) else _calendar_suggestion(slicer.current, as_of)
-    if not suggestion:  # not today's period, so only `keep` makes sense
+    suggested = None if value in ([], SELECT_ALL) else suggestion(slicer.current, as_of)
+    if not suggested:  # not today's period, so only `keep` makes sense
         return {**question, "prompt": f"{slicer.page}: {field} opens with {shown}. Keep checking that or skip it?",
                 "choices": ["keep", "skip"], "suggested": "keep", "needs_human": False}
     return {**question, "prompt": f"{slicer.page}: {field} opens with {shown}, which looks like the current period "
-                                  f"({suggestion[0]}). Keep {shown} always, follow the current period, or skip it?",
+                                  f"({suggested[0]}). Keep {shown} always, follow the current period, or skip it?",
             "choices": ["keep", "current", "skip"], "suggested": "current", "needs_human": True,
-            "calendar_format": suggestion[0], "_starts": suggestion[1]}
+            "calendar_format": suggested[0], "_fits": suggested[1]}
 
 
 def _show(current: dict) -> str:
@@ -184,25 +180,6 @@ def _show(current: dict) -> str:
     return json.dumps(value, default=str)
 
 
-def _calendar_suggestion(current: dict, as_of: datetime.date) -> tuple[str, list[int]] | None:
-    """The first format that reproduces a single current value today, and the fiscal starts that do."""
-    values = current.get("selected")
-    values = values if isinstance(values, list) else []  # `all` names no value
-    if len(values) != 1 or not isinstance(values[0], (str, int)) or isinstance(values[0], bool):
-        return None
-    for text in _FORMATS:
-        starts = [start for start in range(1, 13) if _renders(text, as_of, start) == values[0]]
-        if starts:
-            return text, starts
-    return None
-
-
-def _renders(text: str, as_of: datetime.date, start: int) -> Any:
-    fields = calendar_fields(as_of, {"fiscal_year_start_month": start, "fiscal_year_named_by": "end"})
-    bare = text[1:-1] if text.startswith("{") and text.endswith("}") and text.count("{") == 1 else None
-    return fields[bare] if bare in FIELDS else text.format_map(fields)
-
-
 def _answers(args: argparse.Namespace, questions: dict) -> dict[str, Any]:
     if args.answers:
         try:
@@ -212,35 +189,52 @@ def _answers(args: argparse.Namespace, questions: dict) -> dict[str, Any]:
         if not isinstance(given, dict):
             raise InitError(f"--answers {args.answers}: must be a JSON object of question id -> answer")
     elif sys.stdin.isatty():
-        given = _ask(questions["questions"])
+        given = _ask(questions["questions"], datetime.date.fromisoformat(questions["as_of"]))
     else:
         raise InitError("no terminal to ask on: run with --questions --format json to see the questions, "
                         "then pass --answers FILE (a JSON object of question id -> answer)")
     known = {q["id"]: q for q in questions["questions"]}
-    unknown = sorted(set(given) - set(known))
+    unknown = sorted(set(given) - set(known) - {START, NAMED_BY})
     if unknown:
         raise InitError(f"--answers names unknown question(s): {', '.join(unknown)}")
-    return {qid: given.get(qid, q["suggested"]) for qid, q in known.items()}
+    return {**{qid: given[qid] for qid in (START, NAMED_BY) if qid in given},
+            **{qid: given.get(qid, q["suggested"]) for qid, q in known.items()}}
 
 
-def _ask(questions: list[dict]) -> dict[str, Any]:
+def _ask(questions: list[dict], as_of: datetime.date) -> dict[str, Any]:
     """Ask on stderr, so stdout stays one document under --format json; re-ask until an answer is valid."""
     answers: dict[str, Any] = {}
     for q in questions:
-        if q["id"] in (_START, _NAMED_BY) and "current" not in answers.values():
+        if q["id"] in (START, NAMED_BY) and "current" not in [answers.get(i) for i in q["applies_to"]]:
             continue
-        valid = [str(c) for c in q.get("choices", range(1, 13))]
-        while True:
-            print(f"{q['prompt']}\n  [{'/'.join(valid)}] default {q['suggested']}: ", end="", file=sys.stderr)
-            try:
-                typed = input().strip()
-            except EOFError:
-                typed = ""
-            if not typed or typed in valid:
-                break
-            print(f"  '{typed}' isn't one of {', '.join(valid)}", file=sys.stderr)
-        answers[q["id"]] = (int(typed) if typed.isdigit() else typed) if typed else q["suggested"]
+        if q["id"] == NAMED_BY and answers[START] == 1:
+            answers[NAMED_BY] = "end"  # a January fiscal year is named the same either way
+            continue
+        prompt = naming_prompt(answers[START], as_of) if q["id"] == NAMED_BY else q["prompt"]
+        answers[q["id"]] = _ask_one(q, prompt)
     return answers
+
+
+def _ask_one(q: dict, prompt: str) -> Any:
+    valid = [str(c) for c in q.get("choices", range(1, 13))]
+    shown = "1-12" if "choices" not in q else "/".join(valid)
+    default = "" if q["suggested"] is None else f" default {q['suggested']}"
+    while True:
+        print(f"{prompt}\n  [{shown}]{default}: ", end="", file=sys.stderr)
+        try:
+            typed = input().strip()
+        except EOFError as exc:
+            if q["suggested"] is None:
+                raise InitError(f"{q['id']}: no answer, and it has no default") from exc
+            typed = ""
+        if typed in valid:
+            return int(typed) if typed.isdigit() else typed
+        if not typed and q["suggested"] is not None:
+            return q["suggested"]
+        if q["id"] == START and not typed:
+            print("  a fiscal year start month is needed: type 1-12", file=sys.stderr)
+        else:
+            print(f"  '{typed}' isn't one of {', '.join(valid) if 'choices' in q else '1-12'}", file=sys.stderr)
 
 
 def _rule(q: dict, answer: Any) -> tuple[dict[str, Any] | None, bool]:
@@ -276,9 +270,13 @@ def _escaped(values: list | str) -> list | str:
 def _write(args: argparse.Namespace, report: Path, questions: dict, answers: dict) -> int:
     built = [(q, *_rule(q, answers[q["id"]])) for q in questions["questions"] if "column" in q]
     rules = [(q, rule) for q, rule, _ in built if rule]
-    calendar = None
-    if any(follows for _, rule, follows in built if rule):
-        calendar = {"fiscal_year_start_month": answers[_START], "fiscal_year_named_by": answers[_NAMED_BY]}
+    fiscal_ids = [q["id"] for q, rule, follows in built
+                  if follows and uses_fiscal(rule["implementation"]["selected"][0])]
+    try:
+        calendar = fiscal_calendar(answers, fiscal_ids)
+    except ValueError as exc:
+        raise InitError(str(exc)) from exc
+    if calendar:
         validate_calendar(calendar)
     path = _contract_path(report)
     document, summary = _merge(path, report, rules, calendar, args.force)
@@ -287,9 +285,11 @@ def _write(args: argparse.Namespace, report: Path, questions: dict, answers: dic
     except ValueError as exc:
         raise InitError(str(exc)) from exc
     try:  # the file must read back exactly as `fab-test pbir` will read it
-        resolve_contract(parse_contract(document, path), datetime.date.fromisoformat(questions["as_of"]))
+        contract = parse_contract(document, path)
+        resolved = resolve_contract(contract, datetime.date.fromisoformat(questions["as_of"]))
     except (ContractError, CalendarError) as exc:
         raise InitError(f"the contract wouldn't be valid, so nothing was written:\n{exc}") from exc
+    _check_current(built, {e.rule_id: e.expected for e in resolved}, contract.calendar, summary)
     text = yaml.safe_dump(document, sort_keys=False, allow_unicode=True)
     if not args.dry_run:
         path.write_text(text, encoding="utf-8")
@@ -297,6 +297,18 @@ def _write(args: argparse.Namespace, report: Path, questions: dict, answers: dic
                   **({"content": text} if args.dry_run else {})},
            lambda s: text if args.dry_run else _summary_text(s))
     return 0
+
+
+def _check_current(built: list, expected: dict, fiscal: dict | None, summary: dict) -> None:
+    """Refuse a current-period rule the report doesn't open with today: stale, or the wrong fiscal year."""
+    written = set(summary["added"]) | set(summary["replaced"])
+    problems = [mismatch(q["id"], q["field"], ", ".join(map(str, expected[q["id"]])),
+                         ", ".join(map(str, q["current"]["selected"])), fiscal,
+                         uses_fiscal(rule["implementation"]["selected"][0]))
+                for q, rule, follows in built
+                if follows and q["id"] in written and expected[q["id"]] != q["current"]["selected"]]
+    if problems:
+        raise InitError("nothing was written:\n  " + "\n  ".join(problems))
 
 
 def _merge(path: Path, report: Path, rules: list, calendar: dict | None, force: bool):
@@ -311,7 +323,7 @@ def _merge(path: Path, report: Path, rules: list, calendar: dict | None, force: 
             raise InitError(f"{path} isn't a contract (not a YAML mapping); move it aside or fix it")
     else:
         document = _new_document(report)
-    summary["calendar"] = _merge_calendar(document, calendar, force)
+    summary["calendar"] = merge_calendar(document, calendar, force)
     for q, rule in rules:
         quality = _column(document, q["table"], q["column"])
         existing = next((r for r in quality if isinstance(r, dict) and r.get("id") == rule["id"]), None)
@@ -326,22 +338,6 @@ def _merge(path: Path, report: Path, rules: list, calendar: dict | None, force: 
         else:
             summary["kept"].append(rule["id"])
     return document, summary
-
-
-def _merge_calendar(document: dict, calendar: dict | None, force: bool) -> str | None:
-    if not calendar:
-        return None
-    properties = document.setdefault("customProperties", [])
-    existing = next((p for p in properties if isinstance(p, dict) and p.get("property") == _CALENDAR_PROPERTY), None)
-    if existing is None:
-        properties.append({"property": _CALENDAR_PROPERTY, "value": calendar})
-        return "added"
-    if existing.get("value") == calendar:
-        return "unchanged"
-    if force:
-        existing["value"] = calendar
-        return "replaced"
-    return "kept"
 
 
 def _new_document(report: Path) -> dict[str, Any]:

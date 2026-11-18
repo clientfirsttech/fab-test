@@ -22,6 +22,8 @@ ROOT = Path(__file__).resolve().parents[1]
 TEST_BED = ROOT / "fabric-artifacts" / "SampleModel-DefaultState.Report"
 AS_OF = "2026-11-14"
 SEMESTER = "standard-slicers-fiscal-semester"
+# The test bed's company fiscal year, as a person answers it; init never guesses one (test_slicer_init_calendar.py).
+FISCAL_YEAR = {"calendar.fiscal_year_start_month": 7, "calendar.fiscal_year_named_by": "end"}
 
 
 def _bed(tmp_path: Path) -> Path:
@@ -47,7 +49,7 @@ def _questions(report: Path, capsys) -> dict:
 
 def _answers(tmp_path: Path, answers: dict) -> str:
     path = tmp_path / "answers.json"
-    path.write_text(json.dumps(answers), encoding="utf-8")
+    path.write_text(json.dumps({**FISCAL_YEAR, **answers}), encoding="utf-8")
     return str(path)
 
 
@@ -89,7 +91,7 @@ def test_given_a_current_calendar_value_should_suggest_a_format_and_a_calendar_t
     assert semester["suggested"] == "current" and semester["needs_human"] is True
     assert semester["calendar_format"] == "FY{fiscal_year_short}-S{fiscal_semester}"
     start = questions["calendar.fiscal_year_start_month"]
-    assert start["suggested"] == 7 and 7 in start["reproduces"] and start["needs_human"] is True
+    assert start["suggested"] is None and 7 in start["reproduces"] and start["needs_human"] is True
     assert "calendar_format" not in questions["standard-slicers-half-year"]  # 2025 H2 is stale today
 
 
@@ -97,7 +99,8 @@ def test_given_a_current_calendar_value_should_suggest_a_format_and_a_calendar_t
 def test_given_suggested_answers_should_write_a_contract_the_reader_accepts_and_that_matches_today(
         tmp_path, capsys):
     report = _bed(tmp_path)
-    suggested = {q["id"]: q["suggested"] for q in _questions(report, capsys)["questions"]}
+    questions = _questions(report, capsys)["questions"]
+    suggested = {q["id"]: q["suggested"] for q in questions if q["suggested"] is not None}  # + the fiscal year
 
     code, _out, err = _run(report, capsys, "--answers", _answers(tmp_path, suggested))
 
@@ -136,9 +139,10 @@ def test_given_no_terminal_and_no_answers_should_exit_2_naming_both_flags(tmp_pa
 @pytest.mark.pbir
 def test_given_a_terminal_should_ask_and_take_the_suggestion_on_enter(tmp_path, capsys, monkeypatch):
     report = _bed(tmp_path)
+    asked = len(_questions(report, capsys)["questions"]) - 2  # every slicer and navigator; then the fiscal year
 
     code, out, err = _run(report, capsys, "--format", "json", monkeypatch=monkeypatch, tty=True,
-                          typed="maybe\nskip\n" + "\n" * 40)
+                          typed="maybe\nskip\n" + "\n" * (asked - 1) + "7\nend\n")
 
     assert code == 0
     ids = {e.rule_id for e in load_contract(_contract_path(report)).expectations}

@@ -70,7 +70,9 @@ Fields: `year`, `year_short`, `half`, `quarter`, `month`, `fiscal_year`, `fiscal
 - "Which month does your fiscal year start in?"
 - "Is the year that runs to <month before the start> 2027 called FY27 or FY26?" (the year it ends in is `end`; the year it starts in is `start`)
 
-Never take `suggested` for `calendar.fiscal_year_start_month`. On a given day several start months reproduce the same label, and the suggestion prefers 1, which is wrong for most fiscal years. On 2026-09-30, `FY26` fits start months 1, 10, 11 and 12. With 1, the check expects `FY26` until 31 December: it passes a report left on last year's value for three months, and fails one moved to `FY27` on 1 October. `reproduces` lists the months that fit. The user's answer must be one of them, or today's value is stale and the report needs fixing in Desktop first.
+`init` asks the two fiscal questions only when an answer follows a fiscal field (`fiscal_year`, `fiscal_year_short`, `fiscal_semester`, `fiscal_quarter`, `fiscal_month`); `{year} H{half}` or `{year}-{month:02}` need no fiscal year, and no `fabTestCalendar` is written for them. The questions have no `suggested` answer unless the contract already holds a `fabTestCalendar` (a person's earlier answer), because on any one day several fiscal years produce the same label: on 2026-09-30, `FY26` fits start months 1, 10, 11 and 12. `reproduces` lists the start months that fit today's values under either naming, and `applies_to` the slicer questions that need the answer. A January start needs no naming answer.
+
+`init` refuses (exit 2, nothing written) a fiscal year under which a slicer answered `current` isn't on today's period, e.g. an April start for a report on `FY27-S1` in November 2026 (that would be `FY27-S2`). Either the answer is wrong or the report is stale: ask the user which, and fix the slicer in Desktop or answer `keep`.
 
 | Fiscal year | `fiscal_year_start_month` | `fiscal_year_named_by` | Last day / first day of FY27 for `FY{fiscal_year_short}` |
 |---|---|---|---|
@@ -99,11 +101,12 @@ fab-test pbir --artifact Sales --contract path/to/contract.yaml   # skip pairing
 ```
 ContractInit {
   (on a terminal) => fab-test pbir contract init REPORT        // asks per slicer; Enter takes the suggestion
+                                                                 // the fiscal year has none: it must be typed
   (an agent) => {
     1. fab-test pbir contract init REPORT --questions --format json
     2. ask the user every question with needs_human: true; take `suggested` for the rest
-       (calendar.fiscal_year_start_month and _named_by: ask in the user's words, never take `suggested`;
-        see Fiscal years differ)
+       (the calendar.* questions, when listed: ask in the user's words, see Fiscal years differ;
+        they're needed only if the user answers current for a question in their applies_to)
     3. write {question id: answer} to a JSON file
     4. fab-test pbir contract init REPORT --answers FILE [--dry-run]
   }
@@ -113,6 +116,8 @@ ContractInit {
   calendar_format names it. A label init doesn't recognise can still take {"current": "<format>"}
   answer per bookmark navigator (question has kind: navigator) = keep | skip   // skip only when two on a page differ or one preselects a deleted bookmark
   answer for calendar.fiscal_year_start_month = 1..12; calendar.fiscal_year_named_by = start | end
+  (a current answer follows a fiscal field, and no fiscal year answered or in the contract) => exit 2 naming it
+  (under the answered fiscal year a current slicer isn't on today's period) => exit 2; nothing written
   (an existing contract) => adds rules for uncovered slicers; keeps every rule it has; --force replaces a differing rule's implementation only (severity and other keys stay)
   (its fabTestCalendar differs from the answers) => kept and reported (`calendar: kept`); --force replaces it
   (the contract contains '#') => exit 2 unless --force, because rewriting drops comments
@@ -121,7 +126,7 @@ ContractInit {
 }
 ```
 
-Each question carries `current` (what the slicer opens with), `choices`, `suggested`, and for a single value that a calendar format reproduces today, `calendar_format`. `calendar.fiscal_year_start_month` lists the start months that reproduce every calendar suggestion (`reproduces`); more than one means the user must say which. `contract` is reserved in pbir's TARGET position: a report named `contract` is reached with `--artifact contract`.
+Each question carries `current` (what the slicer opens with), `choices`, `suggested`, and for a single value that a calendar format reproduces today, `calendar_format`. The `calendar.*` questions are listed only when a suggested format uses a fiscal field; `calendar.fiscal_year_start_month` lists the start months that reproduce every such suggestion (`reproduces`), and both list the slicer questions that need them (`applies_to`). An answers file may give them even when unlisted, for a `{"current": "<format>"}` that uses a fiscal field. `contract` is reserved in pbir's TARGET position: a report named `contract` is reached with `--artifact contract`.
 
 ## Findings and the envelope
 

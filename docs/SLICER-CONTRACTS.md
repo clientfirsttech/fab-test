@@ -25,7 +25,7 @@ Standard Slicers: 'Fiscal Calendar'[Fiscal Semester] opens with FY27-S1, which l
 - **current** checks that the slicer opens on the current period, whatever the date. It's offered only when `init` recognises today's value as one: `FY27-S1` becomes `FY{fiscal_year_short}-S{fiscal_semester}`, which will expect `FY27-S2` from January.
 - **skip** leaves the slicer out.
 
-Answering current also asks when your fiscal year starts and whether it is named by the year it starts or ends in. **Answer with your company's fiscal calendar, not the suggestion.** On any one day several start months produce the same label, and the suggestion prefers January. On 30 September 2026, `FY26` fits a January or an October start alike. Accept January for an October fiscal year and the check keeps expecting `FY26` until 31 December, when it should expect `FY27` from 1 October.
+A slicer that follows a fiscal period (`FY27-S1`, `FY26`) also needs your company's fiscal year, so answering current for it asks when your fiscal year starts and what it's called. There's no default: nothing in a report says which fiscal year it uses, and on any one day several fit (on 30 September 2026, `FY26` fits a January or an October start alike). Once your contract has a fiscal year, `init` offers it as the default. A calendar period (`2026 H2`, `2026-11`) asks nothing more. If a slicer isn't on today's period under the fiscal year you give, `init` says so and writes nothing: either the answer or the report is wrong.
 
 | Your fiscal year | Start month | Named by | Last day of FY26 → first day of FY27 |
 |---|---|---|---|

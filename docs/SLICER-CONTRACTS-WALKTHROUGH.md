@@ -23,11 +23,11 @@ flowchart TD
     G -->|"A shape a rule can't check:<br/>Select all then untick, hierarchy, several columns"| H["skip"]
     G -->|"Today's period, e.g. FY27-S1"| J["keep, current or skip"]
     G -->|"Anything else: Bad, Select all,<br/>nothing ticked, a range, a stale period"| I["keep or skip"]
-    J -->|"current"| K["Fiscal year: start month and naming"]
+    J -->|"current, for a fiscal period"| K["Fiscal year: start month and naming<br/>no default; checked against today"]
 
     H --> L{"Each page's bookmark navigator:<br/>does its bookmark resolve?"}
     I --> L
-    J -->|"keep or skip"| L
+    J -->|"keep, skip, or current for a calendar period"| L
     K --> L
     L -->|"Navigators differ, bookmark deleted,<br/>or a display name two bookmarks share"| M["skip"]
     L -->|"Yes, or nothing preselected"| N["keep or skip"]
@@ -107,16 +107,16 @@ Overview: the bookmark navigator opens with Home. Keep checking that or skip it?
   [keep/skip] default keep:
 ```
 
-If you answered **current** at least once, two more questions follow:
+If you answered **current** for a fiscal period (`FY27-S1`, `FY26`), two more questions follow. They have no default: nothing in the report says when your company's fiscal year starts, and on any one day several months fit.
 
 ```text
-Which month does the fiscal year start in (1-12)?
-  [1/2/3/4/5/6/7/8/9/10/11/12] default 7:
-Is a fiscal year named by the calendar year it starts or ends in?
-  [end/start] default end:
+Which month does your company's fiscal year start in (1-12)? Today's values fit 6, 7, 8, 9, 10 or 11.
+  [1-12]: 7
+Is July 2026 to June 2027 called FY27 (the year it ends in) or FY26 (the year it starts in)?
+  [end/start]: end
 ```
 
-The suggested month is one that reproduces today's values, but several months often do. Answer with your company's real fiscal calendar, not the suggestion.
+A calendar period (`2026 H2`, `2026-11`) doesn't need these, and a January fiscal year skips the second. Next time you run `init` on this report, your answers are the defaults. If a slicer isn't on today's period under the fiscal year you give, `init` stops and says so: either the answer is wrong, or the report is out of date and needs fixing in Desktop.
 
 `init` writes `Sales.Report.odcs.yaml` **beside** the report folder, never inside it: Fabric's Git sync deletes files inside a report folder that aren't part of the report. It pairs with the report through the `logicalId` in `Sales.Report/.platform`, so renaming the report folder doesn't break the pairing.
 
@@ -132,7 +132,7 @@ fab-test pbir contract init "Sales.Report" --questions --format json > questions
 fab-test pbir contract init "Sales.Report" --answers answers.json
 ```
 
-`answers.json` maps question ids to answers, for example `{"overview-category": "keep", "overview-fiscal-semester": "current", "calendar.fiscal_year_start_month": 7}`. Anything left out takes the suggestion. The fiscal-calendar questions are always marked `needs_human`, so make sure a person confirms them.
+`answers.json` maps question ids to answers, for example `{"overview-category": "keep", "overview-fiscal-semester": "current", "calendar.fiscal_year_start_month": 7, "calendar.fiscal_year_named_by": "end"}`. Anything left out takes the suggestion, except the fiscal year, which has none: a fiscal period answered `current` without it exits 2. The fiscal-year questions are always marked `needs_human`, so a person has to answer them.
 
 ## Step 3: Read what it wrote
 
