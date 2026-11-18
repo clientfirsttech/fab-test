@@ -16,6 +16,7 @@ Constraints {
   (task writes or reviews Python) => load aidd-python — it is the language skill the JS/TS skills would otherwise have supplied
   (task adds to, or reviews a diff touching, a file over 400 lines) => load aidd-module-budgets
   (task plans, adds, reviews, or changes an analyzer subcommand, invoke_*.py wrapper, or its registration) => load aidd-analyzer-contract; its Constraints are the minimum bar for parity with the other analyzers
+  (task reviews a diff that changes what a caller reads or answers: messages, errors, --help, prompts, init questions, explain or doctor output, the HTML report, or a skill an agent reads) => load aidd-polite-review; its findings join the review at aidd-review's levels (blocking, should-fix, nit)
   (task involves code changes) => use aidd-tdd — write tests before implementation
   (planning or executing an epic) => its last task is always "Quality gates" (whole-repo ruff, complexity and module-budget ratchets, coverage floor, CI-env run), per vision.md's Definition of Done; no task follows it
   All skills resolve to: .github/skills/<skill-name>/SKILL.md
@@ -28,7 +29,7 @@ Constraints {
 |-----------|---------------|-------|
 | help, list commands | `aidd-please` | List commands without modifying files |
 | plan, what's next, priorities | `aidd-please` | Review plan.md, suggest next steps |
-| discover, user journey, user story, feature | `aidd-product-manager`, `aidd-please` | Interactive product discovery |
+| discover, user journey, user story, feature | `aidd-product-manager`, `aidd-polite-review`, `aidd-please` | Interactive product discovery; `/polite-discover` turns a journey's rude steps into pain points |
 | task, create epic, plan task | `aidd-task-creator`, `aidd-please`, `aidd-tdd`, `aidd-python` | Plan + TDD execution |
 | execute epic, run epic | `aidd-task-creator`, `aidd-please` | Execute a previously planned epic |
 | review, code review | `aidd-review`, `aidd-python`, `aidd-module-budgets`, `aidd-please` | Quality + security review |
@@ -42,6 +43,7 @@ Constraints {
 | pr, pull request, review comments | `aidd-pr`, `aidd-please` | Triage + address PR review comments |
 | parallel, fan out, sub-agents | `aidd-parallel`, `aidd-please` | Delegate to parallel sub-agents |
 | pipeline, step-by-step pipeline | `aidd-pipeline`, `aidd-please` | Run a markdown task list as pipeline |
+| polite review, politeness, ux review | `aidd-polite-review`, `aidd-please` | Review a command, surface, or transcript for how it treats its callers |
 | security, jwt, timing | `aidd-jwt-security` or `aidd-timing-safe-compare` | Security review |
 | upskill, create skill | `aidd-upskill`, `aidd-sudolang-syntax` | Author a new AIDD skill |
 | document, update docs, sync docs, update readme | `document` | Sync README, QUICK-VALIDATION, and fab-test skill with codebase |
@@ -54,6 +56,7 @@ Constraints {
 | `aidd-python` | Python best practices, simplicity budgets, over-engineering review lens |
 | `aidd-module-budgets` | File-level size budgets, split seams for oversized modules |
 | `aidd-analyzer-contract` | Minimum requirements for a new or changed analyzer: envelope, exit codes, report, telemetry, registration touch points |
+| `aidd-polite-review` | How considerately a surface treats its three callers: Cooper's polite-software traits, excise, pain points for discovery |
 | `document` | Sync docs: README, QUICK-VALIDATION, fab-test skill |
 | `fab-test` | fab-test CLI reference — subcommands, flags, result locations |
 

@@ -1,8 +1,8 @@
 ---
-description: "AI-Driven Development (AIDD) framework agent for systematic task planning, epic management, product discovery, user journeys, code review, bug fixing, TDD workflow, hotspot analysis, changelog management, and conventional commits. Use when: plan task, create epic, execute epic, discover feature, user story, user journey, code review, fix bug, refactoring candidates, hotspots, churn analysis, log changes, commit, test-driven development."
+description: "AI-Driven Development (AIDD) framework agent for systematic task planning, epic management, product discovery, user journeys, code review, polite software review, bug fixing, TDD workflow, hotspot analysis, changelog management, and conventional commits. Use when: plan task, create epic, execute epic, discover feature, user story, user journey, code review, polite review, fix bug, refactoring candidates, hotspots, churn analysis, log changes, commit, test-driven development."
 name: "AIDD"
 tools: [read, edit, search, execute, agent, todo]
-argument-hint: "Command: help | plan | discover | task | execute | review | churn | fix | test | log | commit"
+argument-hint: "Command: help | plan | discover | task | execute | review | polite review | churn | fix | test | log | commit"
 user-invocable: true
 ---
 
@@ -28,7 +28,7 @@ When the user invokes you with any of these phrases, execute the corresponding w
 |-----------|-------------|----------|
 | **help**, **list commands** | `aidd-please` | List all available AIDD commands |
 | **plan**, **what's next**, **priorities** | `aidd-please` | Review plan.md and suggest next steps |
-| **discover**, **user journey**, **user story** | `aidd-product-manager`, `aidd-please` | Interactive product discovery session |
+| **discover**, **user journey**, **user story** | `aidd-product-manager`, `aidd-polite-review`, `aidd-please` | Interactive product discovery session |
 | **task**, **create epic**, **plan task** | `aidd-task-creator`, `aidd-please`, `aidd-tdd`, `aidd-python` | Plan and execute task epic with TDD |
 | **execute epic**, **run epic** | `aidd-task-creator`, `aidd-please` | Execute previously planned epic |
 | **review**, **code review** | `aidd-review`, `aidd-python`, `aidd-module-budgets`, `aidd-please` | Thorough code review |
@@ -44,6 +44,7 @@ When the user invokes you with any of these phrases, execute the corresponding w
 | **parallel**, **fan out**, **sub-agents** | `aidd-parallel`, `aidd-please` | Delegate to parallel sub-agents |
 | **pipeline**, **step-by-step pipeline** | `aidd-pipeline`, `aidd-please` | Run a markdown task list as a pipeline |
 | **upskill**, **create skill** | `aidd-upskill`, `aidd-sudolang-syntax` | Author a new AIDD skill |
+| **polite review**, **politeness**, **ux review** | `aidd-polite-review`, `aidd-please` | Review how a surface treats its three callers |
 | **security**, **jwt**, **timing** | `aidd-jwt-security` or `aidd-timing-safe-compare` | Targeted security review |
 
 This table mirrors the Command Map in `.github/skills/aidd-workflow/SKILL.md`, which is

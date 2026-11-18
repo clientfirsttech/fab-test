@@ -18,6 +18,10 @@ Guiding vision and constraints: [vision.md](vision.md)
 
 ## Standalone Tasks
 
+- **`contract init`: politeness pilot findings** — on `feature/pbir-slicer-default-state`, from the Polite Software Review pilot (2026-11-17). Fix before that branch merges: on Windows, stdin on NUL reports `isatty()` True, so an unattended `init` takes every default and reports ✓ for a contract nobody answered (C1; check stderr and a real console too). Then: name a rule that `skip` leaves in place, and let `--force` drop it (C2); ask the 14 routine questions as one list (C3); resolve a report name and say when a path doesn't exist (C4); list a question's own choices (C5). Evidence and fixes: [plan/polite-review-pilot.md](plan/polite-review-pilot.md).
+
+- **`doctor`: politeness pilot findings** — from the same pilot, on `dev`: print the service-mode remediation once, not four times (D1); accept `-q` like every analyzer (D2); one status per state across `doctor` and `doctor --local`, and remedies that say what to do (D3, provisional: `fab-test local` itself wasn't run); wrap lines at the terminal width (D4). See [plan/polite-review-pilot.md](plan/polite-review-pilot.md).
+
 - **RDL: decide PRM-04** — the Fabric service rejects any report with a MultiValue + Nullable parameter (400; 201 for the same file with AllowBlank), so PRM-04 has no service-accepted fixture and stays planned. Either keep it planned, or activate it with the unpublished fixture, on the grounds that the rejection itself shows the rule matters (it catches a report that can never publish).
 
 - **RDL: ACC-04/ACC-05 heading and header tags** — blocked on one Report Builder save: tag a title textbox as a heading and a tablix header row as column headers, save, and commit the file so the structure-type element names can be confirmed before writing the checks. Then add both to `tools/generate_rdl_fixtures.py` with a `-Pass` near-miss each.

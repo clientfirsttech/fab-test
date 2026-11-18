@@ -71,19 +71,29 @@ X of Y steps are excise.
 
 ## /polite-discover output
 
+The shape of the journeys in `plan/story-map/` (see `terse-cli-output.yaml`), so aidd-product-manager's `/save` can write it unchanged:
+
 ```yaml
-# For plan/story-map/<journey>.yaml; aidd-product-manager's /save writes it
 painPoints:
-  - name: [finding title]
-    description: [what happens and why it costs the caller]
+  - id: [cuid2]
+    name: [finding title]
+    description: >
+      [principle]: [what happens, quoted where it can be] [why it costs the caller]
     impact: [1..10]
     frequency: [1..10]
-    principle: [principle]
-stories:
-  - name: [short name]
-    story: As a [persona], I want [job], so that [benefit]
-    painPoint: [pain point name]
-    priority: [impact * frequency]
+
+steps:
+  - id: [the existing step's id]
+    name: [the existing step's name]
+    userStories:
+      - id: [cuid2]
+        name: [short name]
+        story: As a [persona name from personas.yaml], I want [job], so that [benefit]
+        painPoint: [the pain point's id]
+        priority: [impact * frequency]
+        functionalRequirements:
+          - Given [situation], should [job]
+        status: { state: backlog }
 ```
 
 Present the stories ranked by priority, then the excise count for each journey step that has any.
