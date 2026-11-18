@@ -1,0 +1,21 @@
+import '.github/skills/aidd-polite-review/SKILL.md'
+
+userPrompt = """
+You are in a test environment. Do not run any commands and do not edit any files.
+The personas are Local Developer, CI Pipeline, and AI Agent.
+
+/polite-discover this proposed design for a journey step (a hypothetical design, not fab-test's real `init`), before it is built:
+
+  step: Write a slicer contract
+  description: >
+    The Local Developer runs `fab-test pbir contract init Sales`. For each of the
+    report's 12 slicers it asks, one at a time, for the table name, the column
+    name, and the default value, though all three are in the report's files.
+    It then asks "Write contract? [y/N]". There is no flag to answer the
+    questions, so a CI Pipeline can't run it.
+"""
+
+- Given questions whose answers are in the report's files, should report them as excise and propose inferring the answers and showing them for confirmation
+- Given no non-interactive path, should report a pain point for the CI Pipeline persona
+- Given each pain point, should give impact and frequency on a 1 to 10 scale
+- Given each user story, should use "As a [persona], I want [job], so that [benefit]" with a persona from the list, and a priority equal to impact times frequency

@@ -53,6 +53,7 @@ severity(finding) {
   (costs real time, blocks the goal, or sits on the most frequent path) => High
   (noticeable friction or confusion on a common path) => Medium
   (polish, or friction on a rare path) => Low
+  "Deceives" means hiding or misstating what happened; a documented convention that surprises is Medium at most
 }
 
 Frequency decides how much friction is acceptable; stakes decide how much protection is needed. A mildly rude message on a constant command outranks an awful one on a rare command.
