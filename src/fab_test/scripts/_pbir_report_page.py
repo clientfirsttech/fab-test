@@ -59,29 +59,29 @@ _NAV = ('<nav class="toc">On this page: <a href="#results">Results</a>'
         '<a href="#inspector">PBIR Inspector&#x27;s page</a></nav>\n')
 
 
-def render_pbir_report(envelope: dict[str, Any], contract_note: str, inspector_html: Path | None,
+def render_pbir_report(envelope: dict[str, Any], unpaired: str, inspector_html: Path | None,
                        base_dir: Path) -> str:
     """The page for one PBIR run.
 
-    ``contract_note`` is the run header's contract line (it says why no
-    contract paired); ``inspector_html`` is PBIR Inspector's TestRun.html, or
+    ``unpaired`` says why no contract paired (shown only when none did);
+    ``inspector_html`` is PBIR Inspector's TestRun.html, or
     None when it wrote none; ``base_dir`` is where the page will live, so the
     frame's link is relative and the folder can move.
     """
     summary = envelope.get("contract")
     rows = rule_rows(summary, envelope.get("test_results") or [])
     table = report_table(_HEADERS, rows, class_index=2, status_index=5, msg_index=4)
-    before = _NAV + _sources(summary, contract_note, rows)
+    before = _NAV + _sources(summary, unpaired, rows)
     after = _inspector_section(inspector_html, base_dir) + _OPEN_SCRIPT
     return render_report(envelope, base_dir, before=before, after=after, style=_STYLE, table=table)
 
 
-def write_pbir_report(envelope: dict[str, Any], path: Path, contract_note: str,
+def write_pbir_report(envelope: dict[str, Any], path: Path, unpaired: str,
                       inspector_html: Path | None) -> Path | None:
     """Write the page to ``path``; None, with a warning, when it can't be. Never raises: a report is a convenience."""
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(render_pbir_report(envelope, contract_note, inspector_html, path.parent), encoding="utf-8")
+        path.write_text(render_pbir_report(envelope, unpaired, inspector_html, path.parent), encoding="utf-8")
     except (OSError, ValueError, TypeError, KeyError) as exc:
         print(f"::warning::could not render report for {path}: {exc}", file=sys.stderr)
         return None
@@ -105,12 +105,21 @@ def rule_rows(summary: dict | None, results: list[dict[str, Any]]) -> list[tuple
     return sorted(rows, key=lambda row: _RANK.get(row[5], 1))
 
 
+_NOT_RUN = ("NOT RUN", "SKIP", "SKIPPED")
+
+
 def _outcome(rows: list[tuple]) -> str:
-    failed = sum(row[5] not in ("PASS", "NOT RUN") for row in rows)
-    return f"{failed} failed" if failed else "all passed"
+    """`2 failed`, `all passed`, `1 passed, 2 not run`, or `nothing ran` (never "all passed" for no passes)."""
+    passed = sum(row[5] == "PASS" for row in rows)
+    not_run = sum(row[5] in _NOT_RUN for row in rows)
+    failed = len(rows) - passed - not_run
+    if not failed and not passed:
+        return "nothing ran"
+    counts = [f"{failed} failed"] if failed else [f"{passed} passed"] if not_run else ["all passed"]
+    return ", ".join(counts + ([f"{not_run} not run"] if not_run else []))
 
 
-def _sources(summary: dict | None, note: str, rows: list[tuple]) -> str:
+def _sources(summary: dict | None, unpaired: str, rows: list[tuple]) -> str:
     """Where each rule set came from, with its counts: the contract's file, or why none paired."""
     contract = [row for row in rows if row[0] != RULES_SOURCE]
     rules = [row for row in rows if row[0] == RULES_SOURCE]
@@ -118,8 +127,7 @@ def _sources(summary: dict | None, note: str, rows: list[tuple]) -> str:
         name, checks = describe(summary)
         line = f"Slicer contract: <code>{escape(name)}</code> · {escape(checks)} · {_outcome(contract)}"
     else:
-        reason = note.removeprefix("📜 Slicer contract: ").removeprefix("none (").removesuffix(")")
-        line = f"Slicer contract: none paired: {escape(reason)}"
+        line = f"Slicer contract: none paired: {escape(unpaired)}"
     count = f"{len(rules)} result{'' if len(rules) == 1 else 's'}"
     return f'<p class="meta" id="results">{line}<br>{RULES_SOURCE}: {count} · {_outcome(rules)}</p>\n'
 

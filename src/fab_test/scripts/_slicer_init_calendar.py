@@ -115,15 +115,19 @@ def naming_prompt(start: int, as_of: datetime.date) -> str:
             f"(the year it ends in) or FY{first % 100:02d} (the year it starts in)?")
 
 
-def fiscal_calendar(answers: dict, needed_by: list[str]) -> dict | None:
-    """The `fabTestCalendar` to write, or None when no rule needs one. Raises ValueError naming what's missing."""
+def fiscal_calendar(answers: dict, needed_by: list[str], existing: dict | None = None) -> dict | None:
+    """The `fabTestCalendar` to write, or None when no rule needs one: the answers, else the contract's
+    ``existing`` one (the fiscal questions aren't listed when no known format fits). Raises ValueError naming
+    what's missing."""
     if not needed_by:
         return None
-    start = answers.get(START)
+    existing = existing or {}
+    start = answers.get(START) or existing.get("fiscal_year_start_month")
     because = f"because {', '.join(needed_by)} {'follows' if len(needed_by) == 1 else 'follow'} the fiscal year"
     if start is None:
         raise ValueError(f"{START}: required, {because}; which month does your company's fiscal year start in?")
-    named_by = answers.get(NAMED_BY) or ("end" if start == 1 else None)  # a January year is named the same either way
+    # A January year is named the same either way.
+    named_by = answers.get(NAMED_BY) or existing.get("fiscal_year_named_by") or ("end" if start == 1 else None)
     if named_by is None:
         raise ValueError(f"{NAMED_BY}: required, {because}; "
                          "is a fiscal year named by the year it ends in or starts in?")
@@ -147,11 +151,40 @@ def merge_calendar(document: dict, calendar: dict | None, force: bool) -> str | 
     return "kept"
 
 
+def check_current(questions: list[dict], contract: Any, resolved: list, follows: set[str], summary: dict) -> list[str]:
+    """Why the contract can't be written: a rule that follows the current period, which the report doesn't
+    open with today. Checked: the rules this run adds or replaces, and, when the fiscal year is added or
+    replaced, every rule in the contract that follows it."""
+    written = (set(summary["added"]) | set(summary["replaced"])) & follows
+    recheck = summary["calendar"] in ("added", "replaced")
+    opens = {(q["page"], q["table"], q["column"]): q for q in questions if "column" in q}
+    problems = []
+    for rule, now in zip(contract.expectations, resolved, strict=True):
+        q = opens.get((rule.page, rule.table, rule.column))
+        fiscal_rule = rule.check == "selected" and any(isinstance(v, str) and uses_fiscal(v) for v in
+                                                      (rule.expected if isinstance(rule.expected, list) else []))
+        if q is None or not (rule.rule_id in written or (recheck and fiscal_rule)):
+            continue
+        opens_with = q["current"].get("selected")
+        if isinstance(opens_with, list) and now.expected != opens_with:
+            problems.append(mismatch(rule.rule_id, q["field"], ", ".join(map(str, now.expected)),
+                                     ", ".join(map(str, opens_with)), contract.calendar, fiscal_rule))
+    if problems and summary["calendar"] == "kept":
+        problems.append("the contract's fabTestCalendar was kept over your answers; --force replaces it")
+    return problems
+
+
 def mismatch(rule_id: str, field: str, expected: Any, opens_with: Any, fiscal: dict | None, fiscal_rule: bool) -> str:
     """Why a current-period rule can't be written: the report isn't on today's period under these answers."""
     under = ""
     if fiscal_rule and fiscal:
-        month = calendar.month_name[fiscal["fiscal_year_start_month"]]
-        under = f" with a fiscal year starting in {month}, named by the year it {fiscal['fiscal_year_named_by']}s in,"
+        under = f" with {describe_calendar(fiscal)},"
+    wrong_year = " or the fiscal year is wrong" if fiscal_rule else ""
     return (f"{rule_id}:{under} today is {expected}, but {field} opens with {opens_with}; either the report is out "
-            "of date (fix the slicer in Desktop and run init again, or answer keep) or the fiscal year is wrong")
+            f"of date (fix the slicer in Desktop and run init again, or answer keep){wrong_year}")
+
+
+def describe_calendar(fiscal: dict) -> str:
+    """`a fiscal year starting in July, named by the year it ends in`."""
+    month = calendar.month_name[fiscal["fiscal_year_start_month"]]
+    return f"a fiscal year starting in {month}, named by the year it {fiscal['fiscal_year_named_by']}s in"

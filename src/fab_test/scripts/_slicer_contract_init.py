@@ -44,11 +44,11 @@ from ._slicer_contract_run import CONTRACT_SUFFIX, report_logical_id
 from ._slicer_init_calendar import (
     NAMED_BY,
     START,
+    check_current,
     existing_calendar,
     fiscal_calendar,
     fiscal_questions,
     merge_calendar,
-    mismatch,
     naming_prompt,
     suggestion,
     uses_fiscal,
@@ -57,9 +57,9 @@ from ._slicer_init_output import (
     add_output_flags,
     can_ask,
     level,
+    pbir_refusal,
     print_payload,
     questions_text,
-    report_refusal,
     summary_text,
 )
 
@@ -81,6 +81,9 @@ def contract_main(argv: list[str]) -> int:
     except (InitError, CalendarError, ContractError) as exc:
         print(f"  ✗ fab-test pbir contract: {exc}", file=sys.stderr)
         return 2
+    except KeyboardInterrupt:  # Ctrl-C at a prompt
+        print("\n  ✗ fab-test pbir contract: interrupted; nothing was written", file=sys.stderr)
+        return 130
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -99,7 +102,8 @@ def _parser() -> argparse.ArgumentParser:
     init.add_argument("--dry-run", action="store_true", help="Print the contract instead of writing it")
     init.add_argument("--force", action="store_true",
                       help="Replace rules that differ, and rewrite a commented contract")
-    init.add_argument("--format", choices=("text", "json"), default="text", dest="output_format")
+    init.add_argument("--format", choices=("text", "json"), default="text", dest="output_format",
+                      help="text for people, json for agents and scripts [default: text]")
     add_output_flags(init)
     return parser
 
@@ -118,7 +122,7 @@ def _report(args: argparse.Namespace) -> Path:
         raise InitError("name the report: a path to its .Report folder, or --artifact NAME")
     if not (report / "definition" / "pages").is_dir():
         raise InitError(f"{report} is not a PBIR report folder (no definition/pages)")
-    refusal = report_refusal(args, report.name)  # --report / --open-report belong to `fab-test pbir`
+    refusal = pbir_refusal(args, report.name)  # --report, --contract, ... belong to `fab-test pbir`
     if refusal:
         raise InitError(refusal)
     return report
@@ -264,6 +268,10 @@ def _rule(q: dict, answer: Any) -> tuple[dict[str, Any] | None, bool]:
     if "unsupported" in q["current"]:
         raise InitError(f"{q['id']}: {q['current']['unsupported']}; the only answer is skip")
     if answer == "current" or (isinstance(answer, dict) and list(answer) == ["current"]):
+        ticked = q["current"].get("selected")
+        if not isinstance(ticked, list) or not ticked:
+            raise InitError(f"{q['id']}: only a slicer with values ticked can follow the current period, and "
+                            f"{q['field']} opens with {_show(q['current'])}; answer keep or skip")
         text = answer["current"] if isinstance(answer, dict) else q.get("calendar_format")
         if not isinstance(text, str) or not text:
             raise InitError(f"{q['id']}: no period format reproduces {_show(q['current'])} today; "
@@ -292,13 +300,13 @@ def _write(args: argparse.Namespace, report: Path, questions: dict, answers: dic
     rules = [(q, rule) for q, rule, _ in built if rule]
     fiscal_ids = [q["id"] for q, rule, follows in built
                   if follows and uses_fiscal(rule["implementation"]["selected"][0])]
+    path = _contract_path(report)
     try:
-        calendar = fiscal_calendar(answers, fiscal_ids)
+        calendar = fiscal_calendar(answers, fiscal_ids, existing_calendar(path))
     except ValueError as exc:
         raise InitError(str(exc)) from exc
     if calendar:
         validate_calendar(calendar)
-    path = _contract_path(report)
     document, summary = _merge(path, report, rules, calendar, args.force)
     try:
         apply_navigator_answers(document, questions["questions"], answers, args.force, summary)
@@ -309,27 +317,19 @@ def _write(args: argparse.Namespace, report: Path, questions: dict, answers: dic
         resolved = resolve_contract(contract, datetime.date.fromisoformat(questions["as_of"]))
     except (ContractError, CalendarError) as exc:
         raise InitError(f"the contract wouldn't be valid, so nothing was written:\n{exc}") from exc
-    _check_current(built, {e.rule_id: e.expected for e in resolved}, contract.calendar, summary)
+    follows = {rule["id"] for _q, rule, follow in built if follow}
+    problems = check_current(questions["questions"], contract, resolved, follows, summary)
+    if problems:
+        raise InitError("nothing was written:\n  " + "\n  ".join(problems))
     text = yaml.safe_dump(document, sort_keys=False, allow_unicode=True)
     if not args.dry_run:
         path.write_text(text, encoding="utf-8")
     verbose = contract if level(args) == "verbose" else None
     print_payload(args, {"contract": str(path), "written": not args.dry_run, **summary,
                          **({"content": text} if args.dry_run else {})},
-                  lambda s: text if args.dry_run else summary_text(s, verbose), asked_for=args.dry_run)
+                  lambda s: text if args.dry_run else summary_text(s, verbose, contract.calendar),
+                  asked_for=args.dry_run)
     return 0
-
-
-def _check_current(built: list, expected: dict, fiscal: dict | None, summary: dict) -> None:
-    """Refuse a current-period rule the report doesn't open with today: stale, or the wrong fiscal year."""
-    written = set(summary["added"]) | set(summary["replaced"])
-    problems = [mismatch(q["id"], q["field"], ", ".join(map(str, expected[q["id"]])),
-                         ", ".join(map(str, q["current"]["selected"])), fiscal,
-                         uses_fiscal(rule["implementation"]["selected"][0]))
-                for q, rule, follows in built
-                if follows and q["id"] in written and expected[q["id"]] != q["current"]["selected"]]
-    if problems:
-        raise InitError("nothing was written:\n  " + "\n  ".join(problems))
 
 
 def _merge(path: Path, report: Path, rules: list, calendar: dict | None, force: bool):

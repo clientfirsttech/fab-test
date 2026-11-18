@@ -70,11 +70,11 @@ Fields: `year`, `year_short`, `half`, `quarter`, `month`, `fiscal_year`, `fiscal
 - "Which month does your fiscal year start in?"
 - "Is the year that runs to <month before the start> 2027 called FY27 or FY26?" (the year it ends in is `end`; the year it starts in is `start`)
 
-`init` asks the two fiscal questions only when an answer follows a fiscal field (`fiscal_year`, `fiscal_year_short`, `fiscal_semester`, `fiscal_quarter`, `fiscal_month`); `{year} H{half}` or `{year}-{month:02}` need no fiscal year, and no `fabTestCalendar` is written for them. The questions have no `suggested` answer unless the contract already holds a `fabTestCalendar` (a person's earlier answer), because on any one day several fiscal years produce the same label: on 2026-09-30, `FY26` fits start months 1, 10, 11 and 12. `reproduces` lists the start months that fit today's values under either naming, and `applies_to` the slicer questions that need the answer. A January start needs no naming answer.
+`init` asks the two fiscal questions only when an answer follows a fiscal field (`fiscal_year`, `fiscal_year_short`, `fiscal_semester`, `fiscal_quarter`, `fiscal_month`); `{year} H{half}` or `{year}-{month:02}` need no fiscal year, and no `fabTestCalendar` is written for them. The questions have no `suggested` answer unless the contract already holds a `fabTestCalendar` (a person's earlier answer), because on any one day several fiscal years produce the same label: on 2026-09-30, `FY26` fits start months 1, 10, 11 and 12 for a year named by the year it ends in, and 1 to 9 for one named by the year it starts in. `reproduces` lists the start months that fit today's values under either naming, and `applies_to` the slicer questions that need the answer. A January start needs no naming answer.
 
 `init` refuses (exit 2, nothing written) a fiscal year under which a slicer answered `current` isn't on today's period, e.g. an April start for a report on `FY27-S1` in November 2026 (that would be `FY27-S2`). Either the answer is wrong or the report is stale: ask the user which, and fix the slicer in Desktop or answer `keep`.
 
-| Fiscal year | `fiscal_year_start_month` | `fiscal_year_named_by` | Last day / first day of FY27 for `FY{fiscal_year_short}` |
+| Fiscal year | `fiscal_year_start_month` | `fiscal_year_named_by` | Where the year turns over, as `FY{fiscal_year_short}` |
 |---|---|---|---|
 | Calendar year | 1 | `end` (either) | 2026-12-31 `FY26` / 2027-01-01 `FY27` |
 | October start, named by end year (e.g. US federal) | 10 | `end` | 2026-09-30 `FY26` / 2026-10-01 `FY27` |
@@ -119,15 +119,19 @@ ContractInit {
   answer for calendar.fiscal_year_start_month = 1..12; calendar.fiscal_year_named_by = start | end
   (a current answer follows a fiscal field, and no fiscal year answered or in the contract) => exit 2 naming it
   (under the answered fiscal year a current slicer isn't on today's period) => exit 2; nothing written
+  (--force replaces the contract's fabTestCalendar) => every rule following a fiscal field is checked again; the same
+  (current for a slicer with no values ticked: a range, relative, input, Select all or nothing ticked) => exit 2
   (an existing contract) => adds rules for uncovered slicers; keeps every rule it has; --force replaces a differing rule's implementation only (severity and other keys stay)
   (its fabTestCalendar differs from the answers) => kept and reported (`calendar: kept`); --force replaces it
   (the contract contains '#') => exit 2 unless --force, because rewriting drops comments
   (the result wouldn't read back as fab-test pbir reads it, or the report has no .platform logicalId) => exit 2; nothing written
   (on a terminal) => prompts go to stderr, so --format json stdout stays one document
-  -q / ANALYZER_VERBOSITY=summary => nothing printed on success; errors, --questions, --dry-run and
-                                     --format json still print
-  -v => also every rule in the contract: id, page, field, check, and added | kept | replaced | unchanged
+  -q / ANALYZER_VERBOSITY=summary / fab-test.yml verbosity: summary => nothing printed on success; errors,
+                                     --questions, --dry-run and --format json still print
+  -v => also every rule in the contract: id, page, field, what it expects, and added | kept | replaced | unchanged
   --report | --no-report | --open-report => exit 2 naming `fab-test pbir --artifact <name> --open-report`
+  --contract | --output-dir => exit 2 naming `fab-test pbir --artifact <name> <flag> ...` (init writes beside the report)
+  Ctrl-C at a prompt => exit 130; nothing written
 }
 ```
 
@@ -137,7 +141,7 @@ Each question carries `current` (what the slicer opens with), `choices`, `sugges
 
 One rule per expectation (`CONTRACT.<id>`) and one per page (`CONTRACT.page.<display name>`), with the contract's severity. A finding's `object` is the page; its `message` names the field, what the slicer opens with and what the contract expects, e.g. `'Fiscal Calendar'[Half Year] opens with ['2025 H2']; the contract expects 2026 H2`, or for a navigator `the bookmark navigator opens with [Bookmark 2]; the contract expects Bookmark 1`. A missing slicer or a renamed page is a finding, never a silent pass. The envelope gains `contract`: `file`, `as_of`, `report_logical_id`, and each rule's resolved `expected`; `navigators` lists each navigator entry's `expected` bookmark and the internal `bookmarks` it resolved to.
 
-Two rule sets run together: the PBIR rules (packaged or `--rules`) and the contract's `CONTRACT.*` rules. Every envelope finding and `test_results` row carries `source`: `rules` or `contract`; filter on it rather than the id prefix. A contract finding's `message` is what the rule found, without PBIR Inspector's `Rule "…" FAILED with result: [...]` wrapper. With `--report` / `--open-report`, the report is fab-test's page (as for `bpa`): links at the top; a *Slicer contract* section (the contract, its checks, how many failed, then a table row per check: rule, severity, page, expects, found, status; or why none paired); a *PBIR rules* section (the filterable results table); and PBIR Inspector's TestRun.html collapsed in a frame at the bottom, where the contract's results are under ruleset `Slicer contract` instead of `Rules`. The run header names the paired contract (`📜 Slicer contract: <file> (<n> slicer checks, <n> bookmark navigators)`) or says `none` with the `logicalId` it looked for, and the count line splits findings by source (`… from the PBIR rules, … from the slicer contract`).
+Two rule sets run together: the PBIR rules (packaged or `--rules`) and the contract's `CONTRACT.*` rules. Every envelope finding and `test_results` row carries `source`: `rules` or `contract`; filter on it rather than the id prefix. A contract finding's `message` is what the rule found, without PBIR Inspector's `Rule "…" FAILED with result: [...]` wrapper. With `--report` / `--open-report`, the report is fab-test's page (as for `bpa`): a line naming the contract's path, its checks and how many failed (or why none paired) and how the PBIR rules did; one filterable table for both rule sets, whose `Source` column says `PBIR rules` or `Slicer contract (<file name>)`, a contract check being one row (its worst result across the pages it ran on; the message is what it found, or what it expects when it passed); and PBIR Inspector's TestRun.html collapsed in a frame at the bottom, where the contract's results are under ruleset `Slicer contract` instead of `Rules`. The run header names the paired contract (`📜 Slicer contract: <file> (<n> slicer checks, <n> bookmark navigators)`) or says `none` with the `logicalId` it looked for, and the count line splits findings by source (`… from the PBIR rules, … from the slicer contract`).
 
 A malformed contract, an unknown calendar field, a bad calendar setting, or two contracts pairing with one report: exit `2` before any analyzer starts, one message naming each problem by its path in the file. Every contract under `--artifact-dir` is read, so a broken contract for another report stops an `--artifact` run too; the message says so.
 

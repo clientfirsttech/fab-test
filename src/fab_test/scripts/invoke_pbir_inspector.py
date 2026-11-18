@@ -35,7 +35,7 @@ from ._analyzer_envelope import (
 )
 from ._pbir_report_fixups import fix_favicon_link, fix_log_type_filter, fix_screenshot_images, mark_contract_ruleset
 from ._pbir_report_page import PAGE_NAME, write_pbir_report
-from ._pbir_rule_sources import contract_line, count_line, tag_sources
+from ._pbir_rule_sources import contract_line, count_line, tag_sources, unpaired_reason
 from ._table_style import findings_table
 
 _VERBOSITY_LEVELS = {"summary": 0, "default": 1, "verbose": 2, "debug": 3}
@@ -126,7 +126,7 @@ def write_results(
     native_html_out: "Path | None" = None,
     contract_summary: "Path | None" = None,
     report_page: bool = False,
-    contract_note: str = "",
+    unpaired: str = "",
 ) -> dict[str, Any]:
     """Write standardized PBIR Inspector envelope JSON, and return it.
 
@@ -134,6 +134,7 @@ def write_results(
     beside the envelope and becomes ``native_html_output_path``, the page
     `--open-report` and `fab-test all` link; PBIR Inspector's TestRun.html,
     framed at its bottom, is kept as ``inspector_html_output_path``.
+    ``unpaired`` says why no slicer contract paired, for the page.
     """
     env = build_envelope(
         EnvelopeIdentity("pbir_inspector", str(result.artifact_path)),
@@ -152,7 +153,7 @@ def write_results(
         env["contract"] = json.loads(contract_summary.read_text(encoding="utf-8"))
     if native_html_out is not None:
         env["inspector_html_output_path"] = env["native_html_output_path"] = str(native_html_out)
-    if report_page and (page := write_pbir_report(env, result.output_path.parent / PAGE_NAME, contract_note,
+    if report_page and (page := write_pbir_report(env, result.output_path.parent / PAGE_NAME, unpaired,
                                                   native_html_out)):
         env["native_html_output_path"] = str(page)
     write_envelope(result.output_path, env)
@@ -605,7 +606,7 @@ def run_inspector(args: argparse.Namespace) -> int:
     level = _verbosity()
     contract_summary = Path(args.contract_summary) if getattr(args, "contract_summary", None) else None
     _log_run_header(level, artifact_stem, artifact_path, rules_path, inspector_path, output_path, native_out,
-                    contract=(contract := contract_line(artifact_path, contract_summary)))
+                    contract=contract_line(artifact_path, contract_summary))
 
     # Ensure output directories exist before invoking the tool.
     native_out.parent.mkdir(parents=True, exist_ok=True)
@@ -664,7 +665,7 @@ def run_inspector(args: argparse.Namespace) -> int:
         native_html_out=native_html_out,
         contract_summary=contract_summary,
         report_page=emit_html,
-        contract_note=contract,
+        unpaired="" if contract_summary is not None else unpaired_reason(artifact_path),
     )
     _log_inspector_outcome(outcome, findings, env, level, paired=contract_summary is not None)
 

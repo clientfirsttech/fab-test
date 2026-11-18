@@ -50,6 +50,37 @@ def test_given_analyzer_verbosity_summary_should_be_quiet_too(tmp_path, capsys, 
 
 
 @pytest.mark.pbir
+def test_given_fab_test_yml_verbosity_summary_should_be_quiet_too(tmp_path, capsys, monkeypatch):
+    monkeypatch.delenv("ANALYZER_VERBOSITY", raising=False)
+    (tmp_path / "fab-test.yml").write_text("verbosity: summary\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+
+    assert _run(tmp_path, capsys)[:3] == (0, "", "")
+
+
+@pytest.mark.pbir
+@pytest.mark.parametrize("flag", [["--contract", "c.odcs.yaml"], ["--output-dir", "out"]])
+def test_given_a_flag_of_fab_test_pbir_should_name_that_command(tmp_path, capsys, flag):
+    code, _out, err, contract = _run(tmp_path, capsys, *flag)
+
+    assert code == 2 and not contract.exists()
+    assert f"{flag[0]}: contract init writes <Report>.Report.odcs.yaml beside the report" in err
+    assert "fab-test pbir --artifact SampleModel-DefaultState" in err
+
+
+@pytest.mark.pbir
+def test_given_ctrl_c_while_asking_should_exit_130_without_a_traceback(tmp_path, capsys, monkeypatch):
+    def interrupted(*_args):
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr("fab_test.scripts._slicer_contract_init._answers", interrupted)
+
+    code, _out, err, contract = _run(tmp_path, capsys)
+
+    assert code == 130 and "Traceback" not in err and not contract.exists()
+
+
+@pytest.mark.pbir
 def test_given_quiet_and_json_should_still_print_the_one_json_document(tmp_path, capsys):
     code, out, _err, _contract = _run(tmp_path, capsys, "-q", "--format", "json")
 
@@ -77,17 +108,18 @@ def test_given_verbose_should_list_every_rule_with_its_check_and_what_happened(t
     code, out, _err, _contract = _run(tmp_path, capsys, *verbose)
 
     assert code == 0
-    assert "standard-slicers-alignment  Standard Slicers  'AlignmentDim'[Alignment]  selected: ['Bad']  added" in out
-    assert ("standard-slicers-fiscal-semester  Standard Slicers  'Fiscal Calendar'[Fiscal Semester]  "
-            "selected: ['FY{fiscal_year_short}-S{fiscal_semester}']  added") in out
-    assert "page-1-bookmark-navigator  Page 1  bookmark navigator  selected: Bookmark 2  added" in out
+    assert "standard-slicers-alignment  Standard Slicers  'AlignmentDim'[Alignment] opens with Bad  added" in out
+    assert ("standard-slicers-fiscal-semester  Standard Slicers  'Fiscal Calendar'[Fiscal Semester] "
+            "opens with FY{fiscal_year_short}-S{fiscal_semester}  added") in out
+    assert "opens up to 2026-10-28  added" in out and "datetime.date" not in out          # words, not reprs
+    assert "page-1-bookmark-navigator  Page 1  bookmark navigator opens with Bookmark 2  added" in out
 
 
 @pytest.mark.pbir
 def test_given_the_default_should_not_list_each_rule(tmp_path, capsys):
     _code, out, _err, _contract = _run(tmp_path, capsys)
 
-    assert "added:" in out and "selected: ['Bad']" not in out
+    assert "added:" in out and "opens with Bad" not in out
 
 
 @pytest.mark.pbir

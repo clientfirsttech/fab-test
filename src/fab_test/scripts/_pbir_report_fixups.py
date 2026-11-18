@@ -160,8 +160,9 @@ def mark_contract_ruleset(report_path: Path) -> None:
     rules under one ruleset, "Rules". Renaming the contract's to "Slicer
     contract" lets the page's own Ruleset Name filter separate them. (The
     contract itself is shown on fab-test's report page, which frames this
-    one.) A page without the data marker, or whose data doesn't parse, is
-    left alone; running it twice changes nothing more.
+    one.) A page without the data marker, whose data doesn't parse or isn't
+    shaped as expected, or with no contract results, is left as it was;
+    running it twice changes nothing more.
     """
     with contextlib.suppress(OSError):
         text = report_path.read_text(encoding="utf-8")
@@ -172,8 +173,14 @@ def mark_contract_ruleset(report_path: Path) -> None:
             data, end = json.JSONDecoder().raw_decode(text, begin)
         except ValueError:
             return
-        for result in data.get("Results", []) if isinstance(data, dict) else []:
-            if str(result.get("RuleId", "")).startswith("CONTRACT."):
-                result["RuleSetName"] = CONTRACT_RULESET
-        payload = json.dumps(data, ensure_ascii=False).replace("</", r"<\/")  # never close the script early
+        results = data.get("Results") if isinstance(data, dict) else None
+        contract = [r for r in results if isinstance(r, dict) and str(r.get("RuleId", "")).startswith("CONTRACT.")
+                    and r.get("RuleSetName") != CONTRACT_RULESET] if isinstance(results, list) else []
+        if not contract:
+            return
+        for result in contract:
+            result["RuleSetName"] = CONTRACT_RULESET
+        # Inside <script>, any `<` can end it early (`</script>`) or swallow the page's own end (`<!--<script>`);
+        # PBIR Inspector's encoder escapes them all, and so does this.
+        payload = json.dumps(data, ensure_ascii=False).replace("<", r"\u003c")
         report_path.write_text(text[:begin] + payload + text[end:], encoding="utf-8")

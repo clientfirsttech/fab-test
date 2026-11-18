@@ -40,8 +40,8 @@ _RESULTS = [  # envelope test_results, tagged with their source; one rule yields
     {"rule": "DISABLE_DROP_SHADOW", "severity": "warning", "object": "Page 1", "message": "",
      "status": "pass", "source": "rules"},
 ]
-_PAIRED = "📜 Slicer contract: Sales.Report.odcs.yaml (2 slicer checks, 1 bookmark navigator)"
-_NONE = "📜 Slicer contract: none (no *.odcs.yaml under --artifact-dir has fabTestReport abc; only the PBIR rules run)"
+_PAIRED = ""
+_NONE = "no *.odcs.yaml under --artifact-dir has fabTestReport abc; only the PBIR rules run"
 _CONTRACT_SOURCE = "Slicer contract (Sales.Report.odcs.yaml)"
 
 
@@ -113,6 +113,34 @@ def test_given_every_check_passed_should_say_so(tmp_path):
     sources = _sources(_page(tmp_path, _envelope(results)))
 
     assert "1 bookmark navigator · all passed" in sources and "PBIR rules: 1 result · all passed" in sources
+
+
+@pytest.mark.pbir
+def test_given_pbir_inspector_ran_nothing_should_not_say_all_passed(tmp_path):
+    sources = _sources(_page(tmp_path, _envelope(results=[])))
+
+    assert "1 bookmark navigator · nothing ran" in sources and "PBIR rules: 0 results · nothing ran" in sources
+    assert "all passed" not in sources
+
+
+@pytest.mark.pbir
+def test_given_some_contract_checks_did_not_run_should_count_them(tmp_path):
+    results = [r for r in _RESULTS if r["rule"] in ("CONTRACT.alignment-default", "DISABLE_DROP_SHADOW")]
+
+    sources = _sources(_page(tmp_path, _envelope(results)))
+
+    assert "1 bookmark navigator · 1 passed, 2 not run" in sources
+
+
+@pytest.mark.pbir
+def test_given_html_in_a_contract_file_name_should_escape_it(tmp_path):
+    contract = {**_SUMMARY, "file": "Sales<img src=x>.Report.odcs.yaml"}
+
+    page = _page(tmp_path, _envelope(contract=contract))
+
+    assert "<img" not in page
+    assert "<td>Slicer contract (Sales&lt;img src=x&gt;.Report.odcs.yaml)</td>" in page              # Source
+    assert "<code>Sales&lt;img src=x&gt;.Report.odcs.yaml</code>" in page                           # its path
 
 
 @pytest.mark.pbir

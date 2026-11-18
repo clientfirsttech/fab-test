@@ -46,11 +46,15 @@ def contract_line(report: Path, contract_summary: Path | None) -> str:
     if contract_summary is not None:
         name, checks = describe(json.loads(contract_summary.read_text(encoding="utf-8")))
         return f"📜 Slicer contract: {name} ({checks})"
+    return f"📜 Slicer contract: none ({unpaired_reason(report)})"
+
+
+def unpaired_reason(report: Path) -> str:
+    """Why no contract paired with ``report``."""
     logical_id = report_logical_id(report)
     if not logical_id:
-        return "📜 Slicer contract: none (the report has no .platform logicalId to pair on; pass --contract FILE)"
-    return (f"📜 Slicer contract: none (no *.odcs.yaml under --artifact-dir has fabTestReport {logical_id}; "
-            "only the PBIR rules run)")
+        return "the report has no .platform logicalId to pair on; pass --contract FILE"
+    return f"no *.odcs.yaml under --artifact-dir has fabTestReport {logical_id}; only the PBIR rules run"
 
 
 def describe(summary: dict) -> tuple[str, str]:
@@ -84,19 +88,19 @@ def contract_rows(summary: dict, results: list[dict[str, Any]]) -> list[tuple]:
         if r.get("source") == CONTRACT and _RANK.get(status, 3) < _RANK.get(worst.get(r["rule"], ("",))[0], 3):
             worst[r["rule"]] = (status, "" if status == "pass" else r.get("message", ""))
     rows = []
-    checks = [(r["id"], r["severity"], r["page"], f"{r['field']} {_expects(r['check'], r['expected'])}")
+    checks = [(r["id"], r["severity"], r["page"], f"{r['field']} {expects(r['check'], r['expected'])}")
               for r in summary.get("rules", [])]
     checks += [(n["id"], n["severity"], n["page"], f"bookmark navigator opens with {n['expected'] or 'no bookmark'}")
                for n in summary.get("navigators", [])]
-    for rule_id, severity, page, expects in checks:
+    for rule_id, severity, page, wanted in checks:
         status, found_text = worst.pop(RULE_PREFIX + rule_id, ("not run", ""))
-        rows.append((RULE_PREFIX + rule_id, severity, page, expects, found_text, status))
+        rows.append((RULE_PREFIX + rule_id, severity, page, wanted, found_text, status))
     rows += [(rule, "error", rule.removeprefix(f"{RULE_PREFIX}page."), "the page exists", found_text, status)
              for rule, (status, found_text) in worst.items()]
     return rows
 
 
-def _expects(check: str, expected: Any) -> str:
+def expects(check: str, expected: Any) -> str:
     """A check's expected opening state in words, as Desktop shows it."""
     if check == "selected":
         values = "Select all" if expected == "all" else ", ".join(map(str, expected)) or "nothing ticked"

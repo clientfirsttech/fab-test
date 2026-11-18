@@ -201,3 +201,102 @@ def test_given_a_terminal_that_closes_before_the_fiscal_year_is_answered_should_
     code, _out, err = _run(report, capsys)
 
     assert code == 2 and START in err and not _contract(report).exists()
+
+
+@pytest.mark.pbir
+@pytest.mark.parametrize("rule_id", ["date-between-date", "date-relative-date", "input-slicer-name",
+                                     "empty-and-all-eye-color", "empty-and-all-alignment"])
+def test_given_current_for_a_slicer_with_no_values_ticked_should_exit_2_and_write_nothing(tmp_path, capsys, rule_id):
+    report = _bed(tmp_path)
+
+    code, _out, err = _answer(tmp_path, report, capsys, {rule_id: {"current": "{year}"}, SEMESTER: "skip"})
+
+    assert code == 2 and not _contract(report).exists()
+    assert f"{rule_id}: only a slicer with values ticked can follow the current period" in err
+    assert "Traceback" not in err
+
+
+@pytest.mark.pbir
+def test_given_force_replacing_the_fiscal_year_should_recheck_every_rule_that_follows_it(tmp_path, capsys):
+    report = _bed(tmp_path)
+    assert _answer(tmp_path, report, capsys, {START: 7, NAMED_BY: "end"})[0] == 0
+
+    code, _out, err = _run(report, capsys, "--force", "--answers",
+                           str(_answers_file(tmp_path, {START: 4, NAMED_BY: "end"})))
+
+    assert code == 2, err
+    assert f"{SEMESTER}: with a fiscal year starting in April, named by the year it ends in, today is FY27-S2" in err
+    assert load_contract(_contract(report)).calendar == {"fiscal_year_start_month": 7, "fiscal_year_named_by": "end"}
+
+
+@pytest.mark.pbir
+def test_given_a_new_fiscal_year_should_say_so_in_the_summary(tmp_path, capsys):
+    code, out, err = _answer(tmp_path, _bed(tmp_path), capsys, {START: 7, NAMED_BY: "end"})
+
+    assert code == 0, err
+    assert "fabTestCalendar: added (a fiscal year starting in July, named by the year it ends in)" in out
+
+
+@pytest.mark.pbir
+def test_given_the_contracts_fiscal_year_was_kept_over_the_answer_should_say_so_when_refusing(tmp_path, capsys):
+    report = _bed(tmp_path)
+    assert _answer(tmp_path, report, capsys, {START: 7, NAMED_BY: "end"})[0] == 0
+    document = yaml.safe_load(_contract(report).read_text(encoding="utf-8"))   # a wrong fiscal year, set by hand
+    next(p for p in document["customProperties"] if p["property"] == "fabTestCalendar")["value"] = {
+        "fiscal_year_start_month": 4, "fiscal_year_named_by": "end"}
+    for table in document["schema"]:
+        for prop in table["properties"]:
+            prop["quality"] = [r for r in prop["quality"] if r["id"] != SEMESTER]
+    _contract(report).write_text(yaml.safe_dump(document, sort_keys=False), encoding="utf-8")
+
+    code, _out, err = _answer(tmp_path, report, capsys, {START: 7, NAMED_BY: "end"})
+
+    assert code == 2
+    assert "the contract's fabTestCalendar was kept over your answers; --force replaces it" in err
+
+
+@pytest.mark.pbir
+def test_given_a_custom_fiscal_format_and_a_contract_with_a_fiscal_year_should_use_it(tmp_path, capsys):
+    report = _bed(tmp_path)
+    assert _answer(tmp_path, report, capsys, {START: 7, NAMED_BY: "end"})[0] == 0
+    _set_value(report, "Fiscal Semester", "'FY2027 Sem 1'")          # no known format: no fiscal questions listed
+
+    code, _out, err = _run(report, capsys, "--force", "--answers", str(_answers_file(
+        tmp_path, {SEMESTER: {"current": "FY{fiscal_year} Sem {fiscal_semester}"}})))
+
+    assert code == 0, err
+
+
+@pytest.mark.pbir
+def test_given_fiscal_answers_no_question_listed_should_accept_them(tmp_path, capsys):
+    report = _bed(tmp_path)
+    _set_value(report, "Fiscal Semester", "'FY2027 Sem 1'")
+    assert START not in _questions(report, capsys)
+
+    code, _out, err = _answer(tmp_path, report, capsys, {
+        SEMESTER: {"current": "FY{fiscal_year} Sem {fiscal_semester}"}, START: 7, NAMED_BY: "end"})
+
+    assert code == 0, err
+    assert load_contract(_contract(report)).calendar == {"fiscal_year_start_month": 7, "fiscal_year_named_by": "end"}
+
+
+@pytest.mark.pbir
+def test_given_a_january_fiscal_year_on_a_terminal_should_not_ask_how_it_is_named(tmp_path, capsys, monkeypatch):
+    import io
+
+    report = _bed(tmp_path)
+    _set_value(report, "Fiscal Semester", "'FY26-S2'")
+    questions = len(_questions(report, capsys)) - 2
+    monkeypatch.setattr("sys.stdin", io.StringIO("\n" * questions + "1\n"))   # no answer for the naming question
+    monkeypatch.setattr("fab_test.scripts._slicer_contract_init.can_ask", lambda: True)
+
+    code, _out, err = _run(report, capsys)
+
+    assert code == 0, err
+    assert "Is January" not in err
+
+
+def _answers_file(tmp_path: Path, answers: dict) -> Path:
+    path = tmp_path / "answers.json"
+    path.write_text(json.dumps(answers), encoding="utf-8")
+    return path

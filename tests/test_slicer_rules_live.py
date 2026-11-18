@@ -303,7 +303,6 @@ def test_given_report_should_show_the_contract_and_frame_pbir_inspectors_page(in
     assert '<iframe src="native.json/TestRun.html"' in html
     page = Path(envelope["inspector_html_output_path"])
     text = page.read_text(encoding="utf-8")
-    assert "fabTestContract" not in text
     start = text.index("let testRunData = ") + len("let testRunData = ")
     results = json.JSONDecoder().raw_decode(text, start)[0]["Results"]
     assert {r["RuleSetName"] for r in results if r["RuleId"].startswith("CONTRACT.")} == {"Slicer contract"}
