@@ -122,8 +122,11 @@ ContractInit {
   (--force replaces the contract's fabTestCalendar) => every rule following a fiscal field is checked again; the same
   (current for a slicer with no values ticked: a range, relative, input, Select all or nothing ticked) => exit 2
   (an existing contract) => adds rules for uncovered slicers; keeps every rule it has; --force replaces a differing rule's implementation only (severity and other keys stay)
+  (a rule or navigator already in the contract) => its question keeps that rule's id, even one renamed by hand; a new rule never takes an id the contract uses
   (its fabTestCalendar differs from the answers) => kept and reported (`calendar: kept`); --force replaces it
   (the contract contains '#') => exit 2 unless --force, because rewriting drops comments
+  ('#' without --force, a file that isn't a YAML mapping, an id two rules share, or no contract and no .platform logicalId)
+    => exit 2 before the first question, --questions included
   (the result wouldn't read back as fab-test pbir reads it, or the report has no .platform logicalId) => exit 2; nothing written
   (on a terminal) => prompts go to stderr, so --format json stdout stays one document
   -q / ANALYZER_VERBOSITY=summary / fab-test.yml verbosity: summary => nothing printed on success; errors,

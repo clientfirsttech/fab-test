@@ -53,6 +53,7 @@ from ._slicer_init_calendar import (
     suggestion,
     uses_fiscal,
 )
+from ._slicer_init_existing import ExistingContractError, Owner, navigator_owner, read_existing, slicer_owner
 from ._slicer_init_output import (
     add_output_flags,
     can_ask,
@@ -72,12 +73,16 @@ def contract_main(argv: list[str]) -> int:
     args = _parser().parse_args(argv)
     try:
         report = _report(args)
-        questions = build_questions(report, args.as_of or today())
+        try:  # anything that would stop the write is found before the first question
+            existing, owners = read_existing(_contract_path(report), report, args.force)
+        except ExistingContractError as exc:
+            raise InitError(str(exc)) from exc
+        questions = build_questions(report, args.as_of or today(), owners)
         if args.questions:
             print_payload(args, questions, questions_text, asked_for=True)
             return 0
         answers = _answers(args, questions)
-        return _write(args, report, questions, answers)
+        return _write(args, report, questions, answers, existing)
     except (InitError, CalendarError, ContractError) as exc:
         print(f"  ✗ fab-test pbir contract: {exc}", file=sys.stderr)
         return 2
@@ -128,13 +133,18 @@ def _report(args: argparse.Namespace) -> Path:
     return report
 
 
-def build_questions(report: Path, as_of: datetime.date) -> dict[str, Any]:
+def build_questions(report: Path, as_of: datetime.date, owners: dict[str, Owner] | None = None) -> dict[str, Any]:
+    """The questions for ``report``; ``owners`` (each id an existing contract uses, and what it checks) keeps
+    a rule's own id and gives no other question one already taken."""
     used: set[str] = set()
+    owners = owners or {}
     try:
         slicers = _one_per_column(read_slicers(report))
-        questions = [_slicer_question(s, _rule_id(f"{s.page} {s.column}", used, f"slicer-{i + 1}"), as_of)
+        questions = [_slicer_question(s, _rule_id(f"{s.page} {s.column}", used, f"slicer-{i + 1}",
+                                                  slicer_owner(s.page, s.table, s.column), owners), as_of)
                      for i, s in enumerate(slicers)]
-        questions += navigator_questions(report, lambda text: _rule_id(text, used))
+        questions += navigator_questions(
+            report, lambda text, page: _rule_id(text, used, "rule", navigator_owner(page), owners))
     except (OSError, ValueError) as exc:
         raise InitError(f"{report}: a page or visual file can't be read ({exc})") from exc
     questions += fiscal_questions(questions, existing_calendar(_contract_path(report)))
@@ -160,10 +170,17 @@ def _one_per_column(slicers: list[Slicer]) -> list[Slicer]:
     return result
 
 
-def _rule_id(text: str, used: set[str], fallback: str = "rule") -> str:
+def _rule_id(text: str, used: set[str], fallback: str = "rule", owner: Owner | None = None,
+             owners: dict[str, Owner] | None = None) -> str:
+    """The id the contract already gives ``owner``, else one made from ``text`` that nothing else uses."""
+    owners = owners or {}
+    mine = next((i for i, o in owners.items() if owner is not None and o == owner and i not in used), None)
+    if mine:
+        used.add(mine)
+        return mine
     base = re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-") or fallback
     rule_id, n = base, 1
-    while rule_id in used or rule_id.startswith("page."):
+    while rule_id in used or rule_id in owners or rule_id.startswith("page."):
         n += 1
         rule_id = f"{base}-{n}"
     used.add(rule_id)
@@ -295,7 +312,7 @@ def _escaped(values: list | str) -> list | str:
     return [v.replace("{", "{{").replace("}", "}}") if isinstance(v, str) else v for v in values]
 
 
-def _write(args: argparse.Namespace, report: Path, questions: dict, answers: dict) -> int:
+def _write(args: argparse.Namespace, report: Path, questions: dict, answers: dict, existing: dict | None) -> int:
     built = [(q, *_rule(q, answers[q["id"]])) for q in questions["questions"] if "column" in q]
     rules = [(q, rule) for q, rule, _ in built if rule]
     fiscal_ids = [q["id"] for q, rule, follows in built
@@ -307,7 +324,7 @@ def _write(args: argparse.Namespace, report: Path, questions: dict, answers: dic
         raise InitError(str(exc)) from exc
     if calendar:
         validate_calendar(calendar)
-    document, summary = _merge(path, report, rules, calendar, args.force)
+    document, summary = _merge(existing or _new_document(report), rules, calendar, args.force)
     try:
         apply_navigator_answers(document, questions["questions"], answers, args.force, summary)
     except ValueError as exc:
@@ -332,18 +349,8 @@ def _write(args: argparse.Namespace, report: Path, questions: dict, answers: dic
     return 0
 
 
-def _merge(path: Path, report: Path, rules: list, calendar: dict | None, force: bool):
+def _merge(document: dict, rules: list, calendar: dict | None, force: bool):
     summary: dict[str, Any] = {"added": [], "kept": [], "replaced": [], "unchanged": [], "calendar": None}
-    if path.exists():
-        text = path.read_text(encoding="utf-8")
-        if "#" in text and not force:
-            raise InitError(f"{path} contains '#' (a comment), which rewriting would drop; edit it by hand, "
-                            "or pass --force to rewrite it (see the result first with --dry-run)")
-        document = yaml.safe_load(text)
-        if not isinstance(document, dict):
-            raise InitError(f"{path} isn't a contract (not a YAML mapping); move it aside or fix it")
-    else:
-        document = _new_document(report)
     summary["calendar"] = merge_calendar(document, calendar, force)
     for q, rule in rules:
         quality = _column(document, q["table"], q["column"])
@@ -362,10 +369,8 @@ def _merge(path: Path, report: Path, rules: list, calendar: dict | None, force: 
 
 
 def _new_document(report: Path) -> dict[str, Any]:
+    """A contract for ``report``, which read_existing has checked has a logicalId."""
     logical_id = report_logical_id(report)
-    if not logical_id:
-        raise InitError(f"{report} has no .platform logicalId, which a contract pairs by; "
-                        "save the report from Power BI Desktop or Fabric to create it")
     name = report.name.removesuffix(".Report")
     return {"apiVersion": "v3.1.0", "kind": "DataContract",
             "id": re.sub(r"[^a-z0-9]+", "-", f"{name} slicer defaults".lower()).strip("-") or "slicer-defaults",

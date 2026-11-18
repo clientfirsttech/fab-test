@@ -250,39 +250,6 @@ def _visual_page_names(artifact_path: Path) -> dict[str, str]:
     return names
 
 
-def _page_name(finding: dict[str, Any]) -> str:
-    """Extract a page name from a PBIR finding."""
-    parent = finding.get("ParentDisplayName") or ""
-    item_path = finding.get("ItemPath") or ""
-    if parent:
-        return parent
-    if item_path:
-        parts = [p for p in item_path.replace("\\", "/").split("/") if p]
-        if parts:
-            return parts[0]
-    return ""
-
-
-def _object_name(finding: dict[str, Any]) -> str:
-    """Extract an object name from a PBIR finding."""
-    item_path = finding.get("ItemPath") or ""
-    if item_path:
-        parts = [p for p in item_path.replace("\\", "/").split("/") if p]
-        if parts:
-            return parts[-1]
-    return finding.get("ParentDisplayName") or ""
-
-
-def _pbir_severity_label(finding: dict[str, Any]) -> str:
-    """Return a severity label string for a PBIR finding."""
-    return "Error" if _is_error_finding(finding) else "Warning"
-
-
-def _pbir_severity_rank(finding: dict[str, Any]) -> int:
-    """Return numeric severity rank for sorting PBIR findings (errors first)."""
-    return 3 if _is_error_finding(finding) else 2
-
-
 def _pbir_rule_id(finding: dict[str, Any]) -> str:
     """Return the best available rule id for a PBIR finding."""
     return (

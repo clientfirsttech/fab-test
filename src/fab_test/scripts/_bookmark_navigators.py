@@ -151,11 +151,12 @@ def _rule(e: NavigatorExpectation, bookmarks: dict[str, str]) -> dict[str, Any]:
     }
 
 
-def navigator_questions(report: Path, rule_id: Callable[[str], str]) -> list[dict[str, Any]]:
-    """`contract init` questions, one per page with a navigator; ``rule_id`` makes ids unique across the contract."""
+def navigator_questions(report: Path, rule_id: Callable[[str, str], str]) -> list[dict[str, Any]]:
+    """`contract init` questions, one per page with a navigator; ``rule_id(text, page)`` gives each its id,
+    unique across the contract."""
     questions = []
     for n in read_navigators(report):
-        question = {"id": rule_id(f"{n.page} bookmark navigator"), "kind": "navigator", "page": n.page,
+        question = {"id": rule_id(f"{n.page} bookmark navigator", n.page), "kind": "navigator", "page": n.page,
                     "current": n.current, "needs_human": False}
         if "unsupported" in n.current:
             question.update(prompt=f"{n.page}: the bookmark navigator opens with {n.current['unsupported']}, "

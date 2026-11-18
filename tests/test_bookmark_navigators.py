@@ -262,7 +262,7 @@ def _question(current):
 def test_given_an_unsupported_navigator_should_offer_only_skip(tmp_path):
     from fab_test.scripts._bookmark_navigators import navigator_questions
 
-    [question] = navigator_questions(_report(tmp_path, "gone"), lambda text: "n")
+    [question] = navigator_questions(_report(tmp_path, "gone"), lambda text, page: "n")
 
     assert (question["choices"], question["suggested"]) == (["skip"], "skip")
     assert "a bookmark the report no longer has (gone)" in question["prompt"]
@@ -272,8 +272,8 @@ def test_given_an_unsupported_navigator_should_offer_only_skip(tmp_path):
 def test_given_a_navigator_should_offer_keep_and_show_its_bookmark_or_no_bookmark(tmp_path):
     from fab_test.scripts._bookmark_navigators import navigator_questions
 
-    [home] = navigator_questions(_report(tmp_path, "b1"), lambda text: "n")
-    [nothing] = navigator_questions(_report(tmp_path / "2", None), lambda text: "n")
+    [home] = navigator_questions(_report(tmp_path, "b1"), lambda text, page: "n")
+    [nothing] = navigator_questions(_report(tmp_path / "2", None), lambda text, page: "n")
 
     assert (home["choices"], home["suggested"]) == (["keep", "skip"], "keep")
     assert "opens with Home." in home["prompt"] and "opens with no bookmark." in nothing["prompt"]
