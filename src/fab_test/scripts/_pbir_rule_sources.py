@@ -9,6 +9,7 @@ envelope row with `source`: `rules` or `contract`.
 
 from __future__ import annotations
 
+import contextlib
 import json
 from pathlib import Path
 from typing import Any
@@ -25,8 +26,19 @@ def source_of(rule_id: str) -> str:
 
 
 def tag_sources(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Each finding or test result with the rule set it came from."""
-    return [{**row, "source": source_of(row.get("rule", ""))} for row in rows]
+    """Each finding or test result with the rule set it came from; a contract row's message is what it found."""
+    tagged = [{**row, "source": source_of(row.get("rule", ""))} for row in rows]
+    return [{**row, "message": found(row.get("message", ""))} if row["source"] == CONTRACT else row for row in tagged]
+
+
+def found(message: str) -> str:
+    """What a rule found, without PBIR Inspector's `Rule "…" FAILED with result: [...], expected: []` wrapper."""
+    start, end = message.find("FAILED with result: ["), message.rfind("], expected:")
+    with contextlib.suppress(ValueError):
+        result = json.loads(message[start + len("FAILED with result: "):end + 1]) if 0 <= start < end else None
+        if isinstance(result, list) and result and all(isinstance(r, str) for r in result):
+            return "; ".join(result)
+    return message
 
 
 def contract_line(report: Path, contract_summary: Path | None) -> str:

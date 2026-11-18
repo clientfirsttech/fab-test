@@ -284,3 +284,18 @@ def test_given_no_contract_should_say_none_paired(inspector, tmp_path):
 
     assert "📜 Slicer contract: none (no *.odcs.yaml under --artifact-dir has fabTestReport " in (
         result.stdout + result.stderr)
+
+
+def test_given_report_should_show_the_contract_on_pbir_inspectors_page(inspector, tmp_path):
+    root = _bed(tmp_path, _contract())
+
+    _run(root, "--report")
+
+    [page] = list((root / "out").glob("pbir/*/native.json/*.html"))
+    text = page.read_text(encoding="utf-8")
+    assert 'id="fabTestContract"' in text and "SampleModel-DefaultState.Report.odcs.yaml (" in text
+    assert "<code>CONTRACT.half-year-current</code>" in text
+    start = text.index("let testRunData = ") + len("let testRunData = ")
+    results = json.JSONDecoder().raw_decode(text, start)[0]["Results"]
+    assert {r["RuleSetName"] for r in results if r["RuleId"].startswith("CONTRACT.")} == {"Slicer contract"}
+    assert {r["RuleSetName"] for r in results if not r["RuleId"].startswith("CONTRACT.")} == {"Rules"}

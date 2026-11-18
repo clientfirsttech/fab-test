@@ -15,6 +15,7 @@ from __future__ import annotations
 import base64
 import contextlib
 import json
+from html import escape
 from pathlib import Path
 
 _BROKEN_FAVICON_LINK = '<link rel="icon" href="../icon/pbiinspector.png">'
@@ -147,3 +148,50 @@ def fix_log_type_filter(report_path: Path) -> None:
     html = html.replace(_BROKEN_LOG_TYPE_CHECK, _FIXED_LOG_TYPE_CHECK)
     with contextlib.suppress(OSError):
         report_path.write_text(html, encoding="utf-8")
+
+
+_DATA_MARKER = "let testRunData = "
+_LAYOUT_MARKER = '<div class="row g-3">'
+_PANEL_ID = 'id="fabTestContract"'
+CONTRACT_RULESET = "Slicer contract"
+
+
+def mark_contract_rules(report_path: Path, contract: str, counts: str, failed: list[dict], paired: bool) -> None:
+    """Show the slicer contract on TestRun.html, and give its results their own ruleset.
+
+    PBIR Inspector lists the packaged rules and the contract's ``CONTRACT.*``
+    rules under one ruleset, "Rules", and the page never says a contract ran.
+    This adds a panel above the results (``contract``: the run header's
+    contract line; ``counts``: findings by rule set; ``failed``: the
+    contract's findings) and renames the contract's results' ruleset to
+    "Slicer contract", so the page's Ruleset Name filter separates them.
+    A page without the data or layout markers, or already marked, is left alone.
+    """
+    with contextlib.suppress(OSError):
+        text = report_path.read_text(encoding="utf-8")
+        begin = text.find(_DATA_MARKER) + len(_DATA_MARKER)
+        if _PANEL_ID in text or begin < len(_DATA_MARKER) or _LAYOUT_MARKER not in text:
+            return
+        try:
+            data, end = json.JSONDecoder().raw_decode(text, begin)
+        except ValueError:
+            return
+        for result in data.get("Results", []) if isinstance(data, dict) else []:
+            if str(result.get("RuleId", "")).startswith("CONTRACT."):
+                result["RuleSetName"] = CONTRACT_RULESET
+        payload = json.dumps(data, ensure_ascii=False).replace("</", r"<\/")  # never close the script early
+        text = text[:begin] + payload + text[end:]
+        text = text.replace(_LAYOUT_MARKER, _contract_panel(contract, counts, failed, paired) + _LAYOUT_MARKER, 1)
+        report_path.write_text(text, encoding="utf-8")
+
+
+def _contract_panel(contract: str, counts: str, failed: list[dict], paired: bool) -> str:
+    items = "".join(f"<li><code>{escape(f['rule'])}</code> {escape(f.get('object', ''))}: "
+                    f"{escape(f.get('message', ''))}</li>" for f in failed)
+    failures = f'<ul class="mb-1">{items}</ul>' if items else ""
+    tip = ('<p class="small text-body-secondary mb-0">Type <kbd>contract</kbd> in Ruleset Name to see only the '
+           "contract's results; its rule ids start with <code>CONTRACT.</code>.</p>") if paired else ""
+    return (f'<div {_PANEL_ID} class="my-3 p-3 bg-body rounded shadow-sm">'
+            f'<h6 class="border-bottom pb-2 mb-2">Slicer contract</h6>'
+            f'<p class="mb-1">{escape(contract.removeprefix("📜 "))}</p><p class="mb-1">{escape(counts)}</p>'
+            f"{failures}{tip}</div>\n        ")

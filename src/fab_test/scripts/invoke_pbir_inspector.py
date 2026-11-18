@@ -33,7 +33,7 @@ from ._analyzer_envelope import (
     native_output_path,
     write_envelope,
 )
-from ._pbir_report_fixups import fix_favicon_link, fix_log_type_filter, fix_screenshot_images
+from ._pbir_report_fixups import fix_favicon_link, fix_log_type_filter, fix_screenshot_images, mark_contract_rules
 from ._pbir_rule_sources import contract_line, count_line, tag_sources
 from ._table_style import findings_table
 
@@ -590,7 +590,7 @@ def run_inspector(args: argparse.Namespace) -> int:
     level = _verbosity()
     contract_summary = Path(args.contract_summary) if getattr(args, "contract_summary", None) else None
     _log_run_header(level, artifact_stem, artifact_path, rules_path, inspector_path, output_path, native_out,
-                    contract=contract_line(artifact_path, contract_summary))
+                    contract=(contract := contract_line(artifact_path, contract_summary)))
 
     # Ensure output directories exist before invoking the tool.
     native_out.parent.mkdir(parents=True, exist_ok=True)
@@ -630,6 +630,10 @@ def run_inspector(args: argparse.Namespace) -> int:
     findings = tag_sources([_normalize_finding(f, page_names) for f in raw_findings if _is_violation(f)])
     test_results = tag_sources(_pbir_test_results(raw_findings, page_names))
     native_html_out = _locate_native_html(native_out, emit_html, inspector_path)
+    if native_html_out:  # PBIR Inspector's page doesn't know a contract ran; say so on it
+        paired = contract_summary is not None
+        mark_contract_rules(native_html_out, contract, count_line(findings, paired),
+                            [f for f in findings if f["source"] == "contract"], paired)
 
     outcome = _classify_inspector_result(findings, proc.returncode, has_output=bool(raw_findings))
     write_results(

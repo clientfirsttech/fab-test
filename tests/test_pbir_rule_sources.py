@@ -90,3 +90,24 @@ def test_given_a_report_without_a_logical_id_should_say_it_cant_pair(tmp_path):
 ])
 def test_given_findings_should_split_the_count_by_rule_set(rules, paired, expected):
     assert count_line([{"rule": r} for r in rules], paired) == expected
+
+
+FOUND = "'Fiscal Calendar'[Half Year] opens with ['2025 H2']; the contract expects 2026 H2"
+# As PBIR Inspector writes a failed rule's message (CRLF and all).
+WRAPPED = ("Rule \"Standard Slicers: 'Fiscal Calendar'[Half Year] opens with 2026 H2\" FAILED with result: [\r\n"
+           f"  {json.dumps(FOUND)}\r\n], expected: []")
+
+
+@pytest.mark.pbir
+def test_given_a_contract_finding_should_carry_only_what_the_rule_found():
+    [row] = tag_sources([{"rule": "CONTRACT.half-year-current", "message": WRAPPED}])
+
+    assert row["message"] == FOUND
+
+
+@pytest.mark.pbir
+@pytest.mark.parametrize("rule, message", [("SHOW_VISUAL_HEADER", WRAPPED),                 # not ours to reword
+                                           ("CONTRACT.r1", "no result list to unwrap"),
+                                           ("CONTRACT.r1", 'FAILED with result: [1, 2], expected: []')])
+def test_given_any_other_message_should_leave_it_as_pbir_inspector_wrote_it(rule, message):
+    assert tag_sources([{"rule": rule, "message": message}])[0]["message"] == message
