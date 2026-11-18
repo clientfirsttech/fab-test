@@ -109,8 +109,11 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
         ),
     ),
     "src/fab_test/scripts/invoke_playwright.py": (
-        1049,
+        1050,
         (
+            "2026-11-18: +1 line importing explain_paginated_failures, which says when a paginated "
+            "report's workspace has no capacity; the logic lives in playwright_validation/"
+            "paginated_capacity.py. "
             "2026-10-09: +28 lines for Run Timing task 2: loading the timing plugin, lapping "
             "discovery/token/render phases, and splitting the envelope-building tail into "
             "_finish_report so _run_single_report stays under the statement budget. The timing "

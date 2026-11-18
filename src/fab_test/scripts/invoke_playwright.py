@@ -59,6 +59,7 @@ from .playwright_validation.execution_runtime import (
     redact_execution_text,
 )
 from .playwright_validation.fabric_service_client import build_fabric_service_client
+from .playwright_validation.paginated_capacity import explain_paginated_failures
 from .playwright_validation.phase_timing import TIMING_PLUGIN, PhaseClock, case_timing, clear_case_timing
 from .playwright_validation.power_bi_api import PowerBiApiError
 from .playwright_validation.resolver import (
@@ -921,10 +922,10 @@ def _finish_report(
     if summary:
         message += f" ({summary})"
 
-    test_results = _test_results_rows(
+    test_results = explain_paginated_failures(_test_results_rows(
         cases, test_cases_dir, overall_success=success, cloud=config.cloud,
         fallback_error=setup_error or "",
-    )
+    ), config)  # an RDL error in a workspace with no capacity says so
     message = setup_error or message
     findings = (
         [{

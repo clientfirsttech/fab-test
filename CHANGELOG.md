@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-11-18
+
+- 🐛 - `fab-test playwright` Says When A Paginated Report's Workspace Has No Capacity - Power BI renders a paginated report only on a capacity (Fabric, Premium or Premium Per User). In a workspace without one the embedded report opens with "Query execution failed for dataset 'DataSet1'", and the run recorded only `RDL error modal detected`, which points at the report and its data. When a paginated case fails that way, the workspace is now checked once and, if it has no capacity, the case's `actual` and finding say so and name the fix (assign one in the workspace's settings, under License info). A check that can't be made adds nothing.
+
 ## 2026-11-13
 
 - 📦 - Version `1.10.0b1` - User-requested minor bump from `1.9.0b12`, retaining public beta status; installation examples and both fab-test skill copies name the new version.
