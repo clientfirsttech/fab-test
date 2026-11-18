@@ -457,3 +457,29 @@ def test_given_the_unreleased_calendar_answer_should_refuse_it_naming_current(tm
 
     assert code == 2
     assert f'{SEMESTER}: answer must be keep, current, skip or {{"current": "<format>"}}, got {answer!r}' in err
+
+
+@pytest.mark.pbir
+@pytest.mark.parametrize("rule_id, shown", [("date-relative-date", "Last 20 Calendar Months"),
+                                            ("date-between-date", "up to 2026-10-28"),
+                                            ("date-picker-date", "1939-10-01 to 1951-08-27")])
+def test_given_a_date_slicer_should_show_what_it_opens_with_in_words_not_json(tmp_path, capsys, rule_id, shown):
+    question = {q["id"]: q for q in _questions(_bed(tmp_path), capsys)["questions"]}[rule_id]
+
+    assert f"opens with {shown}. Keep checking that or skip it?" in question["prompt"]
+
+
+@pytest.mark.pbir
+def test_given_a_terminal_should_take_the_first_letter_of_a_choice(tmp_path, capsys, monkeypatch):
+    report = _bed(tmp_path)
+    ids = [q["id"] for q in _questions(report, capsys)["questions"]][:-2]   # then the fiscal year
+    assert ids[:2] == ["standard-slicers-alignment", "standard-slicers-chart-measure"]  # neither is a period
+
+    code, _out, err = _run(report, capsys, monkeypatch=monkeypatch, tty=True,
+                           typed="s\nk\n" + "\n" * (len(ids) - 2) + "7\ne\n")  # skip, keep, defaults
+
+    assert code == 0, err
+    assert "isn't one of" not in err
+    rules = {e.rule_id for e in load_contract(_contract_path(report)).expectations}
+    assert "standard-slicers-alignment" not in rules and "standard-slicers-chart-measure" in rules
+    assert load_contract(_contract_path(report)).calendar["fiscal_year_named_by"] == "end"

@@ -177,7 +177,10 @@ def _show(current: dict) -> str:
         return "Select all"
     if check in ("selected", "contains"):
         return ", ".join(map(str, value)) or ("no selection" if check == "selected" else "nothing typed")
-    return json.dumps(value, default=str)
+    if check == "relative":  # as Desktop shows it: Last 20 Calendar Months
+        return f"{value['range']} {value['duration']} {value['period']}"
+    start, end = value.get("from"), value.get("to")
+    return f"{start} to {end}" if start and end else f"up to {end}" if end else f"from {start} on"
 
 
 def _answers(args: argparse.Namespace, questions: dict) -> dict[str, Any]:
@@ -227,6 +230,8 @@ def _ask_one(q: dict, prompt: str) -> Any:
             if q["suggested"] is None:
                 raise InitError(f"{q['id']}: no answer, and it has no default") from exc
             typed = ""
+        letters = [c for c in q.get("choices", []) if typed and c.startswith(typed.lower())]
+        typed = letters[0] if len(letters) == 1 else typed  # `k` for keep, `e` for end
         if typed in valid:
             return int(typed) if typed.isdigit() else typed
         if not typed and q["suggested"] is not None:

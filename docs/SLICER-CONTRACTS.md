@@ -37,7 +37,7 @@ A slicer that follows a fiscal period (`FY27-S1`, `FY26`) also needs your compan
 
 Preview a rollover with `--as-of` on its first day. A contract has one fiscal calendar, and a label naming both years (`2026-27`) can't follow the current period, so keep it and update it at rollover.
 
-Enter takes the suggestion. The contract is written beside the report, never inside it: Fabric deletes files inside a report folder that aren't part of the report.
+Type a choice or its first letter; Enter takes the suggestion. The contract is written beside the report, never inside it: Fabric deletes files inside a report folder that aren't part of the report.
 
 Run `init` again after adding slicers: it adds rules for the new ones and leaves yours alone (`--force` replaces a rule's check, keeping anything else you added to it). `--dry-run` shows the file without writing it, and nothing is written unless the result is a contract `fab-test pbir` accepts.
 

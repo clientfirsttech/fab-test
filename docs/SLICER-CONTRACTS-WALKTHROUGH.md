@@ -81,7 +81,7 @@ From the repository root, point `init` at the report folder:
 fab-test pbir contract init "Sales.Report"
 ```
 
-`init` lists every slicer, page by page, and asks one question each. Press Enter to take the default in brackets.
+`init` lists every slicer, page by page, and asks one question each. Type a choice or its first letter (`k`, `c`, `s`), or press Enter to take the default.
 
 ```text
 Overview: 'Product'[Category] opens with Bikes. Keep checking that or skip it?
