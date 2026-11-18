@@ -120,7 +120,7 @@ A calendar period (`2026 H2`, `2026-11`) doesn't need these, and a January fisca
 
 `init` writes `Sales.Report.odcs.yaml` **beside** the report folder, never inside it: Fabric's Git sync deletes files inside a report folder that aren't part of the report. It pairs with the report through the `logicalId` in `Sales.Report/.platform`, so renaming the report folder doesn't break the pairing.
 
-Add `--dry-run` to see the file without writing it.
+Add `--dry-run` to see the file without writing it. `-q` prints nothing when it succeeds (the exit code says it did), and `-v` lists every rule in the contract with what it checks and whether it was added, kept or replaced.
 
 ### Letting an agent build it instead
 
@@ -209,6 +209,8 @@ A run checks two sets of rules: the **PBIR rules** every report gets (fab-test's
 **Which contract?** The one whose `fabTestReport` matches the `logicalId` in the report's `.platform`, wherever it sits under `--artifact-dir`; the file name doesn't matter. If none matches, the 📜 line says `none` and names the `logicalId` it looked for. `--artifact` narrows the reports checked, not the contracts read: every contract under `--artifact-dir` is read first, so a broken one for another report still stops the run (exit 2, with a note saying so).
 
 On a report saved straight after `init`, every `CONTRACT.*` rule passes: `0 from the slicer contract`.
+
+Add `--open-report` to see it in a browser. PBIR Inspector's page opens with a **Slicer contract** panel: the contract it used (or why none paired), the same split count, and each contract rule that failed. In the results below, the contract's rules are under the ruleset *Slicer contract* and the PBIR rules under *Rules*, so typing `contract` in the page's Ruleset Name filter shows only the contract's.
 
 ## Step 5: Prove it catches a mistake
 

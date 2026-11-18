@@ -51,6 +51,14 @@ from ._slicer_init_calendar import (
     suggestion,
     uses_fiscal,
 )
+from ._slicer_init_output import (
+    add_output_flags,
+    level,
+    print_payload,
+    questions_text,
+    report_refusal,
+    summary_text,
+)
 
 
 class InitError(Exception):
@@ -63,7 +71,7 @@ def contract_main(argv: list[str]) -> int:
         report = _report(args)
         questions = build_questions(report, args.as_of or today())
         if args.questions:
-            _print(args, questions, _questions_text)
+            print_payload(args, questions, questions_text, asked_for=True)
             return 0
         answers = _answers(args, questions)
         return _write(args, report, questions, answers)
@@ -89,6 +97,7 @@ def _parser() -> argparse.ArgumentParser:
     init.add_argument("--force", action="store_true",
                       help="Replace rules that differ, and rewrite a commented contract")
     init.add_argument("--format", choices=("text", "json"), default="text", dest="output_format")
+    add_output_flags(init)
     return parser
 
 
@@ -106,6 +115,9 @@ def _report(args: argparse.Namespace) -> Path:
         raise InitError("name the report: a path to its .Report folder, or --artifact NAME")
     if not (report / "definition" / "pages").is_dir():
         raise InitError(f"{report} is not a PBIR report folder (no definition/pages)")
+    refusal = report_refusal(args, report.name)  # --report / --open-report belong to `fab-test pbir`
+    if refusal:
+        raise InitError(refusal)
     return report
 
 
@@ -298,9 +310,10 @@ def _write(args: argparse.Namespace, report: Path, questions: dict, answers: dic
     text = yaml.safe_dump(document, sort_keys=False, allow_unicode=True)
     if not args.dry_run:
         path.write_text(text, encoding="utf-8")
-    _print(args, {"contract": str(path), "written": not args.dry_run, **summary,
-                  **({"content": text} if args.dry_run else {})},
-           lambda s: text if args.dry_run else _summary_text(s))
+    verbose = contract if level(args) == "verbose" else None
+    print_payload(args, {"contract": str(path), "written": not args.dry_run, **summary,
+                         **({"content": text} if args.dry_run else {})},
+                  lambda s: text if args.dry_run else summary_text(s, verbose), asked_for=args.dry_run)
     return 0
 
 
@@ -373,25 +386,3 @@ def _named(items: list, name: str) -> dict:
 
 def _contract_path(report: Path) -> Path:
     return report.parent / f"{report.name}{CONTRACT_SUFFIX}"
-
-
-def _print(args: argparse.Namespace, payload: dict, as_text) -> None:
-    print(json.dumps(payload, indent=2, default=str) if args.output_format == "json" else as_text(payload))
-
-
-def _questions_text(questions: dict) -> str:
-    lines = [f"Contract: {questions['contract']} (as of {questions['as_of']})"]
-    for q in questions["questions"]:
-        hint = f" -> {q['calendar_format']}" if q.get("calendar_format") else ""
-        lines.append(f"  {q['id']}: {q['prompt']} [suggested: {q['suggested']}{hint}]")
-    return "\n".join(lines)
-
-
-def _summary_text(summary: dict) -> str:
-    lines = [f"  ✓ {summary['contract']}"]
-    lines += [f"    {key}: {', '.join(ids)}" for key, ids in summary.items() if isinstance(ids, list) and ids]
-    if summary["kept"]:
-        lines.append("    kept: their checks differ from the report today; --force replaces them")
-    if summary["calendar"] == "kept":
-        lines.append("    the contract's fabTestCalendar differs from your answers and was kept; --force replaces it")
-    return "\n".join(lines)

@@ -42,6 +42,13 @@ Constraints {
   (backward compat) => existing commands, env vars, and result paths released in
                        1.0.0 and later keep working; new surfaces are additive
                        and optional
+  (output modes)  => a new command, flag or output is run under -q, the default, -v,
+                     --format json and --report / --open-report before review passes:
+                     -q prints only the result, the default adds what a person acts on,
+                     -v adds per-item detail, json stdout stays one document, and the
+                     HTML report shows what the terminal shows. A flag that doesn't
+                     apply is refused naming the command that does, never left to
+                     argparse's "unrecognized arguments"
   (secrets)       => credentials are never written to stdout, result envelopes, the run
                      manifest, or telemetry
   (documentation) => an epic is not done until all three callers are documented: the
