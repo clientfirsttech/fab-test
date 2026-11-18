@@ -266,6 +266,14 @@ def _reset_results_stems():
     _SUFFIXED.clear()
 
 
+@pytest.fixture(autouse=True)
+def _default_verbosity(monkeypatch):
+    """Start every test at the default verbosity. An analyzer's main() run in-process with -v or -q sets
+    ANALYZER_VERBOSITY in os.environ for its subprocesses and leaves it set, so without this a test's
+    output depends on which tests ran before it on the same worker. A test that wants a level sets it."""
+    monkeypatch.delenv("ANALYZER_VERBOSITY", raising=False)
+
+
 def _clear_github_env(monkeypatch):
     """Remove every GitHub-Actions env var a git-context test might inherit."""
     for name in (
