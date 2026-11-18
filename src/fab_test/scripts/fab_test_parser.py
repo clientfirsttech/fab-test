@@ -22,6 +22,7 @@ from ._fab_test_context import (
 )
 from ._feature_flags import add_disabled_stubs
 from ._service_flags import add_service_flags, add_workspace_flag
+from ._slicer_contract_run import add_contract_flags
 from .fab_test_registry import (
     _DEFAULT_A11Y_PATH,
     _DEFAULT_BPA_RULES,
@@ -408,6 +409,7 @@ def _add_pbir_subparser(subs: argparse._SubParsersAction) -> None:
         metavar="PATH",
         help=f"PBIR Inspector rules JSON [default: {_DEFAULT_PBIR_RULES}]",
     )
+    add_contract_flags(pbir_p)
 
 def _add_a11y_subparser(subs: argparse._SubParsersAction) -> None:
     a11y_p = subs.add_parser(

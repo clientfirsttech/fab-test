@@ -147,3 +147,40 @@ def fix_log_type_filter(report_path: Path) -> None:
     html = html.replace(_BROKEN_LOG_TYPE_CHECK, _FIXED_LOG_TYPE_CHECK)
     with contextlib.suppress(OSError):
         report_path.write_text(html, encoding="utf-8")
+
+
+_DATA_MARKER = "let testRunData = "
+CONTRACT_RULESET = "Slicer contract"
+
+
+def mark_contract_ruleset(report_path: Path) -> None:
+    """Give the slicer contract's results their own ruleset on TestRun.html.
+
+    PBIR Inspector lists the packaged rules and the contract's ``CONTRACT.*``
+    rules under one ruleset, "Rules". Renaming the contract's to "Slicer
+    contract" lets the page's own Ruleset Name filter separate them. (The
+    contract itself is shown on fab-test's report page, which frames this
+    one.) A page without the data marker, whose data doesn't parse or isn't
+    shaped as expected, or with no contract results, is left as it was;
+    running it twice changes nothing more.
+    """
+    with contextlib.suppress(OSError):
+        text = report_path.read_text(encoding="utf-8")
+        begin = text.find(_DATA_MARKER) + len(_DATA_MARKER)
+        if begin < len(_DATA_MARKER):
+            return
+        try:
+            data, end = json.JSONDecoder().raw_decode(text, begin)
+        except ValueError:
+            return
+        results = data.get("Results") if isinstance(data, dict) else None
+        contract = [r for r in results if isinstance(r, dict) and str(r.get("RuleId", "")).startswith("CONTRACT.")
+                    and r.get("RuleSetName") != CONTRACT_RULESET] if isinstance(results, list) else []
+        if not contract:
+            return
+        for result in contract:
+            result["RuleSetName"] = CONTRACT_RULESET
+        # Inside <script>, any `<` can end it early (`</script>`) or swallow the page's own end (`<!--<script>`);
+        # PBIR Inspector's encoder escapes them all, and so does this.
+        payload = json.dumps(data, ensure_ascii=False).replace("<", r"\u003c")
+        report_path.write_text(text[:begin] + payload + text[end:], encoding="utf-8")

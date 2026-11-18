@@ -31,7 +31,7 @@ When the user invokes you with any of these phrases, execute the corresponding w
 | **discover**, **user journey**, **user story** | `aidd-product-manager`, `aidd-please` | Interactive product discovery session |
 | **task**, **create epic**, **plan task** | `aidd-task-creator`, `aidd-please`, `aidd-tdd` | Plan and execute task epic with TDD |
 | **execute epic**, **run epic** | `aidd-task-creator`, `aidd-please` | Execute previously planned epic |
-| **review**, **code review** | `aidd-review`, `aidd-python`, `aidd-module-budgets`, `aidd-please` | Thorough code review |
+| **review**, **code review** | `aidd-review`, `aidd-python`, `aidd-module-budgets`, `aidd-please` | Thorough code review; run any new command, flag or output under `-q`, the default, `-v`, `--format json` and `--report` / `--open-report` ([vision.md](../../vision.md) `output modes`) |
 | **churn**, **hotspots**, **refactoring** | `aidd-churn`, `aidd-please` | Run hotspot analysis |
 | **fix bug**, **aidd fix** | `aidd-fix`, `aidd-please` | Fix bug with AIDD process |
 | **user test**, **test script** | `aidd-user-testing`, `aidd-please` | Generate test scripts |

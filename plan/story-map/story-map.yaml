@@ -9,3 +9,6 @@ storyMap:
     - file: playwright-execution-config.yaml
       id: pwexec20261001journey0001
       name: Playwright Execution Configuration
+    - file: pbir-slicer-default-state.yaml
+      id: p5puo3stoc7jduf4ahxs857j
+      name: PBIR Slicer Default State

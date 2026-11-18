@@ -1,0 +1,44 @@
+/// Field parameter for the SampleModel-DefaultState test bed (PBIR Slicer Default State epic).
+table 'Chart Measure'
+	lineageTag: 38be4eef-55d7-4ce2-834d-b73f3a7ef4db
+
+	column 'Chart Measure'
+		dataType: string
+		lineageTag: b44cb487-7a78-442c-8ac6-a67a2b141f65
+		summarizeBy: none
+		sourceColumn: [Value1]
+		sortByColumn: 'Chart Measure Order'
+
+		relatedColumnDetails
+			groupByColumn: 'Chart Measure Fields'
+
+	column 'Chart Measure Fields'
+		dataType: string
+		isHidden
+		lineageTag: e986bbbf-02da-4d66-be0a-42da38aeb67a
+		summarizeBy: none
+		sourceColumn: [Value2]
+		sortByColumn: 'Chart Measure Order'
+
+		extendedProperty ParameterMetadata =
+				{
+				  "version": 3,
+				  "kind": 2
+				}
+
+	column 'Chart Measure Order'
+		dataType: int64
+		isHidden
+		formatString: 0
+		lineageTag: 42170389-ba3f-41ab-b5cd-ead4cff5d1cd
+		summarizeBy: sum
+		sourceColumn: [Value3]
+
+	partition 'Chart Measure' = calculated
+		mode: import
+		source =
+				{
+				    ("Number of Characters", NAMEOF('MarvelFact'[Number of Characters]), 0),
+				    ("Running Total", NAMEOF('MarvelFact'[Running Total of Character Appearances]), 1)
+				}
+

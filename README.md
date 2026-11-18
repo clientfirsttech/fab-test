@@ -16,7 +16,7 @@ every command in this README are unchanged.
 
 ### From PyPI (beta)
 
-The current release is the beta `1.10.0b1`. pip skips pre-releases unless you
+The current release is the beta `1.10.0b2`. pip skips pre-releases unless you
 pass `--pre` or name the version, so a bare `pip install cft-fab-test` finds
 nothing until the first final release.
 
@@ -24,7 +24,7 @@ nothing until the first final release.
 python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
 
-pip install --pre cft-fab-test          # or pin it: "cft-fab-test==1.10.0b1"
+pip install --pre cft-fab-test          # or pin it: "cft-fab-test==1.10.0b2"
 
 fab-test --version
 ```
@@ -445,6 +445,20 @@ With a user configured, an RLS-secured model's roles are discovered and tested
 under one embed token each. `PLAYWRIGHT_USER_NAME` still wins over the file, and
 a case with no role embeds with no identity at all.
 
+### Checking what a report's slicers open with
+
+A slicer contract (`<Report>.Report.odcs.yaml`, beside the report) states the
+values each slicer is preselected with, fixed or following the calendar (the
+current semester). `fab-test pbir` checks it with the packaged rules;
+`fab-test pbir contract init` builds it by asking about each slicer.
+
+```bash
+fab-test pbir contract init fabric-artifacts/SampleModel-DefaultState.Report
+fab-test pbir --artifact SampleModel-DefaultState --as-of 2027-01-15
+```
+
+See [docs/SLICER-CONTRACTS.md](https://github.com/clientfirsttech/fab-test/blob/main/docs/SLICER-CONTRACTS.md).
+
 ### Validating a paginated (RDL) report
 
 A Power BI paginated report has no page/bookmark dimension and doesn't fire the
@@ -557,16 +571,16 @@ Each artifact gets a self-contained HTML page beside its envelope, and `fab-test
   ╰────────────┴───────────────────────┴──────────┴───────┴────────╯
 
   pbir/SampleModel-PQLAssert
-    fab-test-results/pbir/SampleModel-PQLAssert/native.json/TestRun.html
+    fab-test-results/pbir/SampleModel-PQLAssert/report.html
   bpa/SampleModel-PQLAssert
     fab-test-results/bpa/SampleModel-PQLAssert/report.html
 
   Index:  fab-test-results/index.html
 ```
 
-PBIR Inspector writes its own `TestRun.html` and it appears **with or without** `--report`; it is richer than anything generated from the envelope, so `fab-test` never overwrites it. Two upstream asset paths in it are repaired in place, both by inlining as base64 so nothing 404s once the report is copied out of the tool's install directory: the favicon link, and every per-object screenshot. Tabular Editor emits TRX and `pql-test` emits JSON, so those two get a generated `report.html`.
+Every analyzer's report is fab-test's `report.html`. For `pbir` it is the same page as `bpa`'s: one filterable table for both rule sets, whose *Source* column says where each row came from (*PBIR rules*, or *Slicer contract (file name)*), a line above it with the contract's path and each set's counts, and PBIR Inspector's own `TestRun.html` (screenshots, page wireframes, its own filters) collapsed in a frame at the bottom. `fab-test` never overwrites PBIR Inspector's page. Two upstream asset paths in it are repaired in place, both by inlining as base64 so nothing 404s once the report is copied out of the tool's install directory: the favicon link, and every per-object screenshot. Tabular Editor emits TRX and `pql-test` emits JSON, so neither has a page of its own.
 
-Every analyzer's envelope also records **every test conducted, not only the failures**: pass, fail, warning, and skip. The two generated reports show that as a table with an All / Errors / Warnings / Passed filter, so a passing run no longer reads as an empty page; PBIR Inspector's own report keeps its own UI, so for that one the full list is there for telemetry to read rather than for the filter to show.
+Every analyzer's envelope also records **every test conducted, not only the failures**: pass, fail, warning, and skip. The reports show that as a table with an All / Errors / Warnings / Passed filter, so a passing run no longer reads as an empty page.
 
 That table also has a **search box and sortable column headers**: type to narrow to a rule, test, or object by name, or click a header to sort by that column (click again to reverse); the sorted column shows a ▲/▼ arrow so it's obvious which column and direction is active, and the arrow moves to whichever column you click next. Both work together with the status filter. The report stays fully offline and self-contained; the small script behind search and sort never fetches or links to anything outside the page itself.
 

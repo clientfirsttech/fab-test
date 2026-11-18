@@ -55,6 +55,7 @@ from ._run_targets import (
 )
 from ._scan import find_skipped_checkouts as _find_skipped_checkouts
 from ._service_export import service_item_type, service_readiness
+from ._slicer_contract_run import prepare_contracts
 from ._target import TargetError, select_target
 from ._telemetry import eventhouse_rows, lakehouse_rows
 from .fab_test_local import _LOCAL_ANALYZERS, _local_readiness
@@ -445,6 +446,8 @@ def _explain_analyzer(args: argparse.Namespace) -> int:
         # this the command named the legacy default while Tool named the
         # bootstrapped install.
         args._resolved_tool_path = str(readiness["resolved_path"])
+    if name == "pbir" and prepare_contracts(args) is not None:
+        return 2
     command = _build_command(name, artifact, args, output_dir)
     default_rules_path = {
         "bpa": _DEFAULT_BPA_RULES,

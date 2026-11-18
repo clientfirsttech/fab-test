@@ -59,6 +59,8 @@ from ._service_export import (
     service_item_type,
     service_target_refusal,
 )
+from ._slicer_contract_init import contract_main
+from ._slicer_contract_run import prepare_contracts
 from ._target import TargetError, select_target, workspace_conflict
 
 # Re-exported: `_dispatch_admin_command`'s handler table and `_prepare_target`
@@ -312,6 +314,7 @@ _PREPARE_STEPS: tuple[Callable[[argparse.Namespace], int | None], ...] = (
     _dispatch_admin_command,
     _prepare_target,
     _prepare_paths,
+    prepare_contracts,
 )
 
 
@@ -390,6 +393,8 @@ def main() -> int:
     keeps the guards out of here -- they used to be ten early returns
     inline, one per failure mode added over time.
     """
+    if sys.argv[1:3] == ["pbir", "contract"]:  # `contract` is reserved in pbir's TARGET position
+        return contract_main(sys.argv[3:])
     parser = build_parser()
     args = parser.parse_args()
     if args.analyzer == "help":

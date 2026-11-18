@@ -1,0 +1,66 @@
+/// Disconnected fiscal calendar for the SampleModel-DefaultState test bed (PBIR Slicer Default State epic).
+/// Fiscal years start in July and are named by their end year: 14 Nov 2026 is FY27, semester FY27-S1, half 2026 H2.
+table 'Fiscal Calendar'
+	lineageTag: d29a3333-b4ce-41d0-8d70-cfc34c27bc9a
+
+	column Date
+		dataType: dateTime
+		formatString: Long Date
+		lineageTag: 42f3f451-9013-4911-912f-a8d99bac2cb1
+		summarizeBy: none
+		sourceColumn: [Date]
+
+	column 'Fiscal Year'
+		dataType: string
+		lineageTag: 77d3de37-fd68-4dd2-a006-12d1ab87f0c9
+		summarizeBy: none
+		sourceColumn: [Fiscal Year]
+
+	column 'Fiscal Semester'
+		dataType: string
+		lineageTag: 474449b4-b29a-4765-b2c4-11479261ffb5
+		summarizeBy: none
+		sourceColumn: [Fiscal Semester]
+		sortByColumn: 'Fiscal Semester Sort'
+
+	column 'Fiscal Semester Sort'
+		dataType: int64
+		isHidden
+		formatString: 0
+		lineageTag: cc9e5896-c0e1-451a-a553-e6db8e25fef3
+		summarizeBy: none
+		sourceColumn: [Fiscal Semester Sort]
+
+	column 'Half Year'
+		dataType: string
+		lineageTag: 1d96819f-a651-4937-825f-e24d8aac900d
+		summarizeBy: none
+		sourceColumn: [Half Year]
+		sortByColumn: 'Half Year Sort'
+
+	column 'Half Year Sort'
+		dataType: int64
+		isHidden
+		formatString: 0
+		lineageTag: c62f50d4-3e86-4fca-86a8-625547f01f1d
+		summarizeBy: none
+		sourceColumn: [Half Year Sort]
+
+	partition 'Fiscal Calendar' = calculated
+		mode: import
+		source =
+				GENERATE(
+				    CALENDAR(DATE(2024, 7, 1), DATE(2028, 6, 30)),
+				    VAR _FiscalYear = YEAR([Date]) + IF(MONTH([Date]) >= 7, 1, 0)
+				    VAR _FiscalSemester = IF(MONTH([Date]) >= 7, 1, 2)
+				    VAR _Half = IF(MONTH([Date]) <= 6, 1, 2)
+				    RETURN
+				        ROW(
+				            "Fiscal Year", "FY" & RIGHT(_FiscalYear, 2),
+				            "Fiscal Semester", "FY" & RIGHT(_FiscalYear, 2) & "-S" & _FiscalSemester,
+				            "Fiscal Semester Sort", _FiscalYear * 10 + _FiscalSemester,
+				            "Half Year", YEAR([Date]) & " H" & _Half,
+				            "Half Year Sort", YEAR([Date]) * 10 + _Half
+				        )
+				)
+

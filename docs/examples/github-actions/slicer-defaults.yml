@@ -1,0 +1,24 @@
+# Check every report's slicer contract on each change, and weekly so a
+# calendar rollover (a new semester) fails a run even when nothing was committed.
+# See docs/SLICER-CONTRACTS.md.
+name: slicer defaults
+on:
+  push:
+    paths: ["**/*.Report/**", "**/*.odcs.yaml"]
+  pull_request:
+    paths: ["**/*.Report/**", "**/*.odcs.yaml"]
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+jobs:
+  slicer-defaults:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install "cft-fab-test==1.10.0b2"
+      - name: Check slicer defaults
+        run: fab-test pbir --format json

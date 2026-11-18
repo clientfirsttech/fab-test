@@ -43,7 +43,7 @@ ENVELOPE_REQUIRED_KEYS: frozenset = frozenset(
 # pointing nowhere.
 #
 # native_html_output_path is a human-readable report for this artifact --
-# an upstream one where the tool produces it (PBIR Inspector's TestRun.html)
+# fab-test's report.html (for PBIR, a page framing PBIR Inspector's TestRun.html)
 # or a generated one otherwise. `fab-test all` surfaces it in the Report
 # column, which is why it needs to be part of the contract rather than a
 # field one wrapper happened to set.

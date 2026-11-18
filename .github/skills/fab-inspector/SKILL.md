@@ -120,7 +120,7 @@ fab-test-results/pbir/<artifact-stem>/
     └── TestRun_<guid>_<HHMMSS>.html       ← HTML report (when --emit-html)
 ```
 
-The envelope includes `native_html_output_path` pointing to the first discovered `.html` file inside `native.json/` when HTML output is present.
+With `--report`, the envelope's `native_html_output_path` points at fab-test's `report.html` beside it, which frames that HTML file at its bottom; `inspector_html_output_path` points at the HTML file itself.
 
 ## Rules File Format
 

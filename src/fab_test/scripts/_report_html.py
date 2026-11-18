@@ -292,6 +292,12 @@ def _table(
     )
 
 
+def report_table(headers: tuple[str, ...], rows: list[tuple], *, class_index: int, status_index: int,
+                 msg_index: int) -> str:
+    """The filterable table every fab-test report uses, for a page that builds its own rows (PBIR's two rule sets)."""
+    return _filterable_table(headers, rows, class_index=class_index, status_index=status_index, msg_index=msg_index)
+
+
 def _filter_controls() -> str:
     """Four radio-input tabs, checked state driving the CSS in ``_STYLE``."""
     parts = []
@@ -411,7 +417,34 @@ def _timing_section(envelope: dict[str, Any]) -> str:
     return section
 
 
-def render_report(envelope: dict[str, Any], base_dir: Path | None = None) -> str:
+def _body(envelope: dict[str, Any], base_dir: Path | None) -> str:
+    """The results table: every test conducted when the envelope lists them, else its findings."""
+    test_results = envelope.get("test_results") or []
+    if test_results:
+        # Every test conducted, filterable by status -- an analyzer opts in
+        # simply by populating this field; no new HTML to write. Supersedes
+        # the findings-only table below, since findings is a subset of this.
+        kind, rows = normalize_test_results(test_results)
+        if kind == "tests":
+            # Evidence (index 5) and report_link (index 6) are both additive
+            # columns -- present only when some row actually carries one, so
+            # an analyzer with neither (pql-test today) renders exactly as
+            # it did before either column existed. See
+            # `_render_test_results_table` for the four combinations.
+            return _render_test_results_table(rows, base_dir)
+        return _filterable_table(_RULE_STATUS_HEADERS, rows, class_index=1, status_index=4, msg_index=3)
+    kind, rows = normalize_findings(envelope.get("findings") or [])
+    if not rows:
+        return '<p class="none">No findings.</p>'
+    if kind == "tests":
+        return _table(_TEST_HEADERS, rows, class_index=4)
+    return _table(_RULE_HEADERS, rows, class_index=1)
+
+
+def render_report(
+    envelope: dict[str, Any], base_dir: Path | None = None, *, before: str = "", after: str = "", style: str = "",
+    table: str | None = None,
+) -> str:
     """Return a complete, self-contained HTML report for ``envelope``.
 
     Deterministic given the same ``base_dir``: the same envelope always
@@ -424,38 +457,15 @@ def render_report(envelope: dict[str, Any], base_dir: Path | None = None) -> str
     resolve relative to the report the same way `render_index`'s links
     resolve relative to the index; omit it and a `test_results` row that
     happens to carry evidence links with an absolute path instead.
+    ``before``/``after`` wrap the results table, ``style`` extends the
+    stylesheet and ``table`` replaces the one rendered from the envelope,
+    for an analyzer whose page builds its own rows (PBIR).
     """
     analyzer = str(envelope.get("analyzer", "analyzer"))
     artifact = str(envelope.get("artifact_path", ""))
     status = str(envelope.get("status", ""))
     message = str(envelope.get("message", ""))
-    test_results = envelope.get("test_results") or []
-
-    if test_results:
-        # Every test conducted, filterable by status -- an analyzer opts in
-        # simply by populating this field; no new HTML to write. Supersedes
-        # the findings-only table below, since findings is a subset of this.
-        kind, rows = normalize_test_results(test_results)
-        if kind == "tests":
-            # Evidence (index 5) and report_link (index 6) are both additive
-            # columns -- present only when some row actually carries one, so
-            # an analyzer with neither (pql-test today) renders exactly as
-            # it did before either column existed. See
-            # `_render_test_results_table` for the four combinations.
-            body = _render_test_results_table(rows, base_dir)
-        else:
-            body = _filterable_table(
-                _RULE_STATUS_HEADERS, rows, class_index=1, status_index=4, msg_index=3
-            )
-    else:
-        findings = envelope.get("findings") or []
-        kind, rows = normalize_findings(findings)
-        if not rows:
-            body = '<p class="none">No findings.</p>'
-        elif kind == "tests":
-            body = _table(_TEST_HEADERS, rows, class_index=4)
-        else:
-            body = _table(_RULE_HEADERS, rows, class_index=1)
+    body = table if table is not None else _body(envelope, base_dir)
 
     meta = f"<code>{escape(artifact)}</code> — status: {escape(status)}"
     # Run time comes from the envelope, never from render time: a report
@@ -476,11 +486,11 @@ def render_report(envelope: dict[str, Any], base_dir: Path | None = None) -> str
         '<html lang="en">\n<head>\n<meta charset="utf-8">\n'
         '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
         f"<title>{escape(analyzer)} — {escape(artifact)}</title>\n"
-        f"<style>{_STYLE}</style>\n</head>\n<body>\n"
+        f"<style>{_STYLE}{style}</style>\n</head>\n<body>\n"
         f"<h1>fab-test {escape(analyzer)}</h1>\n"
         f'<p class="meta">{meta}</p>\n'
         f"{_timing_section(envelope)}"
-        f"{body}\n"
+        f"{before}{body}\n{after}"
         "</body>\n</html>\n"
     )
 
@@ -753,8 +763,8 @@ def attach_report(envelope: dict[str, Any], envelope_path: Path | str) -> None:
     """Render a report beside ``envelope_path`` and record it on the envelope.
 
     A no-op unless generation is enabled, and a no-op when the envelope
-    already carries ``native_html_output_path`` — that means the upstream
-    tool produced its own report (PBIR Inspector's ``TestRun.html``),
+    already carries ``native_html_output_path`` — that means the wrapper
+    wrote its own page (PBIR's, which frames PBIR Inspector's ``TestRun.html``),
     which is richer than anything rendered from the envelope and must not
     be overwritten.
 
