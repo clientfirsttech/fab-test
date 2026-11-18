@@ -420,6 +420,14 @@ the baseline) so the two cases can be told apart:
 A case that never rendered because its embed token failed records that failure
 as `actual`, never `rendered`.
 
+A paginated report renders only on a capacity (Fabric, Premium or Premium Per
+User). In a workspace without one, the report opens with "Query execution failed
+for dataset ...", so when a case fails with an RDL error, the workspace is
+checked once and, if it has no capacity, `actual` says so with the fix:
+`RDL error modal detected: the workspace isn't on a capacity, ...; assign one in
+the workspace's settings, under License info`. The check is best-effort; when
+it can't be made, `actual` stays `RDL error modal detected`.
+
 **A paginated report bound to a Power BI dataset resolves that binding
 automatically -- from the report's own local `.rdl` file, when one exists.**
 Power BI's `GET /reports/{id}` metadata lookup that resolves an interactive
