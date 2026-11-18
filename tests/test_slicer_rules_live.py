@@ -297,7 +297,9 @@ def test_given_report_should_show_the_contract_and_frame_pbir_inspectors_page(in
     html = report.read_text(encoding="utf-8")
     assert ("SampleModel-DefaultState.Report.odcs.yaml</code> · 12 slicer checks, 3 bookmark navigators · 1 failed"
             in html)
-    assert '<tr class="error" data-status="error"><td>CONTRACT.half-year-current</td>' in html
+    assert ('<tr class="error" data-status="error"><td>Slicer contract (SampleModel-DefaultState.Report.odcs.yaml)'
+            "</td><td>CONTRACT.half-year-current</td>") in html
+    assert "<td>PBIR rules</td>" in html
     assert '<iframe src="native.json/TestRun.html"' in html
     page = Path(envelope["inspector_html_output_path"])
     text = page.read_text(encoding="utf-8")

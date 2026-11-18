@@ -1,17 +1,17 @@
 """fab-test's own `--report` page for a PBIR run (PBIR Slicer Default State epic).
 
 Every other analyzer's report is fab-test's page (bpa, pql_test, rdl): a
-header, the run's meta line and one filterable table. PBIR's is the same page,
-with the slicer contract's checks and the PBIR rules as two sections, links
-to each at the top, and PBIR Inspector's own TestRun.html collapsed at the
-bottom, framed rather than restyled.
+header, the run's meta line and one filterable table. PBIR's is the same page:
+one table for both rule sets, a Source column naming where each row came
+from, a line above it with where the contract lives, and PBIR Inspector's own
+TestRun.html collapsed at the bottom, framed rather than restyled.
 """
 
 from pathlib import Path
 
 import pytest
 
-from fab_test.scripts._pbir_report_page import render_pbir_report, write_pbir_report
+from fab_test.scripts._pbir_report_page import render_pbir_report, rule_rows, write_pbir_report
 
 _FOUND = "'Fiscal Calendar'[Half Year] opens with ['2025 H2']; the contract expects 2026 H2"
 _SUMMARY = {
@@ -42,6 +42,7 @@ _RESULTS = [  # envelope test_results, tagged with their source; one rule yields
 ]
 _PAIRED = "📜 Slicer contract: Sales.Report.odcs.yaml (2 slicer checks, 1 bookmark navigator)"
 _NONE = "📜 Slicer contract: none (no *.odcs.yaml under --artifact-dir has fabTestReport abc; only the PBIR rules run)"
+_CONTRACT_SOURCE = "Slicer contract (Sales.Report.odcs.yaml)"
 
 
 def _envelope(results=_RESULTS, contract=_SUMMARY) -> dict:
@@ -62,17 +63,17 @@ def _between(page: str, start: str, end: str) -> str:
     return page[page.index(start):page.index(end, page.index(start))]
 
 
-def _contract(page: str) -> str:
-    return _between(page, 'id="contract"', 'id="rules"')
+def _sources(page: str) -> str:
+    return _between(page, 'id="results"', "</p>")
 
 
-def _rules(page: str) -> str:
-    return _between(page, 'id="rules"', 'id="inspector"')
+def _table(page: str) -> str:
+    return _between(page, "<table>", "</table>")
 
 
-def _row(section: str, rule: str) -> str:
-    start = section.index(f"<td>{rule}</td>")
-    return section[section.rindex("<tr", 0, start):section.index("</tr>", start)]
+def _row(page: str, rule: str, source: str = _CONTRACT_SOURCE) -> str:
+    start = page.index(f"<td>{source}</td><td>{rule}</td>")
+    return page[page.rindex("<tr", 0, start):page.index("</tr>", start)]
 
 
 @pytest.mark.pbir
@@ -82,45 +83,56 @@ def test_given_a_run_should_be_the_page_every_other_analyzer_gets(tmp_path):
     assert page.startswith("<!DOCTYPE html>")
     assert "<h1>fab-test pbir_inspector</h1>" in page
     assert "<code>fabric-artifacts/Sales.Report</code> — status: failed" in page
-    assert 'class="filter-bar"' in page                                     # bpa's filterable table
+    assert page.count('class="filter-bar"') == 1 and page.count("<table>") == 1     # bpa's one filterable table
 
 
 @pytest.mark.pbir
-def test_given_a_run_should_link_to_each_section_from_the_top(tmp_path):
-    page = _page(tmp_path)
+def test_given_both_rule_sets_should_name_each_rows_source_in_one_table(tmp_path):
+    table = _table(_page(tmp_path))
 
-    nav = _between(page, '<nav class="toc"', "</nav>")
-    assert all(f'href="#{section}"' in nav for section in ("contract", "rules", "inspector"))
-    assert page.index("</nav>") < page.index('id="contract"') < page.index('id="rules"') < page.index('id="inspector"')
-
-
-@pytest.mark.pbir
-def test_given_a_contract_should_summarise_it_in_the_terminals_words(tmp_path):
-    contract = _contract(_page(tmp_path))
-
-    assert "Slicer contract" in contract
-    assert "<code>Sales.Report.odcs.yaml</code> · 2 slicer checks, 1 bookmark navigator · 1 failed" in contract
-    assert "<th>Rule</th><th>Severity</th><th>Page</th><th>Expects</th><th>Found</th><th>Status</th>" in contract
+    assert ("<th>Source</th><th>Rule</th><th>Severity</th><th>Object</th><th>Message</th><th>Status</th>"
+            in table)
+    assert f"<td>{_CONTRACT_SOURCE}</td><td>CONTRACT.alignment-default</td>" in table
+    assert "<td>PBIR rules</td><td>SHOW_VISUAL_HEADER</td>" in table
+    assert "<td>PBIR rules</td><td>CONTRACT." not in table
 
 
 @pytest.mark.pbir
-def test_given_every_contract_check_passed_should_say_so(tmp_path):
+def test_given_a_contract_should_say_where_it_lives_and_how_each_rule_set_did(tmp_path):
+    sources = _sources(_page(tmp_path))
+
+    assert ("Slicer contract: <code>Sales.Report.odcs.yaml</code> · 2 slicer checks, 1 bookmark navigator · "
+            "1 failed") in sources
+    assert "PBIR rules: 2 results · 1 failed" in sources
+
+
+@pytest.mark.pbir
+def test_given_every_check_passed_should_say_so(tmp_path):
     results = [r for r in _RESULTS if r["status"] == "pass"]
 
-    assert "· all passed" in _contract(_page(tmp_path, _envelope(results)))
+    sources = _sources(_page(tmp_path, _envelope(results)))
+
+    assert "1 bookmark navigator · all passed" in sources and "PBIR rules: 1 result · all passed" in sources
 
 
 @pytest.mark.pbir
-def test_given_a_contract_check_should_show_what_it_expects_and_its_worst_result(tmp_path):
-    contract = _contract(_page(tmp_path))
+def test_given_a_contract_check_should_show_its_worst_result_and_what_it_found(tmp_path):
+    failed = _row(_page(tmp_path), "CONTRACT.half-year-current")
 
-    failed = _row(contract, "CONTRACT.half-year-current")
     assert 'class="warning" data-status="warning"' in failed
-    assert "&#x27;Fiscal Calendar&#x27;[Half Year] opens with 2026 H2" in failed
+    assert "<td>Standard Slicers</td>" in failed
     assert "opens with [&#x27;2025 H2&#x27;]; the contract expects 2026 H2" in failed
-    assert 'data-status="pass"' in _row(contract, "CONTRACT.alignment-default")
-    assert "bookmark navigator opens with Bookmark 2" in _row(contract, "CONTRACT.page-1-navigator")
-    assert "the page exists" in _row(contract, "CONTRACT.page.Standard Slicers")
+    assert "<td>WARNING</td>" in failed
+
+
+@pytest.mark.pbir
+def test_given_a_passing_contract_check_should_show_what_it_expects(tmp_path):
+    page = _page(tmp_path)
+
+    assert "&#x27;AlignmentDim&#x27;[Alignment] opens with Bad" in _row(page, "CONTRACT.alignment-default")
+    assert 'data-status="pass"' in _row(page, "CONTRACT.alignment-default")
+    assert "bookmark navigator opens with Bookmark 2" in _row(page, "CONTRACT.page-1-navigator")
+    assert "the page exists" in _row(page, "CONTRACT.page.Standard Slicers")
 
 
 @pytest.mark.pbir
@@ -135,9 +147,9 @@ def test_given_each_kind_of_check_should_say_what_it_expects_in_words(tmp_path, 
     summary = {"file": "c.odcs.yaml", "navigators": [], "rules": [
         {"id": "r", "page": "P", "field": "'T'[C]", "check": check, "expected": expected, "severity": "error"}]}
 
-    contract = _contract(_page(tmp_path, _envelope(results=[], contract=summary)))
+    row = _row(_page(tmp_path, _envelope(results=[], contract=summary)), "CONTRACT.r", "Slicer contract (c.odcs.yaml)")
 
-    assert f"&#x27;T&#x27;[C] {shown}" in _row(contract, "CONTRACT.r")
+    assert f"&#x27;T&#x27;[C] {shown}" in row and 'data-status="skip"' in row      # not run: no page matched
 
 
 @pytest.mark.pbir
@@ -146,19 +158,27 @@ def test_given_no_contract_should_say_why_and_still_list_the_pbir_rules(tmp_path
 
     page = _page(tmp_path, _envelope(rules_only, contract=None), note=_NONE)
 
-    assert "none paired: no *.odcs.yaml under --artifact-dir has fabTestReport abc; only the PBIR rules run" in (
-        _contract(page))
-    assert "<table" not in _contract(page)
-    assert "<td>SHOW_VISUAL_HEADER</td>" in _rules(page)
+    assert ("Slicer contract: none paired: no *.odcs.yaml under --artifact-dir has fabTestReport abc; "
+            "only the PBIR rules run") in _sources(page)
+    assert "Slicer contract (" not in _table(page)
+    assert "<td>PBIR rules</td><td>SHOW_VISUAL_HEADER</td>" in _table(page)
 
 
 @pytest.mark.pbir
-def test_given_both_rule_sets_should_list_only_the_pbir_rules_in_the_rules_table(tmp_path):
-    rules = _rules(_page(tmp_path))
+def test_given_both_rule_sets_should_list_failures_first_whichever_set_they_came_from():
+    rows = rule_rows(_SUMMARY, _RESULTS)
 
-    assert "<td>SHOW_VISUAL_HEADER</td>" in rules and "<td>DISABLE_DROP_SHADOW</td>" in rules
-    assert "CONTRACT." not in rules
-    assert "<p class=\"meta\">2 results · 1 failed</p>" in rules
+    assert [row[5] for row in rows] == sorted((row[5] for row in rows), key=["ERROR", "WARNING", "PASS"].index)
+    assert [row[1] for row in rows][:2] == ["SHOW_VISUAL_HEADER", "CONTRACT.half-year-current"]
+
+
+@pytest.mark.pbir
+def test_given_a_run_should_link_to_the_results_and_inspectors_page_from_the_top(tmp_path):
+    page = _page(tmp_path)
+
+    nav = _between(page, '<nav class="toc"', "</nav>")
+    assert 'href="#results"' in nav and 'href="#inspector"' in nav
+    assert page.index("</nav>") < page.index('id="results"') < page.index("<table>") < page.index('id="inspector"')
 
 
 @pytest.mark.pbir
@@ -167,7 +187,7 @@ def test_given_inspectors_page_should_frame_it_collapsed_at_the_bottom(tmp_path)
 
     inspector = page[page.index('<details id="inspector">'):]                 # closed until asked for
     assert inspector.index("</details>") > inspector.index("<iframe")
-    assert page.rindex("</details>") > page.rindex("</table>")               # below every fab-test table
+    assert page.rindex("</details>") > page.rindex("</table>")               # below fab-test's table
     assert '<iframe src="native.json/TestRun.html"' in inspector and 'loading="lazy"' in inspector
     assert '<a href="native.json/TestRun.html" target="_blank"' in inspector
 
@@ -216,11 +236,21 @@ def test_given_a_click_on_the_inspector_link_should_open_its_section(page, tmp_p
 
 
 @pytest.mark.playwright
-def test_given_the_rules_filter_should_leave_the_contract_table_alone(page, tmp_path):
+def test_given_a_search_for_the_contract_should_leave_only_its_rows(page, tmp_path):
+    page.set_content(_page(tmp_path))
+
+    page.fill(".search-box", "Sales.Report.odcs.yaml")
+
+    assert page.is_visible("td:text-is('CONTRACT.alignment-default')")
+    assert not page.is_visible("td:text-is('SHOW_VISUAL_HEADER')")
+
+
+@pytest.mark.playwright
+def test_given_the_errors_filter_should_apply_to_both_rule_sets(page, tmp_path):
     page.set_content(_page(tmp_path))
 
     page.click('label[for="f-error"]')
 
-    assert page.is_visible("text=CONTRACT.alignment-default")              # a passing contract row
-    assert not page.is_visible("td:text-is('DISABLE_DROP_SHADOW')")         # a passing PBIR rule row
     assert page.is_visible("td:text-is('SHOW_VISUAL_HEADER')")
+    assert not page.is_visible("td:text-is('DISABLE_DROP_SHADOW')")          # a passing PBIR rule
+    assert not page.is_visible("td:text-is('CONTRACT.alignment-default')")   # a passing contract check

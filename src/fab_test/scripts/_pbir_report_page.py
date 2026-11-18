@@ -4,10 +4,11 @@ Every other analyzer's report is fab-test's page (bpa, pql_test, rdl): a
 header, the run's meta line and one filterable table, rendered from the
 envelope by `render_report`. PBIR Inspector writes its own TestRun.html,
 richer (screenshots, page wireframes) but laid out its own way and blind to
-the slicer contract. This is the same page for PBIR: the slicer contract's
-checks and the PBIR rules as two sections, links to each at the top, and
-PBIR Inspector's page collapsed at the bottom in a frame, so it keeps its
-own look and scripts.
+the slicer contract. This is the same page for PBIR: one table holding both
+rule sets, a Source column saying which each row came from (the PBIR rules,
+or the slicer contract by its file name), a line above it with where the
+contract lives, and PBIR Inspector's page collapsed at the bottom in a frame,
+so it keeps its own look and scripts.
 
 Like `render_report`, it computes no finding of its own: every row traces to
 the envelope's `test_results` and `contract`.
@@ -21,15 +22,18 @@ from html import escape
 from pathlib import Path
 from typing import Any
 
+from ._analyzer_envelope import normalize_test_results
 from ._pbir_rule_sources import CONTRACT, contract_rows, describe
 from ._report_html import render_report, report_table
 
 PAGE_NAME = "report.html"
+RULES_SOURCE = "PBIR rules"
+_HEADERS = ("Source", "Rule", "Severity", "Object", "Message", "Status")
+_RANK = {"ERROR": 0, "FAIL": 0, "WARNING": 1, "SKIPPED": 2, "SKIP": 2, "NOT RUN": 2, "PASS": 3}  # failures first
 
 _STYLE = """
 nav.toc { margin: 0 0 1.5rem; font-size: 0.95rem; }
 nav.toc a { margin-right: 1.25rem; }
-h2 { font-size: 1.15rem; margin: 2rem 0 0.25rem; }
 details#inspector { margin-top: 2.5rem; padding-top: 1rem; border-top: 2px solid #8886; }
 details#inspector > summary { cursor: pointer; font-weight: 600; font-size: 1.15rem; }
 iframe { width: 100%; height: 85vh; margin-top: 0.5rem; border: 1px solid #8884; border-radius: 0.5rem;
@@ -51,8 +55,8 @@ _OPEN_SCRIPT = """<script>
 </script>
 """
 
-_NAV = ('<nav class="toc">On this page: <a href="#contract">Slicer contract</a>'
-        '<a href="#rules">PBIR rules</a><a href="#inspector">PBIR Inspector&#x27;s page</a></nav>\n')
+_NAV = ('<nav class="toc">On this page: <a href="#results">Results</a>'
+        '<a href="#inspector">PBIR Inspector&#x27;s page</a></nav>\n')
 
 
 def render_pbir_report(envelope: dict[str, Any], contract_note: str, inspector_html: Path | None,
@@ -64,13 +68,12 @@ def render_pbir_report(envelope: dict[str, Any], contract_note: str, inspector_h
     None when it wrote none; ``base_dir`` is where the page will live, so the
     frame's link is relative and the folder can move.
     """
-    results = envelope.get("test_results") or []
-    rules = [r for r in results if r.get("source") != CONTRACT]
-    page_envelope = {**envelope, "test_results": rules,
-                     "findings": [f for f in envelope.get("findings") or [] if f.get("source") != CONTRACT]}
-    before = _NAV + _contract_section(envelope.get("contract"), contract_note, results) + _rules_heading(rules)
+    summary = envelope.get("contract")
+    rows = rule_rows(summary, envelope.get("test_results") or [])
+    table = report_table(_HEADERS, rows, class_index=2, status_index=5, msg_index=4)
+    before = _NAV + _sources(summary, contract_note, rows)
     after = _inspector_section(inspector_html, base_dir) + _OPEN_SCRIPT
-    return render_report(page_envelope, base_dir, before=before, after=after, style=_STYLE)
+    return render_report(envelope, base_dir, before=before, after=after, style=_STYLE, table=table)
 
 
 def write_pbir_report(envelope: dict[str, Any], path: Path, contract_note: str,
@@ -85,27 +88,40 @@ def write_pbir_report(envelope: dict[str, Any], path: Path, contract_note: str,
     return path
 
 
-def _outcome(statuses: list[str]) -> str:
-    failed = sum(status not in ("pass", "not run") for status in statuses)
+def rule_rows(summary: dict | None, results: list[dict[str, Any]]) -> list[tuple]:
+    """(source, rule, severity, object, message, status) for both rule sets, failures first.
+
+    A contract check is one row, its worst result across the pages it ran on:
+    the message is what it found when it didn't pass, else what it expects.
+    A PBIR rule is a row per object it ran on, as on every other report.
+    """
+    rows: list[tuple] = []
+    if summary:
+        source = f"Slicer contract ({Path(summary['file']).name})"
+        rows += [(source, rule, severity, page, found or expects, status.upper())
+                 for rule, severity, page, expects, found, status in contract_rows(summary, results)]
+    _kind, rules = normalize_test_results([r for r in results if r.get("source") != CONTRACT])
+    rows += [(RULES_SOURCE, *row) for row in rules]
+    return sorted(rows, key=lambda row: _RANK.get(row[5], 1))
+
+
+def _outcome(rows: list[tuple]) -> str:
+    failed = sum(row[5] not in ("PASS", "NOT RUN") for row in rows)
     return f"{failed} failed" if failed else "all passed"
 
 
-def _contract_section(summary: dict | None, note: str, results: list[dict]) -> str:
-    heading = '<h2 id="contract">Slicer contract</h2>\n'
-    if not summary:
+def _sources(summary: dict | None, note: str, rows: list[tuple]) -> str:
+    """Where each rule set came from, with its counts: the contract's file, or why none paired."""
+    contract = [row for row in rows if row[0] != RULES_SOURCE]
+    rules = [row for row in rows if row[0] == RULES_SOURCE]
+    if summary:
+        name, checks = describe(summary)
+        line = f"Slicer contract: <code>{escape(name)}</code> · {escape(checks)} · {_outcome(contract)}"
+    else:
         reason = note.removeprefix("📜 Slicer contract: ").removeprefix("none (").removesuffix(")")
-        return f'{heading}<p class="none">none paired: {escape(reason)}</p>\n'
-    rows = contract_rows(summary, results)
-    name, checks = describe(summary)
-    meta = f"<code>{escape(name)}</code> · {escape(checks)} · {_outcome([row[-1] for row in rows])}"
-    table = report_table(("Rule", "Severity", "Page", "Expects", "Found", "Status"), rows, status_index=5, msg_index=4)
-    return f'{heading}<p class="meta">{meta}</p>\n{table}\n'
-
-
-def _rules_heading(rules: list[dict]) -> str:
+        line = f"Slicer contract: none paired: {escape(reason)}"
     count = f"{len(rules)} result{'' if len(rules) == 1 else 's'}"
-    outcome = _outcome([str(r.get("status", "pass")) for r in rules])
-    return f'<h2 id="rules">PBIR rules</h2>\n<p class="meta">{count} · {outcome}</p>\n'
+    return f'<p class="meta" id="results">{line}<br>{RULES_SOURCE}: {count} · {_outcome(rules)}</p>\n'
 
 
 def _inspector_section(inspector_html: Path | None, base_dir: Path) -> str:

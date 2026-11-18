@@ -56,7 +56,7 @@ The run says which contract paired with the report and splits its findings betwe
 📊 1 finding(s) (1 error(s), 0 warning(s)): 0 from the PBIR rules, 1 from the slicer contract
 ```
 
-A report pairs with the contract whose `fabTestReport` matches its `.platform` `logicalId`, wherever the file is under `--artifact-dir`; with none, the 📜 line says `none` and names the id. In the envelope, each finding and test result carries `source`: `rules` or `contract`. With `--report` or `--open-report`, the report is fab-test's page, the same as `bpa`'s: a **Slicer contract** section (one table row per check), a **PBIR rules** section (the filterable results table), and PBIR Inspector's own page collapsed in a frame at the bottom, with links to each at the top. On PBIR Inspector's page the contract's results are under the ruleset *Slicer contract*, so its Ruleset Name filter separates them.
+A report pairs with the contract whose `fabTestReport` matches its `.platform` `logicalId`, wherever the file is under `--artifact-dir`; with none, the 📜 line says `none` and names the id. In the envelope, each finding and test result carries `source`: `rules` or `contract`. With `--report` or `--open-report`, the report is fab-test's page, the same as `bpa`'s: one filterable table for both rule sets, its **Source** column saying *PBIR rules* or *Slicer contract (file name)* (a row per contract check), a line above it with the contract's path and each set's counts, and PBIR Inspector's own page collapsed in a frame at the bottom, linked from the top. On PBIR Inspector's page the contract's results are under the ruleset *Slicer contract*, so its Ruleset Name filter separates them.
 
 A slicer that drifted is a finding on its page:
 
