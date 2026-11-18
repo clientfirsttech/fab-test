@@ -571,16 +571,16 @@ Each artifact gets a self-contained HTML page beside its envelope, and `fab-test
   ╰────────────┴───────────────────────┴──────────┴───────┴────────╯
 
   pbir/SampleModel-PQLAssert
-    fab-test-results/pbir/SampleModel-PQLAssert/native.json/TestRun.html
+    fab-test-results/pbir/SampleModel-PQLAssert/report.html
   bpa/SampleModel-PQLAssert
     fab-test-results/bpa/SampleModel-PQLAssert/report.html
 
   Index:  fab-test-results/index.html
 ```
 
-PBIR Inspector writes its own `TestRun.html` and it appears **with or without** `--report`; it is richer than anything generated from the envelope, so `fab-test` never overwrites it. Two upstream asset paths in it are repaired in place, both by inlining as base64 so nothing 404s once the report is copied out of the tool's install directory: the favicon link, and every per-object screenshot. Tabular Editor emits TRX and `pql-test` emits JSON, so those two get a generated `report.html`.
+Every analyzer's report is fab-test's `report.html`. For `pbir` it is the same page as `bpa`'s: the slicer contract's checks and the PBIR rules as two sections, links to each at the top, and PBIR Inspector's own `TestRun.html` (screenshots, page wireframes, its own filters) collapsed in a frame at the bottom. `fab-test` never overwrites PBIR Inspector's page. Two upstream asset paths in it are repaired in place, both by inlining as base64 so nothing 404s once the report is copied out of the tool's install directory: the favicon link, and every per-object screenshot. Tabular Editor emits TRX and `pql-test` emits JSON, so neither has a page of its own.
 
-Every analyzer's envelope also records **every test conducted, not only the failures**: pass, fail, warning, and skip. The two generated reports show that as a table with an All / Errors / Warnings / Passed filter, so a passing run no longer reads as an empty page; PBIR Inspector's own report keeps its own UI, so for that one the full list is there for telemetry to read rather than for the filter to show.
+Every analyzer's envelope also records **every test conducted, not only the failures**: pass, fail, warning, and skip. The reports show that as a table with an All / Errors / Warnings / Passed filter, so a passing run no longer reads as an empty page.
 
 That table also has a **search box and sortable column headers**: type to narrow to a rule, test, or object by name, or click a header to sort by that column (click again to reverse); the sorted column shows a ▲/▼ arrow so it's obvious which column and direction is active, and the arrow moves to whichever column you click next. Both work together with the status filter. The report stays fully offline and self-contained; the small script behind search and sort never fetches or links to anything outside the page itself.
 

@@ -44,16 +44,21 @@ def found(message: str) -> str:
 def contract_line(report: Path, contract_summary: Path | None) -> str:
     """The run header's line: which contract paired with ``report``, or why none did."""
     if contract_summary is not None:
-        summary = json.loads(contract_summary.read_text(encoding="utf-8"))
-        checks = _count(len(summary.get("rules", [])), "slicer check")
-        if summary.get("navigators"):
-            checks += f", {_count(len(summary['navigators']), 'bookmark navigator')}"
-        return f"📜 Slicer contract: {_relative(Path(summary['file']))} ({checks})"
+        name, checks = describe(json.loads(contract_summary.read_text(encoding="utf-8")))
+        return f"📜 Slicer contract: {name} ({checks})"
     logical_id = report_logical_id(report)
     if not logical_id:
         return "📜 Slicer contract: none (the report has no .platform logicalId to pair on; pass --contract FILE)"
     return (f"📜 Slicer contract: none (no *.odcs.yaml under --artifact-dir has fabTestReport {logical_id}; "
             "only the PBIR rules run)")
+
+
+def describe(summary: dict) -> tuple[str, str]:
+    """A paired contract's file, relative where it can be, and its checks: `2 slicer checks, 1 bookmark navigator`."""
+    checks = _count(len(summary.get("rules", [])), "slicer check")
+    if summary.get("navigators"):
+        checks += f", {_count(len(summary['navigators']), 'bookmark navigator')}"
+    return str(_relative(Path(summary["file"]))), checks
 
 
 def _count(n: int, noun: str) -> str:

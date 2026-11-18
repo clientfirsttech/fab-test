@@ -292,11 +292,8 @@ def _table(
     )
 
 
-REPORT_STYLE = _STYLE  # for a fab-test section inside another tool's page (scoped there)
-
-
 def report_table(headers: tuple[str, ...], rows: list[tuple], status_index: int, msg_index: int) -> str:
-    """The table every fab-test report uses, severity in column 1, for a section embedded elsewhere."""
+    """The table every fab-test report uses, severity in column 1, for a page's extra section."""
     return _table(headers, rows, class_index=1, status_index=status_index, msg_index=msg_index)
 
 
@@ -419,7 +416,9 @@ def _timing_section(envelope: dict[str, Any]) -> str:
     return section
 
 
-def render_report(envelope: dict[str, Any], base_dir: Path | None = None) -> str:
+def render_report(
+    envelope: dict[str, Any], base_dir: Path | None = None, *, before: str = "", after: str = "", style: str = ""
+) -> str:
     """Return a complete, self-contained HTML report for ``envelope``.
 
     Deterministic given the same ``base_dir``: the same envelope always
@@ -432,6 +431,8 @@ def render_report(envelope: dict[str, Any], base_dir: Path | None = None) -> str
     resolve relative to the report the same way `render_index`'s links
     resolve relative to the index; omit it and a `test_results` row that
     happens to carry evidence links with an absolute path instead.
+    ``before``/``after`` wrap the results table and ``style`` extends the
+    stylesheet, for an analyzer whose page has more than one table (PBIR).
     """
     analyzer = str(envelope.get("analyzer", "analyzer"))
     artifact = str(envelope.get("artifact_path", ""))
@@ -484,11 +485,11 @@ def render_report(envelope: dict[str, Any], base_dir: Path | None = None) -> str
         '<html lang="en">\n<head>\n<meta charset="utf-8">\n'
         '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
         f"<title>{escape(analyzer)} — {escape(artifact)}</title>\n"
-        f"<style>{_STYLE}</style>\n</head>\n<body>\n"
+        f"<style>{_STYLE}{style}</style>\n</head>\n<body>\n"
         f"<h1>fab-test {escape(analyzer)}</h1>\n"
         f'<p class="meta">{meta}</p>\n'
         f"{_timing_section(envelope)}"
-        f"{body}\n"
+        f"{before}{body}\n{after}"
         "</body>\n</html>\n"
     )
 
@@ -761,8 +762,8 @@ def attach_report(envelope: dict[str, Any], envelope_path: Path | str) -> None:
     """Render a report beside ``envelope_path`` and record it on the envelope.
 
     A no-op unless generation is enabled, and a no-op when the envelope
-    already carries ``native_html_output_path`` — that means the upstream
-    tool produced its own report (PBIR Inspector's ``TestRun.html``),
+    already carries ``native_html_output_path`` — that means the wrapper
+    wrote its own page (PBIR's, which frames PBIR Inspector's ``TestRun.html``),
     which is richer than anything rendered from the envelope and must not
     be overwritten.
 

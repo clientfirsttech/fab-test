@@ -286,16 +286,22 @@ def test_given_no_contract_should_say_none_paired(inspector, tmp_path):
         result.stdout + result.stderr)
 
 
-def test_given_report_should_show_the_contract_on_pbir_inspectors_page(inspector, tmp_path):
+def test_given_report_should_show_the_contract_and_frame_pbir_inspectors_page(inspector, tmp_path):
     root = _bed(tmp_path, _contract())
 
     _run(root, "--report")
 
-    [page] = list((root / "out").glob("pbir/*/native.json/*.html"))
+    envelope = _envelope(root)
+    report = Path(envelope["native_html_output_path"])
+    assert report.name == "report.html"
+    html = report.read_text(encoding="utf-8")
+    assert ("SampleModel-DefaultState.Report.odcs.yaml</code> · 12 slicer checks, 3 bookmark navigators · 1 failed"
+            in html)
+    assert '<tr class="error" data-status="error"><td>CONTRACT.half-year-current</td>' in html
+    assert '<iframe src="native.json/TestRun.html"' in html
+    page = Path(envelope["inspector_html_output_path"])
     text = page.read_text(encoding="utf-8")
-    assert 'id="fabTestContract"' in text
-    assert "SampleModel-DefaultState.Report.odcs.yaml · 12 slicer checks, 3 bookmark navigators · 1 failed" in text
-    assert '<tr class="error" data-status="error"><td>CONTRACT.half-year-current</td>' in text
+    assert "fabTestContract" not in text
     start = text.index("let testRunData = ") + len("let testRunData = ")
     results = json.JSONDecoder().raw_decode(text, start)[0]["Results"]
     assert {r["RuleSetName"] for r in results if r["RuleId"].startswith("CONTRACT.")} == {"Slicer contract"}

@@ -177,8 +177,8 @@ def build_pbir_command(
     # it, so it is load-bearing rather than a display choice. HTML is the
     # only part --report gates, which puts pbir on the same footing as bpa
     # and pql_test: JSON envelope by default, a readable page on request.
-    # PBIR Inspector's own page is richer than anything rendered from the
-    # envelope, so attach_report stands aside once this one exists.
+    # The wrapper writes fab-test's page itself, framing PBIR Inspector's,
+    # so attach_report stands aside once that one exists.
     if contract_summary:
         command.extend(["--contract-summary", str(contract_summary)])
     if resolve_report(args):

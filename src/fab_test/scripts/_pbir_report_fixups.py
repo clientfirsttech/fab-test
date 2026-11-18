@@ -15,11 +15,7 @@ from __future__ import annotations
 import base64
 import contextlib
 import json
-from html import escape
 from pathlib import Path
-
-from ._pbir_rule_sources import contract_rows
-from ._report_html import REPORT_STYLE, report_table
 
 _BROKEN_FAVICON_LINK = '<link rel="icon" href="../icon/pbiinspector.png">'
 
@@ -154,27 +150,23 @@ def fix_log_type_filter(report_path: Path) -> None:
 
 
 _DATA_MARKER = "let testRunData = "
-_LAYOUT_MARKER = '<div class="row g-3">'
-_PANEL_ID = 'id="fabTestContract"'
 CONTRACT_RULESET = "Slicer contract"
 
 
-def mark_contract_rules(report_path: Path, contract: str, summary: dict | None, results: list[dict]) -> None:
-    """Show the slicer contract on TestRun.html, and give its results their own ruleset.
+def mark_contract_ruleset(report_path: Path) -> None:
+    """Give the slicer contract's results their own ruleset on TestRun.html.
 
     PBIR Inspector lists the packaged rules and the contract's ``CONTRACT.*``
-    rules under one ruleset, "Rules", and the page never says a contract ran.
-    This adds a collapsible section above the results, styled as fab-test's
-    own reports (``contract``: the run header's contract line; ``summary``:
-    the paired contract's, or None; ``results``: the envelope's tagged
-    test results), and renames the contract's results' ruleset to "Slicer
-    contract", so the page's Ruleset Name filter separates them. A page
-    without the data or layout markers, or already marked, is left alone.
+    rules under one ruleset, "Rules". Renaming the contract's to "Slicer
+    contract" lets the page's own Ruleset Name filter separate them. (The
+    contract itself is shown on fab-test's report page, which frames this
+    one.) A page without the data marker, or whose data doesn't parse, is
+    left alone; running it twice changes nothing more.
     """
     with contextlib.suppress(OSError):
         text = report_path.read_text(encoding="utf-8")
         begin = text.find(_DATA_MARKER) + len(_DATA_MARKER)
-        if _PANEL_ID in text or begin < len(_DATA_MARKER) or _LAYOUT_MARKER not in text:
+        if begin < len(_DATA_MARKER):
             return
         try:
             data, end = json.JSONDecoder().raw_decode(text, begin)
@@ -184,37 +176,4 @@ def mark_contract_rules(report_path: Path, contract: str, summary: dict | None, 
             if str(result.get("RuleId", "")).startswith("CONTRACT."):
                 result["RuleSetName"] = CONTRACT_RULESET
         payload = json.dumps(data, ensure_ascii=False).replace("</", r"<\/")  # never close the script early
-        text = text[:begin] + payload + text[end:]
-        text = text.replace(_LAYOUT_MARKER, _contract_section(contract, summary, results) + _LAYOUT_MARKER, 1)
-        report_path.write_text(text, encoding="utf-8")
-
-
-# The section lives in a declarative shadow root: fab-test's report stylesheet styles `body` and
-# `table`, which would restyle PBIR Inspector's whole page; inside the shadow root it reaches only here.
-_SECTION_STYLE = """
-:host { display: block; font-family: ui-sans-serif, -apple-system, "Segoe UI", system-ui, sans-serif; }
-details { padding: 0.75rem 1rem; border: 1px solid #8884; border-radius: 0.5rem; background: Canvas; }
-summary { cursor: pointer; font-weight: 600; }
-details[open] summary { margin-bottom: 0.75rem; }
-.meta { margin: 0.75rem 0 0; }
-"""
-
-
-def _contract_section(contract: str, summary: dict | None, results: list[dict]) -> str:
-    if summary is None:
-        title, opened = "Slicer contract · none paired", False
-        body = f'<p class="meta">{escape(contract.removeprefix("📜 Slicer contract: "))}</p>'
-    else:
-        rows = contract_rows(summary, results)
-        failed = sum(row[-1] not in ("pass", "not run") for row in rows)
-        name, _, checks = contract.removeprefix("📜 Slicer contract: ").rstrip(")").rpartition(" (")  # as the terminal
-        title = f"Slicer contract · {name} · {checks} · {f'{failed} failed' if failed else 'all passed'}"
-        opened = bool(failed)
-        body = (report_table(("Rule", "Severity", "Page", "Expects", "Found", "Status"), rows, status_index=5,
-                             msg_index=4)
-                + '<p class="meta">Type <kbd>contract</kbd> in the Ruleset Name filter to see only the '
-                  "contract&#x27;s results.</p>")
-    return (f'<div {_PANEL_ID} class="my-3"><template shadowrootmode="open">'
-            f"<style>{REPORT_STYLE}{_SECTION_STYLE}</style>"
-            f"<details{' open' if opened else ''}><summary>{escape(title)}</summary>{body}</details>"
-            "</template></div>\n        ")
+        report_path.write_text(text[:begin] + payload + text[end:], encoding="utf-8")

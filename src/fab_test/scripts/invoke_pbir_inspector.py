@@ -33,7 +33,8 @@ from ._analyzer_envelope import (
     native_output_path,
     write_envelope,
 )
-from ._pbir_report_fixups import fix_favicon_link, fix_log_type_filter, fix_screenshot_images, mark_contract_rules
+from ._pbir_report_fixups import fix_favicon_link, fix_log_type_filter, fix_screenshot_images, mark_contract_ruleset
+from ._pbir_report_page import PAGE_NAME, write_pbir_report
 from ._pbir_rule_sources import contract_line, count_line, tag_sources
 from ._table_style import findings_table
 
@@ -124,8 +125,16 @@ def write_results(
     rules_path: Path,
     native_html_out: "Path | None" = None,
     contract_summary: "Path | None" = None,
-) -> None:
-    """Write standardized PBIR Inspector envelope JSON."""
+    report_page: bool = False,
+    contract_note: str = "",
+) -> dict[str, Any]:
+    """Write standardized PBIR Inspector envelope JSON, and return it.
+
+    With ``report_page`` (``--report``), fab-test's own page is written
+    beside the envelope and becomes ``native_html_output_path``, the page
+    `--open-report` and `fab-test all` link; PBIR Inspector's TestRun.html,
+    framed at its bottom, is kept as ``inspector_html_output_path``.
+    """
     env = build_envelope(
         EnvelopeIdentity("pbir_inspector", str(result.artifact_path)),
         status=result.status,
@@ -135,15 +144,19 @@ def write_results(
         duration_ms=result.duration_ms,
     )
     env["rules_file"] = str(rules_path)
-    if native_html_out is not None:
-        env["native_html_output_path"] = str(native_html_out)
     # Additive: every rule PBIR Inspector evaluated, passed or failed --
     # `findings` stays violations-only for callers already reading that
     # meaning. Mirrors BPA's `test_results` (HTML Report Format epic).
     env["test_results"] = result.test_results or []
     if contract_summary is not None:  # PBIR Slicer Default State: the contract, as-of date and resolved values
         env["contract"] = json.loads(contract_summary.read_text(encoding="utf-8"))
+    if native_html_out is not None:
+        env["inspector_html_output_path"] = env["native_html_output_path"] = str(native_html_out)
+    if report_page and (page := write_pbir_report(env, result.output_path.parent / PAGE_NAME, contract_note,
+                                                  native_html_out)):
+        env["native_html_output_path"] = str(page)
     write_envelope(result.output_path, env)
+    return env
 
 
 def parse_findings(raw_text: str) -> list[dict[str, Any]]:
@@ -535,7 +548,7 @@ def _classify_inspector_result(
 def _log_inspector_outcome(
     outcome: dict[str, Any],
     findings: list[dict[str, Any]],
-    native_html_out: Path | None,
+    env: dict[str, Any],
     level: int,
     paired: bool = False,
 ) -> None:
@@ -545,8 +558,10 @@ def _log_inspector_outcome(
     if not findings:
         icon = "✅" if outcome["status"] == "passed" else "❌"
         log(f"{icon} {outcome['message']}")
-    if native_html_out:
-        log(f"📄 Native HTML: {native_html_out}")
+    if env.get("native_html_output_path"):
+        log(f"📄 Report: {env['native_html_output_path']}")
+    if env.get("inspector_html_output_path") not in (None, env.get("native_html_output_path")):
+        log(f"📄 PBIR Inspector's page: {env['inspector_html_output_path']}")
     if findings:
         counts = f"{outcome['error_count']} error(s), {outcome['warning_count']} warning(s)"
         log(f"📊 {len(findings)} finding(s) ({counts}): {count_line(findings, paired)}")
@@ -630,12 +645,11 @@ def run_inspector(args: argparse.Namespace) -> int:
     findings = tag_sources([_normalize_finding(f, page_names) for f in raw_findings if _is_violation(f)])
     test_results = tag_sources(_pbir_test_results(raw_findings, page_names))
     native_html_out = _locate_native_html(native_out, emit_html, inspector_path)
-    if native_html_out:  # PBIR Inspector's page doesn't know a contract ran; say so on it
-        summary = json.loads(contract_summary.read_text(encoding="utf-8")) if contract_summary else None
-        mark_contract_rules(native_html_out, contract, summary, test_results)
+    if native_html_out:  # its Ruleset Name filter can then tell the contract's results apart
+        mark_contract_ruleset(native_html_out)
 
     outcome = _classify_inspector_result(findings, proc.returncode, has_output=bool(raw_findings))
-    write_results(
+    env = write_results(
         WrapperResult(
             output_path,
             outcome["status"],
@@ -649,8 +663,10 @@ def run_inspector(args: argparse.Namespace) -> int:
         rules_path,
         native_html_out=native_html_out,
         contract_summary=contract_summary,
+        report_page=emit_html,
+        contract_note=contract,
     )
-    _log_inspector_outcome(outcome, findings, native_html_out, level, paired=contract_summary is not None)
+    _log_inspector_outcome(outcome, findings, env, level, paired=contract_summary is not None)
 
     if outcome["status"] == "passed":
         return 0
