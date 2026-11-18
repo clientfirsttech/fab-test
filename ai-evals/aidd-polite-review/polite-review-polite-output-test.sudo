@@ -1,0 +1,21 @@
+import '.github/skills/aidd-polite-review/SKILL.md'
+
+userPrompt = """
+You are in a test environment. Do not run any commands and do not edit any files.
+Review only the transcript below; it is the evidence, and it counts as "read".
+
+/polite-review the quiet mode of `acme-lint`, a made-up linter, as an AI agent uses it in an edit loop:
+
+$ acme-lint check -q
+check passed e=0 w=0 results/check/app/report.json
+$ acme-lint typecheck -q
+typecheck: type checker not found. Install it with `acme-lint setup typecheck`, or pass --checker-path PATH, set ACME_CHECKER_PATH, or set tools.checker in acme.yaml.
+$ acme-lint setup typecheck -q
+typecheck ready
+$ acme-lint typecheck -q
+typecheck passed e=0 w=0 results/typecheck/app/report.json
+"""
+
+- Given output that is terse, names its result path, and names every way to fix a missing tool, should report no High finding
+- Given polite behavior, should list it under what the surface already does well rather than invent findings to fill sections
+- Given a missing-tool message naming a command, a flag, an env var, and a config key, should credit it as actionable for an agent
