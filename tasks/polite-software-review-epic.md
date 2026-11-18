@@ -1,6 +1,6 @@
 # Polite Software Review Epic
 
-**Status**: 📋 PLANNED 2026-11-17, decisions awaiting the user's review.
+**Status**: ✅ IMPLEMENTED 2026-11-17 on `feature/aidd-polite-review` (worktree `.claude/worktrees/aidd-polite-review`, from `dev`), not merged or archived: Decisions 1, 4, 6 and 7 await the user's review. Gates pass: ruff, both ratchets, 3011 + 201 tests, coverage 89.98%, CI-env run (the 16 live Playwright renders skip: no service principal in the worktree). Evals 15/15 at one run each. Pilot: [plan/polite-review-pilot.md](../plan/polite-review-pilot.md), nine findings filed as two plan.md standalone tasks. The source copy is deleted when the epic is archived.
 **Goal**: AIDD discovery and review ask whether fab-test treats each of its three callers like a considerate helper, using one project skill, `aidd-polite-review`, built from the user's "Polite Software Review" text ([source](../plan/polite-software-review-source.md)).
 
 **Decisions** (proposed 2026-11-17; review before starting):
