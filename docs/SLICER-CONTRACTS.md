@@ -25,7 +25,17 @@ Standard Slicers: 'Fiscal Calendar'[Fiscal Semester] opens with FY27-S1, which l
 - **current** checks that the slicer opens on the current period, whatever the date. It's offered only when `init` recognises today's value as one: `FY27-S1` becomes `FY{fiscal_year_short}-S{fiscal_semester}`, which will expect `FY27-S2` from January.
 - **skip** leaves the slicer out.
 
-Answering current also asks when your fiscal year starts and whether it is named by the year it starts or ends in. `init` suggests the answer that reproduces today's values; several months can, so check it.
+Answering current also asks when your fiscal year starts and whether it is named by the year it starts or ends in. **Answer with your company's fiscal calendar, not the suggestion.** On any one day several start months produce the same label, and the suggestion prefers January. On 30 September 2026, `FY26` fits a January or an October start alike. Accept January for an October fiscal year and the check keeps expecting `FY26` until 31 December, when it should expect `FY27` from 1 October.
+
+| Your fiscal year | Start month | Named by | Last day of FY26 → first day of FY27 |
+|---|---|---|---|
+| Calendar year | 1 | end | 31 Dec 2026 → 1 Jan 2027 |
+| October start (e.g. US federal) | 10 | end | 30 Sep 2026 → 1 Oct 2026 |
+| July start (e.g. Microsoft, Australia) | 7 | end | 30 Jun 2026 → 1 Jul 2026 |
+| April start (e.g. India) | 4 | end | 31 Mar 2026 → 1 Apr 2026 |
+| April start, named by the year it starts (e.g. Japan) | 4 | start | 31 Mar 2027 → 1 Apr 2027 |
+
+Preview a rollover with `--as-of` on its first day. A contract has one fiscal calendar, and a label naming both years (`2026-27`) can't follow the current period, so keep it and update it at rollover.
 
 Enter takes the suggestion. The contract is written beside the report, never inside it: Fabric deletes files inside a report folder that aren't part of the report.
 

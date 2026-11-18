@@ -63,6 +63,27 @@ A `selected` or `contains` string with `{fields}` is resolved for the run's date
 
 Fields: `year`, `year_short`, `half`, `quarter`, `month`, `fiscal_year`, `fiscal_year_short`, `fiscal_semester`, `fiscal_quarter`, `fiscal_month`. `*_short` are two-digit text (`09`). A format spec is allowed (`{month:02}`). A value that is one bare field (`"{year}"`) keeps its type, so it matches a whole-number column (`2026L`). Nothing is evaluated: attribute or index access, conversions and nested placeholders are refused.
 
+### Fiscal years differ: always ask
+
+`fabTestCalendar` is the user's company fiscal calendar, and nothing in the report says what it is. Ask the user; never infer it:
+
+- "Which month does your fiscal year start in?"
+- "Is the year that runs to <month before the start> 2027 called FY27 or FY26?" (the year it ends in is `end`; the year it starts in is `start`)
+
+Never take `suggested` for `calendar.fiscal_year_start_month`. On a given day several start months reproduce the same label, and the suggestion prefers 1, which is wrong for most fiscal years. On 2026-09-30, `FY26` fits start months 1, 10, 11 and 12. With 1, the check expects `FY26` until 31 December: it passes a report left on last year's value for three months, and fails one moved to `FY27` on 1 October. `reproduces` lists the months that fit. The user's answer must be one of them, or today's value is stale and the report needs fixing in Desktop first.
+
+| Fiscal year | `fiscal_year_start_month` | `fiscal_year_named_by` | Last day / first day of FY27 for `FY{fiscal_year_short}` |
+|---|---|---|---|
+| Calendar year | 1 | `end` (either) | 2026-12-31 `FY26` / 2027-01-01 `FY27` |
+| October start, named by end year (e.g. US federal) | 10 | `end` | 2026-09-30 `FY26` / 2026-10-01 `FY27` |
+| July start, named by end year (e.g. Microsoft, Australia) | 7 | `end` | 2026-06-30 `FY26` / 2026-07-01 `FY27` |
+| April start, named by end year (e.g. India) | 4 | `end` | 2026-03-31 `FY26` / 2026-04-01 `FY27` |
+| April start, named by start year (e.g. Japan) | 4 | `start` | 2026-03-31 `FY25` / 2026-04-01 `FY26` |
+
+`fiscal_quarter`, `fiscal_semester` and `fiscal_month` count from the start month (1 October is Q1 for an October start). Preview a rollover with `--as-of` on its first day (`--as-of 2026-10-01`); the scheduled run catches it for real.
+
+Limits: one `fabTestCalendar` per contract, so a report whose slicers follow two different fiscal years can follow only one; check the other with `keep` or skip it. A label naming both years (`2026-27`, `FY2026/27`) can't be written as a format, since the fields name only one fiscal year; use `keep`, and update it at rollover.
+
 ## Running the check
 
 ```bash
@@ -81,6 +102,8 @@ ContractInit {
   (an agent) => {
     1. fab-test pbir contract init REPORT --questions --format json
     2. ask the user every question with needs_human: true; take `suggested` for the rest
+       (calendar.fiscal_year_start_month and _named_by: ask in the user's words, never take `suggested`;
+        see Fiscal years differ)
     3. write {question id: answer} to a JSON file
     4. fab-test pbir contract init REPORT --answers FILE [--dry-run]
   }
