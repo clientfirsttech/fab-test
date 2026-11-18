@@ -292,6 +292,14 @@ def _table(
     )
 
 
+REPORT_STYLE = _STYLE  # for a fab-test section inside another tool's page (scoped there)
+
+
+def report_table(headers: tuple[str, ...], rows: list[tuple], status_index: int, msg_index: int) -> str:
+    """The table every fab-test report uses, severity in column 1, for a section embedded elsewhere."""
+    return _table(headers, rows, class_index=1, status_index=status_index, msg_index=msg_index)
+
+
 def _filter_controls() -> str:
     """Four radio-input tabs, checked state driving the CSS in ``_STYLE``."""
     parts = []

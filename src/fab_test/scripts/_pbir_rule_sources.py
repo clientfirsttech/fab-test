@@ -67,6 +67,45 @@ def _relative(path: Path) -> Path:
         return path
 
 
+_RANK = {"error": 0, "warning": 1, "pass": 2}
+
+
+def contract_rows(summary: dict, results: list[dict[str, Any]]) -> list[tuple]:
+    """(rule, severity, page, expects, found, status) per contract check: its worst result across the pages
+    it ran on, what it found when that wasn't a pass, and the page-exists checks the contract adds."""
+    worst: dict[str, tuple[str, str]] = {}
+    for r in results:
+        status = r.get("status", "pass")
+        if r.get("source") == CONTRACT and _RANK.get(status, 3) < _RANK.get(worst.get(r["rule"], ("",))[0], 3):
+            worst[r["rule"]] = (status, "" if status == "pass" else r.get("message", ""))
+    rows = []
+    checks = [(r["id"], r["severity"], r["page"], f"{r['field']} {_expects(r['check'], r['expected'])}")
+              for r in summary.get("rules", [])]
+    checks += [(n["id"], n["severity"], n["page"], f"bookmark navigator opens with {n['expected'] or 'no bookmark'}")
+               for n in summary.get("navigators", [])]
+    for rule_id, severity, page, expects in checks:
+        status, found_text = worst.pop(RULE_PREFIX + rule_id, ("not run", ""))
+        rows.append((RULE_PREFIX + rule_id, severity, page, expects, found_text, status))
+    rows += [(rule, "error", rule.removeprefix(f"{RULE_PREFIX}page."), "the page exists", found_text, status)
+             for rule, (status, found_text) in worst.items()]
+    return rows
+
+
+def _expects(check: str, expected: Any) -> str:
+    """A check's expected opening state in words, as Desktop shows it."""
+    if check == "selected":
+        values = "Select all" if expected == "all" else ", ".join(map(str, expected)) or "nothing ticked"
+        return f"opens with {values}"
+    if check == "contains":
+        return f"opens containing {', '.join(map(str, expected))}" if expected else "opens with nothing typed"
+    if check == "relative":
+        return f"opens with {expected['range']} {expected['duration']} {expected['period']}"
+    start, end = expected.get("from"), expected.get("to")
+    if start and end:
+        return f"opens from {start} to {end}"
+    return f"opens up to {end}" if end else f"opens from {start} on"
+
+
 def count_line(findings: list[dict[str, Any]], paired: bool) -> str:
     """How many findings came from each rule set; the contract's count shows even at 0, so a pass is visible."""
     from_contract = sum(source_of(f.get("rule", "")) == CONTRACT for f in findings)

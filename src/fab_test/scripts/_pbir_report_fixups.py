@@ -18,6 +18,9 @@ import json
 from html import escape
 from pathlib import Path
 
+from ._pbir_rule_sources import contract_rows
+from ._report_html import REPORT_STYLE, report_table
+
 _BROKEN_FAVICON_LINK = '<link rel="icon" href="../icon/pbiinspector.png">'
 
 
@@ -156,16 +159,17 @@ _PANEL_ID = 'id="fabTestContract"'
 CONTRACT_RULESET = "Slicer contract"
 
 
-def mark_contract_rules(report_path: Path, contract: str, counts: str, failed: list[dict], paired: bool) -> None:
+def mark_contract_rules(report_path: Path, contract: str, summary: dict | None, results: list[dict]) -> None:
     """Show the slicer contract on TestRun.html, and give its results their own ruleset.
 
     PBIR Inspector lists the packaged rules and the contract's ``CONTRACT.*``
     rules under one ruleset, "Rules", and the page never says a contract ran.
-    This adds a panel above the results (``contract``: the run header's
-    contract line; ``counts``: findings by rule set; ``failed``: the
-    contract's findings) and renames the contract's results' ruleset to
-    "Slicer contract", so the page's Ruleset Name filter separates them.
-    A page without the data or layout markers, or already marked, is left alone.
+    This adds a collapsible section above the results, styled as fab-test's
+    own reports (``contract``: the run header's contract line; ``summary``:
+    the paired contract's, or None; ``results``: the envelope's tagged
+    test results), and renames the contract's results' ruleset to "Slicer
+    contract", so the page's Ruleset Name filter separates them. A page
+    without the data or layout markers, or already marked, is left alone.
     """
     with contextlib.suppress(OSError):
         text = report_path.read_text(encoding="utf-8")
@@ -181,17 +185,36 @@ def mark_contract_rules(report_path: Path, contract: str, counts: str, failed: l
                 result["RuleSetName"] = CONTRACT_RULESET
         payload = json.dumps(data, ensure_ascii=False).replace("</", r"<\/")  # never close the script early
         text = text[:begin] + payload + text[end:]
-        text = text.replace(_LAYOUT_MARKER, _contract_panel(contract, counts, failed, paired) + _LAYOUT_MARKER, 1)
+        text = text.replace(_LAYOUT_MARKER, _contract_section(contract, summary, results) + _LAYOUT_MARKER, 1)
         report_path.write_text(text, encoding="utf-8")
 
 
-def _contract_panel(contract: str, counts: str, failed: list[dict], paired: bool) -> str:
-    items = "".join(f"<li><code>{escape(f['rule'])}</code> {escape(f.get('object', ''))}: "
-                    f"{escape(f.get('message', ''))}</li>" for f in failed)
-    failures = f'<ul class="mb-1">{items}</ul>' if items else ""
-    tip = ('<p class="small text-body-secondary mb-0">Type <kbd>contract</kbd> in Ruleset Name to see only the '
-           "contract's results; its rule ids start with <code>CONTRACT.</code>.</p>") if paired else ""
-    return (f'<div {_PANEL_ID} class="my-3 p-3 bg-body rounded shadow-sm">'
-            f'<h6 class="border-bottom pb-2 mb-2">Slicer contract</h6>'
-            f'<p class="mb-1">{escape(contract.removeprefix("📜 "))}</p><p class="mb-1">{escape(counts)}</p>'
-            f"{failures}{tip}</div>\n        ")
+# The section lives in a declarative shadow root: fab-test's report stylesheet styles `body` and
+# `table`, which would restyle PBIR Inspector's whole page; inside the shadow root it reaches only here.
+_SECTION_STYLE = """
+:host { display: block; font-family: ui-sans-serif, -apple-system, "Segoe UI", system-ui, sans-serif; }
+details { padding: 0.75rem 1rem; border: 1px solid #8884; border-radius: 0.5rem; background: Canvas; }
+summary { cursor: pointer; font-weight: 600; }
+details[open] summary { margin-bottom: 0.75rem; }
+.meta { margin: 0.75rem 0 0; }
+"""
+
+
+def _contract_section(contract: str, summary: dict | None, results: list[dict]) -> str:
+    if summary is None:
+        title, opened = "Slicer contract · none paired", False
+        body = f'<p class="meta">{escape(contract.removeprefix("📜 Slicer contract: "))}</p>'
+    else:
+        rows = contract_rows(summary, results)
+        failed = sum(row[-1] not in ("pass", "not run") for row in rows)
+        name, _, checks = contract.removeprefix("📜 Slicer contract: ").rstrip(")").rpartition(" (")  # as the terminal
+        title = f"Slicer contract · {name} · {checks} · {f'{failed} failed' if failed else 'all passed'}"
+        opened = bool(failed)
+        body = (report_table(("Rule", "Severity", "Page", "Expects", "Found", "Status"), rows, status_index=5,
+                             msg_index=4)
+                + '<p class="meta">Type <kbd>contract</kbd> in the Ruleset Name filter to see only the '
+                  "contract&#x27;s results.</p>")
+    return (f'<div {_PANEL_ID} class="my-3"><template shadowrootmode="open">'
+            f"<style>{REPORT_STYLE}{_SECTION_STYLE}</style>"
+            f"<details{' open' if opened else ''}><summary>{escape(title)}</summary>{body}</details>"
+            "</template></div>\n        ")

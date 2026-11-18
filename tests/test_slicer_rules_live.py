@@ -293,8 +293,9 @@ def test_given_report_should_show_the_contract_on_pbir_inspectors_page(inspector
 
     [page] = list((root / "out").glob("pbir/*/native.json/*.html"))
     text = page.read_text(encoding="utf-8")
-    assert 'id="fabTestContract"' in text and "SampleModel-DefaultState.Report.odcs.yaml (" in text
-    assert "<code>CONTRACT.half-year-current</code>" in text
+    assert 'id="fabTestContract"' in text
+    assert "SampleModel-DefaultState.Report.odcs.yaml · 12 slicer checks, 3 bookmark navigators · 1 failed" in text
+    assert '<tr class="error" data-status="error"><td>CONTRACT.half-year-current</td>' in text
     start = text.index("let testRunData = ") + len("let testRunData = ")
     results = json.JSONDecoder().raw_decode(text, start)[0]["Results"]
     assert {r["RuleSetName"] for r in results if r["RuleId"].startswith("CONTRACT.")} == {"Slicer contract"}

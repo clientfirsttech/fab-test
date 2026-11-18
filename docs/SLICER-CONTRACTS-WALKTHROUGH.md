@@ -210,7 +210,7 @@ A run checks two sets of rules: the **PBIR rules** every report gets (fab-test's
 
 On a report saved straight after `init`, every `CONTRACT.*` rule passes: `0 from the slicer contract`.
 
-Add `--open-report` to see it in a browser. PBIR Inspector's page opens with a **Slicer contract** panel: the contract it used (or why none paired), the same split count, and each contract rule that failed. In the results below, the contract's rules are under the ruleset *Slicer contract* and the PBIR rules under *Rules*, so typing `contract` in the page's Ruleset Name filter shows only the contract's.
+Add `--open-report` to see it in a browser. PBIR Inspector's page opens with a collapsible **Slicer contract** section, laid out like fab-test's other reports: its summary line names the contract and says how many checks failed (it starts open when one did), and the table lists every check with its page, what it expects, what it found and its status. With no contract it says why none paired. In the results below, the contract's rules are under the ruleset *Slicer contract* and the PBIR rules under *Rules*, so typing `contract` in the page's Ruleset Name filter shows only the contract's.
 
 ## Step 5: Prove it catches a mistake
 

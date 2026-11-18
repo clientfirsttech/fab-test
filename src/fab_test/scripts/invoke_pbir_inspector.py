@@ -631,9 +631,8 @@ def run_inspector(args: argparse.Namespace) -> int:
     test_results = tag_sources(_pbir_test_results(raw_findings, page_names))
     native_html_out = _locate_native_html(native_out, emit_html, inspector_path)
     if native_html_out:  # PBIR Inspector's page doesn't know a contract ran; say so on it
-        paired = contract_summary is not None
-        mark_contract_rules(native_html_out, contract, count_line(findings, paired),
-                            [f for f in findings if f["source"] == "contract"], paired)
+        summary = json.loads(contract_summary.read_text(encoding="utf-8")) if contract_summary else None
+        mark_contract_rules(native_html_out, contract, summary, test_results)
 
     outcome = _classify_inspector_result(findings, proc.returncode, has_output=bool(raw_findings))
     write_results(
