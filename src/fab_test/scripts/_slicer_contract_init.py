@@ -9,7 +9,7 @@ The questions are data, so all three callers get the same ones:
 
 Per slicer the answer is `keep` (check today's selection), `current` (follow
 the current period, with the format `init` recognised) or `{"current": "<format>"}`,
-or `skip`; `calendar` is accepted for `current`. `current` is offered only when a
+or `skip`. `current` is offered only when a
 known period format reproduces today's value; otherwise `keep`/`skip`, and a
 selection a rule can't check only `skip`. Each page's bookmark navigator (a
 question with `kind: navigator`) is `keep` or `skip`. A missing answer takes
@@ -40,7 +40,6 @@ from ._slicer_calendar import FIELDS, CalendarError, calendar_fields, resolve_co
 from ._slicer_contract import ENGINE, SELECT_ALL, ContractError, parse_contract
 from ._slicer_contract_run import CONTRACT_SUFFIX, report_logical_id
 
-_CURRENT = ("current", "calendar")  # `calendar` is the answer's first name, still accepted
 _START = "calendar.fiscal_year_start_month"
 _NAMED_BY = "calendar.fiscal_year_named_by"
 _CALENDAR_PROPERTY = "fabTestCalendar"
@@ -250,9 +249,8 @@ def _rule(q: dict, answer: Any) -> tuple[dict[str, Any] | None, bool]:
         return None, False
     if "unsupported" in q["current"]:
         raise InitError(f"{q['id']}: {q['current']['unsupported']}; the only answer is skip")
-    if answer in _CURRENT or isinstance(answer, dict):
-        text = next((answer[k] for k in _CURRENT if k in answer), None) if isinstance(answer, dict) \
-            else q.get("calendar_format")
+    if answer == "current" or (isinstance(answer, dict) and list(answer) == ["current"]):
+        text = answer["current"] if isinstance(answer, dict) else q.get("calendar_format")
         if not isinstance(text, str) or not text:
             raise InitError(f"{q['id']}: no period format reproduces {_show(q['current'])} today; "
                             'answer {"current": "<format>"} to name one')

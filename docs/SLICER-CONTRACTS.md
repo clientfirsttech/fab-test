@@ -22,7 +22,7 @@ Standard Slicers: 'Fiscal Calendar'[Fiscal Semester] opens with FY27-S1, which l
 ```
 
 - **keep** checks today's selection exactly.
-- **current** checks that the slicer opens on the current period, whatever the date. It's offered only when `init` recognises today's value as one: `FY27-S1` becomes `FY{fiscal_year_short}-S{fiscal_semester}`, which will expect `FY27-S2` from January. (`calendar`, its earlier name, is still accepted in an answers file.)
+- **current** checks that the slicer opens on the current period, whatever the date. It's offered only when `init` recognises today's value as one: `FY27-S1` becomes `FY{fiscal_year_short}-S{fiscal_semester}`, which will expect `FY27-S2` from January.
 - **skip** leaves the slicer out.
 
 Answering current also asks when your fiscal year starts and whether it is named by the year it starts or ends in. `init` suggests the answer that reproduces today's values; several months can, so check it.

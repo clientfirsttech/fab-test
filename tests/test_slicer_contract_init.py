@@ -421,9 +421,8 @@ def test_given_a_value_that_isnt_todays_period_should_offer_only_keep_or_skip(tm
 
 
 @pytest.mark.pbir
-@pytest.mark.parametrize("answer", ["current", "calendar", {"current": "FY{fiscal_year_short}-S{fiscal_semester}"},
-                                    {"calendar": "FY{fiscal_year_short}-S{fiscal_semester}"}])
-def test_given_current_or_the_older_calendar_answer_should_follow_the_current_period(tmp_path, capsys, answer):
+@pytest.mark.parametrize("answer", ["current", {"current": "FY{fiscal_year_short}-S{fiscal_semester}"}])
+def test_given_current_should_follow_the_current_period(tmp_path, capsys, answer):
     report = _bed(tmp_path)
 
     code, _out, err = _run(report, capsys, "--answers", _answers(tmp_path, {SEMESTER: answer}))
@@ -443,3 +442,14 @@ def test_given_current_for_a_value_that_isnt_a_period_should_exit_2_saying_how_t
     assert ('standard-slicers-alignment: no period format reproduces Bad today; answer {"current": "<format>"} '
             "to name one") in err
     assert not _contract_path(report).exists()
+
+
+@pytest.mark.pbir
+@pytest.mark.parametrize("answer", ["calendar", {"calendar": "FY{fiscal_year_short}-S{fiscal_semester}"}])
+def test_given_the_unreleased_calendar_answer_should_refuse_it_naming_current(tmp_path, capsys, answer):
+    report = _bed(tmp_path)
+
+    code, _out, err = _run(report, capsys, "--answers", _answers(tmp_path, {SEMESTER: answer}))
+
+    assert code == 2
+    assert f'{SEMESTER}: answer must be keep, current, skip or {{"current": "<format>"}}, got {answer!r}' in err
