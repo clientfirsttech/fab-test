@@ -111,6 +111,7 @@ ContractInit {
     4. fab-test pbir contract init REPORT --answers FILE [--dry-run]
   }
   (no terminal and no --answers) => exit 2 naming --questions and --answers   // never waits for input
+  terminal = stdin and stderr both one; on Windows a real console (stdin on NUL, as agents run commands, isn't)
   answer per slicer = keep | current | skip | {"current": "<format>"}
   current is offered (choices) only when a known period format reproduces today's value; the question's
   calendar_format names it. A label init doesn't recognise can still take {"current": "<format>"}

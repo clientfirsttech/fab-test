@@ -13,9 +13,32 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import sys
 from typing import Any
 
 _LEVELS = ("summary", "default", "verbose", "debug")  # as ANALYZER_VERBOSITY names them
+
+
+def can_ask() -> bool:
+    """Whether a person is there to answer: prompts go to stderr and answers come from stdin, so both must be
+    a terminal. Windows reports the null device as one (NUL is a character device), which is how coding
+    agents run commands; there, only a real console has a console mode."""
+    streams = (sys.stdin, sys.stderr)
+    if not all(stream.isatty() for stream in streams):
+        return False
+    return os.name != "nt" or all(_console(stream) for stream in streams)
+
+
+def _console(stream: Any) -> bool:
+    try:
+        import ctypes
+        import msvcrt
+        from ctypes import wintypes
+
+        handle = wintypes.HANDLE(msvcrt.get_osfhandle(stream.fileno()))
+        return bool(ctypes.windll.kernel32.GetConsoleMode(handle, ctypes.byref(wintypes.DWORD())))
+    except (AttributeError, ImportError, OSError, ValueError):  # no file handle, or not Windows
+        return False
 
 
 def add_output_flags(parser: argparse.ArgumentParser) -> None:

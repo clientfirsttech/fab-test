@@ -180,7 +180,7 @@ def test_given_a_terminal_should_re_ask_for_a_fiscal_start_month_until_one_is_ty
     report = _bed(tmp_path)
     questions = len(_questions(report, capsys)) - 2                  # every slicer and navigator question
     monkeypatch.setattr("sys.stdin", io.StringIO("\n" * questions + "\n7\nend\n"))
-    monkeypatch.setattr("sys.stdin.isatty", lambda: True, raising=False)
+    monkeypatch.setattr("fab_test.scripts._slicer_contract_init.can_ask", lambda: True)
 
     code, _out, err = _run(report, capsys)
 
@@ -196,7 +196,7 @@ def test_given_a_terminal_that_closes_before_the_fiscal_year_is_answered_should_
 
     report = _bed(tmp_path)
     monkeypatch.setattr("sys.stdin", io.StringIO(""))
-    monkeypatch.setattr("sys.stdin.isatty", lambda: True, raising=False)
+    monkeypatch.setattr("fab_test.scripts._slicer_contract_init.can_ask", lambda: True)
 
     code, _out, err = _run(report, capsys)
 

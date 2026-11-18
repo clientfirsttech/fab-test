@@ -35,7 +35,7 @@ def _bed(tmp_path: Path) -> Path:
 def _run(report: Path, capsys, *extra: str, tty: bool = False, monkeypatch=None, typed: str = ""):
     if monkeypatch is not None:
         monkeypatch.setattr("sys.stdin", io.StringIO(typed))
-        monkeypatch.setattr("sys.stdin.isatty", lambda: tty, raising=False)
+        monkeypatch.setattr("fab_test.scripts._slicer_contract_init.can_ask", lambda: tty)
     code = contract_main(["init", str(report), "--as-of", AS_OF, *extra])
     out, err = capsys.readouterr()
     return code, out, err

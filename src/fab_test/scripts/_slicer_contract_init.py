@@ -5,7 +5,9 @@ The questions are data, so all three callers get the same ones:
 - a human on a terminal is asked each in turn (on stderr); Enter takes the suggestion
 - an agent runs `--questions --format json`, asks the human what it can't
   decide, and applies the answers with `--answers FILE`
-- with no terminal and no answers the command exits 2 and never waits
+- with no terminal and no answers the command exits 2 and never waits; a
+  terminal means stdin and stderr both are one (on Windows, a real console:
+  NUL reports itself as a tty, and it is how coding agents run commands)
 
 Per slicer the answer is `keep` (check today's selection), `current` (follow
 the current period, with the format `init` recognised) or `{"current": "<format>"}`,
@@ -53,6 +55,7 @@ from ._slicer_init_calendar import (
 )
 from ._slicer_init_output import (
     add_output_flags,
+    can_ask,
     level,
     print_payload,
     questions_text,
@@ -203,7 +206,7 @@ def _answers(args: argparse.Namespace, questions: dict) -> dict[str, Any]:
             raise InitError(f"--answers {args.answers}: {exc}") from exc
         if not isinstance(given, dict):
             raise InitError(f"--answers {args.answers}: must be a JSON object of question id -> answer")
-    elif sys.stdin.isatty():
+    elif can_ask():
         given = _ask(questions["questions"], datetime.date.fromisoformat(questions["as_of"]))
     else:
         raise InitError("no terminal to ask on: run with --questions --format json to see the questions, "

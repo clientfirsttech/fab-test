@@ -124,7 +124,7 @@ Add `--dry-run` to see the file without writing it. `-q` prints nothing when it 
 
 ### Letting an agent build it instead
 
-The questions are data, so a coding agent (or a script) can drive `init` without a terminal:
+The questions are data, so a coding agent (or a script) can drive `init` without a terminal. Without `--answers`, `init` asks only when stdin and stderr are both a terminal (on Windows, a real console: a stdin on NUL, which is how coding agents run commands, doesn't count); otherwise it exits 2 and names these flags rather than answering for anyone:
 
 ```bash
 fab-test pbir contract init "Sales.Report" --questions --format json > questions.json

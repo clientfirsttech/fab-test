@@ -106,3 +106,98 @@ def test_given_quiet_and_verbose_together_should_refuse_as_every_command_does(tm
         _run(tmp_path, capsys, "-q", "-v")
 
     assert caught.value.code == 2
+
+
+class _Stream:
+    """A stream that says whether it is a terminal, as `sys.stdin` / `sys.stderr` do."""
+
+    def __init__(self, tty: bool):
+        self._tty = tty
+
+    def isatty(self) -> bool:
+        return self._tty
+
+
+@pytest.mark.pbir
+def test_given_answers_typed_but_prompts_not_shown_should_not_ask(monkeypatch):
+    from fab_test.scripts import _slicer_init_output as output
+
+    monkeypatch.setattr("sys.stdin", _Stream(tty=True))
+    monkeypatch.setattr("sys.stderr", _Stream(tty=False))
+
+    assert not output.can_ask()                                             # nobody would see the questions
+
+
+@pytest.mark.pbir
+def test_given_the_null_device_should_not_ask(monkeypatch):
+    import os
+
+    from fab_test.scripts import _slicer_init_output as output
+
+    with open(os.devnull, encoding="utf-8") as null_in, open(os.devnull, "w", encoding="utf-8") as null_out:
+        monkeypatch.setattr("sys.stdin", null_in)
+        monkeypatch.setattr("sys.stderr", null_out)
+
+        assert not output.can_ask()                                         # Windows reports NUL as a tty
+
+
+@pytest.mark.pbir
+def test_given_a_terminal_on_both_should_ask(monkeypatch):
+    from fab_test.scripts import _slicer_init_output as output
+
+    monkeypatch.setattr("sys.stdin", _Stream(tty=True))
+    monkeypatch.setattr("sys.stderr", _Stream(tty=True))
+    monkeypatch.setattr(output, "_console", lambda stream: True)            # a real Windows console
+
+    assert output.can_ask()
+
+
+@pytest.mark.pbir
+def test_given_a_tty_that_is_not_a_windows_console_should_not_ask(monkeypatch):
+    from fab_test.scripts import _slicer_init_output as output
+
+    monkeypatch.setattr("sys.stdin", _Stream(tty=True))
+    monkeypatch.setattr("sys.stderr", _Stream(tty=True))
+    monkeypatch.setattr(output.os, "name", "nt")
+
+    assert not output.can_ask()                                             # no handle: no console mode
+
+
+@pytest.mark.pbir
+def test_given_stdin_on_the_null_device_should_exit_2_and_write_nothing(tmp_path):
+    import os
+    import subprocess
+    import sys
+
+    report = _bed(tmp_path)
+
+    result = subprocess.run(
+        [sys.executable, "-m", "fab_test.scripts.fab_test", "pbir", "contract", "init", str(report)],
+        stdin=subprocess.DEVNULL, capture_output=True, text=True, encoding="utf-8", check=False,
+        env={**os.environ, "PYTHONIOENCODING": "utf-8"},
+    )
+
+    assert result.returncode == 2, result.stdout + result.stderr
+    assert "no terminal to ask on" in result.stderr and "--answers FILE" in result.stderr
+    assert "✓" not in result.stdout
+    assert not list(tmp_path.glob("*.odcs.yaml"))
+
+
+@pytest.mark.pbir
+def test_given_stdin_and_stderr_on_the_null_device_should_not_answer_for_anyone(tmp_path):
+    """The pilot's run (C1): a report with no fiscal question, so taking every default would write a contract."""
+    import os
+    import subprocess
+    import sys
+
+    report = tmp_path / "SampleModel-PQLAssert.Report"
+    shutil.copytree(ROOT / "fabric-artifacts" / report.name, report)
+
+    result = subprocess.run(
+        [sys.executable, "-m", "fab_test.scripts.fab_test", "pbir", "contract", "init", str(report)],
+        stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, encoding="utf-8",
+        check=False, env={**os.environ, "PYTHONIOENCODING": "utf-8"},
+    )
+
+    assert result.returncode == 2 and "✓" not in result.stdout
+    assert not list(tmp_path.glob("*.odcs.yaml"))
