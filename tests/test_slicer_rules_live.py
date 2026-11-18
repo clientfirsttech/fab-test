@@ -262,3 +262,25 @@ def test_given_either_select_all_shape_or_a_switched_off_flag_should_pass(inspec
     _run(root)
 
     assert _failed(root) == {"CONTRACT.half-year-current"}
+
+
+def test_given_a_paired_contract_should_tell_its_rules_from_the_pbir_rules(inspector, tmp_path):
+    root = _bed(tmp_path, _contract())
+
+    result = _run(root)
+
+    output = result.stdout + result.stderr
+    assert "📜 Slicer contract: " in output and "SampleModel-DefaultState.Report.odcs.yaml (" in output
+    assert "from the PBIR rules, 1 from the slicer contract" in output
+    envelope = _envelope(root)
+    assert {f["source"] for f in envelope["findings"] if f["rule"].startswith("CONTRACT.")} == {"contract"}
+    assert {r["source"] for r in envelope["test_results"] if not r["rule"].startswith("CONTRACT.")} == {"rules"}
+
+
+def test_given_no_contract_should_say_none_paired(inspector, tmp_path):
+    root = _bed(tmp_path, None)
+
+    result = _run(root)
+
+    assert "📜 Slicer contract: none (no *.odcs.yaml under --artifact-dir has fabTestReport " in (
+        result.stdout + result.stderr)

@@ -69,6 +69,9 @@ def prepare_contracts(args: argparse.Namespace) -> int | None:
             _pair(args.slicer_contracts, _resolve(path, as_of))
     except (ContractError, CalendarError) as exc:
         print(f"  ✗ fab-test: {exc}", file=sys.stderr)
+        if getattr(args, "artifact", None):  # a broken contract for another report still stops the run
+            print(f"    every *{CONTRACT_SUFFIX} under --artifact-dir is read before any report runs, including ones "
+                  "for reports --artifact doesn't select; fix it, or narrow --artifact-dir", file=sys.stderr)
         return 2
     return None
 

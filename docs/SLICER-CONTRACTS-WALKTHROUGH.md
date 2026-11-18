@@ -198,7 +198,17 @@ Things you can change by hand:
 fab-test pbir --artifact Sales
 ```
 
-On a report saved straight after `init`, every `CONTRACT.*` rule passes. Other PBIR rules may still report findings; those are unrelated to the contract.
+```text
+📋 Artifact: Sales.Report
+📜 Slicer contract: Sales.Report.odcs.yaml (12 slicer checks, 3 bookmark navigators)
+📊 3 finding(s) (2 error(s), 1 warning(s)): 3 from the PBIR rules, 0 from the slicer contract
+```
+
+A run checks two sets of rules: the **PBIR rules** every report gets (fab-test's packaged ones, or your `--rules` file) and the **slicer contract's** rules, whose ids start with `CONTRACT.`. The 📜 line says which contract this report paired with, and the 📊 line splits the findings between the two. Above, the contract passed, and the three findings are ordinary PBIR rule findings. In the JSON envelope every finding and test result carries `source`: `rules` or `contract`.
+
+**Which contract?** The one whose `fabTestReport` matches the `logicalId` in the report's `.platform`, wherever it sits under `--artifact-dir`; the file name doesn't matter. If none matches, the 📜 line says `none` and names the `logicalId` it looked for. `--artifact` narrows the reports checked, not the contracts read: every contract under `--artifact-dir` is read first, so a broken one for another report still stops the run (exit 2, with a note saying so).
+
+On a report saved straight after `init`, every `CONTRACT.*` rule passes: `0 from the slicer contract`.
 
 ## Step 5: Prove it catches a mistake
 
@@ -253,4 +263,5 @@ Both run on every change to a report or contract, **and on a weekly schedule**. 
 | "bookmarks share that name", or `init` offers only `skip` | two bookmarks have the same display name | Rename one; a name has to say which bookmark |
 | Two bookmark navigators on one page, `init` offers only `skip` | they preselect different bookmarks | Make them agree, or leave the page unchecked |
 | `exit 2` naming a JSON path | the contract YAML doesn't validate | Fix the key it names; nothing ran |
-| No `CONTRACT.*` rules ran | the contract's `fabTestReport` doesn't match `.platform` | Re-run `init`, or pass `--contract FILE` |
+| `📜 Slicer contract: none (... has fabTestReport <id> ...)` | no contract's `fabTestReport` matches that `logicalId` in `.platform` | Re-run `init`, or set `fabTestReport` to that id, or pass `--contract FILE` |
+| exit 2 for a contract you didn't ask about | every contract under `--artifact-dir` is read, even with `--artifact` | Fix it, or narrow `--artifact-dir` |

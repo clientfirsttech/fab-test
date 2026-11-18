@@ -130,6 +130,8 @@ def test_an_older_envelope_shape_is_unaffected_by_test_results(tmp_path, monkeyp
     _exit_code, data = _run(tmp_path, _MIXED_RESULTS, monkeypatch)
 
     assert data["status"] == "failed"
-    assert data["findings"] == [
+    shared = ("rule", "severity", "object", "message")  # the finding schema every analyzer shares
+    assert [{k: f[k] for k in shared} for f in data["findings"]] == [
         {"rule": "MAINT_02", "severity": "error", "object": "Page 2", "message": "Missing alt text"}
     ]
+    assert [f["source"] for f in data["findings"]] == ["rules"]  # additive: PBIR rules, not a slicer contract

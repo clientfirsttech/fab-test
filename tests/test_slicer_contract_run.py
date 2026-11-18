@@ -124,3 +124,12 @@ def test_given_broken_yaml_with_no_fab_test_rules_should_warn_and_skip_it(tmp_pa
 
     assert prepare_contracts(args) is None
     assert args.slicer_contracts == {} and "skipped" in capsys.readouterr().err
+
+
+@pytest.mark.pbir
+def test_given_a_broken_contract_for_another_report_should_say_every_contract_is_read(tmp_path, capsys):
+    _write(tmp_path / "Other.Report.odcs.yaml", _contract(selected=["{nope}"]))
+
+    assert prepare_contracts(_args(tmp_path, artifact="Sales")) == 2
+    assert ("every *.odcs.yaml under --artifact-dir is read before any report runs, including ones for reports "
+            "--artifact doesn't select") in capsys.readouterr().err

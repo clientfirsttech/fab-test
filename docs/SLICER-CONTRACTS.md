@@ -49,6 +49,15 @@ Some selections can't be checked, and `init` only offers to skip them: "Select a
 fab-test pbir --artifact SampleModel-DefaultState
 ```
 
+The run says which contract paired with the report and splits its findings between the PBIR rules every report gets and the contract's `CONTRACT.*` rules:
+
+```
+📜 Slicer contract: fabric-artifacts\SampleModel-DefaultState.Report.odcs.yaml (12 slicer checks, 3 bookmark navigators)
+📊 1 finding(s) (1 error(s), 0 warning(s)): 0 from the PBIR rules, 1 from the slicer contract
+```
+
+A report pairs with the contract whose `fabTestReport` matches its `.platform` `logicalId`, wherever the file is under `--artifact-dir`; with none, the 📜 line says `none` and names the id. In the envelope, each finding and test result carries `source`: `rules` or `contract`.
+
 A slicer that drifted is a finding on its page:
 
 ```

@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-11-17
+
+- ✨ - `fab-test pbir` Tells PBIR Rules From Slicer Contract Rules - A run checks the PBIR rules every report gets and the report's own `CONTRACT.*` rules together, and nothing said which contract paired, or that none had. The run header now names the paired contract and what it checks (`📜 Slicer contract: Sales.Report.odcs.yaml (12 slicer checks, 3 bookmark navigators)`), or says `none` with the `logicalId` it looked for; the count line splits findings (`3 from the PBIR rules, 0 from the slicer contract`), so a passing contract is visible; and every envelope finding and test result carries an additive `source` (`rules` or `contract`). A broken contract for a report `--artifact` didn't select still stops the run, now with a note that every contract under `--artifact-dir` is read.
+
 ## 2026-11-15
 
 - ✨ - Slicer Contracts Tell "Select all" From Nothing Ticked - Both show every row, so a contract couldn't say which one a report opens with: `init` read a "Select all" slicer as `selected: []`, and `selected: []` passed it. `selected: all` now expects "Select all" ticked (inverted selection mode with nothing unticked, whether Desktop writes no filter or `Not In []`), `selected: []` now also requires the mode off, and each fails the other with "opens with [Select all]" or "opens with [no selection]". `init` asks about a "Select all" slicer and writes `all`. Before, a contract that `init` built from a "Select all" slicer passed one that had been cleared.

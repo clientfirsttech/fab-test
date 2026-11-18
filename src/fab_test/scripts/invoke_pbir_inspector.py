@@ -34,6 +34,7 @@ from ._analyzer_envelope import (
     write_envelope,
 )
 from ._pbir_report_fixups import fix_favicon_link, fix_log_type_filter, fix_screenshot_images
+from ._pbir_rule_sources import contract_line, count_line, tag_sources
 from ._table_style import findings_table
 
 _VERBOSITY_LEVELS = {"summary": 0, "default": 1, "verbose": 2, "debug": 3}
@@ -362,6 +363,7 @@ def _log_run_header(
     inspector_path: Path,
     output_path: Path,
     native_out: Path,
+    contract: str = "",
 ) -> None:
     """Print the pre-run banner, once verbosity clears the default threshold."""
     if level < _VERBOSITY_LEVELS["default"]:
@@ -376,6 +378,8 @@ def _log_run_header(
         log(f"🔧 Tool:     {inspector_path}")
     log(f"📊 Envelope: {output_path}")
     log(f"📄 Native JSON: {native_out}")
+    if contract:  # which slicer contract's rules join the PBIR rules, or why none do
+        log(contract)
     log("")
 
 
@@ -533,6 +537,7 @@ def _log_inspector_outcome(
     findings: list[dict[str, Any]],
     native_html_out: Path | None,
     level: int,
+    paired: bool = False,
 ) -> None:
     """Print the post-run summary lines, matching the pre-split log order."""
     if level < _VERBOSITY_LEVELS["default"]:
@@ -543,7 +548,8 @@ def _log_inspector_outcome(
     if native_html_out:
         log(f"📄 Native HTML: {native_html_out}")
     if findings:
-        log(f"📊 {len(findings)} finding(s) ({outcome['error_count']} error(s), {outcome['warning_count']} warning(s))")
+        counts = f"{outcome['error_count']} error(s), {outcome['warning_count']} warning(s)"
+        log(f"📊 {len(findings)} finding(s) ({counts}): {count_line(findings, paired)}")
         if level >= _VERBOSITY_LEVELS["verbose"]:
             _print_findings_table(findings)
 
@@ -582,7 +588,9 @@ def run_inspector(args: argparse.Namespace) -> int:
     emit_html: bool = getattr(args, "emit_html", False)
 
     level = _verbosity()
-    _log_run_header(level, artifact_stem, artifact_path, rules_path, inspector_path, output_path, native_out)
+    contract_summary = Path(args.contract_summary) if getattr(args, "contract_summary", None) else None
+    _log_run_header(level, artifact_stem, artifact_path, rules_path, inspector_path, output_path, native_out,
+                    contract=contract_line(artifact_path, contract_summary))
 
     # Ensure output directories exist before invoking the tool.
     native_out.parent.mkdir(parents=True, exist_ok=True)
@@ -619,8 +627,8 @@ def run_inspector(args: argparse.Namespace) -> int:
     raw_text = _read_native_output(native_out, proc.stdout)
     raw_findings = parse_findings(raw_text)
     page_names = _visual_page_names(artifact_path)
-    findings = [_normalize_finding(f, page_names) for f in raw_findings if _is_violation(f)]
-    test_results = _pbir_test_results(raw_findings, page_names)
+    findings = tag_sources([_normalize_finding(f, page_names) for f in raw_findings if _is_violation(f)])
+    test_results = tag_sources(_pbir_test_results(raw_findings, page_names))
     native_html_out = _locate_native_html(native_out, emit_html, inspector_path)
 
     outcome = _classify_inspector_result(findings, proc.returncode, has_output=bool(raw_findings))
@@ -637,9 +645,9 @@ def run_inspector(args: argparse.Namespace) -> int:
         ),
         rules_path,
         native_html_out=native_html_out,
-        contract_summary=Path(args.contract_summary) if getattr(args, "contract_summary", None) else None,
+        contract_summary=contract_summary,
     )
-    _log_inspector_outcome(outcome, findings, native_html_out, level)
+    _log_inspector_outcome(outcome, findings, native_html_out, level, paired=contract_summary is not None)
 
     if outcome["status"] == "passed":
         return 0
