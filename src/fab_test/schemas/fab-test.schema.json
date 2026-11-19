@@ -47,7 +47,7 @@
     },
     "report": {
       "type": "boolean",
-      "description": "Write a readable HTML report beside each result envelope. Opt-in; false unless set. PBIR Inspector's own TestRun.html is unaffected and appears regardless."
+      "description": "Write a readable HTML report beside each result envelope. Opt-in; false unless set. For pbir it is fab-test's page, framing PBIR Inspector's own TestRun.html, which is written only then too."
     },
     "open_report": {
       "type": "boolean",

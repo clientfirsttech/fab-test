@@ -17,6 +17,7 @@ import argparse
 import contextlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -32,7 +33,9 @@ from ._analyzer_envelope import (
     native_output_path,
     write_envelope,
 )
-from ._pbir_report_fixups import fix_favicon_link, fix_log_type_filter, fix_screenshot_images
+from ._pbir_report_fixups import fix_favicon_link, fix_log_type_filter, fix_screenshot_images, mark_contract_ruleset
+from ._pbir_report_page import PAGE_NAME, write_pbir_report
+from ._pbir_rule_sources import contract_line, count_line, tag_sources, unpaired_reason
 from ._table_style import findings_table
 
 _VERBOSITY_LEVELS = {"summary": 0, "default": 1, "verbose": 2, "debug": 3}
@@ -121,8 +124,18 @@ def write_results(
     result: WrapperResult,
     rules_path: Path,
     native_html_out: "Path | None" = None,
-) -> None:
-    """Write standardized PBIR Inspector envelope JSON."""
+    contract_summary: "Path | None" = None,
+    report_page: bool = False,
+    unpaired: str = "",
+) -> dict[str, Any]:
+    """Write standardized PBIR Inspector envelope JSON, and return it.
+
+    With ``report_page`` (``--report``), fab-test's own page is written
+    beside the envelope and becomes ``native_html_output_path``, the page
+    `--open-report` and `fab-test all` link; PBIR Inspector's TestRun.html,
+    framed at its bottom, is kept as ``inspector_html_output_path``.
+    ``unpaired`` says why no slicer contract paired, for the page.
+    """
     env = build_envelope(
         EnvelopeIdentity("pbir_inspector", str(result.artifact_path)),
         status=result.status,
@@ -132,13 +145,19 @@ def write_results(
         duration_ms=result.duration_ms,
     )
     env["rules_file"] = str(rules_path)
-    if native_html_out is not None:
-        env["native_html_output_path"] = str(native_html_out)
     # Additive: every rule PBIR Inspector evaluated, passed or failed --
     # `findings` stays violations-only for callers already reading that
     # meaning. Mirrors BPA's `test_results` (HTML Report Format epic).
     env["test_results"] = result.test_results or []
+    if contract_summary is not None:  # PBIR Slicer Default State: the contract, as-of date and resolved values
+        env["contract"] = json.loads(contract_summary.read_text(encoding="utf-8"))
+    if native_html_out is not None:
+        env["inspector_html_output_path"] = env["native_html_output_path"] = str(native_html_out)
+    if report_page and (page := write_pbir_report(env, result.output_path.parent / PAGE_NAME, unpaired,
+                                                  native_html_out)):
+        env["native_html_output_path"] = str(page)
     write_envelope(result.output_path, env)
+    return env
 
 
 def parse_findings(raw_text: str) -> list[dict[str, Any]]:
@@ -231,39 +250,6 @@ def _visual_page_names(artifact_path: Path) -> dict[str, str]:
     return names
 
 
-def _page_name(finding: dict[str, Any]) -> str:
-    """Extract a page name from a PBIR finding."""
-    parent = finding.get("ParentDisplayName") or ""
-    item_path = finding.get("ItemPath") or ""
-    if parent:
-        return parent
-    if item_path:
-        parts = [p for p in item_path.replace("\\", "/").split("/") if p]
-        if parts:
-            return parts[0]
-    return ""
-
-
-def _object_name(finding: dict[str, Any]) -> str:
-    """Extract an object name from a PBIR finding."""
-    item_path = finding.get("ItemPath") or ""
-    if item_path:
-        parts = [p for p in item_path.replace("\\", "/").split("/") if p]
-        if parts:
-            return parts[-1]
-    return finding.get("ParentDisplayName") or ""
-
-
-def _pbir_severity_label(finding: dict[str, Any]) -> str:
-    """Return a severity label string for a PBIR finding."""
-    return "Error" if _is_error_finding(finding) else "Warning"
-
-
-def _pbir_severity_rank(finding: dict[str, Any]) -> int:
-    """Return numeric severity rank for sorting PBIR findings (errors first)."""
-    return 3 if _is_error_finding(finding) else 2
-
-
 def _pbir_rule_id(finding: dict[str, Any]) -> str:
     """Return the best available rule id for a PBIR finding."""
     return (
@@ -289,6 +275,11 @@ def _report_scoped_object(finding: dict[str, Any], page_names: dict[str, str]) -
     return ", ".join(pages)
 
 
+def _unescape(message: str) -> str:
+    """PBIR Inspector JSON-escapes the result it quotes (an apostrophe arrives as backslash-u0027); show it."""
+    return re.sub(r"\\u([0-9a-fA-F]{4})", lambda m: chr(int(m.group(1), 16)), message)
+
+
 def _normalize_finding(finding: dict[str, Any], page_names: dict[str, str] | None = None) -> dict[str, Any]:
     """Translate a PBIR Inspector result into the shared finding schema.
 
@@ -306,7 +297,7 @@ def _normalize_finding(finding: dict[str, Any], page_names: dict[str, str] | Non
         "rule": _pbir_rule_id(finding),
         "severity": severity,
         "object": object_name,
-        "message": finding.get("Message") or "",
+        "message": _unescape(finding.get("Message") or ""),
     }
 
 
@@ -353,6 +344,7 @@ def _log_run_header(
     inspector_path: Path,
     output_path: Path,
     native_out: Path,
+    contract: str = "",
 ) -> None:
     """Print the pre-run banner, once verbosity clears the default threshold."""
     if level < _VERBOSITY_LEVELS["default"]:
@@ -367,6 +359,8 @@ def _log_run_header(
         log(f"🔧 Tool:     {inspector_path}")
     log(f"📊 Envelope: {output_path}")
     log(f"📄 Native JSON: {native_out}")
+    if contract:  # which slicer contract's rules join the PBIR rules, or why none do
+        log(contract)
     log("")
 
 
@@ -522,8 +516,9 @@ def _classify_inspector_result(
 def _log_inspector_outcome(
     outcome: dict[str, Any],
     findings: list[dict[str, Any]],
-    native_html_out: Path | None,
+    env: dict[str, Any],
     level: int,
+    paired: bool = False,
 ) -> None:
     """Print the post-run summary lines, matching the pre-split log order."""
     if level < _VERBOSITY_LEVELS["default"]:
@@ -531,10 +526,13 @@ def _log_inspector_outcome(
     if not findings:
         icon = "✅" if outcome["status"] == "passed" else "❌"
         log(f"{icon} {outcome['message']}")
-    if native_html_out:
-        log(f"📄 Native HTML: {native_html_out}")
+    if env.get("native_html_output_path"):
+        log(f"📄 Report: {env['native_html_output_path']}")
+    if env.get("inspector_html_output_path") not in (None, env.get("native_html_output_path")):
+        log(f"📄 PBIR Inspector's page: {env['inspector_html_output_path']}")
     if findings:
-        log(f"📊 {len(findings)} finding(s) ({outcome['error_count']} error(s), {outcome['warning_count']} warning(s))")
+        counts = f"{outcome['error_count']} error(s), {outcome['warning_count']} warning(s)"
+        log(f"📊 {len(findings)} finding(s) ({counts}): {count_line(findings, paired)}")
         if level >= _VERBOSITY_LEVELS["verbose"]:
             _print_findings_table(findings)
 
@@ -573,7 +571,9 @@ def run_inspector(args: argparse.Namespace) -> int:
     emit_html: bool = getattr(args, "emit_html", False)
 
     level = _verbosity()
-    _log_run_header(level, artifact_stem, artifact_path, rules_path, inspector_path, output_path, native_out)
+    contract_summary = Path(args.contract_summary) if getattr(args, "contract_summary", None) else None
+    _log_run_header(level, artifact_stem, artifact_path, rules_path, inspector_path, output_path, native_out,
+                    contract=contract_line(artifact_path, contract_summary))
 
     # Ensure output directories exist before invoking the tool.
     native_out.parent.mkdir(parents=True, exist_ok=True)
@@ -610,12 +610,14 @@ def run_inspector(args: argparse.Namespace) -> int:
     raw_text = _read_native_output(native_out, proc.stdout)
     raw_findings = parse_findings(raw_text)
     page_names = _visual_page_names(artifact_path)
-    findings = [_normalize_finding(f, page_names) for f in raw_findings if _is_violation(f)]
-    test_results = _pbir_test_results(raw_findings, page_names)
+    findings = tag_sources([_normalize_finding(f, page_names) for f in raw_findings if _is_violation(f)])
+    test_results = tag_sources(_pbir_test_results(raw_findings, page_names))
     native_html_out = _locate_native_html(native_out, emit_html, inspector_path)
+    if native_html_out:  # its Ruleset Name filter can then tell the contract's results apart
+        mark_contract_ruleset(native_html_out)
 
     outcome = _classify_inspector_result(findings, proc.returncode, has_output=bool(raw_findings))
-    write_results(
+    env = write_results(
         WrapperResult(
             output_path,
             outcome["status"],
@@ -628,8 +630,11 @@ def run_inspector(args: argparse.Namespace) -> int:
         ),
         rules_path,
         native_html_out=native_html_out,
+        contract_summary=contract_summary,
+        report_page=emit_html,
+        unpaired="" if contract_summary is not None else unpaired_reason(artifact_path),
     )
-    _log_inspector_outcome(outcome, findings, native_html_out, level)
+    _log_inspector_outcome(outcome, findings, env, level, paired=contract_summary is not None)
 
     if outcome["status"] == "passed":
         return 0
@@ -669,6 +674,11 @@ def main() -> int:
             "Path where the PBIR Inspector envelope JSON will be written "
             "(default: fab-test-results/pbir/<stem>/envelope.json)"
         ),
+    )
+    parser.add_argument(
+        "--contract-summary",
+        default=None,
+        help="Slicer contract summary JSON (as-of date, resolved values) to copy into the envelope",
     )
     parser.add_argument(
         "--emit-html",

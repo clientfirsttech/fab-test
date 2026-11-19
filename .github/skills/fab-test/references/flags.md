@@ -73,8 +73,12 @@ fab-test bpa
 |------|---------|---------|
 | `--inspector-path PATH` | `PBIR_INSPECTOR_PATH` | `PBIR-Inspector/PBIRInspectorCLI` |
 | `--rules-path PATH` | — | resolved via the metadata layers (`.fab-test/metadata/rules/pbi-inspector-custom-rules.json` > `.github/metadata/...` > packaged) |
+| `--contract FILE` | — | none: each report pairs with the `*.odcs.yaml` under `--artifact-dir` whose `fabTestReport` is its `.platform` logicalId. A named file applies to every report in the run |
+| `--as-of YYYY-MM-DD` | — | today; the date calendar-driven slicer defaults resolve against |
 
-**Requires the .NET 8 runtime.** The `fab-inspector` release is a framework-dependent build (`.NET 8.0 dependency not included`, per its release notes) — the binary can be present, executable, and correctly versioned and still be unable to run. `fab-test doctor --analyzer pbir` checks for an installed .NET 8+ runtime (via `dotnet --list-runtimes`) and reports not-ready, with a link to the .NET download page, rather than reporting the binary alone as sufficient. If the runtime check somehow passes on a machine where the tool still can't run, the wrapper's own exit code and stderr are surfaced as an `error` envelope status (never a silent `passed` with zero findings) — see [Envelope schema keys](operations.md) for how `error` differs from `passed`.
+`fab-test pbir contract init [REPORT | --artifact NAME [--artifact-dir DIR]]` builds or extends `<Report>.Report.odcs.yaml`: `--questions` (print them, then stop), `--answers FILE`, `--as-of`, `--dry-run`, `--force`, `--format text|json`. See [Slicer contracts](slicer-contracts.md).
+
+**Requires the .NET 10 runtime.** The `fab-inspector` release (4.0 and later) is a framework-dependent build (`Requires the .NET 10.0 runtime (not included)`, per its release notes; it will not start on an older runtime) — the binary can be present, executable, and correctly versioned and still be unable to run. `fab-test doctor --analyzer pbir` checks for an installed .NET 10+ runtime (via `dotnet --list-runtimes`) and reports not-ready, with a link to the .NET download page, rather than reporting the binary alone as sufficient. If the runtime check somehow passes on a machine where the tool still can't run, the wrapper's own exit code and stderr are surfaced as an `error` envelope status (never a silent `passed` with zero findings) — see [Envelope schema keys](operations.md) for how `error` differs from `passed`.
 
 ### a11y
 
@@ -419,6 +423,14 @@ the baseline) so the two cases can be told apart:
 
 A case that never rendered because its embed token failed records that failure
 as `actual`, never `rendered`.
+
+A paginated report renders only on a capacity (Fabric, Premium or Premium Per
+User). In a workspace without one, the report opens with "Query execution failed
+for dataset ...", so when a case fails with an RDL error, the workspace is
+checked once and, if it has no capacity, `actual` says so with the fix:
+`RDL error modal detected: the workspace isn't on a capacity, ...; assign one in
+the workspace's settings, under License info`. The check is best-effort; when
+it can't be made, `actual` stays `RDL error modal detected`.
 
 **A paginated report bound to a Power BI dataset resolves that binding
 automatically -- from the report's own local `.rdl` file, when one exists.**

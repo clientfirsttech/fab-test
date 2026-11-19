@@ -1,0 +1,31 @@
+import '.github/skills/aidd-polite-review/SKILL.md'
+
+userPrompt = """
+You are in a test environment. Do not run any commands and do not edit any files.
+Review only the transcript below; it is the evidence, and it counts as "read".
+
+/polite-review `acme-lint check`, a made-up linter a developer runs about twenty times a day:
+
+$ acme-lint check
+Are you sure you want to check the current directory? [y/N] y
+Traceback (most recent call last):
+  File "acme_lint/config.py", line 12, in load_config
+FileNotFoundError: [Errno 2] No such file or directory: 'acme.yaml'
+$ acme-lint init
+Created acme.yaml
+$ acme-lint check
+Are you sure you want to check the current directory? [y/N] y
+3 problems found.
+
+The same command in CI (CI=true, no TTY):
+
+$ acme-lint check
+Are you sure you want to check the current directory? [y/N]
+Error: EOF when reading a line
+"""
+
+- Given a Python traceback for a missing config file, should report a finding whose fix is a one-line message naming acme.yaml and `acme-lint init`
+- Given a confirmation before every routine, recoverable check, should report a finding whose fix removes the question
+- Given the prompt failing a CI run with EOF, should report a High finding under "Good citizen in automation" whose fix never prompts without a TTY
+- Given a summary that says "3 problems found." without naming them, should report a finding whose fix lists the problems
+- Given the main path, should mark its steps as goal work or excise and state "X of Y steps are excise"

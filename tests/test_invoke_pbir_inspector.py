@@ -498,3 +498,68 @@ class TestClearStaleScreenshotFolder:
 
         assert exit_code == 0
 
+
+
+class TestReportPage:
+    """`--report` writes fab-test's own page for PBIR, the one every other analyzer gets,
+    and frames PBIR Inspector's TestRun.html at its bottom (PBIR Slicer Default State epic)."""
+
+    @staticmethod
+    def _run(tmp_path: Path, monkeypatch, emit_html: bool, write_html: bool = True) -> dict:
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.delenv("ANALYZER_OUTPUT_MODE", raising=False)
+        artifact = tmp_path / "Sales.Report"
+        artifact.mkdir()
+        rules = tmp_path / "rules.json"
+        rules.write_text("[]", encoding="utf-8")
+        inspector = tmp_path / "PBIRInspectorCLI"
+        inspector.write_text("fake", encoding="utf-8")
+        inspector.chmod(0o755)
+        output = tmp_path / "fab-test-results" / "pbir" / "Sales" / "envelope.json"
+        native = output.parent / "native.json"
+        results = {"Results": [{"RuleId": "SHOW_VISUAL_HEADER", "RuleName": "Show header", "LogType": 1,
+                                "Pass": True, "RuleSetName": "Rules", "Message": ""}]}
+
+        def inspector_run(*_args, **_kwargs):
+            native.mkdir(parents=True, exist_ok=True)
+            (native / "TestRun.json").write_text(json.dumps(results), encoding="utf-8")
+            if write_html:
+                (native / "TestRun.html").write_text(
+                    f"<html><script>let testRunData = {json.dumps(results)};</script></html>", encoding="utf-8")
+            return mock.Mock(returncode=0, stdout="", stderr="")
+
+        class Args:
+            artifact_path = str(artifact)
+            rules_path = str(rules)
+            inspector_path = str(inspector)
+            output_path = str(output)
+
+        Args.emit_html = emit_html
+        with mock.patch("fab_test.scripts.invoke_pbir_inspector.subprocess.run", side_effect=inspector_run):
+            run_inspector(Args())
+        return json.loads(output.read_text(encoding="utf-8"))
+
+    def test_given_report_should_point_the_envelope_at_fab_tests_page(self, tmp_path, monkeypatch, capsys):
+        envelope = self._run(tmp_path, monkeypatch, emit_html=True)
+
+        page = Path(envelope["native_html_output_path"])
+        assert page.name == "report.html" and page.parent.name == "Sales"
+        assert Path(envelope["inspector_html_output_path"]).name == "TestRun.html"
+        html = page.read_text(encoding="utf-8")
+        assert "<h1>fab-test pbir_inspector</h1>" in html
+        assert '<iframe src="native.json/TestRun.html"' in html
+        out = capsys.readouterr().out
+        assert f"📄 Report: {page}" in out
+        assert f"📄 PBIR Inspector's page: {envelope['inspector_html_output_path']}" in out
+
+    def test_given_report_without_inspectors_page_should_still_write_fab_tests(self, tmp_path, monkeypatch):
+        envelope = self._run(tmp_path, monkeypatch, emit_html=True, write_html=False)
+
+        assert Path(envelope["native_html_output_path"]).name == "report.html"
+        assert "inspector_html_output_path" not in envelope
+
+    def test_given_no_report_should_write_no_page(self, tmp_path, monkeypatch):
+        envelope = self._run(tmp_path, monkeypatch, emit_html=False)
+
+        assert "native_html_output_path" not in envelope and "inspector_html_output_path" not in envelope
+        assert not (tmp_path / "fab-test-results" / "pbir" / "Sales" / "report.html").exists()

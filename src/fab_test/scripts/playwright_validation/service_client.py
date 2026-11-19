@@ -525,6 +525,14 @@ class FabricRestClient:
         data = self._request("GET", f"/v1.0/myorg/groups/{workspace_id}")
         return str(data.get("name", ""))
 
+    def workspace_on_capacity(self, workspace_id: str) -> bool | None:
+        """Whether a workspace is on a capacity (``isOnDedicatedCapacity``), or None when the API doesn't say.
+
+        A paginated report renders only on one (see ``paginated_capacity``).
+        """
+        value = self._request("GET", f"/v1.0/myorg/groups/{workspace_id}").get("isOnDedicatedCapacity")
+        return value if isinstance(value, bool) else None
+
     def get_dataset_name(self, workspace_id: str, dataset_id: str) -> str:
         """Return a dataset's display name from its GUID.
 

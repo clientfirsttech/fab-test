@@ -44,3 +44,48 @@ def test_active_skills_only_reference_scripts_that_exist():
     ]
 
     assert not missing, "skill doc references a script that does not exist:\n" + "\n".join(missing)
+
+
+# A skill's own `references/` and `assets/` files, named from its SKILL.md.
+# The Polite Software Review source text told agents to "always read"
+# `references/principles.md` and named three more reference files, none of
+# which existed: an agent following it reads nothing and says nothing.
+_SKILL_FILE_REF = re.compile(r"(?<![\w/.-])((?:references|assets)/[A-Za-z0-9_.-]+\.[a-z]+)")
+
+# `document` maintains the fab-test skill, so its `references/` paths are
+# that skill's files, not its own.
+_REFERENCES_ANOTHER_SKILL = {"document": "fab-test"}
+
+
+def _missing_skill_files(skills_dir: Path) -> list[str]:
+    missing = []
+    for skill_md in sorted(skills_dir.glob("*/SKILL.md")):
+        name = skill_md.parent.name
+        owner = skills_dir / _REFERENCES_ANOTHER_SKILL.get(name, name)
+        refs = set(_SKILL_FILE_REF.findall(skill_md.read_text(encoding="utf-8")))
+        missing += [f"{name}: {ref}" for ref in sorted(refs) if not (owner / ref).exists()]
+    return missing
+
+
+@pytest.mark.fab_test
+def test_missing_skill_files_names_each_reference_that_does_not_exist(tmp_path):
+    skill = tmp_path / "aidd-example"
+    (skill / "references").mkdir(parents=True)
+    (skill / "references" / "present.md").write_text("x", encoding="utf-8")
+    (skill / "SKILL.md").write_text(
+        "Always read `references/present.md`, then references/absent.md and assets/t.yaml.\n"
+        "Every `references/*.md` file is optional. See .github/skills/x/references/far.md.",
+        encoding="utf-8",
+    )
+
+    assert _missing_skill_files(tmp_path) == [
+        "aidd-example: assets/t.yaml",
+        "aidd-example: references/absent.md",
+    ]
+
+
+@pytest.mark.fab_test
+def test_skills_only_reference_their_own_files_that_exist():
+    missing = _missing_skill_files(_SKILLS_DIR)
+
+    assert not missing, "SKILL.md names a file the skill does not have:\n" + "\n".join(missing)

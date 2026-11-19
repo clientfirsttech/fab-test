@@ -22,6 +22,7 @@ from ._desktop import (
 from ._report_html import resolve_report
 from ._results_stem import results_stem
 from ._rule_overlay import apply_overlay, apply_pbir_overlay, apply_rdl_overlay
+from ._slicer_contract_run import apply_slicer_contract
 from .fab_test_registry import (
     _DEFAULT_A11Y_PATH,
     _DEFAULT_BPA_RULES,
@@ -155,7 +156,9 @@ def build_pbir_command(
     inspector = getattr(args, "_resolved_tool_path", None) or (
         getattr(args, "inspector_path", None) or _env("PBIR_INSPECTOR_PATH", _DEFAULT_INSPECTOR_PATH)
     )
-    rules_path = _resolve_pbir_rules_path(args, output_dir)
+    rules_path, contract_summary = apply_slicer_contract(
+        artifact, args, output_dir, _resolve_pbir_rules_path(args, output_dir)
+    )
     output = output_dir / "pbir" / results_stem(artifact) / "envelope.json"
     command = [
         sys.executable,
@@ -174,8 +177,10 @@ def build_pbir_command(
     # it, so it is load-bearing rather than a display choice. HTML is the
     # only part --report gates, which puts pbir on the same footing as bpa
     # and pql_test: JSON envelope by default, a readable page on request.
-    # PBIR Inspector's own page is richer than anything rendered from the
-    # envelope, so attach_report stands aside once this one exists.
+    # The wrapper writes fab-test's page itself, framing PBIR Inspector's,
+    # so attach_report stands aside once that one exists.
+    if contract_summary:
+        command.extend(["--contract-summary", str(contract_summary)])
     if resolve_report(args):
         command.append("--emit-html")
     return command

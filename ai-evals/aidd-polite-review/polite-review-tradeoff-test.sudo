@@ -1,0 +1,19 @@
+import '.github/skills/aidd-polite-review/SKILL.md'
+
+userPrompt = """
+You are in a test environment. Do not run any commands and do not edit any files.
+
+/polite-review this proposed change to fab-test, from a pull request description:
+
+"People find `fab-test bpa --format json` unfriendly: it prints a wall of JSON and
+nothing else. This PR prints a friendly line to stdout before the JSON document:
+
+    ✔ bpa passed: 2 artifacts, 0 errors, 3 warnings
+    {"analyzer": "bpa", "status": "warning", ...}
+
+so a person can see the result at a glance."
+"""
+
+- Given a change that adds a line to stdout before the JSON document, should report that it breaks the pipeline and agent callers, which parse stdout as exactly one JSON document
+- Given a fix that helps one caller by degrading another, should not recommend the change as proposed
+- Given the human's need, should propose a fix that serves all three callers, such as the line on stderr or the default text format

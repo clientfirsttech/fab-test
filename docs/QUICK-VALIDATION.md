@@ -6,7 +6,7 @@ Validate the `fab-test` package and its analyzers on your local machine before p
 
 - Python 3.12 or later
 - A clone of this repository
-- (Optional) External analyzer tools such as Tabular Editor or PBIR Inspector if you plan to run `fab-test` against real artifacts. PBIR Inspector additionally needs the .NET 8 runtime installed (it is a framework-dependent build) — `fab-test doctor --analyzer pbir` reports whether it's present
+- (Optional) External analyzer tools such as Tabular Editor or PBIR Inspector if you plan to run `fab-test` against real artifacts. PBIR Inspector additionally needs the .NET 10 runtime installed (it is a framework-dependent build) — `fab-test doctor --analyzer pbir` reports whether it's present
 - Artifacts saved as PBIP projects — semantic models in TMDL, reports in PBIR (see [Assumed project format](../README.md#assumed-project-format)). The wrapper contract tests below need none of this; only the `fab-test` runs against real artifacts do.
 
 ## Virtual environments used by this project
@@ -146,6 +146,15 @@ fab-test bpa --open-report
 ```
 
 `--open-report` implies `--report` and opens the produced report (or, whenever more than one artifact ran — `fab-test all`, or one analyzer against several artifacts — the run's `index.html`) in your default browser once the run finishes — skip the "find it in Explorer, double-click" step. This is a local convenience only: it is automatically suppressed under CI (falls back to printing the path), so there is no reason to add it to a pipeline YAML.
+
+### Check slicer defaults
+
+A report with a slicer contract beside it (`<Report>.Report.odcs.yaml`) has its slicer defaults checked by every `fab-test pbir` run. Build one with `fab-test pbir contract init <path to .Report>`; see [SLICER-CONTRACTS.md](SLICER-CONTRACTS.md).
+
+```bash
+fab-test pbir --artifact SampleModel-DefaultState                 # CONTRACT.* findings name the page, field, actual and expected
+fab-test pbir --artifact SampleModel-DefaultState --as-of 2027-01-15   # what a calendar-driven default will expect then
+```
 
 ### Naming what to test
 

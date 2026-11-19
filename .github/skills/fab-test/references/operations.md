@@ -71,8 +71,9 @@ fab-test-results/
   pbir/
     <artifact-stem>/
       envelope.json
+      report.html     ← generated, only with --report; frames TestRun.html
       native.json/
-        TestRun.html  ← PBIR Inspector's own report, always written
+        TestRun.html  ← PBIR Inspector's own report, only with --report
   pql_test/
     <artifact-stem>/
       envelope.json
@@ -104,12 +105,13 @@ Optional keys — **absent, never null**, so a consumer tests presence:
 
 | Key | Meaning |
 |-----|---------|
-| `native_html_output_path` | A readable HTML report for this artifact: PBIR Inspector's own `TestRun.html`, or the one `fab-test` generated under `--report`. |
+| `native_html_output_path` | A readable HTML report for this artifact: the one `fab-test` generated under `--report` (for `pbir`, its page framing PBIR Inspector's). |
+| `inspector_html_output_path` | `pbir` only, under `--report`: PBIR Inspector's own `TestRun.html`. |
 | `started_at` | UTC ISO-8601 wall-clock time the run started. `duration_ms` says how long; this says when. |
 | `timings` | `playwright` only: where the report's time went. `discovery_ms` (resolving pages, roles, parameters, and generating cases), `token_ms` (minting embed tokens), `render_ms` (the pytest session), `total_ms`, `browser_setup_ms` (fixture setup summed across cases: the browser launch or Azure connection on each worker's first case, plus context and page creation), `backend`, and the `workers` the report actually used. `duration_ms` stays the render phase alone. |
 
 
-For `pql_test`, the envelope also contains `test_results` (full result array from pql-test, native shape). For `bpa`, it contains one entry per rule TE2 evaluated (`RuleName`/`RuleID`/`Severity`/`Category`/`ObjectName` plus a computed `status` of `pass`/`error`/`warning`), passed and failed alike — unlike `findings`, which stays failure-only. `pbir` matches the same idea in the shared `rule`/`severity`/`object`/`message` shape (each with a `status`), so telemetry can see every rule PBIR Inspector evaluated, not only the ones that failed — `pbir`'s own `TestRun.html` still has its own filter UI, so this field feeds telemetry, not the shared report's full-list filter, for that analyzer specifically. `rdl` matches `pbir`'s shape: one row per active rule that passed or is disabled, and one row per hit for a rule that fired (so a rule firing on four datasets has four rows), `status` one of `pass`/`skip`/`warning`/`error` — `skip` means disabled in the overlay. Planned rules (`status: planned` in the catalog) have no row at all; they do not run and never show in a user's results. `playwright` uses the pql-test-shaped `test_results` too (one row per generated report x page x bookmark case), plus an `evidence` map per row (`screenshot`/`console`/`network` paths, whichever exist) that the shared renderer turns into links when `--report` is on (see the `playwright` section in [Flags](flags.md)). All five are `[]` when the analyzer produced no per-test breakdown.
+For `pql_test`, the envelope also contains `test_results` (full result array from pql-test, native shape). For `bpa`, it contains one entry per rule TE2 evaluated (`RuleName`/`RuleID`/`Severity`/`Category`/`ObjectName` plus a computed `status` of `pass`/`error`/`warning`), passed and failed alike — unlike `findings`, which stays failure-only. `pbir` matches the same idea in the shared `rule`/`severity`/`object`/`message` shape (each with a `status`), so telemetry can see every rule PBIR Inspector evaluated, not only the ones that failed — and, as for `bpa`, its report page shows them in the full-list filter (one table, its *Source* column telling the PBIR rules from the slicer contract's checks). `rdl` matches `pbir`'s shape: one row per active rule that passed or is disabled, and one row per hit for a rule that fired (so a rule firing on four datasets has four rows), `status` one of `pass`/`skip`/`warning`/`error` — `skip` means disabled in the overlay. Planned rules (`status: planned` in the catalog) have no row at all; they do not run and never show in a user's results. `playwright` uses the pql-test-shaped `test_results` too (one row per generated report x page x bookmark case), plus an `evidence` map per row (`screenshot`/`console`/`network` paths, whichever exist) that the shared renderer turns into links when `--report` is on (see the `playwright` section in [Flags](flags.md)). All five are `[]` when the analyzer produced no per-test breakdown.
 
 `status` values: `passed` | `failed` | `warning` | `skipped` | `error` | `timeout` | `dry-run`.
 

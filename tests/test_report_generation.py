@@ -6,9 +6,9 @@ Generation is **opt-in**: nothing is rendered unless `--report` is passed,
 so no existing run gets slower and no pipeline collects artifacts it did
 not ask for.
 
-PBIR is deliberately untouched by any of this: its `TestRun.html` comes
-from the upstream tool, so the slot is already filled and the generated
-report must never overwrite it.
+PBIR is deliberately untouched by any of this: its wrapper writes its own
+page (framing PBIR Inspector's `TestRun.html`), so the slot is already
+filled and the generated report must never overwrite it.
 
 Always passes on any machine — no analyzer binary is invoked.
 """

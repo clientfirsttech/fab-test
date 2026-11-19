@@ -22,6 +22,7 @@ from typing import Any
 import pytest
 
 from .execution_runtime import redact_execution_text, write_execution_text
+from .paginated_capacity import RDL_ERROR
 from .test_cases import sanitize_case_id
 
 
@@ -480,7 +481,7 @@ def _test_paginated_report(page: Any, case: dict[str, str]) -> None:
     _write_evidence(page, result_dir, console_logs, failed_requests)
 
     if error_found:
-        error = "RDL error modal detected"
+        error = RDL_ERROR
         _write_result(result_dir, "error", error)
         pytest.fail(redact_execution_text(error))
 
