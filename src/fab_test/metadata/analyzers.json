@@ -69,6 +69,23 @@
         "requires_runtime": {
           "name": "dotnet",
           "min_major": 10
+        },
+        "runtime_fallback": {
+          "version": "3.4.0",
+          "install_urls": {
+            "linux": "https://github.com/NatVanG/fab-inspector/releases/download/v3.4.0/linux-x64-FabInspCLI.zip",
+            "win32": "https://github.com/NatVanG/fab-inspector/releases/download/v3.4.0/win-x64-FabInspCLI.zip",
+            "darwin": "https://github.com/NatVanG/fab-inspector/releases/download/v3.4.0/osx-x64-FabInspCLI.zip"
+          },
+          "install_sha256s": {
+            "linux": "f4f6ed53cf092e235084c8049f394720c8fe52c63479638646079644b191f25e",
+            "win32": "c6f468b1ab1cab5643e490fad0793a8c075e8c94a44388d50b12f7c366fd90bc",
+            "darwin": "d3001d41a4c6c9d085c6aff53c9b8e56bce078f7a5c24cffcdf2b5dba2755ceb"
+          },
+          "requires_runtime": {
+            "name": "dotnet",
+            "min_major": 8
+          }
         }
       }
     },

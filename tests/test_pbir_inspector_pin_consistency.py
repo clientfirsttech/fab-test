@@ -26,9 +26,20 @@ def _tool_install() -> dict:
     return registry["pbir_inspector"]["tool_install"]
 
 
-@pytest.mark.pbir
-def test_every_install_url_downloads_the_pinned_release():
+def _fallback() -> dict:
+    """The .NET 8 fallback, as the bootstrap resolves it: its keys over the pin's."""
     tool = _tool_install()
+    return {key: value for key, value in tool.items() if key != "runtime_fallback"} | tool["runtime_fallback"]
+
+
+# The pin, and the older release a machine without its runtime falls back to.
+_RELEASES = pytest.mark.parametrize("release", [_tool_install, _fallback], ids=["pin", "fallback"])
+
+
+@pytest.mark.pbir
+@_RELEASES
+def test_every_install_url_downloads_the_pinned_release(release):
+    tool = release()
     tag = f"/releases/download/v{tool['version']}/"
 
     stale = {platform: url for platform, url in tool["install_urls"].items() if tag not in url}
@@ -37,8 +48,9 @@ def test_every_install_url_downloads_the_pinned_release():
 
 
 @pytest.mark.pbir
-def test_every_platform_has_a_sha256_for_its_archive():
-    tool = _tool_install()
+@_RELEASES
+def test_every_platform_has_a_sha256_for_its_archive(release):
+    tool = release()
 
     missing = set(tool["install_urls"]) - set(tool["install_sha256s"])
     malformed = {
@@ -89,10 +101,13 @@ def test_every_workflow_that_installs_dotnet_installs_the_release_s_runtime():
     ],
 )
 def test_the_docs_name_the_dotnet_runtime_the_release_needs(document):
-    """The agent's skill and the human's prerequisites both say which .NET to install."""
-    floor = _dotnet_floor()
+    """The agent's skill and the human's prerequisites both say which .NET to
+    install, and what runs on the fallback's."""
+    floor, fallback = _dotnet_floor(), _fallback()
     text = (_ROOT / document).read_text(encoding="utf-8")
 
     named = sorted({int(m) for m in re.findall(r"\.NET (\d+)", text)})
 
-    assert named == [floor], f"{document} names .NET {named}; the pinned release needs .NET {floor}"
+    expected = sorted({floor, fallback["requires_runtime"]["min_major"]})
+    assert named == expected, f"{document} names .NET {named}; the pin and its fallback need .NET {expected}"
+    assert fallback["version"] in text, f"{document} doesn't name the fallback version {fallback['version']}"

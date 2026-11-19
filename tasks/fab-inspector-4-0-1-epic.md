@@ -18,7 +18,7 @@ fab-inspector `v4.0.1` (2026-11-19) is the first stable CLI release since the `v
 
 Decisions (approved by the user, 2026-11-19):
 
-1. **.NET 10 is required, not optional.** `doctor` reports `pbir` not-ready on a machine with only .NET 8, naming the .NET 10 download. This is a behavior change for those machines, recorded in the CHANGELOG; it follows from the pin, since 4.x won't run on .NET 8.
+1. **.NET 10 is required, not optional.** *(Reversed 2026-11-19 by the [fab-inspector .NET 8 Fallback epic](fab-inspector-dotnet8-fallback-epic.md): a .NET 8-only machine now runs 3.4.0, temporarily.)* `doctor` reports `pbir` not-ready on a machine with only .NET 8, naming the .NET 10 download. This is a behavior change for those machines, recorded in the CHANGELOG; it follows from the pin, since 4.x won't run on .NET 8.
 2. **macOS stays on `osx-x64`.** 4.0.1 ships `osx-arm64-FabInspCLI.zip`, but the bootstrap keys install URLs by `sys.platform` only. Choosing by architecture is a separate change, listed as a follow-up.
 3. **`-tags` isn't exposed.** Running a subset of rules by tag is a new surface; out of scope for a pin bump.
 

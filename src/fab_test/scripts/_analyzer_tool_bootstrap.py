@@ -17,9 +17,7 @@ import hashlib
 import json
 import os
 import platform
-import re
 import shutil
-import subprocess
 import sys
 import tempfile
 import zipfile
@@ -29,6 +27,7 @@ from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
 from ._npm_toolchain import find_build_root, install_npm_package, run_npm_build
+from ._tool_runtime import runtime_gap, select_tool_install
 
 _READER_CHUNK_SIZE = 8192
 _USER_AGENT = "fab-test/1.0"
@@ -47,13 +46,13 @@ def _is_ci() -> bool:
     return bool(os.environ.get("GITHUB_ACTIONS") or os.environ.get("CI"))
 
 
-def _notice(message: str) -> None:
+def _notice(message: str, level: str = "notice") -> None:
     """Print a progress note on stderr: a workflow command in CI, plain text elsewhere.
 
     Never stdout: a first-run download would otherwise precede the one
     document `--format json` promises there.
     """
-    print(f"::notice::{message}" if _is_ci() else message, file=sys.stderr)
+    print(f"::{level}::{message}" if _is_ci() else message, file=sys.stderr)
 
 
 def _cache_root(repo_root: Path) -> Path:
@@ -382,90 +381,6 @@ def _probe_pending_install(
     }
 
 
-_DOTNET_RUNTIME_PATTERN = re.compile(r"Microsoft\.NETCore\.App (\d+)\.")
-_NODE_VERSION_PATTERN = re.compile(r"v?(\d+)\.")
-
-
-def _installed_dotnet_majors() -> list[int]:
-    """Return the major versions of every .NET *runtime* (not SDK) installed,
-    via ``dotnet --list-runtimes``. Empty when dotnet is absent or unreadable.
-    """
-    exe = shutil.which("dotnet")
-    if exe is None:
-        return []
-    try:
-        proc = subprocess.run(
-            [exe, "--list-runtimes"], capture_output=True, text=True, timeout=10, check=False
-        )
-    except (OSError, subprocess.SubprocessError):
-        return []
-    return sorted({int(m) for m in _DOTNET_RUNTIME_PATTERN.findall(proc.stdout or "")})
-
-
-def _installed_node_major() -> int | None:
-    """Return Node's major version via ``node --version``, or None if absent."""
-    exe = shutil.which("node")
-    if exe is None:
-        return None
-    try:
-        proc = subprocess.run([exe, "--version"], capture_output=True, text=True, timeout=10, check=False)
-    except (OSError, subprocess.SubprocessError):
-        return None
-    match = _NODE_VERSION_PATTERN.search((proc.stdout or "").strip())
-    return int(match.group(1)) if match else None
-
-
-def _dotnet_runtime_gap(min_major: int) -> dict[str, Any] | None:
-    majors = _installed_dotnet_majors()
-    if any(m >= min_major for m in majors):
-        return None
-    installed = ", ".join(f"{m}.x" for m in majors) if majors else "none found"
-    return {
-        "ready": False,
-        "resolved_path": None,
-        "version": None,
-        "reason": f".NET {min_major}+ runtime not found (installed: {installed})",
-        "remediation": f"Install the .NET {min_major} runtime: "
-        f"https://dotnet.microsoft.com/download/dotnet/{min_major}.0",
-    }
-
-
-def _node_runtime_gap(min_major: int) -> dict[str, Any] | None:
-    major = _installed_node_major()
-    if major is not None and major >= min_major:
-        return None
-    installed = str(major) if major is not None else "not found"
-    return {
-        "ready": False,
-        "resolved_path": None,
-        "version": None,
-        "reason": f"Node.js {min_major}+ not found (installed: {installed})",
-        "remediation": f"Install Node.js >= {min_major} (https://nodejs.org).",
-    }
-
-
-_RUNTIME_GAP_CHECKS = {"dotnet": _dotnet_runtime_gap, "node": _node_runtime_gap}
-
-
-def _runtime_gap(tool_install: dict[str, Any]) -> dict[str, Any] | None:
-    """Return a not-ready dict when ``tool_install``'s declared ``requires_runtime``
-    is missing or older than its ``min_major``, else None.
-
-    A resolved, executable, correctly-versioned binary is still unrunnable
-    without its language runtime -- ``dotnet`` for the PBIR Inspector's
-    framework-dependent build, ``node`` for pbir-a11y once already built.
-    This is checked ahead of local-candidate/cache resolution so it applies
-    whether the tool is on disk, cached, or would still need downloading.
-    """
-    requirement = tool_install.get("requires_runtime")
-    if not requirement:
-        return None
-    check = _RUNTIME_GAP_CHECKS.get(requirement.get("name"))
-    if check is None:
-        return None
-    return check(requirement.get("min_major"))
-
-
 def probe_executable(
     analyzer_name: str,
     metadata_path: Path,
@@ -494,6 +409,35 @@ def probe_executable(
     """
     config = load_analyzer_config(metadata_path, analyzer_name) or {}
     tool_install = config.get("tool_install") or {}
+    selected, fallback = select_tool_install(tool_install)
+    if fallback and _resolves_locally(tool_install, repo_root, explicit_path):
+        selected, fallback = tool_install, None  # a binary of the caller's own isn't the fallback
+    return _with_fallback_note(_probe(analyzer_name, selected, repo_root, explicit_path), fallback)
+
+
+def _resolves_locally(tool_install: dict[str, Any], repo_root: Path, explicit_path: str | None) -> bool:
+    return any(_usable(path) for _source, path in _local_candidates(tool_install, repo_root, explicit_path))
+
+
+def _with_fallback_note(result: dict[str, Any], fallback: dict[str, str] | None) -> dict[str, Any]:
+    """Add the runtime fallback's reason and remediation to a probe result.
+
+    A ready fallback is doctor's ``warning`` (⚠, printed with its remedy, failing
+    only ``--strict``): it runs, but on a runtime past end of support.
+    """
+    if fallback is None:
+        return result
+    remediation = " ".join(part for part in (result.get("remediation"), fallback["remediation"]) if part)
+    noted = {**result, "reason": f"{result['reason']}; {fallback['reason']}", "remediation": remediation}
+    if result.get("ready"):
+        noted["status"] = "warning"
+    return noted
+
+
+def _probe(
+    analyzer_name: str, tool_install: dict[str, Any], repo_root: Path, explicit_path: str | None
+) -> dict[str, Any]:
+    """``probe_executable`` for an already-selected ``tool_install``."""
     env_var = tool_install.get("env_var", "")
     install_url_env_var = tool_install.get("install_url_env_var", "")
     pinned_version = tool_install.get("version")
@@ -512,9 +456,9 @@ def probe_executable(
             "version": None,
         }
 
-    runtime_gap = _runtime_gap(tool_install)
-    if runtime_gap is not None:
-        return runtime_gap
+    gap = runtime_gap(tool_install)
+    if gap is not None:
+        return gap
 
     committed_install_url = _platform_specific(tool_install, "install_url", platform)
 
@@ -605,6 +549,10 @@ def resolve_executable(
     for _source, path in _local_candidates(tool_install, repo_root, explicit_path):
         if _usable(path):
             return path.resolve()
+
+    tool_install, fallback = select_tool_install(tool_install)
+    if fallback:  # every run, not just the download: the machine is on an unsupported runtime
+        _notice(f"{analyzer_name}: {fallback['reason']}. {fallback['remediation']}", level="warning")
 
     cache_dir = _cache_dir(repo_root, analyzer_name, platform, tool_install)
     cached = _read_marker(cache_dir)
