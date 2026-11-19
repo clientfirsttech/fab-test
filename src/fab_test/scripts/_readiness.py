@@ -139,7 +139,7 @@ def check_readiness(name: str, args: argparse.Namespace | None) -> dict[str, Any
     Every branch's dict gets ``version`` and ``status`` keys here rather
     than in each of them, so the doctor row shape stays uniform (only
     ``probe_executable``'s bootstrapped-tool path ever has a version, and
-    only ``_cloud_readiness`` ever says ``warning``).
+    only ``_cloud_readiness`` and a runtime fallback ever say ``warning``).
     """
     result = execution_readiness(_readiness_without_version(name, args), name, args)
     result.setdefault("version", None)

@@ -240,7 +240,7 @@ def test_npm_build_installs_declared_extra_dependencies(tmp_path):
         return _Result()
 
     with unittest.mock.patch(
-        "fab_test.scripts._analyzer_tool_bootstrap.subprocess.run", _fake_run
+        "fab_test.scripts._npm_toolchain.subprocess.run", _fake_run
     ), unittest.mock.patch(
         "fab_test.scripts._analyzer_tool_bootstrap.shutil.which",
         lambda name: f"/usr/bin/{name}",

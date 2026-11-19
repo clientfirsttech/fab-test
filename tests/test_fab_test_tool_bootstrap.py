@@ -788,7 +788,7 @@ def test_probe_executable_not_ready_when_installed_runtime_is_too_old(tmp_path, 
         lambda name: "/usr/bin/dotnet" if name == "dotnet" else None,
     )
     monkeypatch.setattr(
-        "fab_test.scripts._analyzer_tool_bootstrap.subprocess.run",
+        "fab_test.scripts._tool_runtime.subprocess.run",
         lambda *a, **k: _Result(),
     )
 
@@ -823,7 +823,7 @@ def test_probe_executable_ready_when_declared_runtime_is_installed(tmp_path, mon
         lambda name: "/usr/bin/dotnet" if name == "dotnet" else None,
     )
     monkeypatch.setattr(
-        "fab_test.scripts._analyzer_tool_bootstrap.subprocess.run",
+        "fab_test.scripts._tool_runtime.subprocess.run",
         lambda *a, **k: _Result(),
     )
 
