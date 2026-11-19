@@ -55,12 +55,15 @@ from ._slicer_init_calendar import (
 )
 from ._slicer_init_existing import ExistingContractError, Owner, navigator_owner, read_existing, slicer_owner
 from ._slicer_init_output import (
+    add_input_flags,
     add_output_flags,
     can_ask,
     level,
     pbir_refusal,
     print_payload,
     questions_text,
+    resolve_inputs,
+    result_line,
     summary_text,
 )
 
@@ -71,6 +74,7 @@ class InitError(Exception):
 
 def contract_main(argv: list[str]) -> int:
     args = _parser().parse_args(argv)
+    resolve_inputs(args)
     try:
         report = _report(args)
         try:  # anything that would stop the write is found before the first question
@@ -96,35 +100,31 @@ def _parser() -> argparse.ArgumentParser:
                                      description="Build a report's slicer contract (`fab-test pbir` checks it)")
     subs = parser.add_subparsers(dest="action", required=True)
     init = subs.add_parser("init", help="Create or extend <Report>.Report.odcs.yaml, asking how to check each slicer")
-    init.add_argument("target", nargs="?", default=None, metavar="REPORT", help="Path to the .Report folder")
-    init.add_argument("--artifact", default=None, metavar="NAME", help="Report name to find under --artifact-dir")
-    init.add_argument("--artifact-dir", default=".", metavar="DIR", help="Where to look for --artifact [default: .]")
+    add_input_flags(init)
     init.add_argument("--as-of", default=None, dest="as_of", type=datetime.date.fromisoformat, metavar="YYYY-MM-DD",
                       help="Date used to suggest calendar formats [default: today]")
     init.add_argument("--questions", action="store_true", help="Print the questions and suggested answers, then stop")
     init.add_argument("--answers", default=None, metavar="FILE",
                       help="JSON answers by question id; unanswered questions take the suggestion")
-    init.add_argument("--dry-run", action="store_true", help="Print the contract instead of writing it")
+    init.add_argument("--dry-run", action="store_true", help="Show the contract that would be written; write nothing")
     init.add_argument("--force", action="store_true",
                       help="Replace rules that differ, and rewrite a commented contract")
-    init.add_argument("--format", choices=("text", "json"), default="text", dest="output_format",
-                      help="text for people, json for agents and scripts [default: text]")
     add_output_flags(init)
     return parser
 
 
 def _report(args: argparse.Namespace) -> Path:
-    if args.target:
-        report = Path(args.target)
-    elif args.artifact:
-        name = args.artifact if args.artifact.endswith(".Report") else f"{args.artifact}.Report"
+    target = args.target or args.artifact
+    if not target:
+        raise InitError("name the report: a path to its .Report folder, or its name (Sales) under --artifact-dir")
+    report = Path(target)
+    if not report.is_dir():  # a name, found under --artifact-dir as `fab-test pbir` finds one
+        name = target if target.endswith(".Report") else f"{target}.Report"
         found = [p for p in find_artifact_dirs(Path(args.artifact_dir), [".Report"]) if p.name == name]
         if len(found) > 1:
-            raise InitError(f"--artifact {args.artifact} matches {len(found)} reports; pass the path to one: "
+            raise InitError(f"{target} matches {len(found)} reports; pass the path to one: "
                             + ", ".join(map(str, found)))
         report = found[0] if found else Path(args.artifact_dir) / name
-    else:
-        raise InitError("name the report: a path to its .Report folder, or --artifact NAME")
     if not (report / "definition" / "pages").is_dir():
         raise InitError(f"{report} is not a PBIR report folder (no definition/pages)")
     refusal = pbir_refusal(args, report.name)  # --report, --contract, ... belong to `fab-test pbir`
@@ -345,7 +345,7 @@ def _write(args: argparse.Namespace, report: Path, questions: dict, answers: dic
     print_payload(args, {"contract": str(path), "written": not args.dry_run, **summary,
                          **({"content": text} if args.dry_run else {})},
                   lambda s: text if args.dry_run else summary_text(s, verbose, contract.calendar),
-                  asked_for=args.dry_run)
+                  asked_for=args.dry_run, as_line=result_line)
     return 0
 
 

@@ -1,7 +1,8 @@
 """`contract init` under the output flags every fab-test command takes (PBIR Slicer Default State epic).
 
--q prints nothing on success (the exit code is the result), -v lists every
-rule the contract holds, ANALYZER_VERBOSITY works as for the other commands,
+-q prints one result line, shaped like the run's (`contract written added=N
+replaced=N kept=N PATH`, as `fab-test pbir -q` prints `pbir passed e=0 w=0
+PATH`), -v lists every rule the contract holds, ANALYZER_VERBOSITY works as for the other commands,
 and --report / --open-report say which command makes a report rather than
 failing as unrecognised arguments. Errors and asked-for output always print.
 """
@@ -36,17 +37,23 @@ def _run(tmp_path: Path, capsys, *flags: str, answers: dict = FISCAL_YEAR):
 
 @pytest.mark.pbir
 @pytest.mark.parametrize("quiet", [["-q"], ["--quiet"]])
-def test_given_quiet_should_write_the_contract_and_print_nothing(tmp_path, capsys, quiet):
+def test_given_quiet_should_write_the_contract_and_print_one_result_line(tmp_path, capsys, quiet):
     code, out, err, contract = _run(tmp_path, capsys, *quiet)
 
-    assert (code, out, err) == (0, "", "") and contract.exists()
+    assert (code, err) == (0, "") and contract.exists()
+    assert out == f"contract written added=15 replaced=0 kept=0 unchanged=0 {contract}\n"
+
+
+def _quiet_line(out: str) -> bool:
+    return out.startswith("contract written added=") and out.count("\n") == 1
 
 
 @pytest.mark.pbir
 def test_given_analyzer_verbosity_summary_should_be_quiet_too(tmp_path, capsys, monkeypatch):
     monkeypatch.setenv("ANALYZER_VERBOSITY", "summary")
+    code, out, err, _contract = _run(tmp_path, capsys)
 
-    assert _run(tmp_path, capsys)[:3] == (0, "", "")
+    assert (code, err) == (0, "") and _quiet_line(out)
 
 
 @pytest.mark.pbir
@@ -54,8 +61,9 @@ def test_given_fab_test_yml_verbosity_summary_should_be_quiet_too(tmp_path, caps
     monkeypatch.delenv("ANALYZER_VERBOSITY", raising=False)
     (tmp_path / "fab-test.yml").write_text("verbosity: summary\n", encoding="utf-8")
     monkeypatch.chdir(tmp_path)
+    code, out, err, _contract = _run(tmp_path, capsys)
 
-    assert _run(tmp_path, capsys)[:3] == (0, "", "")
+    assert (code, err) == (0, "") and _quiet_line(out)
 
 
 @pytest.mark.pbir
@@ -78,6 +86,74 @@ def test_given_ctrl_c_while_asking_should_exit_130_without_a_traceback(tmp_path,
     code, _out, err, contract = _run(tmp_path, capsys)
 
     assert code == 130 and "Traceback" not in err and not contract.exists()
+
+
+@pytest.mark.pbir
+def test_given_quiet_and_dry_run_should_print_only_the_contract(tmp_path, capsys):
+    code, out, _err, contract = _run(tmp_path, capsys, "-q", "--dry-run")
+
+    assert code == 0 and not contract.exists()
+    assert out.startswith("apiVersion: v3.1.0") and "contract written" not in out
+
+
+@pytest.mark.pbir
+def test_given_format_json_in_fab_test_yml_should_print_json_without_the_flag(tmp_path, capsys, monkeypatch):
+    (tmp_path / "fab-test.yml").write_text("format: json\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    code, out, _err, _contract = _run(tmp_path, capsys)
+
+    assert code == 0 and json.loads(out)["written"] is True
+
+
+@pytest.mark.pbir
+def test_given_the_format_flag_should_win_over_fab_test_yml(tmp_path, capsys, monkeypatch):
+    (tmp_path / "fab-test.yml").write_text("format: json\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    code, out, _err, _contract = _run(tmp_path, capsys, "--format", "text")
+
+    assert code == 0 and out.lstrip().startswith("✓")
+
+
+@pytest.mark.pbir
+def test_given_artifact_dir_in_fab_test_yml_should_find_the_report_by_name(tmp_path, capsys, monkeypatch):
+    (tmp_path / "reports").mkdir()
+    shutil.copytree(TEST_BED, tmp_path / "reports" / TEST_BED.name)
+    (tmp_path / "fab-test.yml").write_text("artifact_dir: reports\n", encoding="utf-8")
+    (tmp_path / "answers.json").write_text(json.dumps(FISCAL_YEAR), encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+
+    code = contract_main(["init", "SampleModel-DefaultState", "--as-of", "2026-11-14", "--answers", "answers.json"])
+
+    assert code == 0 and (tmp_path / "reports" / f"{TEST_BED.name}.odcs.yaml").exists()
+
+
+@pytest.mark.pbir
+@pytest.mark.parametrize("target", ["SampleModel-DefaultState", "SampleModel-DefaultState.Report"])
+def test_given_a_report_name_as_target_should_find_it_under_artifact_dir(tmp_path, capsys, target):
+    _bed(tmp_path)
+    (tmp_path / "answers.json").write_text(json.dumps(FISCAL_YEAR), encoding="utf-8")
+
+    code = contract_main(["init", target, "--artifact-dir", str(tmp_path), "--as-of", "2026-11-14",
+                          "--answers", str(tmp_path / "answers.json"), "-q"])
+
+    assert code == 0 and (tmp_path / f"{TEST_BED.name}.odcs.yaml").exists()
+
+
+@pytest.mark.pbir
+@pytest.mark.parametrize("flag", ["--artifact", "--artifact-dir", "--format"])
+def test_given_an_input_flag_shared_with_the_run_should_read_the_same_in_help(flag):
+    from fab_test.scripts._slicer_contract_init import _parser
+    from fab_test.scripts.fab_test_parser import build_parser
+
+    def action(parser, option):
+        return next(a for a in parser._actions if option in a.option_strings)
+
+    def subparser(parser, name):
+        return next(a for a in parser._actions if a.dest in ("action", "analyzer")).choices[name]
+
+    init, run = action(subparser(_parser(), "init"), flag), action(subparser(build_parser(), "pbir"), flag)
+    assert (init.metavar, tuple(init.choices or ())) == (run.metavar, tuple(run.choices or ()))
+    assert init.default is None or flag == "--artifact"             # resolved from config at run time
 
 
 @pytest.mark.pbir

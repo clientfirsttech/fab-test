@@ -129,8 +129,11 @@ ContractInit {
     => exit 2 before the first question, --questions included
   (the result wouldn't read back as fab-test pbir reads it, or the report has no .platform logicalId) => exit 2; nothing written
   (on a terminal) => prompts go to stderr, so --format json stdout stays one document
-  -q / ANALYZER_VERBOSITY=summary / fab-test.yml verbosity: summary => nothing printed on success; errors,
-                                     --questions, --dry-run and --format json still print
+  -q / ANALYZER_VERBOSITY=summary / fab-test.yml verbosity: summary => one line on success,
+                                     `contract written added=N replaced=N kept=N unchanged=N PATH`; errors, --questions,
+                                     --dry-run and --format json print as without -q
+  TARGET => a path, or a report name found under --artifact-dir, as `fab-test pbir` takes it; --artifact is its alias
+  --artifact-dir, --format => default from fab-test.yml (artifact_dir, format) when the flag isn't given
   -v => also every rule in the contract: id, page, field, what it expects, and added | kept | replaced | unchanged
   --report | --no-report | --open-report => exit 2 naming `fab-test pbir --artifact <name> --open-report`
   --contract | --output-dir => exit 2 naming `fab-test pbir --artifact <name> <flag> ...` (init writes beside the report)

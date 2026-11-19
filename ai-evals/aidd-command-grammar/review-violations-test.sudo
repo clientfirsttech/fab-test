@@ -1,0 +1,31 @@
+import '.github/skills/aidd-command-grammar/SKILL.md'
+
+userPrompt = """
+You are in a test environment. Do not run any commands and do not edit any files. You may read files in this repository.
+Review only the transcript below; it is the evidence.
+
+/command-grammar review this proposed change to fab-test, which adds two new commands for a made-up `notebook` analyzer
+whose authored file is a test suite. Nothing else about them exists yet.
+
+$ fab-test notebook init Sales.Notebook
+Which cells should be tested? [all]:
+Wrote Sales.Notebook/tests.yaml
+
+$ CI=true fab-test notebook init Sales.Notebook < /dev/null
+Which cells should be tested? [all]:
+Error: EOF when reading a line
+$ echo $?
+1
+
+$ fab-test lint Sales.Notebook/tests.yaml
+tests.yaml: 2 problems
+$ echo $?
+3
+"""
+
+- Given `fab-test notebook init`, should report that a verb follows the analyzer with no noun, and propose `fab-test notebook tests init`
+- Given `fab-test lint` at the top level, should report it and propose `fab-test notebook tests lint` taking the item `Sales.Notebook` as TARGET, not the file
+- Given the suite written to `Sales.Notebook/tests.yaml`, should report that the file is inside the item folder and propose a file beside it
+- Given the prompt reached in CI, should report that init must exit 2 before asking, naming `--questions` and `--answers`
+- Given exit code 3 for lint findings, should report that lint findings exit 1
+- Given each finding, should name the checklist row or Constraint it breaks

@@ -120,7 +120,7 @@ A calendar period (`2026 H2`, `2026-11`) doesn't need these, and a January fisca
 
 `init` writes `Sales.Report.odcs.yaml` **beside** the report folder, never inside it: Fabric's Git sync deletes files inside a report folder that aren't part of the report. It pairs with the report through the `logicalId` in `Sales.Report/.platform`, so renaming the report folder doesn't break the pairing.
 
-Add `--dry-run` to see the file without writing it. `-q` prints nothing when it succeeds (the exit code says it did), and `-v` lists every rule in the contract with what it checks and whether it was added, kept or replaced.
+Add `--dry-run` to see the file without writing it. `-q` prints one line when it succeeds (`contract written added=12 replaced=0 kept=0 unchanged=0 Sales.Report.odcs.yaml`), and `-v` lists every rule in the contract with what it checks and whether it was added, kept or replaced.
 
 ### Letting an agent build it instead
 

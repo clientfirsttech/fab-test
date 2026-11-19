@@ -19,18 +19,7 @@ entry when it's fixed.
 
 - **Not discoverable.** `fab_test.py`'s `main` catches `argv[1:3] == ["pbir", "contract"]` before argparse, so `fab-test help`, `list` and `explain` don't know it exists; only `fab-test pbir --help`'s epilog names it.
 - **No `lint` verb.** People are sent to `pql-test contract lint CONTRACT MODEL`, which takes the contract file and the model rather than the report.
-- **Inputs differ from `fab-test pbir`:**
-
-| Flag | `pbir contract init` | `fab-test pbir` |
-|---|---|---|
-| `--artifact` | primary, metavar `NAME`, "Report name to find under --artifact-dir" | deprecated alias for TARGET, metavar `STEM` |
-| `--artifact-dir` | default `.`; ignores `artifact_dir` in `fab-test.yml`/`pyproject.toml` | default from config, else the working directory |
-| `--format` | default `text`; ignores the config's `format` | default from config |
-| `--dry-run` | print the contract, write nothing | list matching artifacts, run nothing |
-| `-q` / `-v` | flag → `ANALYZER_VERBOSITY` → `fab-test.yml` (conforms) | same |
-
-- **`-q` output differs:** init prints nothing on success; the run prints one line per artifact.
-- **Docs:** the fab-test skill's [flags.md](../../../../src/fab_test/skill/references/flags.md) lists init's flags without `-q`/`-v`; only `docs/SLICER-CONTRACTS-WALKTHROUGH.md` documents them.
+- Fixed 2026-11-19 (Authoring Command Grammar epic): TARGET takes a name as the run's does, `--artifact`'s metavar and help match the run's, `--artifact-dir` and `--format` default from `fab-test.yml`, `-q` prints one result line, and flags.md lists `-q`/`-v`.
 
 ## Planned
 

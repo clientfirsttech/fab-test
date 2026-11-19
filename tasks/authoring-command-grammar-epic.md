@@ -85,6 +85,8 @@ Make the skill load on its own, so consistency doesn't depend on anyone remember
 
 ## Skill Evals
 
+**Status**: ✅ 2026-11-19. Three fixtures (plan Data Agent tests; review a breaking and a conforming transcript), 15/15 assertions at `--runs 1`; dated output moved aside.
+
 Prove the skill changes what an agent plans and catches, with riteway AI evals in `ai-evals/aidd-command-grammar/` (`npx -y riteway@9.3.0 ai ... --runs 1`; move the dated output aside, don't commit it).
 
 **Requirements**:
@@ -96,6 +98,8 @@ Prove the skill changes what an agent plans and catches, with riteway AI evals i
 ---
 
 ## Align `pbir contract init` With the Run
+
+**Status**: ✅ 2026-11-19. `-q` prints `contract written added=N replaced=N kept=N unchanged=N PATH` (the run prints `pbir failed e=1 w=0 PATH`). Verified through the console script under -q, the default, -v, `--format json`, `--questions`, `--answers`, `--dry-run`, a refused `--report`, no terminal, and `fab-test.yml` defaults. A broken `fab-test.yml` already crashes every command at import, init included, so it isn't treated differently here; logged in plan.md.
 
 Fix the init-vs-run differences the inventory recorded, so init, lint and the run share inputs and output modes (user, 2026-11-19). TDD each one; remove its row from `known-gaps.md` when it passes.
 
