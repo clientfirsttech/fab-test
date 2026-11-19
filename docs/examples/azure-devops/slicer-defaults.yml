@@ -19,7 +19,7 @@ steps:
   - task: UsePythonVersion@0
     inputs:
       versionSpec: "3.12"
-  - script: pip install "cft-fab-test==1.10.0b3"
+  - script: pip install "cft-fab-test==1.10.0b4"
     displayName: Install fab-test
   - script: fab-test pbir --format json
     displayName: Check slicer defaults
