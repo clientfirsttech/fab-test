@@ -65,3 +65,5 @@ Always last; nothing follows it.
 - Given the finished epic, should pass `ruff check .` over the whole repo, the complexity and module-budget ratchets, and the coverage floor on the full suite, run as CI runs them (vision.md, Definition of Done)
 
 **Result** ✅: `ruff check .` clean; `pytest -n auto -m "not playwright" --cov` 3350 passed, 2 skipped (includes the complexity and module-budget ratchets); `pytest -m playwright --cov --cov-append --cov-fail-under=80` 220 passed, floor held at 91% (exit 0).
+
+**Version**: fab-test bumped to `1.10.0b3` at the user's request (2026-11-19), so this change ships in its own beta; `1.10.0b2` was unreleased.

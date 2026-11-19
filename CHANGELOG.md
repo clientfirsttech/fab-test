@@ -2,6 +2,7 @@
 
 ## 2026-11-19
 
+- 📦 - Version `1.10.0b3` - User-requested bump from `1.10.0b2` (not yet published), so the fab-inspector `4.0.1` pin and its .NET 10 requirement ship in their own beta. Install docs, pipeline examples and both fab-test skill copies name the new version.
 - 📦 - fab-inspector Pin `4.0.1` - `fab-test pbir` downloads fab-inspector `v4.0.1`, up from `v3.4.0` (3.5.0 and 4.0.0 were prereleases), each archive verified against upstream's sha256. Run against every PBIR report under `fabric-artifacts/`, it gives the same findings, envelope and inlined `TestRun.html` as `3.4.0`; its native JSON adds `TagsFilter` and per-result `Tags` (rule tags, new upstream, not exposed by fab-test). **Behavior change**: 4.x needs the **.NET 10** runtime and won't start on .NET 8, so on a machine with only .NET 8, `fab-test doctor --analyzer pbir` reports not-ready naming the .NET 10 download, and `fab-test pbir` writes an `error` envelope and exits non-zero. Install .NET 10 (`actions/setup-dotnet` with `dotnet-version: "10.0.x"`); the repo's own workflows now do.
 
 ## 2026-11-17
