@@ -18,7 +18,7 @@ entry when it's fixed.
 ## `pbir contract init`
 
 - **Not discoverable.** `fab_test.py`'s `main` catches `argv[1:3] == ["pbir", "contract"]` before argparse, so `fab-test help`, `list` and `explain` don't know `contract init` or `contract lint` exist; only `fab-test pbir --help`'s epilog names them.
-- Fixed 2026-11-19 (Authoring Command Grammar epic): `contract lint` exists; TARGET takes a name as the run's does, `--artifact`'s metavar and help match the run's, `--artifact-dir` and `--format` default from `fab-test.yml`, `-q` prints one result line, and flags.md lists `-q`/`-v`.
+- Fixed 2026-11-19 (Authoring Command Grammar epic): `contract lint` exists; TARGET takes a name as the run's does, `--artifact`'s metavar and help match the run's, `--artifact-dir` and `--format` default from `fab-test.yml`, `-q` prints one result line, flags.md lists `-q`/`-v`, every flag of the run is refused naming the run, and `--artifact`/`--artifact-dir`/`--format` share the run's help text (`_cli_utils`). `--as-of`'s help differs on init on purpose: there it dates the `current` suggestion.
 
 ## Planned
 

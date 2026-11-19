@@ -50,7 +50,7 @@ Constraints {
 
   // Inputs: what the run takes, the verbs take the same way
   TARGET is the item (`Sales.Report`), never the authored file; fab-test finds the paired file
-  TARGET, --artifact, --artifact-dir, --as-of and --<noun> FILE have the run's name, metavar, help and default on every verb
+  TARGET, --artifact, --artifact-dir, --format, --as-of and --<noun> FILE have the run's name, metavar and default on every verb, and the run's help text wherever the flag means the same (share the string, e.g. `_cli_utils.ARTIFACT_DIR_HELP`)
   Every default resolves flag → env → fab-test.yml or pyproject.toml → packaged, as the run's do; never a literal default that skips the config
   --<noun> FILE overrides the pairing, on every verb and on the run
 
@@ -67,12 +67,12 @@ Constraints {
   --dry-run means the same on every verb: show what would be written or run, write nothing
 
   // Output: the vision's modes, with the run's meanings
-  -q prints one result line per item (`✓ Sales.Report.odcs.yaml written`); the default adds what a person acts on, including the next step; -v adds per-item detail; --format json keeps stdout one document
+  -q prints one result line per item, shaped like the run's `pbir passed e=0 w=0 PATH` (`contract written added=N replaced=N kept=N unchanged=N PATH`, `unchanged` when nothing changed); the default adds what a person acts on, including the next step; -v adds per-item detail; --format json keeps stdout one document
   Verbosity resolves -q/-v → ANALYZER_VERBOSITY → fab-test.yml; --format resolves like any input default
-  Name the next step: init → `<noun> lint` → the run → the CI snippet; in text as a line, in JSON as `next`
-  Refuse a run-only flag (--report, --open-report, --telemetry, and --output-dir unless the verb writes under fab-test-results/) with exit 2 naming the command that takes it, never argparse's "unrecognized arguments"
+  Name the next step: init → `<noun> lint` → the run → the CI snippet; in text as a line, in JSON as `next` (null when there is none), carrying the TARGET and --artifact-dir as typed so it runs from the same folder
+  Refuse any flag of the run the verb doesn't take (--report, --telemetry, --timeout, ...; --output-dir unless the verb writes under fab-test-results/) with exit 2 naming the run, never argparse's "unrecognized arguments"; a typo is still argparse's error
   (lint wraps an upstream linter) => run it with fab-test's own interpreter or pin, add fab-test's own checks (the file reads as the run reads it, and pairs with an item), and map the result to ExitCode; the caller never needs the upstream command
-  lint writes nothing and no envelope: results are the run's job. With no TARGET it checks every authored file under --artifact-dir, as the run checks every item, and its JSON is one shape either way: {ok, <files>: [...], next}
+  lint writes nothing and no envelope: results are the run's job. With no TARGET it checks every authored file under --artifact-dir, as the run checks every item, and its JSON is one shape either way: {ok, <files>: [...], next}, `next` null unless ok
   Credentials never reach stdout, an authored file, or JSON output
 
   // Discoverable and documented, for all three callers

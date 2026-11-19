@@ -1,6 +1,6 @@
 # Authoring Command Grammar Epic
 
-**Status**: 📋 PLANNED — discovery 2026-11-19; decisions 1–3 are the user's, 4–9 provisional until reviewed.
+**Status**: ✅ IMPLEMENTED 2026-11-19 on `feature/authoring-command-grammar`, AIDD-reviewed and gates passed; not merged. Decisions 1–3 are the user's; 4–9 provisional until reviewed.
 **Goal**: every command that authors a test file follows one grammar, written as an AIDD skill that is loaded when a command is planned and when one is reviewed, and the PBIR contract flow runs init → lint → run without leaving fab-test.
 
 Journey: [authoring-command-grammar.yaml](../plan/story-map/authoring-command-grammar.yaml).
@@ -144,11 +144,18 @@ Record what decision 3 left out, so it isn't lost.
 
 ## AIDD Review
 
-`aidd-review` over the whole epic diff, now including aidd-command-grammar, before the gates; fix what it finds.
+**Status**: ✅ 2026-11-19. An independent reviewer (unanchored on the implementation) ran aidd-review with aidd-python, aidd-module-budgets, aidd-tdd, aidd-command-grammar and aidd-polite-review, exercising the CLI on scratch copies. One blocking finding, eight should-fix, seven nits; all fixed except where noted:
+
+- **Blocking, fixed:** the run's other flags (`--telemetry`, `--timeout`, `--jobs`, `--dry-run` on lint) fell through to argparse's "unrecognized arguments". `parse` now refuses any `fab-test pbir` flag a verb doesn't take, naming the run; a typo is still argparse's error.
+- **Fixed:** `Next:` carries the TARGET and `--artifact-dir` as typed; no-TARGET lint prefers the report beside a contract when two share a `logicalId` and names both otherwise; lint finds contracts with the run's `contract_files`; the skill's `-q` example and help-parity claim corrected, with `--artifact`/`--artifact-dir`/`--format` help shared through `_cli_utils` (the run's help now says they default from `fab-test.yml`) and a test asserting equal help for both verbs; refusals name `fab-test pbir NAME --open-report` and "an HTML report"; `-q` problems name their contract; lint exits 130 on Ctrl-C; `-q` says `contract unchanged` when nothing changed.
+- **Nits fixed:** `next` is `null` rather than absent; missing paths and names get their own messages (C4's other half); `{init,lint}` named when the verb is missing; unreadable YAML on one line; init's "see the result first with --dry-run" now says `--force --dry-run`; `--artifact STEM` in the guide; flags.md trailing space; the epilog says TARGET; `Any` instead of a private argparse type in lint's signature.
+- **Declined:** caching `file_config()` (three reads of a small file per command; not worth the state). On exit 2 with `--format json`, stdout stays empty and the reason goes to stderr, as the run's own refusals do; left as is.
 
 ---
 
 ## Quality Gates
+
+**Status**: ✅ 2026-11-19, on the reviewed code. Whole-repo ruff clean; complexity and module-budget ratchets pass; full suite in CI's two halves: 3421 passed + 2 skipped, then 220 Playwright passed with total coverage 91.25% (floor 80%); the CI-env run (`GITHUB_ACTIONS=true CI=true`) 3421 passed; pip-audit finds no known vulnerabilities. The venv's stale `1.10.0b2` metadata needed `uv pip install -e .` first (environment, not code).
 
 Whole-repo ruff, the complexity and module-budget ratchets, the coverage floor on the full suite, and the CI-env run.
 

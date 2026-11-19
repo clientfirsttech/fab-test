@@ -73,7 +73,7 @@ def test_given_a_flag_of_fab_test_pbir_should_name_that_command(tmp_path, capsys
 
     assert code == 2 and not contract.exists()
     assert f"{flag[0]}: contract init writes <Report>.Report.odcs.yaml beside the report" in err
-    assert "fab-test pbir --artifact SampleModel-DefaultState" in err
+    assert f"fab-test pbir SampleModel-DefaultState {flag[0]} ..." in err
 
 
 @pytest.mark.pbir
@@ -140,20 +140,14 @@ def test_given_a_report_name_as_target_should_find_it_under_artifact_dir(tmp_pat
 
 
 @pytest.mark.pbir
-@pytest.mark.parametrize("flag", ["--artifact", "--artifact-dir", "--format"])
-def test_given_an_input_flag_shared_with_the_run_should_read_the_same_in_help(flag):
-    from fab_test.scripts._slicer_contract_init import _parser
-    from fab_test.scripts.fab_test_parser import build_parser
+def test_given_quiet_and_nothing_changed_should_say_unchanged(tmp_path, capsys):
+    code, _out, _err, contract = _run(tmp_path, capsys, "-q")
+    path = tmp_path / "answers.json"
+    rerun = contract_main(["init", str(contract.parent / TEST_BED.name), "--as-of", "2026-11-14",
+                           "--answers", str(path), "-q"])
 
-    def action(parser, option):
-        return next(a for a in parser._actions if option in a.option_strings)
-
-    def subparser(parser, name):
-        return next(a for a in parser._actions if a.dest in ("action", "analyzer")).choices[name]
-
-    init, run = action(subparser(_parser(), "init"), flag), action(subparser(build_parser(), "pbir"), flag)
-    assert (init.metavar, tuple(init.choices or ())) == (run.metavar, tuple(run.choices or ()))
-    assert init.default is None or flag == "--artifact"             # resolved from config at run time
+    assert (code, rerun) == (0, 0)
+    assert capsys.readouterr().out.startswith("contract unchanged added=0 replaced=0 kept=0 unchanged=15 ")
 
 
 @pytest.mark.pbir
@@ -204,8 +198,8 @@ def test_given_a_report_flag_should_name_the_command_that_makes_one(tmp_path, ca
     code, _out, err, contract = _run(tmp_path, capsys, flag)
 
     assert code == 2 and not contract.exists()
-    assert ("contract init writes a contract, not a report; see it checked with "
-            "fab-test pbir --artifact SampleModel-DefaultState --open-report") in err
+    assert ("contract init writes a contract, not an HTML report; see it checked with "
+            "fab-test pbir SampleModel-DefaultState --open-report") in err
 
 
 @pytest.mark.pbir

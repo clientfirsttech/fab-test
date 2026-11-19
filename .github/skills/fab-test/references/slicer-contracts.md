@@ -108,7 +108,7 @@ ContractLint {
   exit => 0 clean | 1 a problem in a file, unreadable YAML included | 2 nothing to check (no report, no paired
           contract, a run-only flag) | 127 pql-test missing
   --format json => one document: {ok, contracts: [{report, contract, model, as_of, ok, apiVersion, rules,
-                   problems: [{source: fab-test | pql-test, message}]}], next}; `next` only when ok
+                   problems: [{source: fab-test | pql-test, message}]}], next}; `next` null unless ok
   -q => `contract lint passed|failed problems=N PATH` per contract; problems on stderr
   writes nothing; --report, --open-report, --no-report and --output-dir exit 2 naming the run
 }
@@ -123,8 +123,9 @@ ContractLint {
 | `--contract FILE` | refused | the contract to check | checked against every report |
 | `--as-of` | suggests `current` for that date | resolves the calendar | resolves the calendar |
 | `--dry-run` | show, write nothing | — | list, run nothing |
-| `-q` | `contract written added=N … PATH` | `contract lint passed problems=N PATH` | `pbir passed e=N w=N PATH` |
-| `--format json` `next` | `fab-test pbir contract lint NAME` | `fab-test pbir [NAME]` | — |
+| `-q` | `contract written` (or `unchanged`) `added=N … PATH` | `contract lint passed problems=N PATH` | `pbir passed e=N w=N PATH` |
+| `--format json` `next` | `fab-test pbir contract lint TARGET [--artifact-dir DIR]` | `fab-test pbir [TARGET] [--artifact-dir DIR]` | — |
+| A flag of the run it doesn't take (`--telemetry`, `--timeout`, ...) | exit 2 naming the run | exit 2 naming the run | — |
 | `--report`, `--open-report`, `--output-dir` | refused | refused | yes |
 
 ## Building a contract
@@ -161,13 +162,14 @@ ContractInit {
   (the result wouldn't read back as fab-test pbir reads it, or the report has no .platform logicalId) => exit 2; nothing written
   (on a terminal) => prompts go to stderr, so --format json stdout stays one document
   -q / ANALYZER_VERBOSITY=summary / fab-test.yml verbosity: summary => one line on success,
-                                     `contract written added=N replaced=N kept=N unchanged=N PATH`; errors, --questions,
+                                     `contract written|unchanged added=N replaced=N kept=N unchanged=N PATH`; errors, --questions,
                                      --dry-run and --format json print as without -q
   TARGET => a path, or a report name found under --artifact-dir, as `fab-test pbir` takes it; --artifact is its alias
   --artifact-dir, --format => default from fab-test.yml (artifact_dir, format) when the flag isn't given
   -v => also every rule in the contract: id, page, field, what it expects, and added | kept | replaced | unchanged
-  --report | --no-report | --open-report => exit 2 naming `fab-test pbir --artifact <name> --open-report`
-  --contract | --output-dir => exit 2 naming `fab-test pbir --artifact <name> <flag> ...` (init writes beside the report)
+  --report | --no-report | --open-report => exit 2 naming `fab-test pbir <name> --open-report`
+  --contract | --output-dir => exit 2 naming `fab-test pbir <name> <flag> ...` (init writes beside the report)
+  any other flag of the run (--telemetry, --timeout, --jobs, ...) => exit 2 naming `fab-test pbir <name> <flag> ...`
   Ctrl-C at a prompt => exit 130; nothing written
 }
 ```

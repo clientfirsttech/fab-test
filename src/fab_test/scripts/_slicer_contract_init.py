@@ -55,12 +55,14 @@ from ._slicer_init_calendar import (
 )
 from ._slicer_init_existing import ExistingContractError, Owner, navigator_owner, read_existing, slicer_owner
 from ._slicer_init_output import (
+    TARGET_HELP,
     InitError,
     add_input_flags,
     add_output_flags,
     can_ask,
     find_report,
     level,
+    parse,
     pbir_refusal,
     print_payload,
     questions_text,
@@ -72,7 +74,10 @@ from ._slicer_init_output import (
 
 
 def contract_main(argv: list[str]) -> int:
-    args = _parser().parse_args(argv)
+    args, refusal = parse(_parser(), argv)
+    if refusal:  # a flag of `fab-test pbir` the verb doesn't take
+        print(f"  ✗ fab-test pbir contract: {refusal}", file=sys.stderr)
+        return 2
     resolve_inputs(args)
     if args.action == "lint":
         return lint_main(args)
@@ -99,9 +104,9 @@ def contract_main(argv: list[str]) -> int:
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="fab-test pbir contract", description="Build (init) or check (lint) a "
                                      "report's slicer contract; `fab-test pbir` runs it")
-    subs = parser.add_subparsers(dest="action", required=True)
+    subs = parser.add_subparsers(dest="action", required=True, metavar="{init,lint}")
     init = subs.add_parser("init", help="Create or extend <Report>.Report.odcs.yaml, asking how to check each slicer")
-    add_input_flags(init)
+    add_input_flags(init, f"Report to build the contract for: {TARGET_HELP}")
     init.add_argument("--as-of", default=None, dest="as_of", type=datetime.date.fromisoformat, metavar="YYYY-MM-DD",
                       help="Date used to suggest calendar formats [default: today]")
     init.add_argument("--questions", action="store_true", help="Print the questions and suggested answers, then stop")
@@ -333,7 +338,7 @@ def _write(args: argparse.Namespace, report: Path, questions: dict, answers: dic
         path.write_text(text, encoding="utf-8")
     verbose = contract if level(args) == "verbose" else None
     print_payload(args, with_next({"contract": str(path), "written": not args.dry_run, **summary,
-                         **({"content": text} if args.dry_run else {})}),
+                         **({"content": text} if args.dry_run else {})}, args),
                   lambda s: text if args.dry_run else summary_text(s, verbose, contract.calendar),
                   asked_for=args.dry_run, as_line=result_line)
     return 0

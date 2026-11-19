@@ -20,7 +20,7 @@ and you have to check it yourself.
 
 | Item | Where | Guard |
 |---|---|---|
-| TARGET is the item; `--artifact` + `--artifact-dir` find it as on the run (metavar, help, deprecation note) | the verb's parser vs `_add_common_flags` | none |
+| TARGET is the item; `--artifact`, `--artifact-dir`, `--format` read as on the run (metavar, help from `_cli_utils`, deprecation note) | `add_input_flags` vs `_add_common_flags` | `test_given_a_shared_input_flag_should_read_exactly_as_the_runs_help` |
 | `--artifact-dir` and `--format` defaults resolve from config (`_PYPROJECT_CONFIG`, `merged_file_config` + `resolve_setting`) | the verb's parser or its `main` | none |
 | `--as-of`, `--<noun> FILE` shared with the run where the run has them | `add_contract_flags` (pbir) | none |
 | The file is found by the run's pairing (`_contract_files`, `_pair` for pbir), not a second lookup | `_slicer_contract_run.py` (pbir) | per-verb tests |
@@ -47,9 +47,10 @@ and you have to check it yourself.
 | Item | Where | Guard |
 |---|---|---|
 | `-q`/`-v` mutually exclusive, resolved flag → `ANALYZER_VERBOSITY` → `fab-test.yml` (`add_output_flags`, `level`) | `_slicer_init_output.py` | per-verb tests |
-| `-q` prints one result line per item | the verb's printer | none |
-| The next step named in text and as `next` in JSON | the verb's printer | none |
-| Run-only flags refused with exit 2 naming the run (`pbir_refusal`) | `_slicer_init_output.py` | per-verb tests |
+| `-q` prints one result line per item, shaped like the run's | `result_line`, lint's `_lines` | per-verb tests |
+| The next step named in text and as `next` in JSON, with TARGET and `--artifact-dir` as typed | `next_command` | per-verb tests |
+| Every flag of the run the verb doesn't take refused with exit 2 naming the run (`parse`, `pbir_refusal`) | `_slicer_init_output.py` | `test_given_a_flag_of_the_run_should_refuse_naming_the_run_never_unrecognized` |
+| Ctrl-C exits 130 with no traceback | each verb's `main` | per-verb tests |
 | An upstream linter's result mapped to the grammar's exit codes | the lint verb | per-verb tests |
 
 ## Callers

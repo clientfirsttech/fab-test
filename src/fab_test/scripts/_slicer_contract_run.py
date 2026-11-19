@@ -32,6 +32,7 @@ from ._slicer_contract import ENGINE, ContractError, SlicerExpectation, load_con
 from ._slicer_rules import compile_rules
 
 _ANALYZERS = ("pbir", "all", "local")
+AS_OF_HELP = "Date calendar-driven slicer defaults resolve against [default: today]"
 CONTRACT_SUFFIX = ".odcs.yaml"
 
 
@@ -46,13 +47,13 @@ class ResolvedContract:
 
 def add_contract_flags(parser: argparse.ArgumentParser) -> None:
     parser.epilog = ("Slicer defaults: a report pairs with the *.odcs.yaml beside it. Build one with "
-                     "`fab-test pbir contract init REPORT`, check it with `fab-test pbir contract lint REPORT`.")
+                     "`fab-test pbir contract init TARGET`, check it with `fab-test pbir contract lint TARGET`.")
     parser.add_argument("--contract", default=None, metavar="FILE",
                         help="Slicer contract to check every report in the run against, "
                              f"instead of pairing each report with a *{CONTRACT_SUFFIX} by its logicalId")
     parser.add_argument("--as-of", default=None, dest="as_of", metavar="YYYY-MM-DD",
                         type=datetime.date.fromisoformat,
-                        help="Date calendar-driven slicer defaults resolve against [default: today]")
+                        help=AS_OF_HELP)
 
 
 def prepare_contracts(args: argparse.Namespace) -> int | None:
@@ -84,9 +85,14 @@ def _pair(paired: dict[str, ResolvedContract], contract: ResolvedContract) -> No
 
 
 def _contract_files(args: argparse.Namespace) -> list[Path]:
-    root = Path(args.artifact_dir)
     excluded = [Path(args.output_dir)] if getattr(args, "output_dir", None) else []
-    return [p for p in find_files_by_suffix(root, CONTRACT_SUFFIX, excluded_paths=excluded) if _has_slicer_rules(p)]
+    return contract_files(Path(args.artifact_dir), excluded)
+
+
+def contract_files(root: Path, excluded: list[Path] | None = None) -> list[Path]:
+    """Every contract under ``root`` the run reads; `contract lint` finds them the same way."""
+    return [p for p in find_files_by_suffix(root, CONTRACT_SUFFIX, excluded_paths=excluded or [])
+            if _has_slicer_rules(p)]
 
 
 def _has_slicer_rules(path: Path) -> bool:
