@@ -39,9 +39,9 @@
         "default_path": "./PBIR-Inspector/PBIRInspectorCLI",
         "install_url_env_var": "PBIR_INSPECTOR_INSTALL_URL",
         "install_urls": {
-          "linux": "https://github.com/NatVanG/fab-inspector/releases/download/v3.4.0/linux-x64-FabInspCLI.zip",
-          "win32": "https://github.com/NatVanG/fab-inspector/releases/download/v3.4.0/win-x64-FabInspCLI.zip",
-          "darwin": "https://github.com/NatVanG/fab-inspector/releases/download/v3.4.0/osx-x64-FabInspCLI.zip"
+          "linux": "https://github.com/NatVanG/fab-inspector/releases/download/v4.0.1/linux-x64-FabInspCLI.zip",
+          "win32": "https://github.com/NatVanG/fab-inspector/releases/download/v4.0.1/win-x64-FabInspCLI.zip",
+          "darwin": "https://github.com/NatVanG/fab-inspector/releases/download/v4.0.1/osx-x64-FabInspCLI.zip"
         },
         "archive_type": "zip",
         "executable_subpaths": {
@@ -49,11 +49,11 @@
           "win32": "win-x64/FabInspCLI/fab-inspector.exe",
           "darwin": "osx-x64/FabInspCLI/fab-inspector"
         },
-        "version": "3.4.0",
+        "version": "4.0.1",
         "install_sha256s": {
-          "linux": "f4f6ed53cf092e235084c8049f394720c8fe52c63479638646079644b191f25e",
-          "win32": "c6f468b1ab1cab5643e490fad0793a8c075e8c94a44388d50b12f7c366fd90bc",
-          "darwin": "d3001d41a4c6c9d085c6aff53c9b8e56bce078f7a5c24cffcdf2b5dba2755ceb"
+          "linux": "d08c07bd8aa4e35048fb4162a2b42f1e8de6096d3fe4bb797291107f782aafad",
+          "win32": "95162a0d35660b421f0824f2980702543a248d53a559e8d7f204eae3c454c3aa",
+          "darwin": "db6d96ced59d4d3beac8e8046bed2d971925aec06da1a797c2f6d97974cac58e"
         },
         "release_source": {
           "type": "github_release",
@@ -68,7 +68,7 @@
         },
         "requires_runtime": {
           "name": "dotnet",
-          "min_major": 8
+          "min_major": 10
         }
       }
     },

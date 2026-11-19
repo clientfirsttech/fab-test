@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-11-19
+
+- 📦 - fab-inspector Pin `4.0.1` - `fab-test pbir` downloads fab-inspector `v4.0.1`, up from `v3.4.0` (3.5.0 and 4.0.0 were prereleases), each archive verified against upstream's sha256. Run against every PBIR report under `fabric-artifacts/`, it gives the same findings, envelope and inlined `TestRun.html` as `3.4.0`; its native JSON adds `TagsFilter` and per-result `Tags` (rule tags, new upstream, not exposed by fab-test). **Behavior change**: 4.x needs the **.NET 10** runtime and won't start on .NET 8, so on a machine with only .NET 8, `fab-test doctor --analyzer pbir` reports not-ready naming the .NET 10 download, and `fab-test pbir` writes an `error` envelope and exits non-zero. Install .NET 10 (`actions/setup-dotnet` with `dotnet-version: "10.0.x"`); the repo's own workflows now do.
+
 ## 2026-11-17
 
 - ✨ - `contract init` Takes The Output Flags Every Command Takes - `-q`, `-v` and `--open-report` failed as unrecognised arguments. `-q` (or `ANALYZER_VERBOSITY=summary`, or `verbosity: summary` in `fab-test.yml`) now prints nothing on success, `-v` lists every rule in the contract with what it expects and whether it was added, kept, replaced or unchanged, `--report` / `--open-report` exit 2 naming `fab-test pbir --artifact <name> --open-report`, which makes the report, and `--contract` / `--output-dir` exit 2 naming the `fab-test pbir` command they belong to. Ctrl-C at a prompt exits 130 with nothing written. What would stop `init` from writing (a `#` without `--force`, a file that isn't a contract, an id two rules share, a report with no `logicalId`) now stops it before the first question, `--questions` included, instead of after every answer. A rule already in the contract keeps its id, even one renamed by hand, and a new rule never takes an id the contract gives another slicer, which used to fail the write as a duplicate. Errors, `--questions`, `--dry-run` and `--format json` print regardless.

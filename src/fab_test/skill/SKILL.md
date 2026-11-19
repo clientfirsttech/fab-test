@@ -241,7 +241,7 @@ fab-test doctor --format json
 {
   "analyzers": [
     {"analyzer": "bpa", "ready": true, "resolved_path": "C:\\...\\TabularEditor.exe", "reason": "resolved via cached download (version 2.29.0)", "remediation": null, "version": "2.29.0"},
-    {"analyzer": "pbir", "ready": true, "resolved_path": "C:\\...\\fab-inspector.exe", "reason": "resolved via cached download (version 3.4.0)", "remediation": null, "version": "3.4.0"},
+    {"analyzer": "pbir", "ready": true, "resolved_path": "C:\\...\\fab-inspector.exe", "reason": "resolved via cached download (version 4.0.1)", "remediation": null, "version": "4.0.1"},
     {"analyzer": "pql_test", "ready": false, "resolved_path": null, "reason": "no workspace, credentials, or running Desktop instance", "remediation": "Set FABRIC_WORKSPACE_ID ...", "version": null}
   ]
 }
