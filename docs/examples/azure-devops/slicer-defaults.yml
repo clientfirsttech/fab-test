@@ -19,7 +19,9 @@ steps:
   - task: UsePythonVersion@0
     inputs:
       versionSpec: "3.12"
-  - script: pip install "cft-fab-test==1.10.0b4"
+  - script: pip install "cft-fab-test==1.10.0b5"
     displayName: Install fab-test
+  - script: fab-test pbir contract lint --format json
+    displayName: Lint slicer contracts
   - script: fab-test pbir --format json
     displayName: Check slicer defaults

@@ -21,7 +21,7 @@ WHY: PBIR slicer contracts shipped the first authoring flow — `fab-test pbir c
 8. ⏳ **Top-level verbs are about fab-test itself** (`init`, `doctor`, `config`, `list`, `explain`, `skill`, `help`). `fab-test init` stays the repo's config scaffold and never gains an analyzer argument.
 9. ⏳ **Division of labour with `aidd-polite-review`** (on `dev` since #69): the grammar skill decides a command's *shape* (words, flags, files, exit codes); polite review judges how it *talks* (wording, questions, interruptions). Neither restates the other; the grammar skill names polite review in its intro and its plan step.
 
-**Open question**: should `lint` write an envelope under `fab-test-results/` so a pipeline step gets a result path and telemetry, or print only to stdout (text, or one JSON document) as `init` does? Proposed: stdout only, because the run step already writes the envelope and fails with exit 2 on an unreadable file. Settle it in the Characterize task.
+**Open question, settled 2026-11-19**: `lint` prints only (text, or one JSON document) and writes no envelope; the run writes results. Characterizing pql-test 0.2.1 also refined the exit codes: for `lint`, any problem in the file, unreadable YAML included, is a finding (1), as pql-test treats it; 2 means there was nothing to check.
 
 ---
 
@@ -70,7 +70,7 @@ Write `.github/skills/aidd-command-grammar/SKILL.md`, shaped like `aidd-analyzer
 
 ## Wire It Into Planning and Review
 
-**Status**: ✅ 2026-11-19. aidd-workflow (Pre-Flight, the task and review rows, Project-Specific Skills, and a discovery question), aidd-review's Criteria, and aidd-analyzer-contract's scope line.
+**Status**: ✅ 2026-11-19. aidd-workflow (Pre-Flight, the task and review rows, Project-Specific Skills, and a discovery question), aidd-review's Criteria, and aidd-analyzer-contract's scope line. The AIDD agent's copy of the command table (`.github/agents/aidd.agent.md`) was missed here and found by `test_aidd_command_map.py` at the task 6 checkpoint; fixed then.
 
 Make the skill load on its own, so consistency doesn't depend on anyone remembering it.
 
@@ -114,6 +114,8 @@ Fix the init-vs-run differences the inventory recorded, so init, lint and the ru
 ---
 
 ## `fab-test pbir contract lint`
+
+**Status**: ✅ 2026-11-19. `_slicer_contract_lint.py` (255 lines); the report lookup and shared flags moved to `_slicer_init_output.py`, so the init module shrank to 386 lines. Lint also runs with no TARGET over every contract under `--artifact-dir`, as the run does over every report, which the CI examples need; the skill now says so. pql-test runs through its console entry point with fab-test's interpreter (`python -m pql_test` has no `__main__`). Verified through the console script under the default, -q, -v, `--format json`, a refused `--open-report`, and a failing contract. Version `1.10.0b5` (`b4` is on PyPI).
 
 The first command planned with the skill: run `/command-grammar plan pbir contract` and paste its Given/should lines here before TDD. Characterize first: read the installed `pql-test contract lint --help` and its `--format json` output, and settle the open question.
 

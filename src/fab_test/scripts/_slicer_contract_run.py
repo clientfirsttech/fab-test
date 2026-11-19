@@ -45,8 +45,8 @@ class ResolvedContract:
 
 
 def add_contract_flags(parser: argparse.ArgumentParser) -> None:
-    parser.epilog = ("Slicer defaults: a report pairs with the *.odcs.yaml beside it. "
-                     "Build one with `fab-test pbir contract init REPORT` (see its --help).")
+    parser.epilog = ("Slicer defaults: a report pairs with the *.odcs.yaml beside it. Build one with "
+                     "`fab-test pbir contract init REPORT`, check it with `fab-test pbir contract lint REPORT`.")
     parser.add_argument("--contract", default=None, metavar="FILE",
                         help="Slicer contract to check every report in the run against, "
                              f"instead of pairing each report with a *{CONTRACT_SUFFIX} by its logicalId")

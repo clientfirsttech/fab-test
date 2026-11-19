@@ -29,8 +29,9 @@ Verb = init | lint            // closed; see Constraints
 Noun = contract | tests       // the file a person authors; one format per noun
 ExitCode {
   0    done, or lint found nothing
-  1    lint findings
-  2    usage error, unreadable file, refusal, or an answer missing off a terminal
+  1    lint findings: any problem in the file lint checks, unreadable YAML included
+  2    nothing to do or check: usage error, no item or paired file, a refused flag, init's unreadable
+       existing file, or an answer missing off a terminal
   127  a wrapped tool is missing
   130  interrupted
 }
@@ -70,7 +71,8 @@ Constraints {
   Verbosity resolves -q/-v → ANALYZER_VERBOSITY → fab-test.yml; --format resolves like any input default
   Name the next step: init → `<noun> lint` → the run → the CI snippet; in text as a line, in JSON as `next`
   Refuse a run-only flag (--report, --open-report, --telemetry, and --output-dir unless the verb writes under fab-test-results/) with exit 2 naming the command that takes it, never argparse's "unrecognized arguments"
-  (lint wraps an upstream linter) => run it, add fab-test's own checks, and map the result to ExitCode; the caller never needs the upstream command
+  (lint wraps an upstream linter) => run it with fab-test's own interpreter or pin, add fab-test's own checks (the file reads as the run reads it, and pairs with an item), and map the result to ExitCode; the caller never needs the upstream command
+  lint writes nothing and no envelope: results are the run's job. With no TARGET it checks every authored file under --artifact-dir, as the run checks every item, and its JSON is one shape either way: {ok, <files>: [...], next}
   Credentials never reach stdout, an authored file, or JSON output
 
   // Discoverable and documented, for all three callers

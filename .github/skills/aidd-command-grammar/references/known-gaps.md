@@ -13,13 +13,12 @@ entry when it's fixed.
 | `fab-test config --validate` / `--show` | `fab-test.yml` (incl. `rules.<name>` overlays) | Conforms: fab-test's own config |
 | `fab-test pbir contract init` | `<Report>.Report.odcs.yaml`, beside the report | Grammar and placement conform; gaps below. Exits 0, 2 (refusal or unreadable), 130 (interrupted) |
 | `validate-environments-yaml` | `environments.yml` (Playwright's label → workspace map) | Gap: a second console script outside `fab-test`; exit 1 for both a schema error and an unreadable file |
-| `pql-test contract lint` (upstream) | the slicer contract | Gap: the walkthrough's lint step leaves fab-test |
+| `fab-test pbir contract lint` | the slicer contract, paired by logicalId | Conforms (2026-11-19); wraps `pql-test contract lint`, which the docs now name only as its upstream half |
 
 ## `pbir contract init`
 
-- **Not discoverable.** `fab_test.py`'s `main` catches `argv[1:3] == ["pbir", "contract"]` before argparse, so `fab-test help`, `list` and `explain` don't know it exists; only `fab-test pbir --help`'s epilog names it.
-- **No `lint` verb.** People are sent to `pql-test contract lint CONTRACT MODEL`, which takes the contract file and the model rather than the report.
-- Fixed 2026-11-19 (Authoring Command Grammar epic): TARGET takes a name as the run's does, `--artifact`'s metavar and help match the run's, `--artifact-dir` and `--format` default from `fab-test.yml`, `-q` prints one result line, and flags.md lists `-q`/`-v`.
+- **Not discoverable.** `fab_test.py`'s `main` catches `argv[1:3] == ["pbir", "contract"]` before argparse, so `fab-test help`, `list` and `explain` don't know `contract init` or `contract lint` exist; only `fab-test pbir --help`'s epilog names them.
+- Fixed 2026-11-19 (Authoring Command Grammar epic): `contract lint` exists; TARGET takes a name as the run's does, `--artifact`'s metavar and help match the run's, `--artifact-dir` and `--format` default from `fab-test.yml`, `-q` prints one result line, and flags.md lists `-q`/`-v`.
 
 ## Planned
 

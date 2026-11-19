@@ -34,7 +34,7 @@ schema:                                      # only the tables your slicers use;
               selected: ["FY{fiscal_year_short}-S{fiscal_semester}"]
 ```
 
-Validate the file as ODCS, and check its table and column names against the model, with `pql-test contract lint <contract> <Model>.SemanticModel` (exit 0, `names resolve`).
+Check the file before running it with `fab-test pbir contract lint REPORT` (see [Linting a contract](#linting-a-contract)); `pql-test contract lint <contract> <Model>.SemanticModel` is the upstream half of that check.
 
 `implementation` holds `page` and exactly one check:
 
@@ -95,6 +95,37 @@ fab-test pbir --artifact Sales --contract path/to/contract.yaml   # skip pairing
 ```
 
 `--contract FILE` applies to every report in the run, so use it with one report (a deployed report exported for `--workspace` has no `logicalId` to pair on). `all`, `local` and `explain pbir` pair contracts too.
+
+## Linting a contract
+
+```
+ContractLint {
+  fab-test pbir contract lint [TARGET] [--contract FILE] [--as-of DATE] [-q | -v] [--format json]
+  TARGET => the report, as init and the run take it; none => every contract under --artifact-dir, each paired by logicalId
+  checks => fab-test reads it as the run will (calendar as of --as-of) and it pairs with a report;
+            pql-test validates ODCS and resolves table/column names in the model definition.pbir's byPath names
+  (the model isn't in the folder, e.g. byConnection) => names not checked, said in the output; the rest still runs
+  exit => 0 clean | 1 a problem in a file, unreadable YAML included | 2 nothing to check (no report, no paired
+          contract, a run-only flag) | 127 pql-test missing
+  --format json => one document: {ok, contracts: [{report, contract, model, as_of, ok, apiVersion, rules,
+                   problems: [{source: fab-test | pql-test, message}]}], next}; `next` only when ok
+  -q => `contract lint passed|failed problems=N PATH` per contract; problems on stderr
+  writes nothing; --report, --open-report, --no-report and --output-dir exit 2 naming the run
+}
+```
+
+`init`, `lint` and the run take the same inputs and output flags:
+
+| Flag | `contract init` | `contract lint` | `fab-test pbir` |
+|---|---|---|---|
+| `TARGET` / `--artifact` | the report; required | the report; none = every contract | the report; none = every report |
+| `--artifact-dir`, `--format` | default from `fab-test.yml` | same | same |
+| `--contract FILE` | refused | the contract to check | checked against every report |
+| `--as-of` | suggests `current` for that date | resolves the calendar | resolves the calendar |
+| `--dry-run` | show, write nothing | — | list, run nothing |
+| `-q` | `contract written added=N … PATH` | `contract lint passed problems=N PATH` | `pbir passed e=N w=N PATH` |
+| `--format json` `next` | `fab-test pbir contract lint NAME` | `fab-test pbir [NAME]` | — |
+| `--report`, `--open-report`, `--output-dir` | refused | refused | yes |
 
 ## Building a contract
 

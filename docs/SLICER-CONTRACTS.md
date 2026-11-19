@@ -45,9 +45,32 @@ Some selections can't be checked, and `init` only offers to skip them: "Select a
 
 ## 2. Check it
 
+First the contract, then the report against it:
+
 ```bash
+fab-test pbir contract lint SampleModel-DefaultState
 fab-test pbir --artifact SampleModel-DefaultState
 ```
+
+`contract lint` checks the file without running anything: fab-test reads it as the run will, it's valid ODCS, and every table and column it names is in the report's semantic model (pql-test, installed with fab-test, does the last two). It exits `0` when clean, `1` naming each problem, and `2` when no contract pairs with the report. With no report named it checks every contract under `--artifact-dir`.
+
+The three commands take the same inputs and output flags, the way the [command grammar](../.github/skills/aidd-command-grammar/SKILL.md) says every authoring flow does:
+
+| Flag | `contract init` | `contract lint` | `fab-test pbir` |
+|---|---|---|---|
+| `TARGET` | the report, a path or a name under `--artifact-dir`; required | same; none = every contract | same; none = every report |
+| `--artifact NAME` | deprecated alias for TARGET | same | same |
+| `--artifact-dir DIR` | default `artifact_dir` in `fab-test.yml`, else the working directory | same | same |
+| `--contract FILE` | refused: init writes beside the report | the contract to check | the contract every report is checked against |
+| `--as-of YYYY-MM-DD` | the date `current` is suggested for | the date the calendar resolves at | the date the calendar resolves at |
+| `--questions`, `--answers FILE`, `--force` | yes | — | — |
+| `--dry-run` | show the contract, write nothing | — (writes nothing anyway) | list the reports, run nothing |
+| `-q` | `contract written added=N replaced=N kept=N unchanged=N PATH` | `contract lint passed problems=N PATH` per contract | `pbir passed e=N w=N PATH` per report |
+| `-v` | every rule and what happened to it | the model and what each check covered | per-finding detail |
+| `--format json` | one document; `next` names lint | one document; `next` names the run | one document |
+| `--report`, `--open-report` | refused, naming the run | refused, naming the run | the HTML report |
+| `--output-dir DIR` | refused | refused: lint writes nothing | where results go |
+| Exit codes | 0 written, 2 refused or unreadable, 130 interrupted | 0 clean, 1 problems, 2 nothing to check, 127 no pql-test | 0 pass, 1 a finding, 2 a contract can't be read |
 
 The run says which contract paired with the report and splits its findings between the PBIR rules every report gets and the contract's `CONTRACT.*` rules:
 

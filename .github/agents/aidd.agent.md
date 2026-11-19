@@ -29,9 +29,9 @@ When the user invokes you with any of these phrases, execute the corresponding w
 | **help**, **list commands** | `aidd-please` | List all available AIDD commands |
 | **plan**, **what's next**, **priorities** | `aidd-please` | Review plan.md and suggest next steps |
 | **discover**, **user journey**, **user story** | `aidd-product-manager`, `aidd-polite-review`, `aidd-please` | Interactive product discovery session |
-| **task**, **create epic**, **plan task** | `aidd-task-creator`, `aidd-please`, `aidd-tdd`, `aidd-python` | Plan and execute task epic with TDD |
+| **task**, **create epic**, **plan task** | `aidd-task-creator`, `aidd-please`, `aidd-tdd`, `aidd-python`, `aidd-command-grammar` | Plan and execute task epic with TDD; grammar requirements when it adds or changes a command |
 | **execute epic**, **run epic** | `aidd-task-creator`, `aidd-please` | Execute previously planned epic |
-| **review**, **code review** | `aidd-review`, `aidd-python`, `aidd-module-budgets`, `aidd-please` | Thorough code review; run any new command, flag or output under `-q`, the default, `-v`, `--format json` and `--report` / `--open-report` ([vision.md](../../vision.md) `output modes`) |
+| **review**, **code review** | `aidd-review`, `aidd-python`, `aidd-module-budgets`, `aidd-command-grammar`, `aidd-please` | Thorough code review; a new or changed command checked against the grammar; run any new command, flag or output under `-q`, the default, `-v`, `--format json` and `--report` / `--open-report` ([vision.md](../../vision.md) `output modes`) |
 | **churn**, **hotspots**, **refactoring** | `aidd-churn`, `aidd-please` | Run hotspot analysis |
 | **fix bug**, **aidd fix** | `aidd-fix`, `aidd-python`, `aidd-please` | Fix bug with AIDD process |
 | **user test**, **test script** | `aidd-user-testing`, `aidd-please` | Generate test scripts |
@@ -186,6 +186,7 @@ All skills are in `.github/skills/<name>/SKILL.md`:
 - `aidd-python` - Python practices, simplicity budgets, over-engineering review lens
 - `aidd-module-budgets` - File-level size budgets and where to split a module
 - `aidd-analyzer-contract` - Minimum requirements every analyzer subcommand/wrapper meets (loaded by the workflow skill for any analyzer work)
+- `aidd-command-grammar` - One shape for commands that author test files (`<analyzer> <noun> init|lint`); loaded by the workflow skill whenever a command, verb, noun or flag is planned or reviewed
 - `aidd-requirements` - Functional requirements (given/should)
 - `aidd-pr` - Pull-request review triage
 - `aidd-parallel` - Sub-agent delegation

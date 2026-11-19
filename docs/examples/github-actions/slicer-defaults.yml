@@ -19,6 +19,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install "cft-fab-test==1.10.0b4"
+      - run: pip install "cft-fab-test==1.10.0b5"
+      - name: Lint slicer contracts
+        run: fab-test pbir contract lint --format json
       - name: Check slicer defaults
         run: fab-test pbir --format json

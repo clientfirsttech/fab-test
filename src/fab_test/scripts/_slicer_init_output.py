@@ -23,9 +23,33 @@ from typing import Any
 from ._config import VERBOSITY_LEVELS, ConfigError, merged_file_config, resolve_setting, verbosity_level
 from ._metadata import default_repo_root
 from ._pbir_rule_sources import expects
+from ._scan import find_artifact_dirs
 from ._slicer_init_calendar import describe_calendar
 
 FORMATS = ("text", "json")
+_DOES = {"init": "writes a contract", "lint": "checks a contract"}
+
+
+class InitError(Exception):
+    """A request `contract init` or `lint` can't carry out; the message says how to fix it."""
+
+
+def find_report(args: argparse.Namespace) -> Path:
+    """The report TARGET (or --artifact) names: a path, or a name found under --artifact-dir as the run finds one."""
+    target = args.target or args.artifact
+    if not target:
+        raise InitError("name the report: a path to its .Report folder, or its name (Sales) under --artifact-dir")
+    report = Path(target)
+    if not report.is_dir():
+        name = target if target.endswith(".Report") else f"{target}.Report"
+        found = [p for p in find_artifact_dirs(Path(args.artifact_dir), [".Report"]) if p.name == name]
+        if len(found) > 1:
+            raise InitError(f"{target} matches {len(found)} reports; pass the path to one: "
+                            + ", ".join(map(str, found)))
+        report = found[0] if found else Path(args.artifact_dir) / name
+    if not (report / "definition" / "pages").is_dir():
+        raise InitError(f"{report} is not a PBIR report folder (no definition/pages)")
+    return report
 
 
 def file_config() -> dict:
@@ -82,15 +106,15 @@ def _console(stream: Any) -> bool:
         return False
 
 
-def add_output_flags(parser: argparse.ArgumentParser) -> None:
+def add_output_flags(parser: argparse.ArgumentParser, refused: tuple[str, ...] = ("--contract", "--output-dir"),
+                     verbose: str = "Also list every rule in the contract and what happened to it",
+                     quiet: str = "Print one result line: what was written, and where") -> None:
     verbosity = parser.add_mutually_exclusive_group()
-    verbosity.add_argument("-v", "--verbose", action="count", default=0,
-                           help="Also list every rule in the contract and what happened to it")
-    verbosity.add_argument("-q", "--quiet", action="store_true",
-                           help="Print one result line: what was written, and where")
+    verbosity.add_argument("-v", "--verbose", action="count", default=0, help=verbose)
+    verbosity.add_argument("-q", "--quiet", action="store_true", help=quiet)
     for flag in ("--report", "--no-report", "--open-report"):
         parser.add_argument(flag, action="append_const", const=flag, dest="pbir_flags", help=argparse.SUPPRESS)
-    for flag in ("--contract", "--output-dir"):  # take a value, so a person's whole command parses
+    for flag in refused:  # take a value, so a person's whole command parses
         parser.add_argument(flag, action=_Named, nargs="?", dest="pbir_flags", help=argparse.SUPPRESS)
 
 
@@ -113,16 +137,26 @@ def level(args: argparse.Namespace) -> str:
     return {"debug": "verbose"}.get(value, value) if value in VERBOSITY_LEVELS else "default"
 
 
-def pbir_refusal(args: argparse.Namespace, report_name: str) -> str | None:
-    """Why one of `fab-test pbir`'s flags doesn't apply to init, naming the command it belongs to."""
+def pbir_refusal(args: argparse.Namespace, report_name: str, verb: str = "init") -> str | None:
+    """Why one of `fab-test pbir`'s flags doesn't apply to ``verb``, naming the command it belongs to."""
     if not getattr(args, "pbir_flags", None):
         return None
     flag, name = args.pbir_flags[0], report_name.removesuffix(".Report")
+    if flag == "--output-dir" and verb == "lint":
+        return f"--output-dir: contract lint writes nothing; fab-test pbir {name} --output-dir ... writes results"
     if flag in ("--contract", "--output-dir"):
         return (f"{flag}: contract init writes <Report>.Report.odcs.yaml beside the report; {flag} is for "
                 f"checking it: fab-test pbir --artifact {name} {flag} ...")
-    return (f"{flag}: contract init writes a contract, not a report; see it checked with "
+    return (f"{flag}: contract {verb} {_DOES[verb]}, not a report; see it checked with "
             f"fab-test pbir --artifact {name} --open-report")
+
+
+def with_next(payload: dict) -> dict:
+    """``payload`` naming the step after init, once a contract was written: lint it."""
+    if not payload.get("written"):
+        return payload
+    name = Path(payload["contract"]).name.removesuffix(".Report.odcs.yaml")
+    return {**payload, "next": f"fab-test pbir contract lint {name}"}
 
 
 def print_payload(args: argparse.Namespace, payload: dict, as_text, asked_for: bool = False, as_line=None) -> None:
@@ -168,4 +202,6 @@ def summary_text(summary: dict, contract: Any = None, calendar: dict | None = No
                   f"{what.get(e.rule_id, 'already in the contract')}" for e in contract.expectations]
         lines += [f"    {n.rule_id}  {n.page}  bookmark navigator opens with {n.selected or 'no bookmark'}  "
                   f"{what.get(n.rule_id, 'already in the contract')}" for n in contract.navigators]
+    if summary.get("next"):
+        lines.append(f"  Next: {summary['next']}")
     return "\n".join(lines)

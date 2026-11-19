@@ -11,6 +11,8 @@
 | `scripts/_slicer_rules.py` | Compiles slicer expectations into page-scoped PBIR Inspector JSON Logic rules |
 | `scripts/_slicer_contract_run.py` | `--contract`/`--as-of`, the exit-2 prepare step, and pairing a report with its contract by logicalId |
 | `scripts/_slicer_contract_init.py` | `fab-test pbir contract init`: questions as data, `--answers`, create-or-append |
+| `scripts/_slicer_contract_lint.py` | `fab-test pbir contract lint`: pairs each contract with its report, then fab-test's read and `pql-test contract lint` |
+| `scripts/_slicer_init_output.py` | The input and output flags `init` and `lint` share with the run, and their printing |
 | `scripts/_pbir_slicers.py` | Reads a PBIR report's slicers and decodes what each opens with |
 | `scripts/_command_builders.py` | Per-analyzer command builders (`build_<name>_command`, `_COMMAND_BUILDERS`, `build_command`) and the rule-overlay path resolvers |
 | `scripts/invoke_tabular_editor_bpa.py` | BPA subprocess wrapper |

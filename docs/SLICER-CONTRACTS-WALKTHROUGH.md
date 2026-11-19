@@ -5,8 +5,8 @@ This walks you from a Power BI report with no checks to a pipeline that fails wh
 You will:
 
 1. Save the report the way the customer agreed it should open.
-2. Run `fab-test pbir contract init` to write that state down.
-3. Run `fab-test pbir` to check it, then break a slicer to see it caught.
+2. Run `fab-test pbir contract init` to write that state down, and `fab-test pbir contract lint` to check what it wrote.
+3. Run `fab-test pbir` to check the report against it, then break a slicer to see it caught.
 4. Commit the contract and run the check in CI, on a schedule too.
 
 ```mermaid
@@ -34,7 +34,7 @@ flowchart TD
 
     M --> O["Written only if it reads back as a valid contract:<br/>Sales.Report.odcs.yaml beside the report"]
     N --> O
-    O --> P["Step 3: read it, and optionally<br/>pql-test contract lint Sales.Report.odcs.yaml Sales.SemanticModel"]
+    O --> P["Step 3: read it, then check it<br/>fab-test pbir contract lint Sales"]
     P --> Q["Step 4: fab-test pbir --artifact Sales<br/>every CONTRACT.* rule passes"]
     Q --> R["Step 5: break a slicer in Desktop, save, re-run:<br/>a CONTRACT.* finding. Undo it."]
     R --> S["Step 6: commit report and contract together;<br/>CI runs on every push and weekly"]
@@ -179,12 +179,15 @@ Bookmark navigators are listed under `customProperties`, by the bookmark's displ
 
 The contract lists only the tables and columns your slicers use, not the whole model. A report with navigators but no slicers can leave `schema` out entirely.
 
-It's a standard ODCS contract, so pql-test (installed with fab-test) can lint it. Passing the semantic model checks that every table and column it names exists:
+Check it before you run it. `contract lint` takes the report as `init` and `fab-test pbir` do, finds its contract, and checks that fab-test reads it as the run will, that it's valid ODCS, and that every table and column it names is in the report's semantic model (via pql-test, installed with fab-test):
 
 ```bash
-pql-test contract lint "Sales.Report.odcs.yaml" "Sales.SemanticModel"
-# Sales.Report.odcs.yaml: valid ODCS v3.1.0, ... rules, names resolve.
+fab-test pbir contract lint Sales
+#   ✓ Sales.Report.odcs.yaml: valid ODCS v3.1.0, 24 rules, names resolve in Sales.SemanticModel
+#   Next: fab-test pbir Sales
 ```
+
+It exits `1` and names each problem when something is wrong (`pql-test: Region.Regoin: column 'Regoin' not found in model table 'Region'`), and writes nothing. With no report named, it checks every contract under `--artifact-dir`, as `fab-test pbir` checks every report. To run pql-test's own check directly: `pql-test contract lint Sales.Report.odcs.yaml Sales.SemanticModel`.
 
 Things you can change by hand:
 
@@ -244,7 +247,7 @@ Then add a pipeline. Copy one of these into your repository:
 - GitHub Actions: [`examples/github-actions/slicer-defaults.yml`](examples/github-actions/slicer-defaults.yml)
 - Azure DevOps: [`examples/azure-devops/slicer-defaults.yml`](examples/azure-devops/slicer-defaults.yml)
 
-Both run on every change to a report or contract, **and on a weekly schedule**. Keep the schedule: a calendar-driven default goes stale at rollover with no commit, so a push-only pipeline never notices.
+Both lint every contract (`fab-test pbir contract lint`), then check every report, on every change to a report or contract, **and on a weekly schedule**. Keep the schedule: a calendar-driven default goes stale at rollover with no commit, so a push-only pipeline never notices.
 
 `fab-test pbir` exits `1` when a contract rule fails and `2` when a contract can't be read (a typo in the YAML, an unknown calendar field), before any check runs.
 

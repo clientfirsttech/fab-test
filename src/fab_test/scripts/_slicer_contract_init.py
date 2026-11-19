@@ -37,9 +37,9 @@ import yaml
 
 from ._bookmark_navigators import apply_navigator_answers, navigator_questions
 from ._pbir_slicers import Slicer, read_slicers
-from ._scan import find_artifact_dirs
 from ._slicer_calendar import CalendarError, resolve_contract, today, validate_calendar
 from ._slicer_contract import ENGINE, SELECT_ALL, ContractError, parse_contract
+from ._slicer_contract_lint import add_lint_parser, lint_main
 from ._slicer_contract_run import CONTRACT_SUFFIX, report_logical_id
 from ._slicer_init_calendar import (
     NAMED_BY,
@@ -55,9 +55,11 @@ from ._slicer_init_calendar import (
 )
 from ._slicer_init_existing import ExistingContractError, Owner, navigator_owner, read_existing, slicer_owner
 from ._slicer_init_output import (
+    InitError,
     add_input_flags,
     add_output_flags,
     can_ask,
+    find_report,
     level,
     pbir_refusal,
     print_payload,
@@ -65,16 +67,15 @@ from ._slicer_init_output import (
     resolve_inputs,
     result_line,
     summary_text,
+    with_next,
 )
-
-
-class InitError(Exception):
-    """A request the generator can't carry out; the message says how to fix it."""
 
 
 def contract_main(argv: list[str]) -> int:
     args = _parser().parse_args(argv)
     resolve_inputs(args)
+    if args.action == "lint":
+        return lint_main(args)
     try:
         report = _report(args)
         try:  # anything that would stop the write is found before the first question
@@ -96,8 +97,8 @@ def contract_main(argv: list[str]) -> int:
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="fab-test pbir contract",
-                                     description="Build a report's slicer contract (`fab-test pbir` checks it)")
+    parser = argparse.ArgumentParser(prog="fab-test pbir contract", description="Build (init) or check (lint) a "
+                                     "report's slicer contract; `fab-test pbir` runs it")
     subs = parser.add_subparsers(dest="action", required=True)
     init = subs.add_parser("init", help="Create or extend <Report>.Report.odcs.yaml, asking how to check each slicer")
     add_input_flags(init)
@@ -110,23 +111,12 @@ def _parser() -> argparse.ArgumentParser:
     init.add_argument("--force", action="store_true",
                       help="Replace rules that differ, and rewrite a commented contract")
     add_output_flags(init)
+    add_lint_parser(subs)
     return parser
 
 
 def _report(args: argparse.Namespace) -> Path:
-    target = args.target or args.artifact
-    if not target:
-        raise InitError("name the report: a path to its .Report folder, or its name (Sales) under --artifact-dir")
-    report = Path(target)
-    if not report.is_dir():  # a name, found under --artifact-dir as `fab-test pbir` finds one
-        name = target if target.endswith(".Report") else f"{target}.Report"
-        found = [p for p in find_artifact_dirs(Path(args.artifact_dir), [".Report"]) if p.name == name]
-        if len(found) > 1:
-            raise InitError(f"{target} matches {len(found)} reports; pass the path to one: "
-                            + ", ".join(map(str, found)))
-        report = found[0] if found else Path(args.artifact_dir) / name
-    if not (report / "definition" / "pages").is_dir():
-        raise InitError(f"{report} is not a PBIR report folder (no definition/pages)")
+    report = find_report(args)
     refusal = pbir_refusal(args, report.name)  # --report, --contract, ... belong to `fab-test pbir`
     if refusal:
         raise InitError(refusal)
@@ -342,8 +332,8 @@ def _write(args: argparse.Namespace, report: Path, questions: dict, answers: dic
     if not args.dry_run:
         path.write_text(text, encoding="utf-8")
     verbose = contract if level(args) == "verbose" else None
-    print_payload(args, {"contract": str(path), "written": not args.dry_run, **summary,
-                         **({"content": text} if args.dry_run else {})},
+    print_payload(args, with_next({"contract": str(path), "written": not args.dry_run, **summary,
+                         **({"content": text} if args.dry_run else {})}),
                   lambda s: text if args.dry_run else summary_text(s, verbose, contract.calendar),
                   asked_for=args.dry_run, as_line=result_line)
     return 0
