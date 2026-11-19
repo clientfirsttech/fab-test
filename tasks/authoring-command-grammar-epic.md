@@ -17,7 +17,7 @@ WHY: PBIR slicer contracts shipped the first authoring flow — `fab-test pbir c
 4. ⏳ **Verbs are `init` and `lint`, closed.** `init` creates the authored file from the artifact, or appends to it. `lint` validates it against the artifact without running anything, and needs no service. A third verb is added to the skill only when a second analyzer needs it (vision: no abstraction until the second caller).
 5. ⏳ **A noun means one file format everywhere.** `contract` is always ODCS; a Data Agent's promptfoo suite is `tests`. Two analyzers share a noun only if they share the format.
 6. ⏳ **TARGET is always the item, never the authored file.** `init`, `lint` and the run all take `Sales.Report` (or `--artifact NAME` + `--artifact-dir`), and fab-test finds the paired file, so a person learns one argument. `--<noun> FILE` overrides the pairing, as `fab-test pbir --contract` does today.
-7. ⏳ **Authored files live beside the item folder, never inside it**: `<Item>.<Type>.<suffix>` (e.g. `Sales.Report.odcs.yaml`), paired by a stable identity recorded in the file (pbir uses the report's `logicalId`), not by name alone.
+7. ⏳ **Authored files live beside the item folder, never inside it**: `<Item>.<Type>.<suffix>` (e.g. `Sales.Report.odcs.yaml`), paired by a stable identity recorded in the file (pbir uses the report's `logicalId`), not by name alone. This applies to files outside the item's definition. Tests that are part of the definition, like T-TEST procedures in a SQL database project, stay inside (refined by the Inventory, 2026-11-19).
 8. ⏳ **Top-level verbs are about fab-test itself** (`init`, `doctor`, `config`, `list`, `explain`, `skill`, `help`). `fab-test init` stays the repo's config scaffold and never gains an analyzer argument.
 9. ⏳ **Division of labour with `aidd-polite-review`** (on `feature/aidd-polite-review`, not yet on this branch): the grammar skill decides a command's *shape* (words, flags, files, exit codes); polite review judges how it *talks* (wording, questions, interruptions). Neither restates the other, and the grammar skill links to polite review once both are on the same branch.
 
@@ -26,6 +26,8 @@ WHY: PBIR slicer contracts shipped the first authoring flow — `fab-test pbir c
 ---
 
 ## Inventory the Authoring Surface
+
+**Status**: ✅ 2026-11-19, in [known-gaps.md](../.github/skills/aidd-command-grammar/references/known-gaps.md). Beyond the lines below, it found `validate-environments-yaml` (a second console script, exit 1 for an unreadable file), refined decision 7 for files that are part of an item's definition, and recorded that `contract init` exits 130 when interrupted, which the skill's exit-code rule should allow.
 
 List every command a person types to create or check an authored file, as built and as planned, and how each departs from decisions 1–8. This becomes the skill's `references/known-gaps.md`.
 
@@ -54,7 +56,7 @@ Write `.github/skills/aidd-command-grammar/SKILL.md`, shaped like `aidd-analyzer
 - Given output, should require the vision's modes on every verb with the run's meanings: `-q` prints one line per item (the result, e.g. `✓ Sales.Report.odcs.yaml written`), the default adds what a person acts on (the next step), `-v` adds per-item detail (each rule, added/kept/replaced), and `--format json` keeps stdout to one document. `--format` and verbosity resolve from flags, then env, then `fab-test.yml`, never a hard-coded default.
 - Given `--dry-run`, should give it one meaning on every verb: show what would be written or run, and write nothing. `--output-dir` belongs only to a verb that writes under `fab-test-results/`.
 - Given a caller that can't answer a prompt (no TTY, CI, or `--format json`), should require `init` to refuse with exit 2 naming `--questions`/`--answers` before asking anything, never to prompt or guess.
-- Given exit codes, should give every authoring verb the same meanings: 0 done or clean, 1 lint findings, 2 usage error, unreadable file or refusal, 127 a missing wrapped tool.
+- Given exit codes, should give every authoring verb the same meanings: 0 done or clean, 1 lint findings, 2 usage error, unreadable file or refusal, 127 a missing wrapped tool, 130 interrupted.
 - Given any authoring verb's output, should name the next step (`init` → `lint` → run → the CI snippet) in text, and as a `next` field in JSON.
 - Given discoverability, should require each verb to appear in the analyzer's `--help`, `fab-test help`, `list --format json`, and the fab-test skill's flag reference.
 - Given documentation, should require one table per flow in the fab-test skill's flag reference and the guide, with a row per flag and a column each for `init`, `lint` and the run, so a caller sees which inputs and output modes carry across steps and which are refused.
