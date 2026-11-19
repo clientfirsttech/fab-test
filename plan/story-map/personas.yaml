@@ -30,3 +30,11 @@ personas:
       short, readable result and the next step, without CI-only noise.
     createdAt: 1790708179951
     updatedAt: 1790708179951
+  - id: bd5dhqpf414d91ulyndy3sph
+    name: Maintainer
+    description: >
+      Plans, builds and reviews fab-test's own commands, usually through an AI
+      agent following AIDD. Wants each new command to match the last one
+      without having to remember how the last one was built.
+    createdAt: 1795128050292
+    updatedAt: 1795128050292

@@ -12,3 +12,6 @@ storyMap:
     - file: pbir-slicer-default-state.yaml
       id: p5puo3stoc7jduf4ahxs857j
       name: PBIR Slicer Default State
+    - file: authoring-command-grammar.yaml
+      id: mlu1u46l87h3sq1igafep9ma
+      name: Authoring Command Grammar
