@@ -19,7 +19,7 @@ WHY: PBIR slicer contracts shipped the first authoring flow — `fab-test pbir c
 6. ⏳ **TARGET is always the item, never the authored file.** `init`, `lint` and the run all take `Sales.Report` (or `--artifact NAME` + `--artifact-dir`), and fab-test finds the paired file, so a person learns one argument. `--<noun> FILE` overrides the pairing, as `fab-test pbir --contract` does today.
 7. ⏳ **Authored files live beside the item folder, never inside it**: `<Item>.<Type>.<suffix>` (e.g. `Sales.Report.odcs.yaml`), paired by a stable identity recorded in the file (pbir uses the report's `logicalId`), not by name alone. This applies to files outside the item's definition. Tests that are part of the definition, like T-TEST procedures in a SQL database project, stay inside (refined by the Inventory, 2026-11-19).
 8. ⏳ **Top-level verbs are about fab-test itself** (`init`, `doctor`, `config`, `list`, `explain`, `skill`, `help`). `fab-test init` stays the repo's config scaffold and never gains an analyzer argument.
-9. ⏳ **Division of labour with `aidd-polite-review`** (on `feature/aidd-polite-review`, not yet on this branch): the grammar skill decides a command's *shape* (words, flags, files, exit codes); polite review judges how it *talks* (wording, questions, interruptions). Neither restates the other, and the grammar skill links to polite review once both are on the same branch.
+9. ⏳ **Division of labour with `aidd-polite-review`** (on `dev` since #69): the grammar skill decides a command's *shape* (words, flags, files, exit codes); polite review judges how it *talks* (wording, questions, interruptions). Neither restates the other; the grammar skill names polite review in its intro and its plan step.
 
 **Open question**: should `lint` write an envelope under `fab-test-results/` so a pipeline step gets a result path and telemetry, or print only to stdout (text, or one JSON document) as `init` does? Proposed: stdout only, because the run step already writes the envelope and fails with exit 2 on an unreadable file. Settle it in the Characterize task.
 
@@ -48,6 +48,8 @@ List every command a person types to create or check an authored file, as built 
 
 ## Grammar Skill
 
+**Status**: ✅ 2026-11-19. `SKILL.md` (99 body lines, ~1.6k tokens) and `references/checklist.md`; validate-skill checks pass (emulated).
+
 Write `.github/skills/aidd-command-grammar/SKILL.md`, shaped like `aidd-analyzer-contract`: a short contract, Constraints, `planCommand` and `reviewCommand` processes, and `references/checklist.md` + `references/known-gaps.md`.
 
 **Requirements**:
@@ -67,6 +69,8 @@ Write `.github/skills/aidd-command-grammar/SKILL.md`, shaped like `aidd-analyzer
 ---
 
 ## Wire It Into Planning and Review
+
+**Status**: ✅ 2026-11-19. aidd-workflow (Pre-Flight, the task and review rows, Project-Specific Skills, and a discovery question), aidd-review's Criteria, and aidd-analyzer-contract's scope line.
 
 Make the skill load on its own, so consistency doesn't depend on anyone remembering it.
 

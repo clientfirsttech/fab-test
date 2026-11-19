@@ -16,6 +16,8 @@ Constraints {
   (task writes or reviews Python) => load aidd-python — it is the language skill the JS/TS skills would otherwise have supplied
   (task adds to, or reviews a diff touching, a file over 400 lines) => load aidd-module-budgets
   (task plans, adds, reviews, or changes an analyzer subcommand, invoke_*.py wrapper, or its registration) => load aidd-analyzer-contract; its Constraints are the minimum bar for parity with the other analyzers
+  (task plans, adds, reviews, or changes a subcommand, verb, noun, or flag a person types) => load aidd-command-grammar; plan with /command-grammar plan, review with /command-grammar review. Authoring verbs (`<analyzer> <noun> init|lint`) are its scope; the run is aidd-analyzer-contract's
+  (discovery for a new analyzer or a new file a person authors) => ask, as a discovery question, which file the person authors, its noun, and where it lives (aidd-command-grammar's Grammar and Files)
   (task reviews a diff that changes what a caller reads or answers: messages, errors, --help, prompts, init questions, explain or doctor output, the HTML report, or a skill an agent reads) => load aidd-polite-review; its findings join the review at aidd-review's levels (blocking, should-fix, nit)
   (task involves code changes) => use aidd-tdd — write tests before implementation
   (planning or executing an epic) => its last task is always "Quality gates" (whole-repo ruff, complexity and module-budget ratchets, coverage floor, CI-env run), per vision.md's Definition of Done; no task follows it
@@ -30,9 +32,9 @@ Constraints {
 | help, list commands | `aidd-please` | List commands without modifying files |
 | plan, what's next, priorities | `aidd-please` | Review plan.md, suggest next steps |
 | discover, user journey, user story, feature | `aidd-product-manager`, `aidd-polite-review`, `aidd-please` | Interactive product discovery; `/polite-discover` turns a journey's rude steps into pain points |
-| task, create epic, plan task | `aidd-task-creator`, `aidd-please`, `aidd-tdd`, `aidd-python` | Plan + TDD execution |
+| task, create epic, plan task | `aidd-task-creator`, `aidd-please`, `aidd-tdd`, `aidd-python`, `aidd-command-grammar` | Plan + TDD execution; grammar rows when the epic adds or changes a command |
 | execute epic, run epic | `aidd-task-creator`, `aidd-please` | Execute a previously planned epic |
-| review, code review | `aidd-review`, `aidd-python`, `aidd-module-budgets`, `aidd-please` | Quality + security review |
+| review, code review | `aidd-review`, `aidd-python`, `aidd-module-budgets`, `aidd-command-grammar`, `aidd-please` | Quality + security review; grammar when the diff adds or changes a command or flag |
 | churn, hotspots, refactoring candidates | `aidd-churn`, `aidd-please` | Hotspot ranking by LoC × churn × complexity |
 | fix bug, fix, aidd-fix | `aidd-fix`, `aidd-python`, `aidd-please` | Structured bug-fix workflow |
 | user test, test script | `aidd-user-testing`, `aidd-please` | Generate human/AI test scripts |
@@ -56,6 +58,7 @@ Constraints {
 | `aidd-python` | Python best practices, simplicity budgets, over-engineering review lens |
 | `aidd-module-budgets` | File-level size budgets, split seams for oversized modules |
 | `aidd-analyzer-contract` | Minimum requirements for a new or changed analyzer: envelope, exit codes, report, telemetry, registration touch points |
+| `aidd-command-grammar` | One shape for commands that author test files: `<analyzer> <noun> <verb>`, shared flags, file placement, exit codes, output modes |
 | `aidd-polite-review` | How considerately a surface treats its three callers: Cooper's polite-software traits, excise, pain points for discovery |
 | `document` | Sync docs: README, QUICK-VALIDATION, fab-test skill |
 | `fab-test` | fab-test CLI reference — subcommands, flags, result locations |
