@@ -131,6 +131,8 @@ The first command planned with the skill: run `/command-grammar plan pbir contra
 
 ## Follow-ups in plan.md
 
+**Status**: ✅ 2026-11-19. Two deferred tasks (grammar parity test, `pbir contract` subparsers), the Data Agent and `playwright init` tasks pointed at the skill, C4 annotated, and four defects found on the way: a malformed `fab-test.yml` traceback, a failed tool download traceback, `invoke_pql_test`'s broken `-m pql_test` fallback, and `validate-environments-yaml`.
+
 Record what decision 3 left out, so it isn't lost.
 
 **Requirements**:
