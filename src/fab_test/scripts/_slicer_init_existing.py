@@ -50,7 +50,7 @@ def read_existing(path: Path, report: Path, force: bool) -> tuple[dict | None, d
         raise ExistingContractError(f"{path} can't be read ({exc})") from exc
     if "#" in text and not force:
         raise ExistingContractError(f"{path} contains '#' (a comment), which rewriting would drop; edit it by "
-                                    "hand, or pass --force to rewrite it (see the result first with --dry-run)")
+                                    "hand, or pass --force to rewrite it (see the result first with --force --dry-run)")
     try:
         document = yaml.safe_load(text)
     except yaml.YAMLError as exc:

@@ -15,6 +15,13 @@ from pathlib import Path
 CHECKOUTS_NAMED = 3
 CHECKOUT_REMEDIATION = "cd into a checkout, or point at one with --artifact-dir <path>"
 
+# Help for the input flags `fab-test pbir` shares with `pbir contract init` and `lint`: one text, so
+# a person reading either --help reads the same flag (Authoring Command Grammar epic).
+ARTIFACT_HELP = "Deprecated alias for the TARGET argument; only analyze this stem"
+ARTIFACT_DIR_HELP = ("Root to discover artifacts under, recursively "
+                     "(default: artifact_dir in fab-test.yml, else the working directory)")
+FORMAT_HELP = "Output format: text for people, json for agents and scripts (default: format in fab-test.yml, else text)"
+
 
 def terse_print(terse: bool, status: str, scope: str, message: str) -> None:
     """Emit a single terse line when terse mode is active; silently no-ops otherwise.

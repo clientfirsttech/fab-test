@@ -13,12 +13,14 @@ Usage:
 
 Global flags (all subcommands):
     --artifact STEM      Only analyze the artifact matching this stem
-    --artifact-dir DIR   Root to discover artifacts under (default: the working directory)
+    --artifact-dir DIR   Root to discover artifacts under (default: artifact_dir in fab-test.yml, else the working
+                         directory)
     --output-dir DIR     Root for result envelopes (default: fab-test-results)
     --dry-run            List matching artifacts without running any analyzer
     --telemetry          Stream telemetry to Eventhouse when configured
     --no-telemetry       Suppress telemetry even when configured
-    --format {text,json} Output format for aggregate summaries (default: text)
+    --format {text,json} Output format: text for people, json for agents and scripts (default: format in
+                         fab-test.yml, else text)
     -v, --verbose        Increase output verbosity (one -v = verbose, two -v = debug)
 """
 

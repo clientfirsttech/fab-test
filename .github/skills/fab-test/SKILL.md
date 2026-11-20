@@ -1,6 +1,6 @@
 ---
 name: fab-test
-description: fab-test CLI reference for running Fabric artifact analyzers locally (fab-test 1.10.0b4). Covers all subcommands, flags, artifact isolation, result locations, and how fab-test differs from pytest. Use when invoking, troubleshooting, or extending local artifact validation.
+description: fab-test CLI reference for running Fabric artifact analyzers locally (fab-test 1.10.0b5). Covers all subcommands, flags, artifact isolation, result locations, and how fab-test differs from pytest. Use when invoking, troubleshooting, or extending local artifact validation.
 ---
 
 # fab-test
@@ -44,7 +44,7 @@ From PyPI — the package is **`cft-fab-test`** (the command is still
 pre-releases unless you pass `--pre` or name the version exactly:
 
 ```bash
-pip install "cft-fab-test==1.10.0b4"     # or: pip install --pre cft-fab-test
+pip install "cft-fab-test==1.10.0b5"     # or: pip install --pre cft-fab-test
 ```
 
 `fab-test playwright` has its own install path. It runs its render spec as a
@@ -94,6 +94,7 @@ ExitCode {
 SlicerContracts {
   (a report has <Report>.Report.odcs.yaml beside it) => fab-test pbir checks what its slicers open with  // CONTRACT.* findings
   (building one as an agent) => contract init --questions --format json |> ask needs_human |> contract init --answers FILE
+  (before running it, or in CI before `fab-test pbir`) => contract lint [REPORT]  // 0 clean, 1 problems named, 2 nothing to check
   (a calendar-driven value) => resolved for --as-of (default today); the envelope's `contract` block records it
   (a bad contract) => exit 2 before any analyzer starts
 }
@@ -396,6 +397,7 @@ The case a pipeline meets most is a `detail` populated on an aborted run: `fab-t
  fab-test bpa              — Tabular Editor Best Practice Analyzer (SemanticModel artifacts)
  fab-test pbir             — PBIR Inspector static report analysis (Report artifacts), plus each report's slicer contract
  fab-test pbir contract init — Build or extend a report's slicer contract by asking how to check each slicer
+ fab-test pbir contract lint — Check contracts before a run: they read as the run reads them, are valid ODCS, and name what the model has
  fab-test a11y             — pbir-a11y accessibility checks (Report artifacts) — opt-in, not run by `fab-test all`
  fab-test rdl              — RDL static analysis: the active rules for paginated reports (.rdl files) — no external tool
  fab-test pql-test         — pql-test DAX/PQL test runner (SemanticModel artifacts) [alias: pql_test]
@@ -428,6 +430,6 @@ use the original underscore names regardless of which spelling you invoke.
 | [references/reports.md](references/reports.md) | You're generating or debugging the HTML `--report` output, the per-run index, or its search/sort/filter behavior |
 | [references/configuration.md](references/configuration.md) | You're touching `fab-test.yml`, precedence, telemetry, rule overlays, or metadata-file resolution |
 | [references/flags.md](references/flags.md) | You need the full global flag table or a specific subcommand's flags (`bpa`, `pbir`, `a11y`, `rdl`, `pql-test`, `playwright`, `dependencies`, `all`, `local`) |
-| [references/slicer-contracts.md](references/slicer-contracts.md) | A user wants a report's slicer defaults checked (fixed or calendar-driven), you're building a contract with `fab-test pbir contract init`, or a finding's rule starts with `CONTRACT.` |
+| [references/slicer-contracts.md](references/slicer-contracts.md) | A user wants a report's slicer defaults checked (fixed or calendar-driven), you're building a contract with `fab-test pbir contract init` or checking one with `contract lint`, or a finding's rule starts with `CONTRACT.` |
 | [references/operations.md](references/operations.md) | You need `--dry-run`/verbosity behavior, the on-disk result layout, tool-resolution order, or pre-flight checks |
 | [references/source-files.md](references/source-files.md) | You're navigating or modifying the `fab-test` implementation itself |

@@ -1,0 +1,36 @@
+import '.github/skills/aidd-command-grammar/SKILL.md'
+
+userPrompt = """
+You are in a test environment. Do not run any commands and do not edit any files. You may read files in this repository.
+Review only the transcript below; it is the evidence. Judge only the behaviour shown; do not report things the
+transcript doesn't show as findings.
+
+/command-grammar review the lint verb of a made-up `notebook` analyzer whose authored file is a test suite:
+
+$ fab-test notebook tests lint Sales.Notebook
+  ✓ Sales.Notebook.tests.yaml: 4 tests, names resolve
+  Next: fab-test notebook Sales.Notebook
+$ echo $?
+0
+
+$ fab-test notebook tests lint Sales.Notebook -q
+  ✓ Sales.Notebook.tests.yaml: 4 tests
+
+$ fab-test notebook tests lint Sales.Notebook --format json
+{"file": "Sales.Notebook.tests.yaml", "findings": [], "next": "fab-test notebook Sales.Notebook"}
+
+$ fab-test notebook tests lint Broken.Notebook
+  ✗ Broken.Notebook.tests.yaml: test "totals" names cell 7, which Broken.Notebook doesn't have
+$ echo $?
+1
+
+$ fab-test notebook tests lint Sales.Notebook --report
+  ✗ fab-test: --report: tests lint checks a file, it doesn't write a report; see results with `fab-test notebook Sales.Notebook --report`
+$ echo $?
+2
+"""
+
+- Given lint shaped `fab-test <analyzer> <noun> lint` taking the item, should not report a grammar violation for the command's words
+- Given exit 0 clean, 1 on findings and 2 for a refused run-only flag, should report the exit codes as conforming
+- Given the next step in text and as `next` in JSON, should credit it rather than report it
+- Given conforming behaviour, should report no High or blocking finding

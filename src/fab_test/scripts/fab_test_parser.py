@@ -12,6 +12,7 @@ import re
 
 from fab_test import __version__ as _FAB_TEST_VERSION
 
+from ._cli_utils import ARTIFACT_DIR_HELP, ARTIFACT_HELP, FORMAT_HELP
 from ._config import CONFIG_FILENAME
 from ._fab_test_context import (
     _DEFAULT_SUBPROCESS_TIMEOUT,
@@ -79,7 +80,7 @@ def _add_common_flags(
         default=str(_PYPROJECT_CONFIG.get("artifact_dir", artifact_dir_default)),
         metavar="DIR",
         action=_ArtifactDirAction if track_artifact_dir_explicit else "store",
-        help="Root to discover artifacts under, recursively (default: the working directory)",
+        help=ARTIFACT_DIR_HELP,
     )
     if track_artifact_dir_explicit:
         parser.set_defaults(artifact_dir_explicit=False)
@@ -109,7 +110,7 @@ def _add_common_flags(
         "--artifact",
         default=None,
         metavar="STEM",
-        help="Deprecated alias for the TARGET argument; only analyze this stem",
+        help=ARTIFACT_HELP,
     )
     parser.add_argument(
         "--timeout",
@@ -194,7 +195,7 @@ def _add_common_flags(
         choices=["text", "json"],
         default=_PYPROJECT_CONFIG.get("format", "text"),
         dest="output_format",
-        help="Output format for aggregate summaries (default: text)",
+        help=FORMAT_HELP,
     )
 
 
@@ -958,7 +959,7 @@ def _add_list_subparser(subs: argparse._SubParsersAction) -> None:
         "--artifact-dir",
         default=str(_PYPROJECT_CONFIG.get("artifact_dir", ARTIFACT_ROOT)),
         metavar="DIR",
-        help="Root to discover artifacts under, recursively (default: the working directory)",
+        help=ARTIFACT_DIR_HELP,
     )
     list_p.add_argument(
         "--format",
@@ -990,7 +991,7 @@ def _add_explain_subparser(subs: argparse._SubParsersAction) -> None:
         "--artifact-dir",
         default=str(_PYPROJECT_CONFIG.get("artifact_dir", ARTIFACT_ROOT)),
         metavar="DIR",
-        help="Root to discover artifacts under, recursively (default: the working directory)",
+        help=ARTIFACT_DIR_HELP,
     )
     explain_p.add_argument(
         "--output-dir",

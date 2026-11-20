@@ -37,9 +37,9 @@ import yaml
 
 from ._bookmark_navigators import apply_navigator_answers, navigator_questions
 from ._pbir_slicers import Slicer, read_slicers
-from ._scan import find_artifact_dirs
 from ._slicer_calendar import CalendarError, resolve_contract, today, validate_calendar
 from ._slicer_contract import ENGINE, SELECT_ALL, ContractError, parse_contract
+from ._slicer_contract_lint import add_lint_parser, lint_main
 from ._slicer_contract_run import CONTRACT_SUFFIX, report_logical_id
 from ._slicer_init_calendar import (
     NAMED_BY,
@@ -55,22 +55,32 @@ from ._slicer_init_calendar import (
 )
 from ._slicer_init_existing import ExistingContractError, Owner, navigator_owner, read_existing, slicer_owner
 from ._slicer_init_output import (
+    TARGET_HELP,
+    InitError,
+    add_input_flags,
     add_output_flags,
     can_ask,
+    find_report,
     level,
+    parse,
     pbir_refusal,
     print_payload,
     questions_text,
+    resolve_inputs,
+    result_line,
     summary_text,
+    with_next,
 )
 
 
-class InitError(Exception):
-    """A request the generator can't carry out; the message says how to fix it."""
-
-
 def contract_main(argv: list[str]) -> int:
-    args = _parser().parse_args(argv)
+    args, refusal = parse(_parser(), argv)
+    if refusal:  # a flag of `fab-test pbir` the verb doesn't take
+        print(f"  ✗ fab-test pbir contract: {refusal}", file=sys.stderr)
+        return 2
+    resolve_inputs(args)
+    if args.action == "lint":
+        return lint_main(args)
     try:
         report = _report(args)
         try:  # anything that would stop the write is found before the first question
@@ -92,41 +102,26 @@ def contract_main(argv: list[str]) -> int:
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="fab-test pbir contract",
-                                     description="Build a report's slicer contract (`fab-test pbir` checks it)")
-    subs = parser.add_subparsers(dest="action", required=True)
+    parser = argparse.ArgumentParser(prog="fab-test pbir contract", description="Build (init) or check (lint) a "
+                                     "report's slicer contract; `fab-test pbir` runs it")
+    subs = parser.add_subparsers(dest="action", required=True, metavar="{init,lint}")
     init = subs.add_parser("init", help="Create or extend <Report>.Report.odcs.yaml, asking how to check each slicer")
-    init.add_argument("target", nargs="?", default=None, metavar="REPORT", help="Path to the .Report folder")
-    init.add_argument("--artifact", default=None, metavar="NAME", help="Report name to find under --artifact-dir")
-    init.add_argument("--artifact-dir", default=".", metavar="DIR", help="Where to look for --artifact [default: .]")
+    add_input_flags(init, f"Report to build the contract for: {TARGET_HELP}")
     init.add_argument("--as-of", default=None, dest="as_of", type=datetime.date.fromisoformat, metavar="YYYY-MM-DD",
                       help="Date used to suggest calendar formats [default: today]")
     init.add_argument("--questions", action="store_true", help="Print the questions and suggested answers, then stop")
     init.add_argument("--answers", default=None, metavar="FILE",
                       help="JSON answers by question id; unanswered questions take the suggestion")
-    init.add_argument("--dry-run", action="store_true", help="Print the contract instead of writing it")
+    init.add_argument("--dry-run", action="store_true", help="Show the contract that would be written; write nothing")
     init.add_argument("--force", action="store_true",
                       help="Replace rules that differ, and rewrite a commented contract")
-    init.add_argument("--format", choices=("text", "json"), default="text", dest="output_format",
-                      help="text for people, json for agents and scripts [default: text]")
     add_output_flags(init)
+    add_lint_parser(subs)
     return parser
 
 
 def _report(args: argparse.Namespace) -> Path:
-    if args.target:
-        report = Path(args.target)
-    elif args.artifact:
-        name = args.artifact if args.artifact.endswith(".Report") else f"{args.artifact}.Report"
-        found = [p for p in find_artifact_dirs(Path(args.artifact_dir), [".Report"]) if p.name == name]
-        if len(found) > 1:
-            raise InitError(f"--artifact {args.artifact} matches {len(found)} reports; pass the path to one: "
-                            + ", ".join(map(str, found)))
-        report = found[0] if found else Path(args.artifact_dir) / name
-    else:
-        raise InitError("name the report: a path to its .Report folder, or --artifact NAME")
-    if not (report / "definition" / "pages").is_dir():
-        raise InitError(f"{report} is not a PBIR report folder (no definition/pages)")
+    report = find_report(args)
     refusal = pbir_refusal(args, report.name)  # --report, --contract, ... belong to `fab-test pbir`
     if refusal:
         raise InitError(refusal)
@@ -342,10 +337,10 @@ def _write(args: argparse.Namespace, report: Path, questions: dict, answers: dic
     if not args.dry_run:
         path.write_text(text, encoding="utf-8")
     verbose = contract if level(args) == "verbose" else None
-    print_payload(args, {"contract": str(path), "written": not args.dry_run, **summary,
-                         **({"content": text} if args.dry_run else {})},
+    print_payload(args, with_next({"contract": str(path), "written": not args.dry_run, **summary,
+                         **({"content": text} if args.dry_run else {})}, args),
                   lambda s: text if args.dry_run else summary_text(s, verbose, contract.calendar),
-                  asked_for=args.dry_run)
+                  asked_for=args.dry_run, as_line=result_line)
     return 0
 
 
