@@ -17,6 +17,14 @@ Each artifact is stored in its own subdirectory with a naming convention:
 - `CustomerAgent.Agent/` - An agent artifact
 - `DataPipeline.Notebook/` - A notebook artifact
 
+### Paginated report Git identities
+
+Every `*.PaginatedReport/.platform` must have a unique, nonzero
+`config.logicalId`. Preserve that identity when editing or regenerating a report;
+do not copy another report's ID or use an all-zero placeholder. Duplicate placeholder
+IDs can prevent workspace Git synchronization with "Missing or corrupted files".
+The fixture-generator tests check the committed identities as well as the RDL content.
+
 ## SampleModel-DefaultState test bed
 
 `SampleModel-DefaultState.Report` binds to `SampleModel-PQLAssert.SemanticModel` and holds one preselected example per slicer kind for the [PBIR Slicer Default State epic](../tasks/archive/2026-11-14-pbir-slicer-default-state.md). Each selection lives in `visual.objects.general[0].properties.filter` of the named `visual.json`. `Fiscal Calendar` (July fiscal years named by their end year) and the `Chart Measure` field parameter were added to the model for it; `Fiscal Calendar` is disconnected, so its slicers filter nothing.
