@@ -47,6 +47,7 @@ Constraints {
   Never put a verb straight after the analyzer (`fab-test data-agent init`): it collides with TARGET and names no file
   Never add a top-level verb about an artifact's files (`fab-test lint`); top-level verbs are about fab-test, and `fab-test init` stays the config scaffold
   Register the noun as an argparse subparser of its analyzer, so `--help`, `help`, `list` and `explain` know it
+  (a verb out of place, a plural noun, or a retired spelling, and no item has that name) => exit 2 naming the exact command meant; never run it under a second spelling, never pass having checked nothing
 
   // Inputs: what the run takes, the verbs take the same way
   TARGET is the item (`Sales.Report`), never the authored file; fab-test finds the paired file

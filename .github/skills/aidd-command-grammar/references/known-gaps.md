@@ -17,13 +17,12 @@ entry when it's fixed.
 
 ## `pbir contract init`
 
-- **Not discoverable.** `fab_test.py`'s `main` catches `argv[1:3] == ["pbir", "contract"]` before argparse, so `fab-test help`, `list` and `explain` don't know `contract init` or `contract lint` exist; only `fab-test pbir --help`'s epilog names them.
+- **Not discoverable.** `fab_test.py`'s `main` catches `argv[1:3] == ["pbir", "contract"]` before argparse, so `fab-test help`, `list` and `explain` don't know `contract init` or `contract lint` exist; only `fab-test pbir --help`'s epilog names them. A global flag first (`fab-test --config X pbir contract lint`) misses the check: `unrecognized arguments: lint`.
+- **Near misses aren't pointed** (surveyed 2026-11-19). `fab-test pbir lint` takes `lint` as a report name and exits 0 with "no *.Report artifacts found", having checked nothing; `fab-test pbir init Sales` and `fab-test pbir contracts init` end in argparse's "unrecognized arguments". Fixed by the Data Agent Testing epic's Authoring Noun Dispatch task.
 - Fixed 2026-11-19 (Authoring Command Grammar epic): `contract lint` exists; TARGET takes a name as the run's does, `--artifact`'s metavar and help match the run's, `--artifact-dir` and `--format` default from `fab-test.yml`, `-q` prints one result line, flags.md lists `-q`/`-v`, every flag of the run is refused naming the run, and `--artifact`/`--artifact-dir`/`--format` share the run's help text (`_cli_utils`). `--as-of`'s help differs on init on purpose: there it dates the `current` suggestion.
 
 ## Planned
 
-- **Data Agent Testing epic, decision 3:** `promptfooconfig.yaml` inside `NAME.DataAgent/`. Fabric's Commit to Git deletes files in an item folder that aren't part of its definition; the suite belongs beside the folder.
-- **Data Agent Testing epic, decision 10:** `fab-test data-agent init` puts a verb in the analyzer's TARGET position and names no noun. Under the grammar it is `fab-test data-agent tests init`, with `tests lint` beside it.
 - **`fab-test playwright init` (plan.md standalone task):** no noun yet. If it scaffolds the execution YAML that `--playwright-config` reads, the noun names that file.
 
 ## Authored inputs with no verb (not gaps)

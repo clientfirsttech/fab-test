@@ -1,6 +1,6 @@
 # Authoring Command Grammar Epic
 
-**Status**: ✅ IMPLEMENTED 2026-11-19 on `feature/authoring-command-grammar`, AIDD-reviewed and gates passed; not merged. Decisions 1–3 are the user's; 4–9 were proposed by Claude and accepted by the user 2026-11-19, along with lint printing only and its exit codes.
+**Status**: ✅ IMPLEMENTED 2026-11-19 on `feature/authoring-command-grammar`, AIDD-reviewed and gates passed; merged to `dev` (#71). Decisions 1–3 are the user's; 4–9 were proposed by Claude and accepted by the user 2026-11-19, along with lint printing only and its exit codes.
 **Goal**: every command that authors a test file follows one grammar, written as an AIDD skill that is loaded when a command is planned and when one is reviewed, and the PBIR contract flow runs init → lint → run without leaving fab-test.
 
 Journey: [authoring-command-grammar.yaml](../plan/story-map/authoring-command-grammar.yaml).

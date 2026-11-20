@@ -15,6 +15,7 @@ and you have to check it yourself.
 | The noun names one file format across analyzers | the skill's Grammar | none |
 | The analyzer's `--help` epilog names the verbs (`add_contract_flags` sets pbir's) | the analyzer's flag helper | none |
 | `fab-test help` names the verbs | `fab_test_admin.py`'s `_print_help` | none |
+| A near miss (`<analyzer> lint`, `<analyzer> init X`, a plural noun, a retired spelling) exits 2 with `did you mean:` the exact command, unless an item has that name | the shared authoring `parse` | none |
 
 ## Inputs
 
