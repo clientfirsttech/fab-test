@@ -59,6 +59,8 @@ Port the template's `provider.ts` to promptfoo's Python provider contract, start
 
 ## Agent URL Resolution
 
+**Status**: ✅ 2026-11-19 for resolution (`_data_agent_resolution.py`, 8 tests); the explicit-URL escape hatch is the provider's `base_url` and the wrapper honors it, and `--dry-run` belongs to the wrapper and registration tasks. Reuses `resolve_item`, whose no-match message already lists the workspace's agents, so PR #49's extra wrapper for that is dropped. Adds what Data Agents need: a GUID resolves by id, `.DataAgent` is stripped here because the shared suffix list has none, and two agents sharing a name are listed with their ids and a "pass the GUID" remedy instead of "Sales Agent, Sales Agent".
+
 Resolve a Data Agent's API URL from its name via the Fabric API (decision 4).
 
 **Requirements**:
