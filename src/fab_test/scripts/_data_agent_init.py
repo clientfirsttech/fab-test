@@ -12,6 +12,7 @@ from typing import Any
 import yaml
 
 from ._authoring_output import can_ask, next_command, print_payload
+from ._data_agent_init_edit import edit_tests, removal
 from ._data_agent_init_questions import DECLINE_SUGGESTION, InitInputError, Suggestions, read_suggestions
 from ._data_agent_init_tests import (
     MATCH_KEYS,
@@ -96,20 +97,22 @@ def _count(number: int, noun: str = "test") -> str:
     return f"{number} {noun}{'' if number == 1 else 's'}"
 
 
-def _add_or_replace(existing: dict[str, dict[str, str]]) -> bool:
-    """True to start the suite over. Enter adds, the reason init was run; r is one key away."""
-    prompt = f"[a]dd to it (Enter) or [r]eplace all {_count(len(existing))}? "
+def _choose(existing: dict[str, dict[str, str]]) -> str:
+    """"add", "edit" or "replace". Enter adds, the reason init was run; e and r are one key away."""
+    prompt = f"[a]dd to it (Enter), [e]dit one, or [r]eplace all {_count(len(existing))}? "
     while True:
         typed = input_prompt(prompt).strip().lower()
         if typed in {"", "a", "add"}:
             print("Type one of them again to keep or replace it. For a separate suite, rerun with --tests FILE.",
                   file=sys.stderr)
-            return False
+            return "add"
+        if typed in {"e", "edit"}:
+            return "edit"
         if typed in {"r", "replace"}:
             print(f"  → starting over: the {_count(len(existing))} go only once you've written new ones",
                   file=sys.stderr)
-            return True
-        print("  a adds, r replaces", file=sys.stderr)
+            return "replace"
+        print("  a adds, e edits, r replaces", file=sys.stderr)
 
 
 def _new_tests(args: argparse.Namespace, suggestions: Suggestions, suite: Path, document: dict
@@ -120,6 +123,7 @@ def _new_tests(args: argparse.Namespace, suggestions: Suggestions, suite: Path, 
     when the person chose r (or the answers file says "replace": true), never adds a near-duplicate.
     """
     existing = _existing_questions(document)
+    edited: list[dict[str, Any]] = []
     if args.answers:
         try:
             answers = json.loads(Path(args.answers).read_text(encoding="utf-8-sig"))
@@ -127,6 +131,8 @@ def _new_tests(args: argparse.Namespace, suggestions: Suggestions, suite: Path, 
             raise InitInputError(f"Cannot read --answers {args.answers}: {exc}") from exc
         specs = specs_from_answers(answers)
         args.replace_all = isinstance(answers, dict) and answers.get("replace_all") is True
+        if isinstance(answers, dict) and "remove" in answers:
+            args.remove_ids = removal(document["tests"], answers["remove"])
     elif args.output_format == "json" or os.getenv("CI") or not can_ask():
         target = args.target or args.artifact
         raise InitInputError("Writing tests needs your questions and expected answers, and nobody is here to ask. "
@@ -135,7 +141,11 @@ def _new_tests(args: argparse.Namespace, suggestions: Suggestions, suite: Path, 
     else:
         _announce(suite, existing)
         try:
-            args.replace_all = bool(existing) and _add_or_replace(existing)
+            choice = _choose(existing) if existing else "add"
+            args.replace_all = choice == "replace"
+            if choice == "edit":
+                edited, args.remove_ids = edit_tests(document["tests"], input_prompt, sys.stderr)
+                existing = {key: known for key, known in existing.items() if known["id"] not in args.remove_ids}
             specs = ask_tests(suggestions.all(), existing={} if args.replace_all else existing,
                               declines=set(suggestions.decline))
         except EOFError as exc:
@@ -146,9 +156,9 @@ def _new_tests(args: argparse.Namespace, suggestions: Suggestions, suite: Path, 
         known = existing.get(question_key(spec["query"]))
         if known and "id" not in spec:
             spec["id"] = known["id"]
-    args.replace_ids = {spec["id"] for spec in specs if spec.get("replace")}
+    args.replace_ids = {spec["id"] for spec in specs if spec.get("replace")} | {t["metadata"]["id"] for t in edited}
     taken = set() if args.replace_all else {(test.get("metadata") or {}).get("id") for test in document["tests"]}
-    return tests_from_specs(specs, taken - {None})
+    return [*edited, *tests_from_specs(specs, taken - {None})]
 
 
 def _merge(document: dict, new_tests: list[dict], force: bool, replace: set[str] | frozenset = frozenset()
@@ -212,7 +222,8 @@ def _line(payload: dict) -> str:
                           ("remove", "removed")))
         return f"tests dry run, nothing written: would {would} {payload['suite']}"
     counts = " ".join(f"{key}={len(payload[key])}" for key in ("added", "replaced", "kept", "unchanged", "removed"))
-    return f"tests {'written' if payload['added'] or payload['replaced'] else 'unchanged'} {counts} {payload['suite']}"
+    wrote = payload["added"] or payload["replaced"] or payload["removed"]
+    return f"tests {'written' if wrote else 'unchanged'} {counts} {payload['suite']}"
 
 
 def init_main(args: argparse.Namespace) -> int:
@@ -253,20 +264,23 @@ def _init(args: argparse.Namespace) -> int:
     removed = [test.get("metadata", {}).get("id") for test in document["tests"]]
     if getattr(args, "replace_all", False) and new_tests:  # no new questions: nothing goes
         document["tests"] = []
-    else:
-        removed = []
+    else:  # [e]dit's deletions, or --answers "remove": each with its conversation's later turns
+        remove_ids = getattr(args, "remove_ids", set())
+        removed = [test_id for test_id in removed if test_id in remove_ids]
+        document["tests"] = [test for test in document["tests"]
+                             if test.get("metadata", {}).get("id") not in remove_ids]
     counts = _merge(document, new_tests, args.force, getattr(args, "replace_ids", set()))
     counts["removed"] = removed
     effective_config(document, "https://example.invalid/data-agent")
     content = yaml.safe_dump(document, sort_keys=False, allow_unicode=True)
-    if not args.dry_run and (counts["added"] or counts["replaced"]):  # no questions: no file, not an empty one
+    if not args.dry_run and (counts["added"] or counts["replaced"] or counts["removed"]):  # else no file
         _write(suite, content)
     payload = {"item": str(item), "suite": str(suite), **counts,
                "next": None if args.dry_run else next_command(args, "fab-test data-agent tests lint")}
     if args.dry_run:
         payload["document"] = document
     print_payload(args, payload, _text, as_line=_line)  # -q is one line, even for a dry run
-    if args.dry_run and getattr(args, "asked_in_person", False) and _keep(counts, suite):
+    if args.dry_run and getattr(args, "asked_in_person", False) and _keep(counts, suite, args.replace_all):
         _write(suite, content)
         written = {key: value for key, value in payload.items() if key != "document"}
         print_payload(args, {**written, "next": next_command(args, "fab-test data-agent tests lint")},
@@ -274,13 +288,18 @@ def _init(args: argparse.Namespace) -> int:
     return 0
 
 
-def _keep(counts: dict[str, list[str]], suite: Path) -> bool:
+def _keep(counts: dict[str, list[str]], suite: Path, replace_all: bool) -> bool:
     """After a console dry run: write what the person typed, or let it go (Enter = no, as --dry-run asked)."""
     changed = len(counts["added"]) + len(counts["replaced"])
-    if not changed:
+    if not changed and not counts["removed"]:
         return False
-    question = (f"Replace the {_count(len(counts['removed']))} in {suite} with {_count(changed, 'new one')}? [y/N] "
-                if counts["removed"] else f"Write {_count(changed, 'new test')} to {suite}? [y/N] ")
+    if replace_all:
+        question = f"Replace the {_count(len(counts['removed']))} in {suite} with {_count(changed, 'new one')}? [y/N] "
+    elif counts["removed"] or counts["replaced"]:
+        question = (f"Write the changes (added={len(counts['added'])} replaced={len(counts['replaced'])} "
+                    f"removed={len(counts['removed'])}) to {suite}? [y/N] ")
+    else:
+        question = f"Write {_count(changed, 'new test')} to {suite}? [y/N] "
     try:
         reply = input_prompt(question)
     except EOFError:

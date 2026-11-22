@@ -463,6 +463,12 @@ the remaining CLI blast-radius checks are still pending.
 
 ---
 
+## Edit Tests In Init
+
+Asked 2026-11-22: the only way to drop one test was `[r]eplace all`. `tests init` on an existing suite now asks `[a]dd (Enter), [e]dit one, or [r]eplace all`. Given e, should number the tests and, for each pick, `[c]hange its answer` (Enter) rewriting only its check (id, description and conversation stay) or `[d]elete` it with the later turns of its conversation, then offer new questions. Given `"remove": [ids]` in `--answers`, should delete the same way, and refuse an id the suite lacks, naming its ids. Given a delete-only run, should write the file and say `written … removed=N`.
+
+**Status**: ✅ 2026-11-22. `_data_agent_init_edit.py` (84 lines), 15 tests in `tests/test_data_agent_init_edit.py`; both skill copies, `flags.md`, the walkthrough and CHANGELOG. Full parallel suite: 3831 passed, 2 skipped.
+
 ## Quality Gates
 
 **Status**: ✅ 2026-11-22, after the blast-radius fixes. `ruff check .` clean; complexity, module-budget, mode-parity and grammar-parity tests pass; non-playwright half 3713 passed + 2 skipped (no rtk failures now that the hook and its test are gone); playwright half 204 passed, total coverage 90.75% (floor 80%), and its 16 failures are the live-parity HTTP 401 on workspace `c4698d28-…`, which the service principal no longer sees (environmental, as on 2026-11-21); the `GITHUB_ACTIONS=true CI=true` pass 3713 passed; `pip-audit` finds no known vulnerabilities (only the unpublished `cft-fab-test 1.10.0b5` skipped). A live `--format json` run after the fixes printed one JSON document and the same verdicts. Goulash still passes there because the committed suite keeps its pre-decision-23 assertion.

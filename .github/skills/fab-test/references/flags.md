@@ -71,7 +71,7 @@ cause once for every question it stopped.
 | `--format text\|json` | ✓ (`next` in JSON) | ✓ (`{ok, suites, next}`) | ✓ |
 | `-q` / `-v` | `tests written added=N replaced=N kept=N unchanged=N removed=N PATH` / details | `tests passed\|failed e=N w=N PATH` per suite / each finding | one line per item / per-test detail |
 | `--questions` | suggestions, `decline`, the agent's `instructions`, the answers shape | — | — |
-| `--answers FILE` | `{"tests": [{query, expect, match, follow_ups, id?, replace?}], "replace_all"?}` | — | — |
+| `--answers FILE` | `{"tests": [{query, expect, match, follow_ups, id?, replace?}], "replace_all"?, "remove"?: [ids]}` | — | — |
 | `--force` | replace tests with matching ids; rewrite comments | — | — |
 | `--dry-run` | show the suite, write nothing | — | list items and suites; no token |
 | `--workspace`, `--env-file`, `--auth`, `--all`, `--report`, `--open-report`, `--telemetry`, `--timeout`, `--jobs`, `--output-dir` | exit 2 naming the run | exit 2 naming the run | the run's own flags |

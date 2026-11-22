@@ -115,7 +115,7 @@ How each answer matches:
 
 `init` writes `fab-tests/data-agent/Sales.DataAgent.promptfoo.yaml` at the repository root, **outside** the Git-connected folder: Fabric's Commit to Git deletes files inside an item folder that aren't part of its definition. The suite pairs with the item through the `logicalId` in `Sales.DataAgent/.platform`, so renaming either doesn't break it.
 
-Running `init` again lists the suite's tests and asks `[a]dd to it (Enter) or [r]eplace all N tests?`. Typing a question the suite already has asks keep (Enter) or replace. Add `--dry-run` to see the suite without writing it. `-q` prints one line (`tests written added=3 replaced=0 kept=0 unchanged=0 removed=0 PATH`).
+Running `init` again lists the suite's tests and asks `[a]dd to it (Enter), [e]dit one, or [r]eplace all N tests?`. Typing a question the suite already has asks keep (Enter) or replace. `e` numbers the tests; pick one, then `c` (Enter) to give it a new expected answer, or `d` to delete it. A changed answer keeps the test's id and its place in a conversation. Deleting a turn also deletes the turns after it in that conversation, since they follow on from it. Enter on an empty number finishes editing, and then you can add questions as usual. Add `--dry-run` to see the suite without writing it. `-q` prints one line (`tests written added=3 replaced=0 kept=0 unchanged=0 removed=0 PATH`).
 
 ### Letting an agent write it instead
 
@@ -136,7 +136,7 @@ fab-test data-agent tests init Sales --answers answers.json
 ]}
 ```
 
-Add `"replace": true` to a test to replace one the suite already has, or `"replace_all": true` at the top to start the suite over. A coding agent may draft the questions, but **a person supplies every expected answer**.
+Add `"replace": true` to a test to replace one the suite already has, `"remove": ["tell-me-a-joke"]` at the top to delete tests by id (with their conversation's later turns), or `"replace_all": true` at the top to start the suite over. A coding agent may draft the questions, but **a person supplies every expected answer**.
 
 ## Step 3: Read what it wrote, then lint it
 

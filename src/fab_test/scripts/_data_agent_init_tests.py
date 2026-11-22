@@ -143,6 +143,8 @@ def _spec(raw: Any, where: str, *, allow_follow_ups: bool = True) -> dict[str, A
             "match": match or default_match(expect)}
     if isinstance(raw.get("id"), str) and raw["id"].strip():
         spec["id"] = raw["id"].strip()
+    if "remove" in raw:
+        raise InitInputError(f'--answers {where}: "remove" goes at the top level, as a list of test ids')
     if raw.get("replace") is True:  # as typing r at the prompt does; otherwise an existing test is kept
         spec["replace"] = True
     assertion(spec["match"], spec["expect"])  # refuse a bad number now, naming where it is

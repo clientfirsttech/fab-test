@@ -128,7 +128,8 @@ DataAgentTests {
   (CI or another remote runner) => a service principal from secrets, or the pipeline's own az login (azure/login with OIDC, AzureCLI@2) then --auth az, which needs no client secret
   (the identity) => Member or Contributor in the agent's workspace, read on every data source; a service principal also needs the tenant setting "Service principals can use Fabric APIs"
   (a walkthrough or pipeline is wanted) => docs/DATA-AGENT-TESTS-WALKTHROUGH.md; docs/examples/{github-actions,azure-devops}/data-agent-tests.yml (lint, then the run; weekly)
-  (tests init, a suite exists) => list its path and tests, then ask [a]dd (Enter) | [r]eplace all; "replace_all": true in --answers; replacing with no new questions writes nothing
+  (tests init, a suite exists) => list its path and tests, then ask [a]dd (Enter) | [e]dit | [r]eplace all; "replace_all": true in --answers; replacing with no new questions writes nothing
+  (editing) => tests by number until Enter, each [c]hange its answer (Enter: only its check changes, id and conversation stay) | [d]elete (with the later turns of its conversation); then new questions; "remove": [ids] at the top of --answers
   (adding, a question it already has) => ask [k]eep (Enter) | [r]eplace; "replace": true in --answers; otherwise kept
   (tests lint) => offline checks first, then promptfoo validate (installed on first use, as the run does); run it before the run
   (a suite base_url | fabric_urls on a Fabric host) => works; lint warns (w=1) that fab-test can resolve the agent

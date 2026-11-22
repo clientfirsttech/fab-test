@@ -441,7 +441,7 @@ def test_enter_adds_to_the_suite(tmp_path, monkeypatch, capsys):
     capsys.readouterr()
     assert _again(tmp_path, monkeypatch, ["", "Top region?", "West", "", "", ""]) == 0
     err = capsys.readouterr().err
-    assert "[a]dd to it (Enter) or [r]eplace all 1 test?" in err
+    assert "[a]dd to it (Enter), [e]dit one, or [r]eplace all 1 test?" in err
     assert _suite_ids(tmp_path) == ["top-order", "top-region"]
 
 
@@ -467,7 +467,8 @@ def test_a_wrong_key_for_add_or_replace_asks_again(tmp_path, monkeypatch, capsys
     capsys.readouterr()
     assert _again(tmp_path, monkeypatch, ["x", "a", ""]) == 0
     err = capsys.readouterr().err
-    assert err.count("[a]dd to it (Enter) or [r]eplace all 1 test?") == 2 and "a adds, r replaces" in err
+    assert err.count("[a]dd to it (Enter), [e]dit one, or [r]eplace all 1 test?") == 2
+    assert "a adds, e edits, r replaces" in err
 
 
 def test_a_dry_run_that_starts_over_says_so_when_offering_to_write(tmp_path, monkeypatch, capsys):
