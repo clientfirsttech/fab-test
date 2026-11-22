@@ -246,10 +246,10 @@ fab-test playwright --dataset-id <DATASET_GUID> --dataset-workspace-id <WORKSPAC
 fab-test dependencies --semantic-model SalesModel --env dev --env-file .env
 ```
 
-### Data Agent regression tests (feature-gated)
+### Data Agent regression tests
 
-Set `FAB_TEST_ENABLE_DATA_AGENT=1` to enable `fab-test data-agent` (alias
-`agent`). It tests deployed agents, never Power BI Desktop. A bare run takes
+`fab-test data-agent` (alias `agent`) is on by default;
+`FAB_TEST_ENABLE_DATA_AGENT=0` turns it off. It tests deployed agents, never Power BI Desktop. A bare run takes
 its workspace from `FABRIC_WORKSPACE_ID` or `workspace:` in `fab-test.yml`;
 `--workspace NAME_OR_ID` overrides it and enumerates deployed agents.
 Enumeration over five agents requires `--all`.

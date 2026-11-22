@@ -34,11 +34,18 @@ def _item(root, name="Sales", identity="stable", display="Deployed Sales"):
 
 
 def test_disabled_stub_stays_hidden_and_refuses_arbitrary_arguments(monkeypatch):
-    monkeypatch.delenv("FAB_TEST_ENABLE_DATA_AGENT", raising=False)
+    monkeypatch.setenv("FAB_TEST_ENABLE_DATA_AGENT", "0")
     assert "data_agent" not in visible_analyzers()
     with pytest.raises(SystemExit) as raised:
         build_parser().parse_args(["agent", "tests", "init", "--format", "json"])
     assert raised.value.code == 2
+
+
+def test_enabled_by_default_without_the_variable(monkeypatch):
+    monkeypatch.delenv("FAB_TEST_ENABLE_DATA_AGENT", raising=False)
+    assert "data_agent" in visible_analyzers()
+    args = build_parser().parse_args(["data-agent", "tests", "init", "Sales", "--questions"])
+    assert (args.authoring_noun, args.action) == ("tests", "init")
 
 
 def test_enabled_run_alias_and_flags(monkeypatch):

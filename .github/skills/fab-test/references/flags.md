@@ -32,9 +32,9 @@ The older spelling still works: `fab-test bpa --artifact SampleModel-PQLAssert`.
 
 ## Subcommand-Specific Flags
 
-### data-agent (feature-gated)
+### data-agent
 
-Enable with `FAB_TEST_ENABLE_DATA_AGENT=1`; aliases: `agent`, `data_agent`.
+On by default (`FAB_TEST_ENABLE_DATA_AGENT=0` turns it off); aliases: `agent`, `data_agent`.
 Runs against deployed agents only. Suites live beside the `.DataAgent` item,
 not inside its definition. `tests init` and `tests lint` are pending.
 

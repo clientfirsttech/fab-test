@@ -180,6 +180,48 @@ Write a starter suite from the item's definition (decisions 10 and 14), planned 
 
 ---
 
+## `tests init`: Your Questions, How The Answer Matches, And Follow-ups
+
+**Status**: 📋 PROPOSED 2026-11-21 at the user's request; not started. Today init offers fixed questions (a row count per table, one refusal, one two-turn conversation), asks only "Expected answer:", and always writes a case-sensitive `contains`.
+
+What a session looks like (stderr prompts, defaults in brackets):
+
+```
+Suggested: How many rows are in the MarvelFact table?  Keep it? [Y/n] y
+  Expected answer: 16,376
+  Match: [n]umber  [c]ontains  e[x]act  [s]tarts with  [e]nds with  [p]attern  [r]efuses  (Enter = number)
+  Follow-up in the same conversation? (Enter for none): Is that more than 10,000? Answer yes or no.
+    Expected answer: yes
+    Match: [c]ontains  e[x]act  [s]tarts with  [e]nds with  [n]umber  [p]attern  [r]efuses  (Enter = contains) s
+    Follow-up in the same conversation? (Enter for none):
+Your own question? (Enter to finish): Which character appears most often?
+  Expected answer: Spider-Man
+  ...
+```
+
+Polite by design (aidd-polite-review): every choice is one key, Enter takes the default shown, and the default is listed first. A refusal question needs no expected answer, so choosing `r` skips "Expected answer". A typo re-asks the same prompt naming the valid keys. It never restarts the session or loses the answers already given.
+
+**Requirements**:
+- Given today's `--questions` on `agent-sample-model`, should fix what it shows. Ids are two GUIDs joined (`table-6605505c-…-743cae73-…`); use the table's name, slugged, with a suffix only on a clash. A row count is suggested for `_Measures`, a measures-only table; skip tables with no columns, or suggest a question about one of its measures instead.
+- Given the suggestions, should ask keep or skip for each, then ask for the caller's own questions until a blank line. Suggestions stay suggestions: every expected answer still comes from a person (decision 14).
+- Given an expected answer, should ask how it matches with one key per type, case-insensitive, also accepting the full name. Each type writes a promptfoo assertion:
+  - `c` contains → `icontains`
+  - `x` exact → `equals`. Choosing it notes that agents rarely answer word for word.
+  - `s` starts with → `starts-with`
+  - `e` ends with → a `regex` anchored at the end, escaped for JavaScript
+  - `n` number → a `regex` that accepts the digits with or without thousands separators (`16,?376`)
+  - `p` pattern → `regex` as typed
+  - `r` refuses → the refusal check the sample suite uses. It asks no expected answer.
+
+  Enter takes the default: `number` when the answer is a number, `contains` otherwise. The default is listed first. An unknown key re-asks naming the valid keys, keeping every earlier answer.
+- Given the keep or skip question, should take `y`/`n`, with Enter as yes. A follow-up or your own question ends on Enter alone.
+- Given any question, should ask for a follow-up after it, and after each follow-up, until a blank line. A chain shares `vars.conversation` (the first question's id), with `reset: true` on the first turn. Follow-ups get ids `<first-id>-follow-up-<n>`. The chain is written in order, because the run pins `maxConcurrency: 1` for conversations.
+- Given `--questions`, should list the suggestions, the match types and the follow-up shape. Given `--answers FILE`, should accept everything the prompts do, so an agent or a pipeline can author the same suite: a string (`contains`, as today), or `{"match", "value", "follow_ups": [...]}` per id, plus `"custom": [{"id", "query", "match", "value", "follow_ups"}]`. `match` takes the full name or the key (`"number"` or `"n"`), and `equals`/`regex` stay accepted spellings of exact/pattern. The suite always records the promptfoo assertion, never the key. An unknown match type exits 2 naming the valid ones.
+- Given an existing suite, should keep existing ids and chains, append new ones, and replace one only with `--force`, as today.
+- Given `-q`, the default, `-v`, `--format json`, `--dry-run`, `--questions` and `--answers`, should run each through the installed console script. `--dry-run` should show the chain as it will be written.
+
+---
+
 ## `fab-test data-agent tests lint`
 
 Check a suite against its item without the service (decision 13).
@@ -258,6 +300,7 @@ exited 0 with `source: target`; evidence is under
 `files/data-agent-live-typed/data_agent/agent-sample-model/`.
 With credential variables unset and an absent `--env-file`, the installed CLI exited
 127 and named the required service-principal variables and `fab-test auth status`.
+On 2026-11-21, after the Review 1 security fixes (decisions 17 and 19) and the merge of `dev` (`fef5706`), the same paired-suite command exited 0 in 55 s: `16,376`, `Yes.`, and a refusal of the private-balance question. The token went only to the resolved Fabric host. The worker read the principal from the private temp file, which was gone after the run. The client secret appeared in none of the result files. The refusal was the agent's generic "There's content here I can't work with…", not a scoped decline. It passes the refusal check, but a `refuses` match type should be judged against such wording.
 The initial attempts exposed and led to fixes for a persistent-worker import collision,
 credential-file resolution after the working directory changed, and provider errors
 being mislabeled as assertion failures. Independent query provenance, authoring, and
@@ -271,7 +314,7 @@ the remaining CLI blast-radius checks are still pending.
 - Given a live run, should record the command, package/promptfoo versions, verified source binding, baseline answers, observed answers, exit codes, and redacted result/report locations; should keep this task pending-live and the feature flag in place until these checks are evidenced.
 - Given `agent-sample-model` deployed and a service principal, should run bare mode, a typed service target, `--workspace` enumeration, and `tests init` → `tests lint` → the run through the installed console script, including a deliberately failing assertion, a multi-turn conversation, and the missing-credentials `127` path.
 - Given the blast-radius rule, should exercise `all`, `list`, `explain`, `doctor`, `-q`, `--format json`, `--dry-run`, `--report`, and the >5-agent refusal with and without `--all`.
-- Given the live run passes, should delete `data_agent` from `_FEATURES` and `FEATURE_SPELLINGS`, so the documented command exists (Feature Flags decision 3).
+- Given the live run passes, should delete `data_agent` from `_FEATURES` and `FEATURE_SPELLINGS`, so the documented command exists (Feature Flags decision 3). *(2026-11-21, at the user's request after the passing live run: step one of `_feature_flags`' release path is done. The default is `True`, and `FAB_TEST_ENABLE_DATA_AGENT=0` still turns it off. README, QUICK-VALIDATION and the skill drop "feature-gated". The flag tests now set every flag off explicitly. The output-contract test passes `data-agent` a workspace, since the dry run is service-only and offline. Deleting the row waits for a release.)*
 
 ---
 
@@ -306,6 +349,10 @@ the remaining CLI blast-radius checks are still pending.
 13. **Module budgets**: `fab_test_parser.py` is 1131 lines (hard limit 800) and grew without a dated exemption note; `fab_test_summary.py` is 792; `fab_test.py` 443 (soft 400). Add the exemption note or extract the data-agent parser wiring.
 14. **Retry re-posts a user turn** on a persistent conversation thread when the failure follows the post. Make the post idempotent or do not retry after a successful post.
 15. **Out-of-scope changes in the diff** (`fabric-artifacts/README.md`, `tests/test_rdl_fixture_generator.py`, `.platform` edits, the deleted rtk hook): commit separately; restore the hook or drop its test before the final gate.
+
+**From the 2026-11-21 live attempt** (after syncing with `dev`; the workspace's capacity was paused, so Fabric answered `CapacityNotActive`. The token came from the new private credential file, and the resolved URL passed the host check):
+16. The summary line read `❌ agent-sample-model — no findings` for an error envelope. It should say `error` and show the message's first line.
+17. The provider retried a Fabric error marked `"isRetriable": false`. It should treat that flag, and `CapacityNotActive`, as final and name the fix: resume the capacity.
 
 **Nits**: dead `contract_main` and `import os as os`; `_run_targets.py` conditional; `default_type="DataAgent"` hard-coded twice (move to `service_item_type`); `-q` with `--dry-run` prints full text; `explain` prints an empty `--promptfoo-path`; bare-JWT redaction; provider re-reads the principal on every call (cache per process); `_existing()` refuses any `#`; `all` banner stays `mode=local` when `data_agent` runs in service mode (**decide** against Service Targeting); stale epic text (header "PLANNED", provider line/test counts, the package shim `src/fab_test/fabric_data_agent_provider.py`, Registration's "tests noun remains").
 

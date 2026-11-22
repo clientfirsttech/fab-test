@@ -102,11 +102,11 @@ SlicerContracts {
 
 See [references/slicer-contracts.md](references/slicer-contracts.md).
 
-### Data Agent tests (feature-gated)
+### Data Agent tests
 
 ```
 DataAgentTests {
-  (FAB_TEST_ENABLE_DATA_AGENT is unset) => data-agent | agent exits 2; absent from help and list
+  (FAB_TEST_ENABLE_DATA_AGENT=0) => data-agent | agent exits 2; absent from help and list; on by default
   (enabled) => service only; workspace resolves --workspace → FABRIC_WORKSPACE_ID → workspace in config
   (an item has a suite beside it) => pair *.DataAgent.promptfoo.yaml by fabTestDataAgent == .platform config.logicalId
   (an item is selected locally) => resolve the deployed agent by .platform metadata.displayName
@@ -428,7 +428,7 @@ The case a pipeline meets most is a `detail` populated on an aborted run: `fab-t
  fab-test pql-test         — pql-test DAX/PQL test runner (SemanticModel artifacts) [alias: pql_test]
  fab-test playwright       — Playwright visual/error validation (Report artifacts)
  fab-test dependencies     — Discover reports that depend on a deployed semantic model
- fab-test data-agent       — Deployed Data Agent regression tests [aliases: agent, data_agent; requires FAB_TEST_ENABLE_DATA_AGENT=1]
+ fab-test data-agent       — Deployed Data Agent regression tests [aliases: agent, data_agent; FAB_TEST_ENABLE_DATA_AGENT=0 turns it off]
  fab-test all              — Run the analyzers listed in analyzers.json
  fab-test local            — Run BPA, PBIR Inspector, and Desktop-bound pql-test — no cloud required
  fab-test doctor           — Check whether each analyzer's tool/credentials are ready

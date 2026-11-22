@@ -118,9 +118,9 @@ fab-test rdl                             # active rules for paginated (.rdl) rep
 fab-test pql-test --env DEV
 ```
 
-### Run feature-gated Data Agent tests
+### Run Data Agent tests
 
-Set `FAB_TEST_ENABLE_DATA_AGENT=1` and configure a workspace plus a full
+Configure a workspace plus a full
 service principal (`FABRIC_TENANT_ID`, `FABRIC_CLIENT_ID`,
 `FABRIC_CLIENT_SECRET`). Keep `Sales.DataAgent.promptfoo.yaml` beside
 `Sales.DataAgent/`, with its `fabTestDataAgent` set to the item's `.platform`
@@ -157,7 +157,6 @@ A pipeline can run an already-authored suite without prompts:
 ```yaml
 - name: Test deployed Data Agents
   env:
-    FAB_TEST_ENABLE_DATA_AGENT: "1"
     FABRIC_WORKSPACE_ID: ${{ vars.FABRIC_WORKSPACE_ID }}
     FABRIC_TENANT_ID: ${{ secrets.FABRIC_TENANT_ID }}
     FABRIC_CLIENT_ID: ${{ secrets.FABRIC_CLIENT_ID }}

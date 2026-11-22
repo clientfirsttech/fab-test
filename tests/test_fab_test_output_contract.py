@@ -292,11 +292,13 @@ def test_text_format_leaves_analyzer_output_mode_env_unset(tmp_path, monkeypatch
 # Prove stdout purity for every subcommand
 # --------------------------------------------------------------------------- #
 
-# dependencies is the only subcommand with a required flag beyond the common
-# ones; every other --format-capable subcommand runs with just --dry-run.
+# dependencies needs --semantic-model; data-agent is service-only and needs a
+# workspace even for --dry-run (Data Agent decision 12), which stays offline.
+# Every other --format-capable subcommand runs with just --dry-run.
 _STDOUT_PURITY_EXTRA_ARGS = {
     "dependencies": ["--semantic-model", "TestModel"],
     "explain": ["bpa"],
+    "data-agent": ["--workspace", "00000000-0000-0000-0000-000000000000"],
 }
 
 
