@@ -35,6 +35,8 @@ from ._tests_dir import add_tests_dir_flag, search_roots
 _ANALYZERS = ("pbir", "all", "local")
 AS_OF_HELP = "Date calendar-driven slicer defaults resolve against [default: today]"
 CONTRACT_SUFFIX = ".odcs.yaml"
+CONTRACT_FILE_HELP = (f"Slicer contract to use instead of the *{CONTRACT_SUFFIX} that pairs with each report "
+                      "by its logicalId")
 
 
 @dataclass(frozen=True)
@@ -51,9 +53,7 @@ def add_contract_flags(parser: argparse.ArgumentParser) -> None:
                      "or under --artifact-dir. Build one with `fab-test pbir contract init TARGET`, check it with "
                      "`fab-test pbir contract lint TARGET`.")
     add_tests_dir_flag(parser)
-    parser.add_argument("--contract", default=None, metavar="FILE",
-                        help="Slicer contract to check every report in the run against, "
-                             f"instead of pairing each report with a *{CONTRACT_SUFFIX} by its logicalId")
+    parser.add_argument("--contract", default=None, metavar="FILE", help=CONTRACT_FILE_HELP)
     parser.add_argument("--as-of", default=None, dest="as_of", metavar="YYYY-MM-DD",
                         type=datetime.date.fromisoformat,
                         help=AS_OF_HELP)

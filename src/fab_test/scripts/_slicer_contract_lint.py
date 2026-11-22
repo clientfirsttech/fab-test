@@ -36,7 +36,7 @@ from ._authoring_output import add_input_flags, level, next_command, print_paylo
 from ._scan import find_artifact_dirs
 from ._slicer_calendar import CalendarError, resolve_contract, today
 from ._slicer_contract import ContractError, load_contract
-from ._slicer_contract_run import AS_OF_HELP, CONTRACT_SUFFIX, contract_files, report_logical_id
+from ._slicer_contract_run import AS_OF_HELP, CONTRACT_FILE_HELP, CONTRACT_SUFFIX, contract_files, report_logical_id
 from ._slicer_init_output import (
     TARGET_HELP,
     InitError,
@@ -57,9 +57,7 @@ def add_lint_parser(subs: Any) -> None:
     lint = subs.add_parser("lint", help="Check contracts: each reads as `fab-test pbir` reads it, is valid ODCS, "
                                         "and names what the report's semantic model has")
     add_input_flags(lint, f"Report whose contract to check: {TARGET_HELP}; none checks every contract there")
-    lint.add_argument("--contract", default=None, metavar="FILE",
-                      help=f"Contract to check, instead of the *{CONTRACT_SUFFIX} that pairs with the report "
-                           "by its logicalId")
+    lint.add_argument("--contract", default=None, metavar="FILE", help=CONTRACT_FILE_HELP)
     lint.add_argument("--as-of", default=None, dest="as_of", type=datetime.date.fromisoformat, metavar="YYYY-MM-DD",
                       help=AS_OF_HELP)
     add_output_flags(lint, refused=("--output-dir",), verbose="Also name the model and what each check covered",

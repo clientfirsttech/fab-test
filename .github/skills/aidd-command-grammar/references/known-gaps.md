@@ -19,6 +19,7 @@ entry when it's fixed.
 
 ## `pbir contract init`
 
+- **No `--contract FILE` on init** (ratcheted by `tests/test_authoring_grammar_parity.py`). The grammar says `--<noun> FILE` overrides the pairing on every verb, as `data-agent tests init --tests FILE` does. `contract init` refuses `--contract`, naming the run, and always writes or extends the paired contract.
 - Fixed 2026-11-21 (Data Agent Testing epic): the noun is a real argparse subparser, so a global flag first parses. `fab-test help`, `list --format json` (`authoring`) and `explain` (`Author:`) name the verbs. Near misses (`pbir lint`, `pbir init Sales`, `pbir contracts init`) exit 2 with `did you mean:` the exact command. Only an item folder (its suffix, or a `.platform`) counts as a TARGET named like a verb.
 - Fixed 2026-11-19 (Authoring Command Grammar epic): `contract lint` exists; TARGET takes a name as the run's does, `--artifact`'s metavar and help match the run's, `--artifact-dir` and `--format` default from `fab-test.yml`, `-q` prints one result line, flags.md lists `-q`/`-v`, every flag of the run is refused naming the run, and `--artifact`/`--artifact-dir`/`--format` share the run's help text (`_cli_utils`). `--as-of`'s help differs on init on purpose: there it dates the `current` suggestion.
 
