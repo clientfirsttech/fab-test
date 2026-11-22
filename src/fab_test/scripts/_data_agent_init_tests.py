@@ -14,7 +14,7 @@ from typing import Any, TextIO
 from ._data_agent_init_questions import InitInputError
 
 __all__ = ["MATCH_KEYS", "InitInputError", "ask_tests", "assertion", "default_match", "input_prompt",
-           "parse_match", "tests_from_answers", "tests_from_specs"]
+           "parse_match", "question_key", "specs_from_answers", "tests_from_answers", "tests_from_specs"]
 
 # key, canonical name, extra spellings accepted (the full name always is)
 _MATCHES = (
@@ -139,6 +139,8 @@ def _spec(raw: Any, where: str, *, allow_follow_ups: bool = True) -> dict[str, A
             "match": match or default_match(expect)}
     if isinstance(raw.get("id"), str) and raw["id"].strip():
         spec["id"] = raw["id"].strip()
+    if raw.get("replace") is True:  # as typing r at the prompt does; otherwise an existing test is kept
+        spec["replace"] = True
     assertion(spec["match"], spec["expect"])  # refuse a bad number now, naming where it is
     follow_ups = raw.get("follow_ups", [])
     if not allow_follow_ups:
@@ -151,7 +153,12 @@ def _spec(raw: Any, where: str, *, allow_follow_ups: bool = True) -> dict[str, A
 
 
 def tests_from_answers(document: Any) -> list[dict[str, Any]]:
-    """The --answers file: the same questions, matches and follow-ups the prompts take."""
+    """The --answers file as suite tests."""
+    return tests_from_specs(specs_from_answers(document))
+
+
+def specs_from_answers(document: Any) -> list[dict[str, Any]]:
+    """The --answers file: the same questions, matches, follow-ups and replace the prompts take."""
     if not isinstance(document, dict):
         raise InitInputError("--answers must be a JSON object: {\"tests\": [...]}")
     if "tests" not in document:
@@ -159,8 +166,7 @@ def tests_from_answers(document: Any) -> list[dict[str, Any]]:
                              "`fab-test data-agent tests init TARGET --questions` shows an example")
     if not isinstance(document["tests"], list):
         raise InitInputError("--answers tests must be a list of questions")
-    specs = [_spec(item, f"tests[{index}]") for index, item in enumerate(document["tests"])]
-    return tests_from_specs(specs)
+    return [_spec(item, f"tests[{index}]") for index, item in enumerate(document["tests"])]
 
 
 # -- the prompt loop ---------------------------------------------------------------
@@ -206,12 +212,34 @@ def input_prompt(text: str) -> str:
     return input()
 
 
-def ask_tests(suggestions: list[str], ask: Ask | None = None, err: TextIO | None = None) -> list[dict[str, Any]]:
+def question_key(query: str) -> str:
+    """Two spellings of one question meet: case, spacing and a trailing ? or . don't matter."""
+    return " ".join(query.lower().split()).rstrip("?.! ")
+
+
+def _keep_or_replace(known: dict[str, str], ask: Ask, err: TextIO) -> bool:
+    """True to replace: the person typed a question the suite already has, so their intent is unclear."""
+    prompt = (f"  Already in the suite as {known['id']}, expecting {known['summary']}. "
+              "[k]eep it (Enter) or [r]eplace with a new answer? ")
+    while True:
+        typed = ask(prompt).strip().lower()
+        if typed in {"", "k", "keep"}:
+            err.write("  → kept as it is\n")
+            return False
+        if typed in {"r", "replace"}:
+            return True
+        err.write("  k keeps it, r replaces it\n")
+
+
+def ask_tests(suggestions: list[str], ask: Ask | None = None, err: TextIO | None = None,
+              existing: dict[str, dict[str, str]] | None = None) -> list[dict[str, Any]]:
     """Ask for questions until Enter on an empty one; each may grow a chain of follow-ups.
 
+    ``existing`` maps `question_key` to the suite's test (``id``, ``summary``). Typing one of those
+    asks keep or replace, instead of silently keeping the old test and dropping the new answer.
     Prompts go to stderr, so stdout stays the result (and one JSON document under --format json).
     """
-    ask, err = ask or input_prompt, err or sys.stderr
+    ask, err, existing = ask or input_prompt, err or sys.stderr, existing or {}
     err.write("Write the questions to ask the agent and what a right answer looks like.\n"
               "Enter on an empty question finishes; ? lists suggestions from the agent's data.\n")
     specs: list[dict[str, Any]] = []
@@ -223,8 +251,14 @@ def ask_tests(suggestions: list[str], ask: Ask | None = None, err: TextIO | None
             continue
         if not typed:
             return specs
-        spec = _ask_one(_pick(typed, suggestions), "  ", ask, err)
+        query = _pick(typed, suggestions)
+        known = existing.get(question_key(query))
+        if known and not _keep_or_replace(known, ask, err):
+            continue
+        spec = _ask_one(query, "  ", ask, err)
         spec["follow_ups"] = []
+        if known:
+            spec.update(id=known["id"], replace=True)
         while follow_up := ask("  Follow-up in the same conversation (Enter for none): ").strip():
             spec["follow_ups"].append(_ask_one(follow_up, "    ", ask, err))
         specs.append(spec)

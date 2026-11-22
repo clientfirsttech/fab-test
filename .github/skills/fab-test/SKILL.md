@@ -120,7 +120,8 @@ DataAgentTests {
   (persisting results) => redact native.json, effective.promptfoo.yaml, envelope.json; attach the standard report
   (all with a workspace configured and the flag enabled) => include data_agent; (local) => never include it
   (tests init, a person present) => ask each question, its expected answer (Enter = decline), one match key n|c|x|s|e|p|r (Enter = default), follow-ups in the same conversation; ? lists suggestions
-  (tests init, CI | --format json | an agent) => --answers FILE {tests: [{query, expect, match, follow_ups}]}; --questions prints suggestions and the shape; never invent an expected answer
+  (tests init, CI | --format json | an agent) => --answers FILE {tests: [{query, expect, match, follow_ups, replace?}]}; --questions prints suggestions and the shape; never invent an expected answer
+  (tests init, a suite exists) => say its path and tests before the first question; (a question it already has) => ask [k]eep (Enter) | [r]eplace; "replace": true in --answers; otherwise kept
   (tests lint) => offline checks plus promptfoo validate; run it before the run
   (a suite) => code: run it only from trusted branches; never pull_request_target or fork PRs with secrets
   (a suite base_url | fabric_urls host is not Fabric or Power BI) => refused; an exact extra host comes only from the caller's FAB_TEST_DATA_AGENT_ALLOWED_HOSTS

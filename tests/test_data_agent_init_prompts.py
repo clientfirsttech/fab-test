@@ -314,3 +314,79 @@ def test_a_console_run_without_dry_run_writes_without_asking_again(tmp_path, mon
     code, suite = _console_init(tmp_path, monkeypatch, ["Top order?", "42", "", "", ""], dry_run=False)
     assert code == 0 and suite.exists()
     assert "[y/N]" not in capsys.readouterr().err
+
+
+# -- appending politely: say where, and ask about a question the suite already has ----------
+
+
+_EXISTING = {"how many characters are in the data": {"id": "character-count", "summary": "regex 16,?376"}}
+
+
+def _session_with(existing, *typed):
+    replies = iter(typed)
+    err = io.StringIO()
+    specs = ask_tests([], ask=lambda prompt: (err.write(prompt), next(replies))[1], err=err, existing=existing)
+    return specs, err.getvalue()
+
+
+def test_a_question_already_in_the_suite_is_kept_on_enter_without_asking_its_answer():
+    specs, shown = _session_with(_EXISTING, "How many characters are in the data? ", "", "")
+    assert specs == []
+    assert "Already in the suite as character-count, expecting regex 16,?376" in shown
+    assert "[k]eep it (Enter) or [r]eplace" in shown
+    assert "Expected answer" not in shown
+
+
+def test_replacing_a_question_already_in_the_suite_keeps_its_id():
+    specs, _shown = _session_with(_EXISTING, "how many characters are in the data", "r", "16,376", "", "", "")
+    assert specs == [{"query": "how many characters are in the data", "expect": "16,376", "match": "number",
+                      "follow_ups": [], "id": "character-count", "replace": True}]
+
+
+def test_a_wrong_key_for_keep_or_replace_asks_again():
+    specs, shown = _session_with(_EXISTING, "How many characters are in the data?", "z", "k", "")
+    assert specs == [] and shown.count("[k]eep it (Enter) or [r]eplace") == 2
+
+
+def test_the_answers_file_replaces_only_when_it_says_so(tmp_path, monkeypatch, capsys):
+    import argparse
+    import json
+
+    import yaml
+
+    from fab_test.scripts import _data_agent_init as init
+
+    _console_init(tmp_path, monkeypatch, ["Top order?", "42", "", "", ""], dry_run=False)  # suite: top-order
+    capsys.readouterr()
+    suite = tmp_path / "Sales.DataAgent.promptfoo.yaml"
+    for replace, expected in ((False, "kept"), (True, "replaced")):
+        answers = tmp_path / "answers.json"
+        answers.write_text(json.dumps({"tests": [{"query": "Top order?", "expect": "43", "replace": replace}]}),
+                           encoding="utf-8")
+        args = argparse.Namespace(target="Sales", artifact=None, artifact_dir=str(tmp_path), tests=None,
+                                  force=False, questions=False, answers=str(answers), dry_run=False,
+                                  output_format="json", quiet=False, verbose=0, file_config={}, tests_dir=None)
+        assert init.init_main(args) == 0
+        assert json.loads(capsys.readouterr().out)[expected] == ["top-order"]
+    assert "43" in yaml.safe_load(suite.read_text(encoding="utf-8"))["tests"][0]["assert"][0]["value"]
+
+
+def test_init_says_where_the_questions_go_before_the_first_one(tmp_path, monkeypatch, capsys):
+    _console_init(tmp_path, monkeypatch, ["Top order?", "42", "", "", ""], dry_run=False)
+    first = capsys.readouterr().err
+    assert first.index("Writing a new suite: ") < first.index("Question 1")
+
+    import argparse
+
+    from fab_test.scripts import _data_agent_init as init
+
+    replies = iter(["Top order?", "", "", "", ""])  # already there: Enter keeps it; nothing to write
+    monkeypatch.setattr("builtins.input", lambda: next(replies))
+    args = argparse.Namespace(target="Sales", artifact=None, artifact_dir=str(tmp_path), tests=None, force=False,
+                              questions=False, answers=None, dry_run=False, output_format="text",
+                              quiet=False, verbose=0, file_config={}, tests_dir=None)
+    assert init.init_main(args) == 0
+    second = capsys.readouterr().err
+    assert "Adding to " in second and "which has 1 test:" in second and "top-order: Top order?" in second
+    assert "--tests FILE" in second  # the way to a separate suite
+    assert second.index("Adding to ") < second.index("Question 1")
