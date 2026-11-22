@@ -246,6 +246,55 @@ fab-test playwright --dataset-id <DATASET_GUID> --dataset-workspace-id <WORKSPAC
 fab-test dependencies --semantic-model SalesModel --env dev --env-file .env
 ```
 
+### Data Agent regression tests (feature-gated)
+
+Set `FAB_TEST_ENABLE_DATA_AGENT=1` to enable `fab-test data-agent` (alias
+`agent`). It tests deployed agents, never Power BI Desktop. A bare run takes
+its workspace from `FABRIC_WORKSPACE_ID` or `workspace:` in `fab-test.yml`;
+`--workspace NAME_OR_ID` overrides it and enumerates deployed agents.
+Enumeration over five agents requires `--all`.
+
+Keep an inline promptfoo suite beside each item as
+`Sales.DataAgent.promptfoo.yaml`, with `fabTestDataAgent` equal to the
+item's `.platform` `config.logicalId`. The `.platform` display name identifies
+the deployed agent. Renaming either file does not break pairing. Missing suites
+are skipped; duplicate identity claims fail before evaluation.
+
+```bash
+fab-test data-agent --artifact-dir fabric-artifacts --dry-run --format json
+fab-test data-agent Sales.DataAgent --report
+fab-test data-agent "Dev.Workspace/Sales.DataAgent" --tests Sales.DataAgent.promptfoo.yaml
+```
+
+The run needs Node.js >=22.22.0 and a full service principal
+(`FABRIC_TENANT_ID`, `FABRIC_CLIENT_ID`, `FABRIC_CLIENT_SECRET`, or the existing
+service-principal aliases). `--env-file` supplies a credential file.
+Promptfoo 0.124.0 installs through the existing tool bootstrap. Conversation
+tests run sequentially in one Python worker. Redacted native results, the
+effective config, and the envelope live under
+`fab-test-results/data_agent/<item>/`; `--report` adds the standard HTML report.
+`all` includes the enabled analyzer only with a workspace configured; `local`
+never includes it. The `tests init`/`tests lint` authoring commands are still
+pending: author the YAML directly for now.
+
+**A suite is code.** promptfoo runs its `javascript` assertions and `file://`
+hooks with your permissions. Run suites only from trusted branches, never from
+`pull_request_target` or fork pull requests that can reach your secrets.
+fab-test narrows what a suite can reach:
+- **Fabric hosts only.** The token goes only to Fabric and Power BI hosts. A
+  suite's `base_url` or `fabric_urls` on any other host is refused. Allow an
+  exact extra host, such as a gateway, with `FAB_TEST_DATA_AGENT_ALLOWED_HOSTS`
+  (comma-separated) in the caller's environment; a suite can't set it.
+- **No secret in promptfoo's environment.** The service principal never
+  appears in promptfoo's environment. It goes to the provider through a private
+  temporary file that is deleted after the run.
+- **Reserved `env:` keys.** A suite's `env:` may not set `FAB_TEST_*`,
+  `FABRIC_*`, `AZURE_*`, `PROMPTFOO_*` or `PLAYWRIGHT_ENV_FILE`.
+
+Telemetry includes the agent's redacted answers, as every analyzer's envelope
+does. Anyone who can read the telemetry database sees them, so grant it to the
+same audience as the agent's data sources.
+
 ### Keep the output short: `-q`
 
 A default run explains itself for a person: a banner, a result line, and a summary per artifact. When you only need to know whether it passed (an AI agent in an edit loop, a busy CI log), add `-q`:

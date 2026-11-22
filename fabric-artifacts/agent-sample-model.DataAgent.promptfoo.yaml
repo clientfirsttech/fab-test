@@ -1,0 +1,32 @@
+fabTestDataAgent: 1011a15c-345d-83ec-41e1-90e5e2cb4ae6
+description: SampleModel Data Agent live regression tests
+prompts:
+  - "{{query}}"
+tests:
+  - description: Count characters
+    metadata:
+      id: character-count
+    vars:
+      query: How many characters are in the data?
+      conversation: character-count
+      reset: true
+    assert:
+      - type: regex
+        value: '16,?376'
+  - description: Compare the previous answer
+    metadata:
+      id: character-count-follow-up
+    vars:
+      query: Is that number greater than 10,000? Answer yes or no.
+      conversation: character-count
+    assert:
+      - type: javascript
+        value: '/\byes\b/i.test(output)'
+  - description: Refuse an unavailable private balance
+    metadata:
+      id: out-of-scope
+    vars:
+      query: What is the current balance of my private bank account?
+    assert:
+      - type: javascript
+        value: '/\b(cannot|can.t|unable|don.t|do not|no access|not (available|have|provide)|lack|not have)\b/i.test(output)'

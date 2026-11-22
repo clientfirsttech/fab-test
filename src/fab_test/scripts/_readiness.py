@@ -19,7 +19,7 @@ from ._analyzer_tool_bootstrap import (
     resolve_executable,
 )
 from ._cloud_readiness import cloud_readiness
-from ._credentials import probe_credentials
+from ._credentials import configured_workspace, probe_credentials
 from ._desktop import desktop_ports
 from ._feature_flags import is_enabled
 from .fab_test_registry import (
@@ -49,6 +49,8 @@ def resolve_tool(name: str, args: argparse.Namespace) -> Path | None:
         explicit = getattr(args, "inspector_path", None)
     elif name == "a11y":
         explicit = getattr(args, "a11y_path", None)
+    elif name == "data_agent":
+        explicit = getattr(args, "promptfoo_path", None)
 
     resolved = resolve_executable(
         _BOOTSTRAP_REGISTRY_NAME.get(name, name),
@@ -101,6 +103,8 @@ def preflight_error(name: str, args: argparse.Namespace) -> tuple[str, int] | No
     """
     if name == "playwright" and not getattr(args, "plan_only", False):
         return _playwright_preflight_error(args)
+    if name == "data_agent" and is_enabled(name):
+        return _data_agent_preflight_error(args)
     if name not in _BOOTSTRAPPED_ANALYZERS or not is_enabled(name):
         return None
     try:
@@ -115,6 +119,25 @@ def preflight_error(name: str, args: argparse.Namespace) -> tuple[str, int] | No
         return message, 127
     else:
         return None
+
+
+def _data_agent_preflight_error(args: argparse.Namespace) -> tuple[str, int] | None:
+    from .invoke_data_agent import CREDENTIAL_REMEDIATION
+
+    suites = getattr(args, "data_agent_suites", {})
+    artifacts = getattr(args, "data_agent_artifacts", [])
+    if artifacts and not any(suites.get(a) for a in artifacts):
+        return None
+    status = probe_credentials(getattr(args, "playwright_env_file", None))
+    if not status.verified:
+        return f"{status.remediation or ''} {CREDENTIAL_REMEDIATION}".strip(), 127
+    try:
+        resolve_tool("data_agent", args)
+    except UnsupportedPlatformError as exc:
+        return str(exc), 126
+    except RuntimeError as exc:
+        return str(exc), 127
+    return None
 
 
 def _cloud_readiness(name: str, args: argparse.Namespace | None) -> dict[str, Any]:
@@ -151,7 +174,24 @@ def check_readiness(name: str, args: argparse.Namespace | None) -> dict[str, Any
 
 
 def _readiness_without_version(name: str, args: argparse.Namespace | None) -> dict[str, Any]:
-    if name in _CLOUD_ANALYZERS:
+    if name == "data_agent" and is_enabled(name):
+        from .invoke_data_agent import CREDENTIAL_REMEDIATION
+
+        tool = probe_executable(
+            name, ANALYZERS_JSON, REPO_ROOT, explicit_path=getattr(args, "promptfoo_path", None),
+        )
+        if tool["ready"] is False:
+            return tool
+        credentials = probe_credentials(getattr(args, "playwright_env_file", None))
+        workspace = configured_workspace(args, playwright=False)
+        if not credentials.verified or not workspace:
+            tool.update({
+                "ready": False, "status": "error" if workspace or credentials.incomplete else "warning",
+                "reason": "Data Agent service mode needs a workspace and a full service principal",
+                "remediation": "Pass --workspace NAME_OR_ID or set FABRIC_WORKSPACE_ID. " + CREDENTIAL_REMEDIATION,
+            })
+        return tool
+    if name in _CLOUD_ANALYZERS and is_enabled(name):
         return _cloud_readiness(name, args)
 
     if name not in _BOOTSTRAPPED_ANALYZERS or not is_enabled(name):

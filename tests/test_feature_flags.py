@@ -139,7 +139,9 @@ def test_enabling_a_flag_removes_its_stub(monkeypatch):
     monkeypatch.setenv(flags.env_var("data_agent"), "1")
     subs = next(a for a in build_parser()._actions if isinstance(a, argparse._SubParsersAction))
 
-    assert not set(flags.FEATURE_SPELLINGS["data_agent"]) & set(subs.choices)
+    assert set(flags.FEATURE_SPELLINGS["data_agent"]) <= set(subs.choices)
+    assert all(not isinstance(subs.choices[name], flags._DisabledFeatureParser)
+               for name in flags.FEATURE_SPELLINGS["data_agent"])
     assert "sqldb-test" in subs.choices
 
 
@@ -149,13 +151,14 @@ def test_enabling_a_flag_removes_its_stub(monkeypatch):
 
 
 @pytest.mark.fab_test
-def test_top_level_help_is_identical_with_flags_on_or_off():
-    """Stubs add nothing to --help, so a release diff shows only shipped commands."""
+def test_top_level_help_advertises_only_enabled_implementations():
+    """Stubs stay invisible; enabling an implemented feature advertises its real command."""
     off = _run_cli("--help")
     on = _run_cli("--help", enable=_FEATURES)
 
     assert off.returncode == on.returncode == 0
-    assert off.stdout == on.stdout
+    assert "data-agent (agent, data_agent)" in on.stdout
+    assert "sqldb-test" not in on.stdout
     for name in _FEATURES:  # primary spellings; a bare alias like "agent" is ordinary prose
         assert flags.FEATURE_SPELLINGS[name][0] not in off.stdout
 

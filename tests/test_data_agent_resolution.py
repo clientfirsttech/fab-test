@@ -12,7 +12,7 @@ from fab_test.scripts._data_agent_resolution import (
 )
 from fab_test.scripts.playwright_validation.resolver import ItemNotFoundError, ServiceResolutionError
 
-pytestmark = pytest.mark.fab_test
+pytestmark = [pytest.mark.fab_test, pytest.mark.data_agent]
 
 WS = "00000000-0000-0000-0000-000000000001"
 SALES = "11111111-1111-1111-1111-111111111111"

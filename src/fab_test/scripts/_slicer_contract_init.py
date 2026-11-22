@@ -35,7 +35,9 @@ from typing import Any
 
 import yaml
 
+from ._authoring_output import add_input_flags, level, print_payload, resolve_inputs
 from ._bookmark_navigators import apply_navigator_answers, navigator_questions
+from ._config import ConfigError
 from ._pbir_slicers import Slicer, read_slicers
 from ._slicer_calendar import CalendarError, resolve_contract, today, validate_calendar
 from ._slicer_contract import ENGINE, SELECT_ALL, ContractError, parse_contract
@@ -57,16 +59,12 @@ from ._slicer_init_existing import ExistingContractError, Owner, navigator_owner
 from ._slicer_init_output import (
     TARGET_HELP,
     InitError,
-    add_input_flags,
     add_output_flags,
     can_ask,
     find_report,
-    level,
     parse,
     pbir_refusal,
-    print_payload,
     questions_text,
-    resolve_inputs,
     result_line,
     summary_text,
     with_next,
@@ -75,13 +73,18 @@ from ._slicer_init_output import (
 
 def contract_main(argv: list[str]) -> int:
     args, refusal = parse(_parser(), argv)
+    return contract_args_main(args, refusal)
+
+
+def contract_args_main(args: argparse.Namespace, refusal: str | None = None) -> int:
+    """Execute an argparse-parsed contract verb."""
     if refusal:  # a flag of `fab-test pbir` the verb doesn't take
         print(f"  ✗ fab-test pbir contract: {refusal}", file=sys.stderr)
         return 2
-    resolve_inputs(args)
-    if args.action == "lint":
-        return lint_main(args)
     try:
+        resolve_inputs(args)
+        if args.action == "lint":
+            return lint_main(args)
         report = _report(args)
         try:  # anything that would stop the write is found before the first question
             existing, owners = read_existing(_contract_path(report), report, args.force)
@@ -93,7 +96,7 @@ def contract_main(argv: list[str]) -> int:
             return 0
         answers = _answers(args, questions)
         return _write(args, report, questions, answers, existing)
-    except (InitError, CalendarError, ContractError) as exc:
+    except (InitError, CalendarError, ContractError, ConfigError) as exc:
         print(f"  ✗ fab-test pbir contract: {exc}", file=sys.stderr)
         return 2
     except KeyboardInterrupt:  # Ctrl-C at a prompt

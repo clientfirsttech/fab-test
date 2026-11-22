@@ -7,7 +7,7 @@
 
 WHY: Teams deploying Fabric Data Agents have no way to regression-test the agent's actual answers — whether it refuses irrelevant questions, returns the right figures, or holds a conversation — short of asking it by hand. The template repository proves the shape (promptfoo driving the agent's Assistants-compatible API), but it is a standalone Node project with a TypeScript provider, hand-built URLs, and its own CI parsing; nothing about it speaks fab-test's one contract. This epic ports the provider to promptfoo's Python contract (`call_api(prompt, options, context)`), ships it inside the fab-test package, gives people and agents `tests init` and `tests lint` to write and check a suite, and wires the run through the same envelope, exit codes, modes, HTML report, and telemetry as every other analyzer. A Data Agent only exists deployed, so every run is a service test: the suites beside each `*.DataAgent` folder supply the denominator while execution reaches the service. PR #49 built a first cut before the command grammar, feature flags, the `local`/`service` mode rename and the Core Module Split landed on `dev`; this epic ports what still fits (decision 16).
 
-**Decisions** (1–11 recorded 2026-10-04 at discovery review; 3 and 10 rewritten and 12–16 proposed by Claude and accepted by the user 2026-11-19):
+**Decisions** (1–11 recorded 2026-10-04 at discovery review; 3 and 10 rewritten and 12–16 proposed by Claude and accepted by the user 2026-11-19; 17–21 made by Claude at the user's request 2026-11-21 from Review 1, on security and OWASP grounds):
 
 1. ✅ Analyzer name is **`data-agent`** with alias **`agent`** (registry key `data_agent`; the registry key, results folder, and envelope analyzer field agree).
 2. ✅ The provider is **Python**, shipped inside the fab-test package and declared to promptfoo as `file://.../fabric_data_agent_provider.py` — a port of the template's `provider.ts`, not a dependency on it.
@@ -25,7 +25,11 @@ WHY: Teams deploying Fabric Data Agents have no way to regression-test the agent
 14. ✅ **`tests init` never guesses an answer.** It suggests refusal tests from what the agent's data sources don't cover and questions from their selected tables, but every expected figure is `needs_human`, as `contract init` never guesses a fiscal year.
 15. ✅ *(accepted by the user 2026-11-19)* **The noun is a real argparse subparser** for `data-agent tests` and for `pbir contract`. Data Agent must not copy pbir's argv check in `fab_test.py` (a known gap), so this epic fixes both in one place. The generic init/lint helpers move out of `_slicer_init_output.py` into a shared module now that a second caller exists (vision: no abstraction until the second caller). **Consistent, and fudgable by pointing:** a verb out of place (`fab-test pbir lint`), a plural noun (`contracts`) or a retired spelling (`data-agent init`) exits `2` naming the exact command meant — never runs it under a second spelling, and never passes having checked nothing, as `fab-test pbir lint` does today. An item really named `init` or `lint` still runs as a TARGET. The rule is a grammar Constraint, so every authoring flow inherits it.
 16. ✅ **PR #49 is superseded, not rebased** (it conflicts in 21 files). Its provider, URL resolution and the wrapper's result mapping and redaction are ported onto `dev`'s layout; its `data-agent init`, registry and bootstrap edits, and raised module-budget ceilings are not.
-
+17. ✅ *(Review 1, decided 2026-11-21 on OWASP A01/A10/A02)* **The bearer token only goes to Fabric hosts.** Before every request, including each poll, the provider checks that the host is `https`. The host must be `api.fabric.microsoft.com` or end in `.fabric.microsoft.com` or `.powerbi.com`. The provider never follows a redirect; a 3xx is an error naming the target host. `thread_id` and `run_id` are URL-quoted. Any other host is allowed only by `FAB_TEST_DATA_AGENT_ALLOWED_HOSTS`, read from the caller's environment and never from the suite or `fab-test.yml`. A suite can't widen where the token goes, because whoever writes the suite controls its URL.
+18. ✅ *(Review 1, decided 2026-11-21; resolves lint against decision 4)* **Lint and run apply one URL rule.** An explicit `base_url` or `fabric_urls` on an allowed host is a **warning** in lint: the escape hatch still works, and a template user can still migrate. A host that isn't allowed is a **finding** (exit 1) in lint and a refusal in the run, with the same message. Credential keys in a suite stay findings.
+19. ✅ *(Review 1, decided 2026-11-21 on A02/A08, least privilege)* **promptfoo's environment carries no secret.** The wrapper removes `FABRIC_CLIENT_SECRET` and its aliases from the environment it hands promptfoo. It also removes `FABRIC_TENANT_ID`, `FABRIC_CLIENT_ID` and their aliases. The provider reads the principal from the credential file: the caller's `--env-file` when given, or else a temp file the wrapper writes in a private `mkdtemp` directory and deletes in `finally`. This keeps the secret out of promptfoo's `{{ env.* }}` templating, its logs and casual `process.env` reads. It doesn't sandbox a hostile suite, which could still read the file. So the residual risk is documented: **a suite is code. Run it only from trusted branches, never from `pull_request_target` or fork PRs that carry secrets.**
+20. ✅ *(Review 1, decided 2026-11-21; revised the same day at the user's question)* **Telemetry carries the redacted envelope, answers included, like every analyzer.** The destination is the team's own opt-in Eventhouse or Lakehouse, not a third party. Every analyzer already embeds its redacted envelope as `results`, including sqldb-test and pql-test actuals. Answer history is what makes drift visible. Stripping it would be a one-off exception that removes the trail's main value. The residual risk (A01): Eventhouse readers see answers drawn with the service principal's access, which may exceed theirs. Document it beside the telemetry setup: grant the telemetry database to the same audience as the agent's data sources. Never send tokens, secrets or credentials; tests assert the table, `artifact_type: DataAgent`, the mode dimension and the absence of secrets.
+21. ✅ *(Review 1, decided 2026-11-21)* **The `all` banner stays the session's mode.** Each analyzer row shows its own `mode`/`source`, so `data-agent` reads `mode=service` inside an `all` run. This keeps Service Targeting's banner meaning without adding a `mixed` value.
 ---
 
 ## Promptfoo Tool Seam
@@ -54,6 +58,7 @@ Port the template's `provider.ts` to promptfoo's Python provider contract, start
 - Given `vars.conversation` on a test case, should reuse the thread across turns keyed by base URL + conversation id; given `vars.reset`, should delete and recreate it; given thread-not-found, should evict the cached thread and recreate (decision 7).
 - Given any output path — provider response, logs, envelope, telemetry — should never contain the token or client secret.
 - Given the provider is pure Python in the package, should be unit-tested against a mocked token endpoint and agent API with no live service.
+- Given promptfoo starts a fresh persistent Python worker, should load the packaged provider and run the suite rather than failing to import fab-test.
 
 ---
 
@@ -73,6 +78,18 @@ Resolve a Data Agent's API URL from its name via the Fabric API (decision 4).
 
 ## Suite Pairing And Effective Config
 
+**Status**: Implemented 2026-11-19 in `_data_agent_suite.py`. Shared logicalId pairing, duplicate
+claim refusal, explicit `--tests`, packaged-provider injection, native/template config preservation,
+and conversation concurrency are covered. Malformed config values are refused rather than silently
+replaced with defaults. The current run accepts inline test mappings; external
+test-file loading is not implemented. promptfoo 0.124.0 accepts the effective config and per-test
+`metadata.id` through `validate config --config FILE` (real-tool test); bare `validate` is a command
+group, not the validation invocation. Its help offers no JSON output flag.
+On Windows with Node 26.1.0, one CI-mode validation ended in a libuv shutdown assertion
+after printing "Configuration is valid"; a same-environment focused rerun passed.
+The lint task must verify clean exit behavior on its supported CI runtime, not treat
+that success-shaped log as a successful validation.
+
 One pairing rule that the run, `tests init` and `tests lint` all call, and the generated config promptfoo actually reads.
 
 **Requirements**:
@@ -86,6 +103,18 @@ One pairing rule that the run, `tests init` and `tests lint` all call, and the g
 
 ## Analyzer Wrapper (`invoke_data_agent.py`)
 
+**Status**: Implemented 2026-11-19. Real promptfoo 0.124.0 eval with an echo Python provider
+verifies pass/fail result mapping without live agent calls; the installed console script is
+exercised under default, `-q`, `-v`, JSON, `--report`, and CI-suppressed `--open-report`.
+Native output is captured temporarily and persisted redacted, as are the effective config,
+envelope and report. `--no-cache --no-write --no-share` prevent upstream cache/database/share
+copies; promptfoo's config directory is isolated per run. The wrapper passes its own interpreter
+and the credential-file override, and pins conversation workers to one.
+The installed-console timeout regression confirms the wrapper writes its error envelope before
+the outer CLI deadline. Latest focused verification: 172 checks pass with `CI=true` and
+`GITHUB_ACTIONS=true`, including the timeout, config guards, registration, ratchets and skill sync;
+whole-repository ruff is clean. Live-agent verification remains pending below.
+
 Run `promptfoo eval --output results.json` and map results to the one contract, porting PR #49's mapping and redaction.
 
 **Requirements**:
@@ -94,12 +123,19 @@ Run `promptfoo eval --output results.json` and map results to the one contract, 
 - Given promptfoo loads the provider by file path and imports `fab_test`, should run promptfoo with `PROMPTFOO_PYTHON` set to fab-test's own interpreter, and `--env-file` passed on as `PLAYWRIGHT_ENV_FILE`, the variable `resolve_service_principal` searches.
 - Given any test uses `conversation`, should set the provider's `workers: 1` as well as `maxConcurrency: 1`: the thread cache lives in one Python worker's memory, and promptfoo 0.124.0 takes `config.workers` over `PROMPTFOO_PYTHON_WORKERS` and `-j`.
 - Given missing credentials, should preflight-exit `127` naming the exact env vars and `fab-test auth status` before any promptfoo invocation; given a promptfoo crash or usage error, should write an error envelope — never report a prerequisite failure as test verdicts (the pytest-usage-error lesson).
+- Given a suite in a different directory from the caller, should use the same credentials in promptfoo as the preflight; given a provider or worker error, should report an error rather than an assertion failure.
 - Given `ANALYZER_VERBOSITY=summary`/`-q`, should honor the QuietLine contract; given `--format json`, stdout stays one pure document.
 - Given telemetry, should route to `fabric_dynamic_analysis` with artifact_type `DataAgent`, mode as a dimension, and no connection details.
 
 ---
 
 ## Registration And Mode Wiring
+
+**Status**: Run wiring implemented 2026-11-19 behind `FAB_TEST_ENABLE_DATA_AGENT`. Includes
+service-only mode, aliases, scoped discovery, tool/credential readiness, telemetry routing,
+workspace enumeration limit, `all` opt-in with a workspace, and exclusion from `local`.
+`tests` noun registration remains part of Authoring Noun Dispatch below. A dry run lists local
+denominators without a token; it cannot enumerate a live workspace inventory offline.
 
 All analyzer-contract touch points, behind the feature flag, with decision 12's mode rule.
 
@@ -148,6 +184,14 @@ Write a starter suite from the item's definition (decisions 10 and 14), planned 
 
 Check a suite against its item without the service (decision 13).
 
+**Status**: In progress. The CLI verb now performs offline pairing, test-id, credential
+and URL checks and pinned promptfoo config validation. Focused installed-console tests
+cover discovery, malformed files, duplicate suite claims and explicit config; ordinary
+analyzer targets still parse. Near-miss guidance, discovery, parity, all output modes
+and the live init-to-run flow remain to be verified. On Windows with Node 26.1.0,
+the real-validator test again hit the intermittent libuv shutdown assertion before a
+focused rerun passed; supported CI runtime behavior still needs verification.
+
 **Requirements**:
 - Given promptfoo 0.124.0, should characterize `promptfoo validate` first — its help, exit codes, JSON output, and whether it accepts unknown top-level keys and per-test `metadata` — and record the result in this epic before TDD.
 - Given `tests lint Sales.DataAgent`, should find the suite by the run's pairing, build the effective config as the run does with a placeholder agent URL, run `promptfoo validate` on it, add fab-test's own checks (the suite reads, pairs with an item, has unique test ids, and holds no credential or hand-built agent URL), and exit 0 clean, 1 on findings, 2 when nothing pairs, 127 when promptfoo is missing.
@@ -180,7 +224,51 @@ The parser-driven test plan.md deferred until a second authoring flow landed.
 
 ## Verify Live Against A Real Data Agent
 
+**Status**: Pending-live. Mocked Fabric calls and promptfoo's echo-provider checks do not
+satisfy this task. The checked-in `agent-sample-model.DataAgent` already declares
+`SampleModel-PQLAssert` as a semantic-model source; its published datasource has a placeholder
+workspace ID, so the deployed binding must be verified before claiming a live test.
+On 2026-11-20 the configured service principal accessed `fab-test-working-area` and its
+published `agent-sample-model`. Its published definition binds `SampleModel-PQLAssert`
+(`15b32997-f24c-4a7f-a1a2-d5f2f9bfb990`) in that workspace and selects `MarvelFact`.
+A direct provider smoke question, "How many characters are in the data?", returned `0`;
+the same question on retry returned `16,376`, which the user independently verified on
+2026-11-20. FabricIQ MCP query tools were unavailable here, so the baseline's query and
+verification method have not been independently recorded. Neither smoke call is a passing suite.
+The installed CLI subsequently ran the paired suite against the published agent: on
+2026-11-20, `fab-test data-agent agent-sample-model --artifact-dir fabric-artifacts
+--workspace 2aea22b0-2e68-485a-8902-e8e5da32e3ef --timeout 600 --report -q`
+exited 0 with promptfoo 0.124.0 and cft-fab-test 1.10.0b5. The factual answer was
+`16,376`, the conversation follow-up `Yes.`, and the agent declined the private-balance
+request. Redacted envelope and HTML report are in the session's
+`files/data-agent-live-credentials-fixed/data_agent/agent-sample-model/`.
+An isolated suite with the intentionally wrong `999,?999` expectation exited 1:
+the agent answered `16,376`, and the assertion appeared in both the redacted envelope
+and HTML report under `files/data-agent-live-intentional-failure/data_agent/agent-sample-model/`.
+Running the unchanged paired suite again exited 0 with the same three answers; its
+redacted evidence is under `files/data-agent-live-recovery/data_agent/agent-sample-model/`.
+Bare `fab-test data-agent`, with `FABRIC_WORKSPACE_ID` set, also exited 0 with
+`mode: service` and `source: env`; evidence is under
+`files/data-agent-live-bare/data_agent/agent-sample-model/`.
+Workspace enumeration with `--workspace` and no TARGET exited 0 for one agent,
+and stdout parsed as one JSON document; its redacted evidence is under
+`files/data-agent-live-enumeration/data_agent/agent-sample-model/`.
+The typed `fab-test-working-area.Workspace/agent-sample-model.DataAgent` target also
+exited 0 with `source: target`; evidence is under
+`files/data-agent-live-typed/data_agent/agent-sample-model/`.
+With credential variables unset and an absent `--env-file`, the installed CLI exited
+127 and named the required service-principal variables and `fab-test auth status`.
+The initial attempts exposed and led to fixes for a persistent-worker import collision,
+credential-file resolution after the working directory changed, and provider errors
+being mislabeled as assertion failures. Independent query provenance, authoring, and
+the remaining CLI blast-radius checks are still pending.
+
 **Requirements**:
+- Given the existing `agent-sample-model` and `SampleModel-PQLAssert`, should verify the deployed agent is published, bound to the actual deployed sample semantic model, and accessible to the test service principal; any required deployment, rebinding, or permission changes need explicit approval.
+- Given the selected `MarvelFact` table and `[Number of Characters]` measure, should query the semantic model independently to record verified expected answers, then ask the real Data Agent matching questions and compare its answers with those baselines, never with guessed figures or an echo provider.
+- Given the verified sample source, should author `agent-sample-model.DataAgent.promptfoo.yaml` beside the item, pair it using the item's logicalId, and include a grounded factual question, an out-of-scope refusal, and a conversation whose follow-up depends on the first turn.
+- Given that live suite, should demonstrate a clean run exits `0`, a deliberately incorrect expected answer exits `1` with the failed assertion in the envelope and HTML report, and restoring the verified expectation returns the suite to passing.
+- Given a live run, should record the command, package/promptfoo versions, verified source binding, baseline answers, observed answers, exit codes, and redacted result/report locations; should keep this task pending-live and the feature flag in place until these checks are evidenced.
 - Given `agent-sample-model` deployed and a service principal, should run bare mode, a typed service target, `--workspace` enumeration, and `tests init` → `tests lint` → the run through the installed console script, including a deliberately failing assertion, a multi-turn conversation, and the missing-credentials `127` path.
 - Given the blast-radius rule, should exercise `all`, `list`, `explain`, `doctor`, `-q`, `--format json`, `--dry-run`, `--report`, and the >5-agent refusal with and without `--all`.
 - Given the live run passes, should delete `data_agent` from `_FEATURES` and `FEATURE_SPELLINGS`, so the documented command exists (Feature Flags decision 3).
@@ -189,8 +277,39 @@ The parser-driven test plan.md deferred until a second authoring flow landed.
 
 ## AIDD Review
 
+**Status**: Review 1 done 2026-11-21 by an unanchored reviewer (aidd-review, python, module-budgets, tdd, analyzer-contract, command-grammar, polite-review; CLI exercised on scratch copies, no service calls). Gates: `ruff check .` clean; complexity and module-budget tests pass; non-playwright half 3518 passed, 87% coverage, 3 failures only in `tests/test_rtk_hook_safety.py` (the hook file is deleted in the working tree, unrelated to this epic); focused data-agent tests 118 passed; `pip-audit` clean. Findings are the next section. Playwright half and the `CI=true` pass are still to run (Quality Gates).
+
 **Requirements**:
 - Given the epic's diff, should be reviewed by a reviewer not anchored on the implementation, with aidd-review, aidd-python, aidd-module-budgets, aidd-tdd, aidd-analyzer-contract, aidd-command-grammar and aidd-polite-review, exercising the CLI on scratch copies.
+
+---
+
+## Review 1 Follow-ups
+
+**Status**: 📋 PLANNED. Ordered by severity; each is a task to do test-first. The **decide** points are settled by decisions 17–21 (2026-11-21): item 2 → 17, item 3 → 19, item 4 → 18, item 11 → 20, the `all` banner nit → 21.
+
+**Blocking**:
+1. ✅ *(2026-11-21: `near_miss` in `_authoring_parser.py`, called once from `fab_test._authoring_dispatch`; verbs, `contracts`/`test` spellings, aliases, flags as typed, real `init`/`lint`/`contracts` items run as targets; installed-console test for `pbir lint` → 2; CHANGELOG line. The Data Agent changelog entry waits for its feature, item 12.)* **Near-miss guidance is unmet** (Authoring Noun Dispatch). `fab-test pbir lint` still exits 0 having checked nothing; `pbir init Sales`, `pbir contracts init`, `data-agent init Sales`, `data-agent test lint` give argparse's generic error. Implement `did you mean: <exact command>` (exit 2, TARGET and flags as typed) once in `_authoring_parser`, unless an item has that name; add the CHANGELOG line for `pbir lint` 0 → 2.
+2. ✅ *(2026-11-21: provider host check on every bearer request, `_RefuseRedirects` opener, quoted ids, userinfo refused; `effective_config` refuses a suite or provider `env` that sets `FAB_TEST_*`, `FABRIC_*`, `AZURE_*`, `PROMPTFOO_*` or `PLAYWRIGHT_ENV_FILE`. Lint's warn/fail split is item 4.)* **Provider sends the bearer token to any HTTPS host in a suite, and keeps it across redirects** (`fabric_data_agent_provider.py` `_validated_base_url`, `urllib` redirects). Allowlist Fabric/Power BI hosts or require an explicit opt-in; refuse redirects; re-check the host inside `_http_json`. Quote `thread_id`/`run_id` in URLs. **decide**: the allowlist and the opt-in's spelling.
+3. ✅ *(2026-11-21: `_promptfoo_env` strips every service-principal spelling and the Azure SDK secrets. The provider reads the preflight's principal from a file in the run's private temp dir, deleted with it. The trust boundary is in README, QUICK-VALIDATION and the skill, both copies. Note: the real-validator tests hit the known Windows libuv shutdown assertion in 2 of 3 serial runs on Node 26.1.0. That makes lint report a valid suite as an error, so it is in item 5's scope.)* **A suite is code run with the service-principal secret in its environment** (`invoke_data_agent._evaluate` passes `os.environ`). Document the trust boundary (never run on untrusted PRs) in README, QUICK-VALIDATION and the skill; **decide** whether to also pass the secret only to the provider worker via the credential-file path.
+
+**Should-fix**:
+4. **Lint rejects what the run honors** (`base_url`, `fabric_urls`; decision 4's escape hatch and the template-migration requirement). **decide**: lint warns, or the escape hatch is documented as unlintable.
+5. **`tests lint` never installs promptfoo** (`_data_agent_lint_command.py` probes; the run resolves). A fresh CI runner exits 127 at lint, and lint skips its own offline checks when promptfoo is absent. Bootstrap like the run, or run `suite_problems` first and report 127 for the upstream half only.
+6. **Help advertises `data-agent [TARGET] tests …`, which does not parse**; the noun only works as the first word. Scan for the noun before the verb, or drop `[TARGET]` from the usage.
+7. **Discoverability**: `fab-test help`, `list --format json` and `explain data-agent` do not name the verbs; `known-gaps.md` still describes the removed argv check.
+8. **Docs contradict the code**: README, QUICK-VALIDATION, skill and flags.md say init/lint are pending. Still to write: flag table (init, lint, run columns), mode matrix and SP setup, `docs/DATA-AGENT-TESTS-WALKTHROUGH.md`, `docs/examples/` CI snippets, skill targeting and credentials references (copies stay byte-identical).
+9. **Shared authoring module is half done**: run-flag refusal and `add_output_flags` remain in `_slicer_init_output.py` and are re-implemented in `_data_agent_authoring.py` and `_authoring_parser.py`; the authoring layer imports private names from `invoke_data_agent` and `_data_agent_lint_command`.
+10. **`tests init` is thin (decision 14)**: one hard-coded refusal, `aiInstructions` appended as text, `suggested` always null. Derive refusals from what the sources do not cover and questions from selected tables.
+11. **Telemetry is untested.** Add tests for the table, `artifact_type: DataAgent`, mode and no secrets; answers stay (decision 20); document the reader-access caveat.
+12. **Version bump and CHANGELOG entry** are missing for the data-agent work (`aidd-log`; skill frontmatter re-stamp).
+13. **Module budgets**: `fab_test_parser.py` is 1131 lines (hard limit 800) and grew without a dated exemption note; `fab_test_summary.py` is 792; `fab_test.py` 443 (soft 400). Add the exemption note or extract the data-agent parser wiring.
+14. **Retry re-posts a user turn** on a persistent conversation thread when the failure follows the post. Make the post idempotent or do not retry after a successful post.
+15. **Out-of-scope changes in the diff** (`fabric-artifacts/README.md`, `tests/test_rdl_fixture_generator.py`, `.platform` edits, the deleted rtk hook): commit separately; restore the hook or drop its test before the final gate.
+
+**Nits**: dead `contract_main` and `import os as os`; `_run_targets.py` conditional; `default_type="DataAgent"` hard-coded twice (move to `service_item_type`); `-q` with `--dry-run` prints full text; `explain` prints an empty `--promptfoo-path`; bare-JWT redaction; provider re-reads the principal on every call (cache per process); `_existing()` refuses any `#`; `all` banner stays `mode=local` when `data_agent` runs in service mode (**decide** against Service Targeting); stale epic text (header "PLANNED", provider line/test counts, the package shim `src/fab_test/fabric_data_agent_provider.py`, Registration's "tests noun remains").
+
+**Missing tasks confirmed**: Authoring Grammar Parity Test (no file), Document All Three Callers (above), blast-radius pass of both verbs through the installed console script.
 
 ---
 

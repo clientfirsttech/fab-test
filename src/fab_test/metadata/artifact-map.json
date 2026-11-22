@@ -3,6 +3,7 @@
   ".Report": "Report",
   ".PaginatedReport": "PaginatedReport",
   ".Agent": "Agent",
+  ".DataAgent": "DataAgent",
   ".Notebook": "Notebook",
   ".Dataflow": "Dataflow",
   ".Eventhouse": "Eventhouse",

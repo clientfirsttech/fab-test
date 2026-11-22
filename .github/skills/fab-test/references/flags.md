@@ -32,6 +32,27 @@ The older spelling still works: `fab-test bpa --artifact SampleModel-PQLAssert`.
 
 ## Subcommand-Specific Flags
 
+### data-agent (feature-gated)
+
+Enable with `FAB_TEST_ENABLE_DATA_AGENT=1`; aliases: `agent`, `data_agent`.
+Runs against deployed agents only. Suites live beside the `.DataAgent` item,
+not inside its definition. `tests init` and `tests lint` are pending.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `TARGET` | local items with paired suites | Item name/path or `WORKSPACE.Workspace/NAME.DataAgent` |
+| `--workspace NAME_OR_ID` | `FABRIC_WORKSPACE_ID`, then config `workspace:` | Select the workspace; without TARGET, enumerate its deployed agents |
+| `--tests FILE` | logicalId-paired `*.DataAgent.promptfoo.yaml` | Override pairing; required for a service target without a local item |
+| `--env-file PATH` | existing credential-file search | Passed through as `PLAYWRIGHT_ENV_FILE` to the Python provider |
+| `--all` | off | Allow live enumeration over five agents |
+
+Common run flags (`--artifact-dir`, `--output-dir`, `--timeout`, `--jobs`,
+`--dry-run`, verbosity, JSON, reports, telemetry) keep their usual meanings.
+Dry runs show local suite denominators, not a live workspace inventory.
+Node.js >=22.22.0, pinned promptfoo 0.124.0, and a full service principal are
+required. Results live under `data_agent/<results_stem>/`; telemetry uses
+`fabric_dynamic_analysis` with artifact type `DataAgent`.
+
 ### local
 
 Runs BPA, PBIR Inspector, and Desktop-bound `pql-test` against every `.pbip` project discovered under `--artifact-dir` — no `fabric-artifacts` layout required, no Fabric workspace, no service principal. Its subparser doesn't expose `--workspace-id` or `--env` at all, so the remote XMLA path is unreachable from `local`.

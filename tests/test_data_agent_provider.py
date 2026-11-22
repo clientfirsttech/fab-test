@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-pytestmark = pytest.mark.fab_test
+pytestmark = [pytest.mark.fab_test, pytest.mark.data_agent]
 
 BASE = "https://api.fabric.microsoft.com/v1/workspaces/ws/dataagents/agent/aiassistant/openai"
 API = "api-version=2024-05-01-preview"
@@ -197,6 +197,81 @@ def test_given_an_http_url_should_refuse_it(provider, agent):
     assert agent.calls == []
 
 
+# -- where the token may go (decision 17) --------------------------------------
+
+
+@pytest.mark.parametrize("agent_url", [
+    "https://evil.example/agent",
+    "https://api.fabric.microsoft.com.evil.example/agent",
+    "https://evilfabric.microsoft.com/agent",
+    "https://user@evil.example/agent",
+], ids=["foreign", "suffix-spoof", "no-dot-boundary", "userinfo"])
+def test_given_a_base_url_off_the_fabric_hosts_should_refuse_it_before_any_token(provider, agent, agent_url):
+    result = provider.call_api("q", _options(base_url=agent_url), {"vars": {}})
+
+    assert set(result) == {"error"}
+    assert "FAB_TEST_DATA_AGENT_ALLOWED_HOSTS" in result["error"]
+    assert agent.calls == []  # no token requested, none sent
+
+
+@pytest.mark.parametrize("agent_url", [
+    BASE,
+    "https://westus.fabric.microsoft.com/v1/x",
+    "https://wabi-west-us.analysis.windows.net.powerbi.com/x",
+    "https://API.Fabric.Microsoft.com/v1/x",
+], ids=["api", "regional", "powerbi", "case"])
+def test_given_a_fabric_or_power_bi_host_should_accept_it(provider, agent_url):
+    assert provider._validated_base_url(agent_url) == agent_url.rstrip("/")
+
+
+def test_given_a_host_allowed_by_the_callers_environment_should_call_it(provider, monkeypatch):
+    monkeypatch.setenv("FAB_TEST_DATA_AGENT_ALLOWED_HOSTS", " gateway.contoso.example , other.example")
+
+    assert provider._validated_base_url("https://Gateway.Contoso.Example/agent/") == (
+        "https://Gateway.Contoso.Example/agent"
+    )
+    with pytest.raises(provider._Final):
+        provider._validated_base_url("https://sub.gateway.contoso.example/agent")  # exact hosts only
+
+
+def test_given_a_bearer_request_to_a_foreign_host_should_refuse_without_sending(provider, monkeypatch):
+    sent = []
+    monkeypatch.setattr(provider, "_urlopen", lambda request, timeout: sent.append(request))
+
+    with pytest.raises(provider._Final, match=r"evil\.example"):
+        provider._http_json("GET", "https://evil.example/threads", token="tok-123")
+    assert sent == []
+
+
+def test_given_a_redirect_should_refuse_to_follow_it_with_the_token(provider):
+    import urllib.request
+
+    request = urllib.request.Request(f"{BASE}/threads", headers={"Authorization": "Bearer tok-123"})  # noqa: S310
+    handler = provider._RefuseRedirects()
+
+    with pytest.raises(provider._Final, match="redirect") as raised:
+        handler.redirect_request(request, None, 302, "Found", {}, "https://evil.example/steal")
+    assert "evil.example" in str(raised.value)
+    assert "tok-123" not in str(raised.value)
+
+
+def test_given_server_issued_ids_should_quote_them_into_the_path(provider, agent, monkeypatch):
+    odd, quoted = "../../evil?x=", "..%2F..%2Fevil%3Fx%3D"
+    urls = []
+
+    def odd_thread_ids(method, url, **kwargs):
+        urls.append(url)
+        if url.endswith(f"/threads?{API}"):
+            return {"id": odd}
+        return agent(method, url.replace(quoted, "thread-1"), **kwargs)
+
+    monkeypatch.setattr(provider, "_http_json", odd_thread_ids)
+
+    assert provider.call_api("q", _options(), {"vars": {}}) == {"output": "42"}
+    assert any(quoted in url for url in urls)
+    assert not any(odd in url for url in urls)
+
+
 @pytest.mark.parametrize("vars_", [
     {"agent": "sales"},
     {"query": "sales|||What were sales last month?"},
@@ -246,7 +321,7 @@ def test_given_a_request_should_send_json_with_the_bearer_token(provider, monkey
                     auth=request.get_header("Authorization"), timeout=timeout)
         return Response()
 
-    monkeypatch.setattr(provider.urllib.request, "urlopen", urlopen)
+    monkeypatch.setattr(provider, "_urlopen", urlopen)
 
     result = provider._http_json("POST", f"{BASE}/threads?{API}", token="tok-123", timeout=7, json={"a": 1})
 

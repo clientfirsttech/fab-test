@@ -14,20 +14,17 @@ always print: they are what was asked for. `lint` shares all of this.
 from __future__ import annotations
 
 import argparse
-import json
-import os
-import sys
+import os as os
 from pathlib import Path
 from typing import Any
 
-from ._cli_utils import ARTIFACT_DIR_HELP, ARTIFACT_HELP, FORMAT_HELP
-from ._config import VERBOSITY_LEVELS, ConfigError, merged_file_config, resolve_setting, verbosity_level
-from ._metadata import default_repo_root
+from ._authoring_output import can_ask as _can_ask
+from ._authoring_output import console as _console
+from ._authoring_output import next_command
 from ._pbir_rule_sources import expects
 from ._scan import find_artifact_dirs
 from ._slicer_init_calendar import describe_calendar
 
-FORMATS = ("text", "json")
 _DOES = {"init": "writes a contract", "lint": "checks a contract"}
 TARGET_HELP = "a path (./Sales.Report) or a name (Sales or Sales.Report) found under --artifact-dir"
 
@@ -58,36 +55,23 @@ def find_report(args: argparse.Namespace) -> Path:
     return report
 
 
-def file_config() -> dict:
-    """fab-test.yml over pyproject.toml's [tool.fab-test], read from where `fab-test pbir` reads it.
-    Empty when it can't be read: the run is what reports a broken config."""
-    root = default_repo_root()
-    try:
-        return merged_file_config(root, root / "pyproject.toml")[0]
-    except ConfigError:
-        return {}
-
-
-def add_input_flags(parser: argparse.ArgumentParser, target_help: str) -> None:
-    """The report and output format, named, described and defaulted as `fab-test pbir` does."""
-    parser.add_argument("target", nargs="?", default=None, metavar="TARGET", help=target_help)
-    parser.add_argument("--artifact", default=None, metavar="STEM", help=ARTIFACT_HELP)
-    parser.add_argument("--artifact-dir", default=None, metavar="DIR", help=ARTIFACT_DIR_HELP)
-    parser.add_argument("--format", choices=list(FORMATS), default=None, dest="output_format", help=FORMAT_HELP)
-
-
 def parse(parser: argparse.ArgumentParser, argv: list[str]) -> tuple[argparse.Namespace, str | None]:
     """Parse ``argv``; a flag of `fab-test pbir` that the verb doesn't take is a refusal naming the run,
     never argparse's "unrecognized arguments". Anything else unknown is still argparse's error."""
     args, unknown = parser.parse_known_args(argv)
+    return args, unknown_refusal(parser, args, unknown)
+
+
+def unknown_refusal(parser: argparse.ArgumentParser, args: argparse.Namespace, unknown: list[str]) -> str | None:
+    """Refuse run-only flags while leaving unknown options to argparse."""
     flags = [arg.split("=")[0] for arg in unknown if arg.startswith("-")]
     if not flags or flags[0] not in _run_flags():
         if unknown:
             parser.error(f"unrecognized arguments: {' '.join(unknown)}")
-        return args, None
+        return None
     name = Path(args.target or args.artifact or "REPORT").name.removesuffix(".Report")
-    return args, (f"{flags[0]}: contract {args.action} doesn't take it; it's a flag of the run: "
-                  f"fab-test pbir {name} {flags[0]} ...")
+    return (f"{flags[0]}: contract {args.action} doesn't take it; it's a flag of the run: "
+            f"fab-test pbir {name} {flags[0]} ...")
 
 
 def _run_flags() -> set[str]:
@@ -97,35 +81,11 @@ def _run_flags() -> set[str]:
     return {option for action in subs.choices["pbir"]._actions for option in action.option_strings}
 
 
-def resolve_inputs(args: argparse.Namespace) -> None:
-    """Fill the defaults the flags left open: the flag, then fab-test.yml, then the packaged default."""
-    config = file_config()
-    args.artifact_dir_given = args.artifact_dir is not None
-    args.artifact_dir = args.artifact_dir or str(config.get("artifact_dir", default_repo_root()))
-    if args.output_format is None:
-        args.output_format = config.get("format") if config.get("format") in FORMATS else "text"
-
-
 def can_ask() -> bool:
     """Whether a person is there to answer: prompts go to stderr and answers come from stdin, so both must be
     a terminal. Windows reports the null device as one (NUL is a character device), which is how coding
     agents run commands; there, only a real console has a console mode."""
-    streams = (sys.stdin, sys.stderr)
-    if not all(stream.isatty() for stream in streams):
-        return False
-    return os.name != "nt" or all(_console(stream) for stream in streams)
-
-
-def _console(stream: Any) -> bool:
-    try:
-        import ctypes
-        import msvcrt
-        from ctypes import wintypes
-
-        handle = wintypes.HANDLE(msvcrt.get_osfhandle(stream.fileno()))
-        return bool(ctypes.windll.kernel32.GetConsoleMode(handle, ctypes.byref(wintypes.DWORD())))
-    except (AttributeError, ImportError, OSError, ValueError):  # no file handle, or not Windows
-        return False
+    return _can_ask(_console)
 
 
 def add_output_flags(parser: argparse.ArgumentParser, refused: tuple[str, ...] = ("--contract", "--output-dir"),
@@ -147,18 +107,6 @@ class _Named(argparse.Action):
         setattr(namespace, self.dest, [*(getattr(namespace, self.dest, None) or []), option_string])
 
 
-def level(args: argparse.Namespace) -> str:
-    """summary, default or verbose: the flags, then ANALYZER_VERBOSITY, then fab-test.yml, as for every command."""
-    if args.quiet:
-        return "summary"
-    if args.verbose:
-        return "verbose"
-    value, _origin = resolve_setting("verbosity", cli_value=None, env_var="ANALYZER_VERBOSITY",
-                                     file_config=file_config(), packaged_default="default", cast=verbosity_level)
-    value = str(value).strip().lower()
-    return {"debug": "verbose"}.get(value, value) if value in VERBOSITY_LEVELS else "default"
-
-
 def pbir_refusal(args: argparse.Namespace, report_name: str, verb: str = "init") -> str | None:
     """Why one of `fab-test pbir`'s flags doesn't apply to ``verb``, naming the command it belongs to."""
     if not getattr(args, "pbir_flags", None):
@@ -173,29 +121,10 @@ def pbir_refusal(args: argparse.Namespace, report_name: str, verb: str = "init")
             f"fab-test pbir {name} --open-report")
 
 
-def next_command(args: argparse.Namespace, command: str) -> str:
-    """``command`` with the TARGET and --artifact-dir as they were typed, so it runs from the same folder."""
-    target = args.target or args.artifact
-    words = [*([target] if target else []),
-             *(["--artifact-dir", args.artifact_dir] if getattr(args, "artifact_dir_given", False) else [])]
-    return " ".join([command, *(f'"{word}"' if " " in word else word for word in words)])
-
-
 def with_next(payload: dict, args: argparse.Namespace) -> dict:
     """``payload`` naming the step after init: lint the contract, once one was written."""
     written = payload.get("written")
     return {**payload, "next": next_command(args, "fab-test pbir contract lint") if written else None}
-
-
-def print_payload(args: argparse.Namespace, payload: dict, as_text, asked_for: bool = False, as_line=None) -> None:
-    """JSON always; text unless quiet, or always when it is what was asked for (--questions, --dry-run);
-    quiet prints ``as_line``, the one result line, when there is one."""
-    if args.output_format == "json":
-        print(json.dumps(payload, indent=2, default=str))
-    elif asked_for or level(args) != "summary":
-        print(as_text(payload))
-    elif as_line:
-        print(as_line(payload))
 
 
 def result_line(summary: dict) -> str:

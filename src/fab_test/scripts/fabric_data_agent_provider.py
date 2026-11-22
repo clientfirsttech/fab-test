@@ -6,9 +6,8 @@ assistant and a thread, posts the prompt, runs it, polls until the run ends,
 reads the agent's last reply, and deletes the thread -- unless the test names
 a ``conversation``, whose thread is kept for the next turn.
 
-promptfoo loads this file by path (``spec_from_file_location``), not as part
-of the package, so imports are absolute and the wrapper points
-``PROMPTFOO_PYTHON`` at fab-test's own interpreter.
+promptfoo loads the package-level entry point by path; that entry point imports
+this module using the interpreter selected by ``PROMPTFOO_PYTHON``.
 """
 
 from __future__ import annotations
@@ -37,6 +36,8 @@ _POLL_SECONDS = 2
 _TOKEN_REFRESH_MARGIN_SECONDS = 300
 _TERMINAL = frozenset({"completed", "failed", "cancelled", "expired"})
 _BEARER = re.compile(r"(?i)\bbearer\s+[A-Za-z0-9._~+/=-]+")
+ALLOWED_HOSTS_VAR = "FAB_TEST_DATA_AGENT_ALLOWED_HOSTS"
+_TOKEN_HOST_SUFFIXES = (".fabric.microsoft.com", ".powerbi.com")
 
 _TOKEN_CACHE: dict[str, tuple[str, float]] = {}
 _THREAD_CACHE: dict[str, str] = {}
@@ -109,17 +110,60 @@ def _error_text(exc: Exception) -> str:
     return _redact(str(exc))
 
 
-def _http_json(method: str, url: str, **kwargs: Any) -> dict[str, Any]:
+def _allowed_host(host: str) -> bool:
+    """Fabric and Power BI hosts, plus exact hosts the caller's environment names (decision 17).
+
+    Read from the environment, never the suite: whoever writes a suite controls its URL,
+    so a suite must not be able to widen where the token goes.
+    """
+    host = host.lower().rstrip(".")
+    if host.endswith(_TOKEN_HOST_SUFFIXES):
+        return True
+    extra = os.environ.get(ALLOWED_HOSTS_VAR, "")
+    return host in {item.strip().lower() for item in extra.split(",") if item.strip()}
+
+
+def _check_destination(url: str) -> urllib.parse.SplitResult:
     parsed = urllib.parse.urlsplit(url)
+    if parsed.scheme != "https":
+        raise _Final(f"Data Agent URLs must use https: {parsed.scheme}://{parsed.hostname or ''}")
+    if parsed.username or parsed.password or not _allowed_host(parsed.hostname or ""):
+        raise _Final(
+            f"fab-test sends the Fabric token only to Fabric or Power BI hosts, not {parsed.hostname!r}. "
+            f"Remove the suite's base_url/fabric_urls, or allow the exact host in the caller's "
+            f"{ALLOWED_HOSTS_VAR} (comma-separated)"
+        )
+    return parsed
+
+
+class _RefuseRedirects(urllib.request.HTTPRedirectHandler):
+    """urllib keeps the Authorization header across a redirect, so fab-test follows none."""
+
+    def redirect_request(self, _req, _fp, code, _msg, _headers, newurl):  # urllib calls it positionally
+        host = urllib.parse.urlsplit(newurl).hostname
+        raise _Final(f"the Data Agent API answered HTTP {code}, a redirect to {host!r}; fab-test does not follow "
+                     "redirects with a token. Check the agent URL")
+
+
+_OPENER = urllib.request.build_opener(_RefuseRedirects())
+
+
+def _urlopen(request: urllib.request.Request, timeout: float):
+    return _OPENER.open(request, timeout=timeout)
+
+
+def _http_json(method: str, url: str, **kwargs: Any) -> dict[str, Any]:
+    token = kwargs.get("token")
+    parsed = _check_destination(url) if token else urllib.parse.urlsplit(url)
     if parsed.scheme != "https":
         raise _Final(f"Data Agent URLs must use https: {parsed.geturl()}")
     data = kwargs.get("json")
     body = json.dumps(data).encode("utf-8") if data is not None else kwargs.get("data")
     headers = kwargs.get("headers") or {"Content-Type": "application/json"}
-    if kwargs.get("token"):
-        headers = {**headers, "Authorization": "Bearer " + kwargs["token"]}
+    if token:
+        headers = {**headers, "Authorization": "Bearer " + token}
     request = urllib.request.Request(parsed.geturl(), data=body, headers=headers, method=method)  # noqa: S310
-    with urllib.request.urlopen(request, timeout=kwargs.get("timeout", 30)) as response:  # noqa: S310
+    with _urlopen(request, timeout=kwargs.get("timeout", 30)) as response:
         payload = response.read().decode("utf-8")
     return json.loads(payload) if payload else {}
 
@@ -189,10 +233,15 @@ def _authed_json(method: str, url: str, *, timeout: int, **kwargs: Any) -> dict[
 
 
 def _validated_base_url(raw_url: str) -> str:
+    """Refuse an http or non-Fabric agent URL before any token is fetched."""
     base_url = raw_url.rstrip("/")
-    if urllib.parse.urlsplit(base_url).scheme != "https":
-        raise _Final(f"Data Agent base_url must use https: {base_url}")
+    _check_destination(base_url)
     return base_url
+
+
+def _segment(value: Any) -> str:
+    """A server-issued id as one path segment: ``/`` and ``?`` can't steer the request."""
+    return urllib.parse.quote(str(value), safe="")
 
 
 def _base_url(options: dict[str, Any], context: dict[str, Any]) -> str:
@@ -246,7 +295,7 @@ def _post_message(base_url: str, vars_: dict[str, Any], thread_id: str, prompt: 
     url = f"{base_url}/threads/{{}}/messages?api-version={DATA_AGENT_API_VERSION}"
     message = {"role": "user", "content": prompt}
     try:
-        _authed_json("POST", url.format(thread_id), timeout=timeout, json=message)
+        _authed_json("POST", url.format(_segment(thread_id)), timeout=timeout, json=message)
     except Exception as exc:
         if not _is_missing_thread(exc):
             raise
@@ -255,7 +304,7 @@ def _post_message(base_url: str, vars_: dict[str, Any], thread_id: str, prompt: 
     with _THREAD_LOCK:
         _THREAD_CACHE.pop(_conversation_key(base_url, vars_), None)
     thread_id = _thread_id(base_url, vars_, timeout)
-    _authed_json("POST", url.format(thread_id), timeout=timeout, json=message)
+    _authed_json("POST", url.format(_segment(thread_id)), timeout=timeout, json=message)
     return thread_id
 
 
@@ -265,7 +314,8 @@ def _await_run(base_url: str, thread_id: str, run: dict[str, Any], timeout: int)
         if _monotonic() - started > timeout:
             raise RuntimeError(f"Timed out waiting for Data Agent run after {timeout}s")
         _sleep(_POLL_SECONDS)
-        url = f"{base_url}/threads/{thread_id}/runs/{run['id']}?api-version={DATA_AGENT_API_VERSION}"
+        url = (f"{base_url}/threads/{_segment(thread_id)}/runs/{_segment(run['id'])}"
+               f"?api-version={DATA_AGENT_API_VERSION}")
         status = str(_authed_json("GET", url, timeout=timeout).get("status", ""))
     if status != "completed":
         raise RuntimeError(f"Data Agent run ended with status '{status}'")
@@ -291,19 +341,18 @@ def _run_once(prompt: str, options: dict[str, Any], context: dict[str, Any]) -> 
         assistant_id = _authed_json("POST", f"{base_url}/assistants?api-version={DATA_AGENT_API_VERSION}",
                                     timeout=timeout, json={})["id"]
         thread_id = _post_message(base_url, vars_, _thread_id(base_url, vars_, timeout), prompt, timeout)
-        run = _authed_json("POST", f"{base_url}/threads/{thread_id}/runs?api-version={DATA_AGENT_API_VERSION}",
+        thread = f"{base_url}/threads/{_segment(thread_id)}"
+        run = _authed_json("POST", f"{thread}/runs?api-version={DATA_AGENT_API_VERSION}",
                            timeout=timeout, json={"assistant_id": assistant_id})
         _await_run(base_url, thread_id, run, timeout)
-        messages = _authed_json(
-            "GET", f"{base_url}/threads/{thread_id}/messages?order=asc&api-version={DATA_AGENT_API_VERSION}",
-            timeout=timeout,
-        )
+        messages = _authed_json("GET", f"{thread}/messages?order=asc&api-version={DATA_AGENT_API_VERSION}",
+                                timeout=timeout)
         return {"output": _last_assistant_text(messages)}
     finally:
         if own_thread and thread_id:
             with contextlib.suppress(Exception):
-                _authed_json("DELETE", f"{base_url}/threads/{thread_id}?api-version={DATA_AGENT_API_VERSION}",
-                             timeout=timeout)
+                _authed_json("DELETE", f"{base_url}/threads/{_segment(thread_id)}"
+                             f"?api-version={DATA_AGENT_API_VERSION}", timeout=timeout)
 
 
 def call_api(prompt: str, options: dict[str, Any], context: dict[str, Any]) -> dict[str, str]:

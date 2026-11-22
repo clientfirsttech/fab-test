@@ -64,6 +64,7 @@ ANALYZER_REGISTRY: dict[str, tuple[str, str]] = {
     "playwright": ("*.Report", "Playwright visual/error validation"),
     "dependencies": ("", "Report dependency discovery"),
     "rdl": ("*.rdl", "RDL (paginated report) static analysis"),
+    "data_agent": ("*.DataAgent", "Deployed Data Agent tests (promptfoo)"),
 }
 
 # Analyzers kept out of the advertised surface: absent from `--help`,
@@ -102,6 +103,7 @@ ANALYZER_SCOPES: dict[str, frozenset[str]] = {
     "pql_test": frozenset({"path", "desktop", "workspace"}),
     "playwright": frozenset({"path", "workspace"}),
     "dependencies": frozenset({"path", "workspace"}),
+    "data_agent": frozenset({"path", "workspace"}),
 }
 
 _SCOPE_HINTS = {
@@ -180,7 +182,7 @@ _BOOTSTRAPPED_ANALYZERS = {"bpa", "pbir", "a11y", "data_agent"}
 # only -- a running Power BI Desktop instance to bind to. Without this set,
 # check_readiness reported them ready on the strength of having no tool to
 # find, a green light `doctor` could not honor.
-_CLOUD_ANALYZERS = {"pql_test", "playwright", "dependencies"}
+_CLOUD_ANALYZERS = {"pql_test", "playwright", "dependencies", "data_agent"}
 
 # The subset that can bind to a running Desktop instance instead of a
 # workspace. Only pql_test does today; see build_pql_test_command.

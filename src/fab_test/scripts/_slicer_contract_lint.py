@@ -32,6 +32,7 @@ from typing import Any
 
 import yaml
 
+from ._authoring_output import add_input_flags, level, next_command, print_payload
 from ._scan import find_artifact_dirs
 from ._slicer_calendar import CalendarError, resolve_contract, today
 from ._slicer_contract import ContractError, load_contract
@@ -39,13 +40,9 @@ from ._slicer_contract_run import AS_OF_HELP, CONTRACT_SUFFIX, contract_files, r
 from ._slicer_init_output import (
     TARGET_HELP,
     InitError,
-    add_input_flags,
     add_output_flags,
     find_report,
-    level,
-    next_command,
     pbir_refusal,
-    print_payload,
 )
 
 _PQL_TEST = "pql-test"  # its console script, run with this interpreter so the version is the one fab-test pins

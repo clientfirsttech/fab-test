@@ -118,6 +118,66 @@ fab-test rdl                             # active rules for paginated (.rdl) rep
 fab-test pql-test --env DEV
 ```
 
+### Run feature-gated Data Agent tests
+
+Set `FAB_TEST_ENABLE_DATA_AGENT=1` and configure a workspace plus a full
+service principal (`FABRIC_TENANT_ID`, `FABRIC_CLIENT_ID`,
+`FABRIC_CLIENT_SECRET`). Keep `Sales.DataAgent.promptfoo.yaml` beside
+`Sales.DataAgent/`, with its `fabTestDataAgent` set to the item's `.platform`
+logicalId. The suite uses inline promptfoo tests and native assertions:
+
+```yaml
+fabTestDataAgent: <config.logicalId from Sales.DataAgent/.platform>
+prompts:
+  - "{{query}}"
+tests:
+  - description: Revenue regression
+    vars:
+      query: What was revenue last year?
+    assert:
+      - type: contains
+        value: "<verified expected answer>"
+```
+
+```bash
+fab-test data-agent --dry-run --format json  # pair local suites; no token or agent calls
+fab-test data-agent Sales.DataAgent --report
+fab-test data-agent "Dev.Workspace/Sales.DataAgent" --tests Sales.DataAgent.promptfoo.yaml --env-file .env
+```
+
+Node.js >=22.22.0 is required; promptfoo 0.124.0 installs on the first run.
+`--workspace NAME_OR_ID` without a target enumerates the workspace; over five
+agents needs `--all`. Unpaired items are skipped. Conversation vars
+`conversation`/`reset` force one Python worker and one concurrent call.
+Reports and redacted results use `fab-test-results/data_agent/<item>/`.
+Authoring commands are pending, so keep the suite manually for now.
+
+A pipeline can run an already-authored suite without prompts:
+
+```yaml
+- name: Test deployed Data Agents
+  env:
+    FAB_TEST_ENABLE_DATA_AGENT: "1"
+    FABRIC_WORKSPACE_ID: ${{ vars.FABRIC_WORKSPACE_ID }}
+    FABRIC_TENANT_ID: ${{ secrets.FABRIC_TENANT_ID }}
+    FABRIC_CLIENT_ID: ${{ secrets.FABRIC_CLIENT_ID }}
+    FABRIC_CLIENT_SECRET: ${{ secrets.FABRIC_CLIENT_SECRET }}
+  run: fab-test data-agent --artifact-dir fabric-artifacts --format json --report
+```
+
+Run this step only for trusted branches. A suite is code: promptfoo runs its
+`javascript` assertions with the job's permissions. Never run it on
+`pull_request_target` or fork pull requests that receive these secrets.
+fab-test sends the token only to Fabric and Power BI hosts. To add an exact
+host, set `FAB_TEST_DATA_AGENT_ALLOWED_HOSTS` in the job's `env`, never in the
+suite. The secret is kept out of promptfoo's environment. Grant the telemetry
+database to the same audience as the agent's data sources, because its rows
+carry the agent's redacted answers.
+
+Install fab-test and Node.js first. See the
+[CLI skill](../.github/skills/fab-test/SKILL.md) for the shared output modes and
+exit codes.
+
 ### Isolate one artifact
 
 ```bash
