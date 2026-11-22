@@ -38,6 +38,12 @@ EXEMPTIONS: dict[str, tuple[int, str]] = {
     "src/fab_test/scripts/fab_test_parser.py": (
         1131,
         (
+            "2026-11-21: +16 lines (1115 -> 1131, Data Agent Testing epic): the data-agent aliases, "
+            "hiding disabled analyzers from typo suggestions, the noun-aware parse_known_args that "
+            "makes `pbir contract` and `data-agent tests` real subparsers (decision 15), and the "
+            "flag-gated call into _data_agent_authoring.add_data_agent_parser, which holds the rest. "
+            "The ceiling is not raised again: the next addition extracts a subparser builder "
+            "instead (Review 2 follow-up 12). "
             "2026-10-06: +10 lines for the playwright --user-name flag. "
             "2026-10-06: +2 lines registering the feature-flag stubs and keeping them out of typo "
             "suggestions (Feature Flags epic; the stub logic itself lives in _feature_flags.py). "

@@ -1,6 +1,6 @@
 # Fabric Data Agent Testing Epic
 
-**Status**: 📋 PLANNED — 11 discovery decisions recorded 2026-10-04; decisions 3 and 10 rewritten and 12–16 added 2026-11-19 against [`aidd-command-grammar`](../.github/skills/aidd-command-grammar/SKILL.md). Supersedes PR #49.
+**Status**: 🔧 IN PROGRESS — Reviews 1 and 2 done 2026-11-21; docs, the parity test and the blast-radius pass remain. 11 discovery decisions recorded 2026-10-04; decisions 3 and 10 rewritten and 12–16 added 2026-11-19 against [`aidd-command-grammar`](../.github/skills/aidd-command-grammar/SKILL.md). Supersedes PR #49.
 **Goal**: A new `data-agent` analyzer that evaluates deployed Fabric Data Agents by running promptfoo with a packaged Python provider, following [fabric-data-agent-testing-template](https://github.com/clientfirsttech/fabric-data-agent-testing-template), with test suites authored through `fab-test data-agent tests init` and `tests lint`.
 
 ## Overview
@@ -61,7 +61,7 @@ Register promptfoo as a wrapped external tool so install, readiness, and provena
 
 ## Python Provider Module
 
-**Status**: ✅ 2026-11-19. `fabric_data_agent_provider.py` (323 lines, 97% covered by 20 tests in `tests/test_data_agent_provider.py`). Beyond PR #49: PR #49's provider could not load under promptfoo — 0.124.0's `wrapper.py` imports it with `spec_from_file_location(<stem>, path)`, no parent package, so its relative imports raised `ImportError` (reproduced); imports are now absolute and a test loads it the way promptfoo does. Credentials come from `resolve_service_principal` (aliases, `.fab-test/.env`, the incomplete-principal message) instead of `os.environ[...]` `KeyError`s, and a secret read from a `.env` file is redacted too. Credential errors, a 401 after one refresh, and a 403 are final (no retries) and name the fix; tokens are redacted from every error.
+**Status**: ✅ 2026-11-19. `fabric_data_agent_provider.py` (now 441 lines, tested by `tests/test_data_agent_provider.py` and `tests/test_data_agent_provider_failures.py`, 37 tests). The package shim `src/fab_test/fabric_data_agent_provider.py` is the path promptfoo loads. Beyond PR #49: PR #49's provider could not load under promptfoo — 0.124.0's `wrapper.py` imports it with `spec_from_file_location(<stem>, path)`, no parent package, so its relative imports raised `ImportError` (reproduced); imports are now absolute and a test loads it the way promptfoo does. Credentials come from `resolve_service_principal` (aliases, `.fab-test/.env`, the incomplete-principal message) instead of `os.environ[...]` `KeyError`s, and a secret read from a `.env` file is redacted too. Credential errors, a 401 after one refresh, and a 403 are final (no retries) and name the fix; tokens are redacted from every error.
 
 Port the template's `provider.ts` to promptfoo's Python provider contract, starting from PR #49's `fabric_data_agent_provider.py` and its tests.
 
@@ -148,7 +148,7 @@ Run `promptfoo eval --output results.json` and map results to the one contract, 
 **Status**: Run wiring implemented 2026-11-19 behind `FAB_TEST_ENABLE_DATA_AGENT`. Includes
 service-only mode, aliases, scoped discovery, tool/credential readiness, telemetry routing,
 workspace enumeration limit, `all` opt-in with a workspace, and exclusion from `local`.
-`tests` noun registration remains part of Authoring Noun Dispatch below. A dry run lists local
+The `tests` noun is registered too (Authoring Noun Dispatch). A dry run lists local
 denominators without a token; it cannot enumerate a live workspace inventory offline.
 
 All analyzer-contract touch points, behind the feature flag, with decision 12's mode rule.
@@ -199,7 +199,7 @@ Write a starter suite from the item's definition (decisions 10 and 14), planned 
 **Status**: ✅ 2026-11-21. The user writes the questions; suggestions are a `?` away and a number picks one (the user's correction: "I'm not asking the questions"). `_data_agent_init_tests.py` holds the match types, ids, chains, `--answers` parsing and the prompt loop, with 60 tests in `tests/test_data_agent_init_prompts.py`, including the whole console flow with typed input. The written regex and JavaScript checks were verified in Node against the live run's answers. Live: init `--answers` → lint → run against `agent-sample-model` passed 3 of 3 (`16,376` by number, `Yes.` as a starts-with follow-up in the same conversation, a refusal).
 - **Departures from the sketch below:** the user's own questions come first; Enter on "Expected answer" means the agent should decline, so there is no separate `r` step; starts and ends with ignore case and trailing punctuation (`Yes.` starts with `yes`). The `--answers` shape is `{"tests": [...]}` only. The old `{suggestion-id: answer}` shape, unreleased, now exits 2 naming the new one.
 - **Known gap:** a follow-up whose root is replaced with `--force` and no follow-ups keeps its old conversation id.
-- **Appending, politely (2026-11-21, the user: "polite software design would ask about that right?"):** init now says where the questions go before the first one: `Writing a new suite: PATH`, or `Adding to PATH, which has 3 tests:` with each id and question, and `--tests FILE` for a separate suite. A blanket "append? [y/N]" would be excise, since adding is why the person ran init and git undoes it. The question is asked only where intent is unclear and the default lost work: typing a question the suite already has (case, spacing and the trailing `?` don't matter) asks `[k]eep it (Enter) or [r]eplace with a new answer?`. Before this, init silently kept the old test and dropped the new answer. A matching question takes the existing id, even a hand-written one like `character-count`, so it is never added twice. `--answers` takes `"replace": true` for parity.
+- **Appending, politely (2026-11-21, the user: "polite software design would ask about that right?"):** init now says where the questions go before the first one: `Writing a new suite: PATH`, or `PATH has 3 tests:` with each id and question, and `--tests FILE` for a separate suite. A blanket "append? [y/N]" would be excise, since adding is why the person ran init and git undoes it. The question is asked only where intent is unclear and the default lost work: typing a question the suite already has (case, spacing and the trailing `?` don't matter) asks `[k]eep it (Enter) or [r]eplace with a new answer?`. Before this, init silently kept the old test and dropped the new answer. A matching question takes the existing id, even a hand-written one like `character-count`, so it is never added twice. `--answers` takes `"replace": true` for parity.
 - **Add or start over (2026-11-21, the user: "wouldn't you want to ask to replace the file or append?"):** yes. Starting a suite over is a real intent with no other path: `--force` replaces only matching tests. So when a suite exists, the listing ends with `[a]dd to it (Enter) or [r]eplace all 3 tests?`. Enter keeps the common path one key. `r` writes nothing until the person has written new questions, and none at all leaves the file untouched. The result line carries `removed=N` (`would remove=N` in a dry run). A console dry run offers `Replace the 3 tests in PATH with 2 new ones? [y/N]`. `--answers` takes `"replace_all": true`.
 
 What a session looks like (stderr prompts, defaults in brackets):
@@ -355,22 +355,22 @@ the remaining CLI blast-radius checks are still pending.
 3. ✅ *(2026-11-21: `_promptfoo_env` strips every service-principal spelling and the Azure SDK secrets. The provider reads the preflight's principal from a file in the run's private temp dir, deleted with it. The trust boundary is in README, QUICK-VALIDATION and the skill, both copies. Note: the real-validator tests hit the known Windows libuv shutdown assertion in 2 of 3 serial runs on Node 26.1.0. That makes lint report a valid suite as an error, so it is in item 5's scope.)* **A suite is code run with the service-principal secret in its environment** (`invoke_data_agent._evaluate` passes `os.environ`). Document the trust boundary (never run on untrusted PRs) in README, QUICK-VALIDATION and the skill; **decide** whether to also pass the secret only to the provider worker via the credential-file path.
 
 **Should-fix**:
-4. **Lint rejects what the run honors** (`base_url`, `fabric_urls`; decision 4's escape hatch and the template-migration requirement). **decide**: lint warns, or the escape hatch is documented as unlintable.
-5. **`tests lint` never installs promptfoo** (`_data_agent_lint_command.py` probes; the run resolves). A fresh CI runner exits 127 at lint, and lint skips its own offline checks when promptfoo is absent. Bootstrap like the run, or run `suite_problems` first and report 127 for the upstream half only.
-6. **Help advertises `data-agent [TARGET] tests …`, which does not parse**; the noun only works as the first word. Scan for the noun before the verb, or drop `[TARGET]` from the usage.
-7. **Discoverability**: `fab-test help`, `list --format json` and `explain data-agent` do not name the verbs; `known-gaps.md` still describes the removed argv check.
+4. ✅ *(Review 2 item 5)* **Lint rejects what the run honors** (`base_url`, `fabric_urls`; decision 4's escape hatch and the template-migration requirement). **decide**: lint warns, or the escape hatch is documented as unlintable.
+5. ✅ *(Review 2 item 6)* **`tests lint` never installs promptfoo** (`_data_agent_lint_command.py` probes; the run resolves). A fresh CI runner exits 127 at lint, and lint skips its own offline checks when promptfoo is absent. Bootstrap like the run, or run `suite_problems` first and report 127 for the upstream half only.
+6. ✅ *(Review 2 item 10)* **Help advertises `data-agent [TARGET] tests …`, which does not parse**; the noun only works as the first word. Scan for the noun before the verb, or drop `[TARGET]` from the usage.
+7. ✅ *(Review 2 item 10)* **Discoverability**: `fab-test help`, `list --format json` and `explain data-agent` do not name the verbs; `known-gaps.md` still describes the removed argv check.
 8. **Docs contradict the code**: README, QUICK-VALIDATION, skill and flags.md say init/lint are pending. Still to write: flag table (init, lint, run columns), mode matrix and SP setup, `docs/DATA-AGENT-TESTS-WALKTHROUGH.md`, `docs/examples/` CI snippets, skill targeting and credentials references (copies stay byte-identical).
 9. **Shared authoring module is half done**: run-flag refusal and `add_output_flags` remain in `_slicer_init_output.py` and are re-implemented in `_data_agent_authoring.py` and `_authoring_parser.py`; the authoring layer imports private names from `invoke_data_agent` and `_data_agent_lint_command`.
 10. **`tests init` is thin (decision 14)**: one hard-coded refusal, `aiInstructions` appended as text, `suggested` always null. Derive refusals from what the sources do not cover and questions from selected tables.
-11. **Telemetry is untested.** Add tests for the table, `artifact_type: DataAgent`, mode and no secrets; answers stay (decision 20); document the reader-access caveat.
-12. **Version bump and CHANGELOG entry** are missing for the data-agent work (`aidd-log`; skill frontmatter re-stamp).
-13. **Module budgets**: `fab_test_parser.py` is 1131 lines (hard limit 800) and grew without a dated exemption note; `fab_test_summary.py` is 792; `fab_test.py` 443 (soft 400). Add the exemption note or extract the data-agent parser wiring.
-14. **Retry re-posts a user turn** on a persistent conversation thread when the failure follows the post. Make the post idempotent or do not retry after a successful post.
+11. ✅ *(Review 2 item 11; the docs caveat was already done)* **Telemetry is untested.** Add tests for the table, `artifact_type: DataAgent`, mode and no secrets; answers stay (decision 20); document the reader-access caveat.
+12. ✅ *(Review 2 item 13; no bump: b5 is unpublished)* **Version bump and CHANGELOG entry** are missing for the data-agent work (`aidd-log`; skill frontmatter re-stamp).
+13. ✅ *(Review 2 item 12: a dated note; the next addition extracts)* **Module budgets**: `fab_test_parser.py` is 1131 lines (hard limit 800) and grew without a dated exemption note; `fab_test_summary.py` is 792; `fab_test.py` 443 (soft 400). Add the exemption note or extract the data-agent parser wiring.
+14. ✅ *(Review 2 item 8)* **Retry re-posts a user turn** on a persistent conversation thread when the failure follows the post. Make the post idempotent or do not retry after a successful post.
 15. **Out-of-scope changes in the diff** (`fabric-artifacts/README.md`, `tests/test_rdl_fixture_generator.py`, `.platform` edits, the deleted rtk hook): commit separately; restore the hook or drop its test before the final gate.
 
 **From the 2026-11-21 live attempt** (after syncing with `dev`; the workspace's capacity was paused, so Fabric answered `CapacityNotActive`. The token came from the new private credential file, and the resolved URL passed the host check):
-16. The summary line read `❌ agent-sample-model — no findings` for an error envelope. It should say `error` and show the message's first line.
-17. The provider retried a Fabric error marked `"isRetriable": false`. It should treat that flag, and `CapacityNotActive`, as final and name the fix: resume the capacity.
+16. ✅ *(Review 2 item 9)* The summary line read `❌ agent-sample-model — no findings` for an error envelope. It should say `error` and show the message's first line.
+17. ✅ *(Review 2 item 8)* The provider retried a Fabric error marked `"isRetriable": false`. It should treat that flag, and `CapacityNotActive`, as final and name the fix: resume the capacity.
 18. ✅ *(2026-11-21: the provider appends one line per answer to `FAB_TEST_DATA_AGENT_PROGRESS`, a file in the wrapper's private temp dir. `_data_agent_progress.Progress` tails it every 0.25 s while promptfoo runs. The lines go to the terminal itself (`CONOUT$`, `/dev/tty`), because fab-test replays the wrapper's stderr only at exit. After grading, `show_verdicts` prints ✓/✗ per test with the failed check. Off under `-q`, in CI, and with no console. Tested with a buffer while a fake promptfoo runs; a live run passed in 49 s.)* **A run is silent for about a minute and looks hung** (the user asked "seems like fab-test data_agent hanging", 2026-11-21; it passed in 58 s). Each question is several agent calls, about 20 s; the wrapper captures promptfoo and prints only at the end. Print `asking 3 questions of agent-sample-model (live agent calls, about 20 s each)` up front. Then print one line per answer on stderr as it lands: `✓ 1/3 Count characters (18 s)`, or `✗` with the failed check. Keep it quiet under `-q`, and keep stdout pure under `--format json`. Severity High: the most frequent path (polite: "keep the caller informed").
 
 **Nits**: dead `contract_main` and `import os as os`; `_run_targets.py` conditional; `default_type="DataAgent"` hard-coded twice (move to `service_item_type`); `-q` with `--dry-run` prints full text; `explain` prints an empty `--promptfoo-path`; bare-JWT redaction; provider re-reads the principal on every call (cache per process); `_existing()` refuses any `#`; `all` banner stays `mode=local` when `data_agent` runs in service mode (**decide** against Service Targeting); stale epic text (header "PLANNED", provider line/test counts, the package shim `src/fab_test/fabric_data_agent_provider.py`, Registration's "tests noun remains").
@@ -381,46 +381,53 @@ the remaining CLI blast-radius checks are still pending.
 
 ## Review 2 Follow-ups
 
-**Status**: 🔧 IN PROGRESS 2026-11-21. Review 2 was done by an unanchored reviewer with the same skills as Review 1. Gates: ruff, complexity and pip-audit are clean. The non-playwright half had 3648 passed, 88%; its only failures are the rtk hook tests (Review 1 item 15). The playwright half had 204 passed, 90.48%; its 16 live-parity failures are a 401, because the service principal no longer sees the parity tests' workspace (environmental). `1.10.0b5` is not on PyPI (the user, 2026-11-21), so these fixes stay in b5. The user said "do the fixes". Each item below is done test-first, together with the open Review 1 items it names.
+**Status**: ✅ 2026-11-21 (commits `f060346`, `4568810`, `fff12d3`, `36eb322` and the checkpoint after them), except the nits noted below. Review 2 was done by an unanchored reviewer with the same skills as Review 1. Gates: ruff, complexity and pip-audit are clean. The non-playwright half had 3648 passed, 88%; its only failures are the rtk hook tests (Review 1 item 15). The playwright half had 204 passed, 90.48%; its 16 live-parity failures are a 401, because the service principal no longer sees the parity tests' workspace (environmental). `1.10.0b5` is not on PyPI (the user, 2026-11-21), so these fixes stay in b5. The user said "do the fixes". Each item below is done test-first, together with the open Review 1 items it names.
 
 **Blocking**:
-1. `tests init` drops a new question whose slug matches an existing id (the 40-character truncation, or a hand-written id). New ids must avoid every id already in the suite. An existing id is reused only on a matching question or an explicit `"id"`.
-2. With no `.git`, `fab-tests/` is never searched, so the run skips every item and exits 0. Outside a repository, `fab-tests/` is read from the working directory, as a relative `tests_dir` already is.
+1. ✅ `tests init` drops a new question whose slug matches an existing id (the 40-character truncation, or a hand-written id). New ids must avoid every id already in the suite. An existing id is reused only on a matching question or an explicit `"id"`.
+2. ✅ With no `.git`, `fab-tests/` is never searched, so the run skips every item and exits 0. Outside a repository, `fab-tests/` is read from the working directory, as a relative `tests_dir` already is.
 
 **Should-fix**:
-3. A `#` inside a quoted value reads as a comment, so init can't extend its own output. Detect real YAML comments.
-4. A folder named `lint`/`test`/`init` in the working directory defeats the near-miss guard. Only an item folder (suffix or `.platform`) counts.
-5. Decision 18 (Review 1 item 4): lint warns on an allowed explicit URL and fails a disallowed host with the run's message. The run refuses a disallowed host before promptfoo starts.
-6. `tests lint` without promptfoo (Review 1 item 5): run the offline checks first, then bootstrap promptfoo the way the run does.
-7. Lint hands `promptfoo validate` the full environment. Strip it as the run does (decision 19).
-8. Provider retries (Review 1 items 14, 17):
+3. ✅ A `#` inside a quoted value reads as a comment, so init can't extend its own output. Detect real YAML comments.
+4. ✅ A folder named `lint`/`test`/`init` in the working directory defeats the near-miss guard. Only an item folder (suffix or `.platform`) counts.
+5. ✅ Decision 18 (Review 1 item 4): lint warns on an allowed explicit URL and fails a disallowed host with the run's message. The run refuses a disallowed host before promptfoo starts.
+6. ✅ `tests lint` without promptfoo (Review 1 item 5): run the offline checks first, then bootstrap promptfoo the way the run does.
+7. ✅ Lint hands `promptfoo validate` the full environment. Strip it as the run does (decision 19).
+8. ✅ Provider retries (Review 1 items 14, 17):
    - `isRetriable: false` and `CapacityNotActive` are final, and the message names the fix.
    - Never retry after the message is posted.
    - A poll timeout is final.
    - A created thread is deleted even if the post fails.
-9. An error envelope reads `❌ … no findings` (Review 1 item 16). Show `error` and the message's first line.
-10. Grammar and discoverability (Review 1 items 6, 7):
+9. ✅ An error envelope reads `❌ … no findings` (Review 1 item 16). Show `error` and the message's first line.
+10. ✅ Grammar and discoverability (Review 1 items 6, 7):
     - Fix the `[TARGET] tests` usage.
     - Name the verbs in `help`, `list --format json` and `explain`.
     - Update `known-gaps.md`.
     - Fix the stale `--answers` help, and make `--tests` help the same on every verb.
     - Print the credential remediation once.
-11. Test quality:
+11. ✅ Test quality:
     - Show requests go through the redirect-refusing opener.
     - Test the userinfo check on an allowed host.
     - Replace the progress test's fixed sleep with a wait-until.
     - Add the telemetry tests (Review 1 item 11).
-12. Module budgets (Review 1 item 13): add a dated note on `fab_test_parser.py`'s exemption, or extract the wiring.
-13. CHANGELOG entry for the data-agent feature (Review 1 item 12). No version bump: b5 is unpublished.
+12. ✅ Module budgets (Review 1 item 13): add a dated note on `fab_test_parser.py`'s exemption, or extract the wiring.
+13. ✅ CHANGELOG entry for the data-agent feature (Review 1 item 12). No version bump: b5 is unpublished.
 
 **Nits**:
-- `-q --dry-run` prints the YAML.
-- `explain` shows an empty `--promptfoo-path`.
-- `default_type="DataAgent"` is hard-coded twice.
-- `import os as os`.
-- The provider re-reads the principal on every call.
-- Refusals give partial commands.
-- Stale epic text.
+- ✅ `-q --dry-run` prints one line.
+- ✅ `explain` no longer shows an empty `--promptfoo-path`.
+- ✅ Refusals name the whole command and the items found.
+- ✅ Stale epic text.
+- Kept: `import os as os` in `_slicer_init_output.py` is a re-export that `test_slicer_init_output.py` patches, so it isn't dead.
+- Open: `default_type="DataAgent"` is hard-coded twice. Moving it to `SERVICE_ITEM_TYPES` would route data-agent through the service-export path its other callers share. That's a blast-radius change, not a nit.
+- Open: the provider re-reads the principal on every call. A per-process cache would need clearing between tests, and a read costs one small file.
+
+**Still open after Review 2** (planned tasks, not review fixes):
+- Review 1 item 8: docs. Still to write: the walkthrough, `docs/examples/` CI snippets, the init/lint/run flag table, and the skill's targeting and credentials references.
+- Review 1 item 9: the shared authoring module.
+- Review 1 item 10: `tests init` suggestions from what the sources don't cover.
+- Review 1 item 15: `.github/hooks/rtk-rewrite.json` is deleted in the working tree (the user's change), so `tests/test_rtk_hook_safety.py` fails 3 tests. Restore the file, or remove it and its test, before the final gate.
+- Also still open: the Authoring Grammar Parity Test, the blast-radius pass, and Quality Gates.
 
 ---
 

@@ -414,7 +414,10 @@ def test_progress_shows_each_answer_live_then_a_verdict_per_test(tmp_path, monke
         for query, seconds in (("How many?", 18), ("My balance?", 21)):
             with progress.open("a", encoding="utf-8") as stream:
                 stream.write(json.dumps({"query": query, "seconds": seconds, "error": False}) + "\n")
-            time.sleep(0.8)  # the watcher polls every 0.25 s: it prints while promptfoo "runs"
+            # the watcher polls every 0.25 s: wait until it prints, while promptfoo still "runs"
+            deadline = time.monotonic() + 10
+            while query not in shown.getvalue() and time.monotonic() < deadline:
+                time.sleep(0.05)
             live.append(shown.getvalue())
         Path(command[command.index("--output") + 1]).write_text(json.dumps({"results": {"results": [
             {"success": True, "description": "Count", "response": {"output": "42"}},
@@ -435,7 +438,6 @@ def test_progress_shows_each_answer_live_then_a_verdict_per_test(tmp_path, monke
 
 
 def test_progress_stays_off_under_quiet_and_in_ci(monkeypatch):
-    monkeypatch.undo()
     monkeypatch.delenv("CI", raising=False)
     monkeypatch.setenv("ANALYZER_VERBOSITY", "summary")
     assert wrapper._terminal() is None
