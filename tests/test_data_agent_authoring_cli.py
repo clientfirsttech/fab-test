@@ -276,3 +276,15 @@ def test_init_does_not_echo_secrets_from_a_malformed_existing_suite(authoring, t
     assert result.returncode == 2
     assert "private-value" not in result.stderr + result.stdout
     assert str(suite) in result.stderr
+
+
+def test_a_dry_run_never_says_written(authoring, tmp_path):
+    item, suite, tool = authoring
+    _definition(item)
+    original = suite.read_bytes()
+    result = _run(tmp_path, tool, "init", item.name, "--answers", str(_answers(tmp_path)), "--dry-run")
+    assert result.returncode == 0, result.stderr
+    first = result.stdout.splitlines()[0]
+    assert first.startswith("tests dry run, nothing written: would add=3 replace=0 keep=0 unchanged=0 ")
+    assert "tests written" not in result.stdout
+    assert suite.read_bytes() == original

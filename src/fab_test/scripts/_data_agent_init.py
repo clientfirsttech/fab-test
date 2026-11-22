@@ -120,6 +120,10 @@ def _text(payload: dict) -> str:
 
 
 def _line(payload: dict) -> str:
+    if "document" in payload:  # --dry-run: say what would happen, never "written"
+        would = " ".join(f"{verb}={len(payload[key])}" for verb, key in
+                         (("add", "added"), ("replace", "replaced"), ("keep", "kept"), ("unchanged", "unchanged")))
+        return f"tests dry run, nothing written: would {would} {payload['suite']}"
     counts = " ".join(f"{key}={len(payload[key])}" for key in ("added", "replaced", "kept", "unchanged"))
     return f"tests {'written' if payload['added'] or payload['replaced'] else 'unchanged'} {counts} {payload['suite']}"
 
