@@ -3,7 +3,9 @@ for byte, so a fixture can always be rebuilt from DS-02.rdl and its one edit
 (RDL Rule Coverage epic, Reproducible fixtures)."""
 
 import importlib.util
+import json
 from pathlib import Path
+from uuid import UUID
 
 import pytest
 
@@ -40,6 +42,19 @@ def test_every_committed_fixture_is_generated_or_hand_built():
     rule_fixtures = {name for name in committed if name.removesuffix("-Pass") in _GENERATOR.active_rule_ids()}
 
     assert rule_fixtures == set(_GENERATED) | _HAND_BUILT
+
+
+def test_paginated_reports_have_unique_nonzero_git_identities():
+    identities = {}
+    for folder in sorted(_ARTIFACTS.glob("*.PaginatedReport")):
+        platform = json.loads((folder / ".platform").read_text(encoding="utf-8-sig"))
+        logical_id = UUID(platform["config"]["logicalId"])
+        assert logical_id.int != 0, f"{folder.name}: Git integration needs a nonzero logicalId"
+        assert logical_id not in identities, (
+            f"{folder.name} and {identities[logical_id]} share logicalId {logical_id}"
+        )
+        identities[logical_id] = folder.name
+    assert identities, "No paginated report Git identities were checked"
 
 
 def test_check_mode_passes_on_the_committed_tree(capsys):
