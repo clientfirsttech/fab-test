@@ -9,8 +9,9 @@ from pathlib import Path
 from ._analyzer_tool_bootstrap import probe_executable
 from ._authoring_output import level, next_command, print_payload
 from ._data_agent_authoring_lint import suite_problems, validate_promptfoo
-from ._data_agent_suite import SUITE_SUFFIX, SuiteError, item_identity, load_suite
-from ._scan import ScanError, find_artifact_dirs, find_files_by_suffix
+from ._data_agent_suite import SuiteError, item_identity, load_suite, suite_files
+from ._scan import ScanError, find_artifact_dirs
+from ._tests_dir import search_roots
 from .fab_test_registry import ANALYZERS_JSON, REPO_ROOT
 
 
@@ -38,9 +39,9 @@ def _identity(path: Path) -> str | None:
 def _targets(args: argparse.Namespace) -> list[tuple[Path | None, Path]]:
     root = Path(args.artifact_dir)
     items = find_artifact_dirs(root, [".DataAgent"])
-    suites = sorted(find_files_by_suffix(root, SUITE_SUFFIX))
     named = args.target or args.artifact
     item = _named_item(items, named) if named else None
+    suites = suite_files(search_roots(args, item))
     if args.tests:
         suite = Path(args.tests)
         if not suite.is_file():

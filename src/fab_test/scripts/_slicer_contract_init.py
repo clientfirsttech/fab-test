@@ -41,7 +41,7 @@ from ._config import ConfigError
 from ._pbir_slicers import Slicer, read_slicers
 from ._slicer_calendar import CalendarError, resolve_contract, today, validate_calendar
 from ._slicer_contract import ENGINE, SELECT_ALL, ContractError, parse_contract
-from ._slicer_contract_lint import add_lint_parser, lint_main
+from ._slicer_contract_lint import add_lint_parser, lint_main, paired_contract
 from ._slicer_contract_run import CONTRACT_SUFFIX, report_logical_id
 from ._slicer_init_calendar import (
     NAMED_BY,
@@ -69,6 +69,7 @@ from ._slicer_init_output import (
     summary_text,
     with_next,
 )
+from ._tests_dir import flow_dir, search_roots
 
 
 def contract_main(argv: list[str]) -> int:
@@ -86,11 +87,12 @@ def contract_args_main(args: argparse.Namespace, refusal: str | None = None) -> 
         if args.action == "lint":
             return lint_main(args)
         report = _report(args)
+        args.contract_path = _contract_path(args, report)
         try:  # anything that would stop the write is found before the first question
-            existing, owners = read_existing(_contract_path(report), report, args.force)
+            existing, owners = read_existing(args.contract_path, report, args.force)
         except ExistingContractError as exc:
             raise InitError(str(exc)) from exc
-        questions = build_questions(report, args.as_of or today(), owners)
+        questions = build_questions(report, args.as_of or today(), owners, args.contract_path)
         if args.questions:
             print_payload(args, questions, questions_text, asked_for=True)
             return 0
@@ -131,7 +133,8 @@ def _report(args: argparse.Namespace) -> Path:
     return report
 
 
-def build_questions(report: Path, as_of: datetime.date, owners: dict[str, Owner] | None = None) -> dict[str, Any]:
+def build_questions(report: Path, as_of: datetime.date, owners: dict[str, Owner] | None = None,
+                    contract: Path | None = None) -> dict[str, Any]:
     """The questions for ``report``; ``owners`` (each id an existing contract uses, and what it checks) keeps
     a rule's own id and gives no other question one already taken."""
     used: set[str] = set()
@@ -145,10 +148,11 @@ def build_questions(report: Path, as_of: datetime.date, owners: dict[str, Owner]
             report, lambda text, page: _rule_id(text, used, "rule", navigator_owner(page), owners))
     except (OSError, ValueError) as exc:
         raise InitError(f"{report}: a page or visual file can't be read ({exc})") from exc
-    questions += fiscal_questions(questions, existing_calendar(_contract_path(report)))
+    contract = contract or report.parent / f"{report.name}{CONTRACT_SUFFIX}"
+    questions += fiscal_questions(questions, existing_calendar(contract))
     for q in questions:
         q.pop("_fits", None)
-    return {"report": str(report), "contract": str(_contract_path(report)), "as_of": as_of.isoformat(),
+    return {"report": str(report), "contract": str(contract), "as_of": as_of.isoformat(),
             "questions": questions}
 
 
@@ -315,7 +319,7 @@ def _write(args: argparse.Namespace, report: Path, questions: dict, answers: dic
     rules = [(q, rule) for q, rule, _ in built if rule]
     fiscal_ids = [q["id"] for q, rule, follows in built
                   if follows and uses_fiscal(rule["implementation"]["selected"][0])]
-    path = _contract_path(report)
+    path = args.contract_path
     try:
         calendar = fiscal_calendar(answers, fiscal_ids, existing_calendar(path))
     except ValueError as exc:
@@ -338,6 +342,7 @@ def _write(args: argparse.Namespace, report: Path, questions: dict, answers: dic
         raise InitError("nothing was written:\n  " + "\n  ".join(problems))
     text = yaml.safe_dump(document, sort_keys=False, allow_unicode=True)
     if not args.dry_run:
+        path.parent.mkdir(parents=True, exist_ok=True)  # fab-tests/pbir/ on the first contract
         path.write_text(text, encoding="utf-8")
     verbose = contract if level(args) == "verbose" else None
     print_payload(args, with_next({"contract": str(path), "written": not args.dry_run, **summary,
@@ -390,5 +395,13 @@ def _named(items: list, name: str) -> dict:
     return items[-1]
 
 
-def _contract_path(report: Path) -> Path:
-    return report.parent / f"{report.name}{CONTRACT_SUFFIX}"
+def _contract_path(args: argparse.Namespace, report: Path) -> Path:
+    """The contract already pairing with the report, wherever it lives; else a new one in fab-tests/pbir/."""
+    beside = report.parent / f"{report.name}{CONTRACT_SUFFIX}"
+    existing = paired_contract(report, search_roots(args, report), required=False)
+    if existing is not None:
+        return existing
+    if beside.exists():
+        return beside
+    home = flow_dir(args, "pbir", report)
+    return home / beside.name if home else beside

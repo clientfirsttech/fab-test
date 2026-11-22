@@ -9,6 +9,10 @@
       "type": "string",
       "description": "Root directory to discover artifacts (default: fabric-artifacts, or the repository root for `fab-test local`)."
     },
+    "tests_dir": {
+      "type": "string",
+      "description": "Folder for authored test files (Data Agent suites, slicer contracts), kept outside the Fabric Git-connected folder (default: fab-tests at the repository root; `fab-tests/data-agent/`, `fab-tests/pbir/`). A relative path is read from the repository root."
+    },
     "output_dir": {
       "type": "string",
       "description": "Root directory for result envelopes and the run manifest (default: fab-test-results)."

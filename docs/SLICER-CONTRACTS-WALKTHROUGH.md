@@ -32,7 +32,7 @@ flowchart TD
     L -->|"Navigators differ, bookmark deleted,<br/>or a display name two bookmarks share"| M["skip"]
     L -->|"Yes, or nothing preselected"| N["keep or skip"]
 
-    M --> O["Written only if it reads back as a valid contract:<br/>Sales.Report.odcs.yaml beside the report"]
+    M --> O["Written only if it reads back as a valid contract:<br/>fab-tests/pbir/Sales.Report.odcs.yaml"]
     N --> O
     O --> P["Step 3: read it, then check it<br/>fab-test pbir contract lint Sales"]
     P --> Q["Step 4: fab-test pbir --artifact Sales<br/>every CONTRACT.* rule passes"]
@@ -118,7 +118,7 @@ Is July 2026 to June 2027 called FY27 (the year it ends in) or FY26 (the year it
 
 A calendar period (`2026 H2`, `2026-11`) doesn't need these, and a January fiscal year skips the second. Next time you run `init` on this report, your answers are the defaults. If a slicer isn't on today's period under the fiscal year you give, `init` stops and says so: either the answer is wrong, or the report is out of date and needs fixing in Desktop.
 
-`init` writes `Sales.Report.odcs.yaml` **beside** the report folder, never inside it: Fabric's Git sync deletes files inside a report folder that aren't part of the report. It pairs with the report through the `logicalId` in `Sales.Report/.platform`, so renaming the report folder doesn't break the pairing.
+`init` writes `fab-tests/pbir/Sales.Report.odcs.yaml` at the repository root, **outside** the Git-connected folder and never inside the report: Fabric's Git sync deletes files inside a report folder that aren't part of the report, and keeping test files out of the connected folder keeps them in one place you can find. It pairs with the report through the `logicalId` in `Sales.Report/.platform`, so renaming the report folder doesn't break the pairing.
 
 Add `--dry-run` to see the file without writing it. `-q` prints one line when it succeeds (`contract written added=12 replaced=0 kept=0 unchanged=0 Sales.Report.odcs.yaml`), and `-v` lists every rule in the contract with what it checks and whether it was added, kept or replaced.
 

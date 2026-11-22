@@ -11,7 +11,7 @@ entry when it's fixed.
 |---|---|---|
 | `fab-test init` | `fab-test.yml`, `.env.example` | Conforms: a top-level verb about fab-test itself. `--format` and `--dry-run` resolve from config like the run's |
 | `fab-test config --validate` / `--show` | `fab-test.yml` (incl. `rules.<name>` overlays) | Conforms: fab-test's own config |
-| `fab-test pbir contract init` | `<Report>.Report.odcs.yaml`, beside the report | Grammar and placement conform; gaps below. Exits 0, 2 (refusal or unreadable), 130 (interrupted) |
+| `fab-test pbir contract init` | `fab-tests/pbir/<Report>.Report.odcs.yaml` | Grammar and placement conform; gaps below. Exits 0, 2 (refusal or unreadable), 130 (interrupted) |
 | `validate-environments-yaml` | `environments.yml` (Playwright's label → workspace map) | Gap: a second console script outside `fab-test`; exit 1 for both a schema error and an unreadable file |
 | `fab-test pbir contract lint` | the slicer contract, paired by logicalId | Conforms (2026-11-19); wraps `pql-test contract lint`, which the docs now name only as its upstream half |
 

@@ -72,7 +72,7 @@ def test_given_a_flag_of_fab_test_pbir_should_name_that_command(tmp_path, capsys
     code, _out, err, contract = _run(tmp_path, capsys, *flag)
 
     assert code == 2 and not contract.exists()
-    assert f"{flag[0]}: contract init writes <Report>.Report.odcs.yaml beside the report" in err
+    assert f"{flag[0]}: contract init writes <Report>.Report.odcs.yaml to fab-tests/pbir/" in err
     assert f"fab-test pbir SampleModel-DefaultState {flag[0]} ..." in err
 
 

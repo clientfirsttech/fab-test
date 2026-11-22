@@ -71,8 +71,8 @@ def test_given_a_contract_outside_here_should_show_its_full_path(tmp_path, monke
 def test_given_no_contract_should_say_none_paired_and_with_which_logical_id(tmp_path):
     line = contract_line(_report(tmp_path), None)
 
-    assert line == (f"📜 Slicer contract: none (no *.odcs.yaml under --artifact-dir has fabTestReport {LOGICAL_ID}; "
-                    "only the PBIR rules run)")
+    assert line == ("📜 Slicer contract: none (no *.odcs.yaml under --artifact-dir or fab-tests/ has fabTestReport "
+                    f"{LOGICAL_ID}; only the PBIR rules run)")
 
 
 @pytest.mark.pbir

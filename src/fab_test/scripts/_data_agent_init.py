@@ -16,6 +16,7 @@ from ._data_agent_init_tests import MATCH_KEYS, ask_tests, input_prompt, tests_f
 from ._data_agent_lint_command import _named_item
 from ._data_agent_suite import SuiteError, effective_config, item_identity, load_suite, suite_index
 from ._scan import ScanError, find_artifact_dirs
+from ._tests_dir import flow_dir, search_roots
 
 
 def _existing(path: Path, logical_id: str, force: bool) -> dict[str, Any]:
@@ -92,6 +93,7 @@ def _merge(document: dict, new_tests: list[dict], force: bool) -> dict[str, list
 
 
 def _write(path: Path, content: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)  # fab-tests/data-agent/ on the first suite
     temporary = None
     try:
         with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=path.parent, delete=False) as stream:
@@ -139,14 +141,22 @@ def init_main(args: argparse.Namespace) -> int:
         return 2
 
 
+def _suite_path(args: argparse.Namespace, item: Path, logical_id: str) -> Path:
+    """The suite already pairing with the item, wherever it lives; else a new one in fab-tests/data-agent/."""
+    existing = suite_index(search_roots(args, item)).get(logical_id)
+    if existing is not None:
+        return existing
+    home = flow_dir(args, "data-agent", item)
+    return (home or item.parent) / f"{item.name}.promptfoo.yaml"
+
+
 def _init(args: argparse.Namespace) -> int:
     target = args.target or args.artifact
     if not target:
         raise InitInputError("Name the Data Agent item as TARGET or --artifact.")
     item = _named_item(find_artifact_dirs(Path(args.artifact_dir), [".DataAgent"]), target)
     logical_id, _ = item_identity(item)
-    suite = (Path(args.tests) if args.tests else
-             suite_index(Path(args.artifact_dir)).get(logical_id, item.parent / f"{item.name}.promptfoo.yaml"))
+    suite = Path(args.tests) if args.tests else _suite_path(args, item, logical_id)
     document = _existing(suite, logical_id, args.force)
     suggestions = build_suggestions(item)
     if args.questions:

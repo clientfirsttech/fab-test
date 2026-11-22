@@ -92,7 +92,7 @@ ExitCode {
 
 ```
 SlicerContracts {
-  (a report has <Report>.Report.odcs.yaml beside it) => fab-test pbir checks what its slicers open with  // CONTRACT.* findings
+  (a report has fab-tests/pbir/<Report>.Report.odcs.yaml, or one under --artifact-dir naming its logicalId) => fab-test pbir checks what its slicers open with  // CONTRACT.* findings
   (building one as an agent) => contract init --questions --format json |> ask needs_human |> contract init --answers FILE
   (before running it, or in CI before `fab-test pbir`) => contract lint [REPORT]  // 0 clean, 1 problems named, 2 nothing to check
   (a calendar-driven value) => resolved for --as-of (default today); the envelope's `contract` block records it
@@ -108,7 +108,8 @@ See [references/slicer-contracts.md](references/slicer-contracts.md).
 DataAgentTests {
   (FAB_TEST_ENABLE_DATA_AGENT=0) => data-agent | agent exits 2; absent from help and list; on by default
   (enabled) => service only; workspace resolves --workspace → FABRIC_WORKSPACE_ID → workspace in config
-  (an item has a suite beside it) => pair *.DataAgent.promptfoo.yaml by fabTestDataAgent == .platform config.logicalId
+  (an item has a suite in fab-tests/data-agent/ or under --artifact-dir) => pair *.DataAgent.promptfoo.yaml by fabTestDataAgent == .platform config.logicalId
+  (authored test files) => fab-tests/<flow>/ at the repository root, outside the Git-connected folder; --tests-dir | FAB_TEST_TESTS_DIR | tests_dir moves it
   (an item is selected locally) => resolve the deployed agent by .platform metadata.displayName
   (no paired suite) => skipped; (two suites claim one logicalId) => exit 2 naming both
   (a service target has no local item) => require --tests FILE

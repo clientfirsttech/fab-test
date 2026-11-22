@@ -254,9 +254,11 @@ its workspace from `FABRIC_WORKSPACE_ID` or `workspace:` in `fab-test.yml`;
 `--workspace NAME_OR_ID` overrides it and enumerates deployed agents.
 Enumeration over five agents requires `--all`.
 
-Keep an inline promptfoo suite beside each item as
-`Sales.DataAgent.promptfoo.yaml`, with `fabTestDataAgent` equal to the
-item's `.platform` `config.logicalId`. The `.platform` display name identifies
+Each item's suite is `fab-tests/data-agent/Sales.DataAgent.promptfoo.yaml`:
+test files live in `fab-tests/` at the repository root, outside the Fabric
+Git-connected folder, where Commit to Git can't delete them and you can find
+them (`--tests-dir` or `tests_dir:` moves it). A suite pairs by
+`fabTestDataAgent`, equal to the item's `.platform` `config.logicalId`. The `.platform` display name identifies
 the deployed agent. Renaming either file does not break pairing. Missing suites
 are skipped; duplicate identity claims fail before evaluation.
 
@@ -504,7 +506,7 @@ a case with no role embeds with no identity at all.
 
 ### Checking what a report's slicers open with
 
-A slicer contract (`<Report>.Report.odcs.yaml`, beside the report) states the
+A slicer contract (`fab-tests/pbir/<Report>.Report.odcs.yaml`) states the
 values each slicer is preselected with, fixed or following the calendar (the
 current semester). `fab-test pbir` checks it with the packaged rules;
 `fab-test pbir contract init` builds it by asking about each slicer.

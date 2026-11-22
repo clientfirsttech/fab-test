@@ -30,7 +30,7 @@ and you have to check it yourself.
 
 | Item | Where | Guard |
 |---|---|---|
-| `<Item>.<Type>.<suffix>` beside the item folder (`_contract_path` for pbir) | the verb module | per-verb tests |
+| `<Item>.<Type>.<suffix>` in `fab-tests/<flow>/`, found under `--artifact-dir` too (`_tests_dir.py`; `_contract_path`, `_suite_path`) | `_tests_dir.py` and the verb module | `tests/test_tests_dir.py`, per-verb tests |
 | Paired by an identity in the file (`fabTestReport` = the report's `logicalId`) | the file format | per-verb tests |
 | Append, keep ids, `--force` to change (`_merge`) | the verb module | per-verb tests |
 

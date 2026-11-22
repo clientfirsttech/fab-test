@@ -44,6 +44,7 @@ from ._slicer_init_output import (
     find_report,
     pbir_refusal,
 )
+from ._tests_dir import search_roots
 
 _PQL_TEST = "pql-test"  # its console script, run with this interpreter so the version is the one fab-test pins
 _PREFIX = "  ✗ fab-test pbir contract:"
@@ -106,30 +107,36 @@ def _targets(args: argparse.Namespace) -> list[Target]:
         if not contract.is_file():
             raise InitError(f"--contract {contract}: no such file")
         return [(find_report(args), contract, None) if named else _pair(contract, root)]
+    roots = search_roots(args)
     if named:
         report = find_report(args)
-        return [(report, _paired(report, root), None)]
-    contracts = sorted(contract_files(root))
+        return [(report, paired_contract(report, search_roots(args, report)), None)]
+    contracts = contract_files(roots)
     if not contracts:
-        raise InitError(f"no slicer contract under --artifact-dir {root}; build one with "
+        raise InitError(f"no slicer contract under --artifact-dir {root} or fab-tests/; build one with "
                         "fab-test pbir contract init REPORT")
     return [_pair(contract, root) for contract in contracts]
 
 
-def _paired(report: Path, root: Path) -> Path:
-    """The one contract under ``root`` naming ``report``'s logicalId; init's file beside it if it can't be read."""
+def paired_contract(report: Path, roots: list[Path], *, required: bool = True) -> Path | None:
+    """The one contract under ``roots`` naming ``report``'s logicalId; init's file beside it if it can't be read.
+
+    ``required=False`` (contract init) returns None when none pairs yet, instead of refusing.
+    """
     logical_id = report_logical_id(report)
     if not logical_id:
         raise InitError(f"{report}/.platform has no logicalId, so no contract can pair with it")
     beside = report.parent / f"{report.name}{CONTRACT_SUFFIX}"
-    candidates = {path.resolve() for path in contract_files(root) if _names(path) == logical_id}
+    candidates = {path.resolve() for path in contract_files(roots) if _names(path) == logical_id}
     if not candidates and beside.is_file() and _names(beside) is None:
         candidates = {beside.resolve()}  # init's own file, unreadable: lint says why
     if len(candidates) > 1:
         raise InitError(f"{len(candidates)} contracts pair with {report.name}: "
                         + ", ".join(map(str, sorted(candidates))) + "; keep one, or pass --contract FILE")
+    if not candidates and not required:
+        return None
     if not candidates:
-        raise InitError(f"no contract under --artifact-dir {root} pairs with {report.name}; pass --artifact-dir "
+        raise InitError(f"no contract under {', '.join(map(str, roots))} pairs with {report.name}; pass --artifact-dir "
                         f"or --contract FILE, or build one with fab-test pbir contract init "
                         f"{report.name.removesuffix('.Report')}")
     return candidates.pop()

@@ -56,7 +56,9 @@ Constraints {
   --<noun> FILE overrides the pairing, on every verb and on the run
 
   // Files
-  An authored file lives beside the item folder as <Item>.<Type>.<suffix>, because Fabric's Commit to Git deletes non-definition files inside it
+  An authored file lives in fab-tests/<flow>/ as <Item>.<Type>.<suffix>, outside the Git-connected folder: Commit to Git deletes non-definition files inside an item folder, and a Git subfolder becomes a workspace folder (Data Agent decision 22)
+  (--tests-dir | FAB_TEST_TESTS_DIR | tests_dir in fab-test.yml) => that folder instead; outside any repository => beside the item
+  Discovery reads fab-tests/ and --artifact-dir; an existing file is extended where it lives
   (the tests are part of the item's own definition, like T-TEST procedures) => they stay inside the folder
   Pair the file with its item by a stable identity recorded in the file (pbir: the report's logicalId), not by name alone
   init appends new entries and keeps existing ids; changing or replacing one needs --force

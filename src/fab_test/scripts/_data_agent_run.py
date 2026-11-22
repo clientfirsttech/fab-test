@@ -17,6 +17,7 @@ from ._mode import ModeError, ResolvedMode
 from ._results_stem import register_stems, results_stem
 from ._scan import find_artifact_dirs
 from ._service_export import ServiceExportError, build_service_client
+from ._tests_dir import search_roots
 from .fab_test_registry import discover_artifacts
 from .invoke_data_agent import credential_secret
 from .playwright_validation.fabric_service_client import FabricServiceClientError
@@ -109,6 +110,11 @@ def discover_data_agents(args: argparse.Namespace) -> list[Path]:
         raise ServiceExportError(str(exc), 2) from exc
 
 
+def paired_suites(args: argparse.Namespace) -> dict[str, Path]:
+    """Suites under --artifact-dir and fab-tests/, by the logicalId each claims."""
+    return suite_index(search_roots(args), [Path(args.output_dir)])
+
+
 def _discover_data_agents(args: argparse.Namespace) -> list[Path]:
     root, output = Path(args.artifact_dir), Path(args.output_dir)
     mode = (args.resolved_mode if getattr(args, "analyzer", None) == "data_agent"
@@ -118,7 +124,7 @@ def _discover_data_agents(args: argparse.Namespace) -> list[Path]:
     explicit = Path(args.tests) if getattr(args, "tests", None) else None
     if explicit:
         load_suite(explicit)
-    paired = {} if explicit else suite_index(root, [output])
+    paired = {} if explicit else paired_suites(args)
     local = find_artifact_dirs(root, (".DataAgent",), excluded_paths=[output])
     selected = discover_artifacts(root, "*.DataAgent", target, output_dir=output)
     names = {path: item_identity(path)[1] for path in local}

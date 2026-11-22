@@ -8,6 +8,7 @@ from ._config import ConfigError
 from ._data_agent_init import init_main
 from ._data_agent_lint_command import lint_main
 from ._service_flags import add_workspace_flag
+from ._tests_dir import add_tests_dir_flag
 
 
 def add_data_agent_parser(subs: argparse._SubParsersAction, add_common_flags) -> None:
@@ -20,6 +21,7 @@ def add_data_agent_parser(subs: argparse._SubParsersAction, add_common_flags) ->
     add_workspace_flag(agent)
     agent.add_argument("--tests", default=None, metavar="FILE",
                        help="Promptfoo suite overriding logicalId pairing with a .DataAgent item")
+    add_tests_dir_flag(agent)
     agent.add_argument("--env-file", default=None, dest="playwright_env_file", metavar="PATH",
                        help="Path to .env file with service principal credentials")
     agent.add_argument("--all", action="store_true", dest="all_items",

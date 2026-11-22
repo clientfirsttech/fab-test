@@ -9,6 +9,7 @@ from typing import Any
 from ._cli_utils import ARTIFACT_DIR_HELP, ARTIFACT_HELP, FORMAT_HELP
 from ._config import VERBOSITY_LEVELS, merged_file_config, resolve_setting, validate_config, verbosity_level
 from ._metadata import default_repo_root
+from ._tests_dir import add_tests_dir_flag
 
 FORMATS = ("text", "json")
 
@@ -27,6 +28,7 @@ def add_input_flags(parser: argparse.ArgumentParser, target_help: str) -> None:
     parser.add_argument("--artifact", default=None, metavar="STEM", help=ARTIFACT_HELP)
     parser.add_argument("--artifact-dir", default=None, metavar="DIR", help=ARTIFACT_DIR_HELP)
     parser.add_argument("--format", choices=list(FORMATS), default=None, dest="output_format", help=FORMAT_HELP)
+    add_tests_dir_flag(parser)
 
 
 def resolve_inputs(args: argparse.Namespace) -> None:

@@ -20,7 +20,7 @@ from fab_test.scripts._slicer_contract import ContractError, load_contract, pars
 
 ROOT = Path(__file__).resolve().parents[1]
 TEST_BED = ROOT / "fabric-artifacts" / "SampleModel-DefaultState.Report"
-EXAMPLE = ROOT / "fabric-artifacts" / "SampleModel-DefaultState.Report.odcs.yaml"
+EXAMPLE = ROOT / "fab-tests" / "pbir" / "SampleModel-DefaultState.Report.odcs.yaml"
 BOOKMARK_1, BOOKMARK_2 = "75775dd0e605004cae9a", "9c65f6aa324d70ac0e33"
 
 

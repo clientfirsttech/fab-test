@@ -1,6 +1,6 @@
 # What SampleModel-DefaultState.Report's slicers open with (PBIR Slicer Default State epic).
-# It sits beside the report folder, not inside it: Fabric's Commit to Git deletes
-# files inside an item folder that aren't part of its definition.
+# It lives in fab-tests/pbir/, outside the Git-connected folder: Fabric's Commit to Git
+# deletes files inside an item folder that aren't part of its definition.
 #
 # Each `engine: fab-test` rule sits on the column its slicer is bound to and names
 # the page; pql-test skips these rules, and fab-test skips everyone else's.

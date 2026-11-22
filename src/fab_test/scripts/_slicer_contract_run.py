@@ -30,6 +30,7 @@ from ._scan import find_files_by_suffix
 from ._slicer_calendar import CalendarError, resolve_contract, today
 from ._slicer_contract import ENGINE, ContractError, SlicerExpectation, load_contract
 from ._slicer_rules import compile_rules
+from ._tests_dir import add_tests_dir_flag, search_roots
 
 _ANALYZERS = ("pbir", "all", "local")
 AS_OF_HELP = "Date calendar-driven slicer defaults resolve against [default: today]"
@@ -46,8 +47,10 @@ class ResolvedContract:
 
 
 def add_contract_flags(parser: argparse.ArgumentParser) -> None:
-    parser.epilog = ("Slicer defaults: a report pairs with the *.odcs.yaml beside it. Build one with "
-                     "`fab-test pbir contract init TARGET`, check it with `fab-test pbir contract lint TARGET`.")
+    parser.epilog = ("Slicer defaults: a report pairs with the *.odcs.yaml naming its logicalId, in fab-tests/pbir/ "
+                     "or under --artifact-dir. Build one with `fab-test pbir contract init TARGET`, check it with "
+                     "`fab-test pbir contract lint TARGET`.")
+    add_tests_dir_flag(parser)
     parser.add_argument("--contract", default=None, metavar="FILE",
                         help="Slicer contract to check every report in the run against, "
                              f"instead of pairing each report with a *{CONTRACT_SUFFIX} by its logicalId")
@@ -71,8 +74,9 @@ def prepare_contracts(args: argparse.Namespace) -> int | None:
     except (ContractError, CalendarError) as exc:
         print(f"  ✗ fab-test: {exc}", file=sys.stderr)
         if getattr(args, "artifact", None):  # a broken contract for another report still stops the run
-            print(f"    every *{CONTRACT_SUFFIX} under --artifact-dir is read before any report runs, including ones "
-                  "for reports --artifact doesn't select; fix it, or narrow --artifact-dir", file=sys.stderr)
+            print(f"    every *{CONTRACT_SUFFIX} under --artifact-dir and fab-tests/ is read before any report runs, "
+                  "including ones for reports --artifact doesn't select; fix it, or narrow --artifact-dir",
+                  file=sys.stderr)
         return 2
     return None
 
@@ -86,13 +90,15 @@ def _pair(paired: dict[str, ResolvedContract], contract: ResolvedContract) -> No
 
 def _contract_files(args: argparse.Namespace) -> list[Path]:
     excluded = [Path(args.output_dir)] if getattr(args, "output_dir", None) else []
-    return contract_files(Path(args.artifact_dir), excluded)
+    return contract_files(search_roots(args), excluded)
 
 
-def contract_files(root: Path, excluded: list[Path] | None = None) -> list[Path]:
-    """Every contract under ``root`` the run reads; `contract lint` finds them the same way."""
-    return [p for p in find_files_by_suffix(root, CONTRACT_SUFFIX, excluded_paths=excluded or [])
-            if _has_slicer_rules(p)]
+def contract_files(roots: Path | list[Path], excluded: list[Path] | None = None) -> list[Path]:
+    """Every contract the run reads, under --artifact-dir and fab-tests/; `contract lint` finds them the same way."""
+    roots = [roots] if isinstance(roots, Path) else roots
+    found = {p.resolve() for root in roots
+             for p in find_files_by_suffix(root, CONTRACT_SUFFIX, excluded_paths=excluded or [])}
+    return sorted(p for p in found if _has_slicer_rules(p))
 
 
 def _has_slicer_rules(path: Path) -> bool:

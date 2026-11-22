@@ -21,13 +21,14 @@ ARTIFACTS = ROOT / "fabric-artifacts"
 REPORT = "SampleModel-DefaultState.Report"
 MODEL = "SampleModel-PQLAssert.SemanticModel"
 CONTRACT = f"{REPORT}.odcs.yaml"
+EXAMPLE = ROOT / "fab-tests" / "pbir" / CONTRACT  # decision 22: test files live in fab-tests/
 
 
 def _bed(tmp_path: Path, contract: str | None = None) -> Path:
-    """The test bed's report, its model and its contract, side by side as Desktop saves them."""
+    """The test bed's report, its model and its contract, side by side (a contract still pairs beside its report)."""
     shutil.copytree(ARTIFACTS / REPORT, tmp_path / REPORT)
     shutil.copytree(ARTIFACTS / MODEL, tmp_path / MODEL)
-    text = (ARTIFACTS / CONTRACT).read_text(encoding="utf-8")
+    text = EXAMPLE.read_text(encoding="utf-8")
     (tmp_path / CONTRACT).write_text(text if contract is None else contract, encoding="utf-8")
     return tmp_path / CONTRACT
 
@@ -40,7 +41,7 @@ def _lint(tmp_path: Path, capsys, *flags: str):
 
 
 def _broken(old: str, new: str) -> str:
-    text = (ARTIFACTS / CONTRACT).read_text(encoding="utf-8")
+    text = EXAMPLE.read_text(encoding="utf-8")
     assert old in text
     return text.replace(old, new, 1)
 

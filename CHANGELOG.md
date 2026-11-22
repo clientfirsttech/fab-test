@@ -2,6 +2,7 @@
 
 ## 2026-11-21
 
+- ✨ - Test Files Live In `fab-tests/` - Slicer contracts and Data Agent suites were written beside each item, among dozens of Fabric folders, where a person couldn't find them. `contract init` and `tests init` now write to `fab-tests/pbir/` and `fab-tests/data-agent/` at the root of the repository holding the items. That's outside the Fabric Git-connected folder, so Commit to Git can't delete them, and a Git subfolder never becomes a workspace folder. Every run and verb reads `fab-tests/` as well as `--artifact-dir`, and files still pair by `logicalId`, so a contract or suite beside its item keeps working, and `init` extends it where it is. `--tests-dir`, `FAB_TEST_TESTS_DIR` or `tests_dir:` in `fab-test.yml` moves the folder. Outside any repository, `init` writes beside the item as before. **Behavior change**: a new contract from `contract init` is written to `fab-tests/pbir/`, not beside the report.
 - 🐛 - `fab-test pbir lint` No Longer Passes Having Checked Nothing - It ran a TARGET named `lint`, found no report and exited 0. It now exits 2 with `did you mean: fab-test pbir contract lint`, carrying the TARGET and flags as typed; `pbir init Sales` and `pbir contracts init` say the same instead of argparse's "unrecognized arguments". **Behavior change** for a script that ran `fab-test pbir lint` and relied on its 0. An item really named `init`, `lint` or `contracts` still runs as a TARGET.
 
 ## 2026-11-19

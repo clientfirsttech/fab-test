@@ -35,8 +35,8 @@ The older spelling still works: `fab-test bpa --artifact SampleModel-PQLAssert`.
 ### data-agent
 
 On by default (`FAB_TEST_ENABLE_DATA_AGENT=0` turns it off); aliases: `agent`, `data_agent`.
-Runs against deployed agents only. Suites live beside the `.DataAgent` item,
-not inside its definition. `tests init` writes your questions, one-key match
+Runs against deployed agents only. Suites live in `fab-tests/data-agent/`, outside
+the Git-connected folder (`--tests-dir` moves it). `tests init` writes your questions, one-key match
 types and follow-ups (`--answers FILE` without a person); `tests lint` checks
 the suite offline.
 

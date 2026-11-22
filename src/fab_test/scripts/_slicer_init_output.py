@@ -115,7 +115,7 @@ def pbir_refusal(args: argparse.Namespace, report_name: str, verb: str = "init")
     if flag == "--output-dir" and verb == "lint":
         return f"--output-dir: contract lint writes nothing; fab-test pbir {name} --output-dir ... writes results"
     if flag in ("--contract", "--output-dir"):
-        return (f"{flag}: contract init writes <Report>.Report.odcs.yaml beside the report; {flag} is for "
+        return (f"{flag}: contract init writes <Report>.Report.odcs.yaml to fab-tests/pbir/; {flag} is for "
                 f"checking it: fab-test pbir {name} {flag} ...")
     return (f"{flag}: contract {verb} {_DOES[verb]}, not an HTML report; see it checked with "
             f"fab-test pbir {name} --open-report")

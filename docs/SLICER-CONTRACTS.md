@@ -37,7 +37,7 @@ A slicer that follows a fiscal period (`FY27-S1`, `FY26`) also needs your compan
 
 Preview a rollover with `--as-of` on its first day. A contract has one fiscal calendar, and a label naming both years (`2026-27`) can't follow the current period, so keep it and update it at rollover.
 
-Type a choice or its first letter; Enter takes the suggestion. The contract is written beside the report, never inside it: Fabric deletes files inside a report folder that aren't part of the report.
+Type a choice or its first letter; Enter takes the suggestion. The contract is written to `fab-tests/pbir/` at the repository root, outside the Git-connected folder and never inside the report: Fabric deletes files inside a report folder that aren't part of the report. `--tests-dir` or `tests_dir:` in `fab-test.yml` moves it; a contract already under `--artifact-dir` is extended where it is.
 
 Run `init` again after adding slicers: it adds rules for the new ones and leaves yours alone (`--force` replaces a rule's check, keeping anything else you added to it). `--dry-run` shows the file without writing it, and nothing is written unless the result is a contract `fab-test pbir` accepts.
 
@@ -61,7 +61,7 @@ The three commands take the same inputs and output flags, the way the [command g
 | `TARGET` | the report, a path or a name under `--artifact-dir`; required | same; none = every contract | same; none = every report |
 | `--artifact STEM` | deprecated alias for TARGET | same | same |
 | `--artifact-dir DIR` | default `artifact_dir` in `fab-test.yml`, else the working directory | same | same |
-| `--contract FILE` | refused: init writes beside the report | the contract to check | the contract every report is checked against |
+| `--contract FILE` | refused: init writes to `fab-tests/pbir/` | the contract to check | the contract every report is checked against |
 | `--as-of YYYY-MM-DD` | the date `current` is suggested for | the date the calendar resolves at | the date the calendar resolves at |
 | `--questions`, `--answers FILE`, `--force` | yes | — | — |
 | `--dry-run` | show the contract, write nothing | — (writes nothing anyway) | list the reports, run nothing |
@@ -76,7 +76,7 @@ The three commands take the same inputs and output flags, the way the [command g
 The run says which contract paired with the report and splits its findings between the PBIR rules every report gets and the contract's `CONTRACT.*` rules:
 
 ```
-📜 Slicer contract: fabric-artifacts\SampleModel-DefaultState.Report.odcs.yaml (12 slicer checks, 3 bookmark navigators)
+📜 Slicer contract: fab-tests\pbir\SampleModel-DefaultState.Report.odcs.yaml (12 slicer checks, 3 bookmark navigators)
 📊 1 finding(s) (1 error(s), 0 warning(s)): 0 from the PBIR rules, 1 from the slicer contract
 ```
 

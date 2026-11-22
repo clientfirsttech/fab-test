@@ -112,8 +112,8 @@ steps:
         priority: 30
         status: { state: backlog, comment: Rule in the grammar skill; Data Agent applies it when built }
       - id: mlu1u46l87h3sq1igafep9mb
-        name: Files beside the item folder
-        story: As a Local Developer, I want every authored file beside the item folder, so that Fabric's Commit to Git never deletes my tests.
+        name: Test files in one folder outside the connected folder
+        story: As a Local Developer, I want every authored file in fab-tests/, outside the Git-connected folder, so that Fabric's Commit to Git never deletes my tests and I can always find them.
         painPoint: cm37f5dx64wvl1zjwnrukbcx
         priority: 24
         status: { state: backlog, comment: Rule in the grammar skill; Data Agent decision 3 to be amended when that epic resumes }

@@ -4,7 +4,7 @@ A slicer contract states what a PBIR report's slicers open with (the values pres
 
 ## The file
 
-An ODCS v3 data contract named `<Report>.Report.odcs.yaml`, beside the report folder. Never inside it: Fabric's Commit to Git deletes files inside an item folder that aren't part of its definition. It pairs with the report whose `.platform` `logicalId` equals its `fabTestReport` custom property.
+An ODCS v3 data contract named `<Report>.Report.odcs.yaml`, in `fab-tests/pbir/` at the repository root (`--tests-dir` moves it). Never inside the report folder: Fabric's Commit to Git deletes files inside an item folder that aren't part of its definition. A contract under `--artifact-dir` still pairs. It pairs with the report whose `.platform` `logicalId` equals its `fabTestReport` custom property.
 
 ```yaml
 apiVersion: v3.1.0
@@ -168,7 +168,7 @@ ContractInit {
   --artifact-dir, --format => default from fab-test.yml (artifact_dir, format) when the flag isn't given
   -v => also every rule in the contract: id, page, field, what it expects, and added | kept | replaced | unchanged
   --report | --no-report | --open-report => exit 2 naming `fab-test pbir <name> --open-report`
-  --contract | --output-dir => exit 2 naming `fab-test pbir <name> <flag> ...` (init writes beside the report)
+  --contract | --output-dir => exit 2 naming `fab-test pbir <name> <flag> ...` (init writes to fab-tests/pbir/)
   any other flag of the run (--telemetry, --timeout, --jobs, ...) => exit 2 naming `fab-test pbir <name> <flag> ...`
   Ctrl-C at a prompt => exit 130; nothing written
 }

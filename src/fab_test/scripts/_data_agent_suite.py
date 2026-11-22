@@ -44,10 +44,17 @@ def item_identity(item: Path) -> tuple[str, str]:
     return logical_id, display_name
 
 
-def suite_index(root: Path, excluded: list[Path] | None = None) -> dict[str, Path]:
+def suite_files(roots: Path | list[Path], excluded: list[Path] | None = None) -> list[Path]:
+    """Every suite under ``roots``: --artifact-dir and fab-tests/ (decision 22)."""
+    roots = [roots] if isinstance(roots, Path) else roots
+    return sorted({path.resolve() for root in roots
+                   for path in find_files_by_suffix(root, SUITE_SUFFIX, excluded_paths=excluded or [])})
+
+
+def suite_index(roots: Path | list[Path], excluded: list[Path] | None = None) -> dict[str, Path]:
     """Index suites by fabTestDataAgent, refusing ambiguous claims before any eval."""
     paired: dict[str, Path] = {}
-    for path in find_files_by_suffix(root, SUITE_SUFFIX, excluded_paths=excluded or []):
+    for path in suite_files(roots, excluded):
         identity = load_suite(path).get("fabTestDataAgent")
         if not isinstance(identity, str) or not identity.strip():
             raise SuiteError(f"{path} needs fabTestDataAgent: <the item's .platform logicalId>.")

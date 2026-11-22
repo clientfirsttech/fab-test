@@ -54,7 +54,7 @@ def unpaired_reason(report: Path) -> str:
     logical_id = report_logical_id(report)
     if not logical_id:
         return "the report has no .platform logicalId to pair on; pass --contract FILE"
-    return f"no *.odcs.yaml under --artifact-dir has fabTestReport {logical_id}; only the PBIR rules run"
+    return f"no *.odcs.yaml under --artifact-dir or fab-tests/ has fabTestReport {logical_id}; only the PBIR rules run"
 
 
 def describe(summary: dict) -> tuple[str, str]:

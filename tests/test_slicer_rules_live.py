@@ -22,7 +22,7 @@ pytestmark = [pytest.mark.integration, pytest.mark.pbir]
 
 ROOT = Path(__file__).resolve().parents[1]
 TEST_BED = ROOT / "fabric-artifacts" / "SampleModel-DefaultState.Report"
-CONTRACT = ROOT / "fabric-artifacts" / "SampleModel-DefaultState.Report.odcs.yaml"
+CONTRACT = ROOT / "fab-tests" / "pbir" / "SampleModel-DefaultState.Report.odcs.yaml"
 RULE_IDS = {"alignment-default", "eye-color-default", "fiscal-semester-current", "half-year-current",
             "year-default", "first-appearance-range", "relative-date-default", "date-picker-default",
             "chart-measure-default", "character-name-default", "alignment-nothing-selected",
@@ -282,7 +282,7 @@ def test_given_no_contract_should_say_none_paired(inspector, tmp_path):
 
     result = _run(root)
 
-    assert "📜 Slicer contract: none (no *.odcs.yaml under --artifact-dir has fabTestReport " in (
+    assert "📜 Slicer contract: none (no *.odcs.yaml under --artifact-dir or fab-tests/ has fabTestReport " in (
         result.stdout + result.stderr)
 
 
