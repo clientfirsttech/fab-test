@@ -182,7 +182,9 @@ Write a starter suite from the item's definition (decisions 10 and 14), planned 
 
 ## `tests init`: Your Questions, How The Answer Matches, And Follow-ups
 
-**Status**: 📋 PROPOSED 2026-11-21 at the user's request; not started. Today init offers fixed questions (a row count per table, one refusal, one two-turn conversation), asks only "Expected answer:", and always writes a case-sensitive `contains`.
+**Status**: ✅ 2026-11-21. The user writes the questions; suggestions are a `?` away and a number picks one (the user's correction: "I'm not asking the questions"). `_data_agent_init_tests.py` holds the match types, ids, chains, `--answers` parsing and the prompt loop, with 60 tests in `tests/test_data_agent_init_prompts.py`, including the whole console flow with typed input. The written regex and JavaScript checks were verified in Node against the live run's answers. Live: init `--answers` → lint → run against `agent-sample-model` passed 3 of 3 (`16,376` by number, `Yes.` as a starts-with follow-up in the same conversation, a refusal).
+- **Departures from the sketch below:** the user's own questions come first; Enter on "Expected answer" means the agent should decline, so there is no separate `r` step; starts and ends with ignore case and trailing punctuation (`Yes.` starts with `yes`). The `--answers` shape is `{"tests": [...]}` only. The old `{suggestion-id: answer}` shape, unreleased, now exits 2 naming the new one.
+- **Known gap:** a follow-up whose root is replaced with `--force` and no follow-ups keeps its old conversation id.
 
 What a session looks like (stderr prompts, defaults in brackets):
 

@@ -90,46 +90,80 @@ def _definition(item):
     }), encoding="utf-8")
 
 
-def test_init_requires_human_answers_and_generates_a_paired_suite(authoring, tmp_path):
+_CHAIN = {"tests": [
+    {"query": "How many orders are there?", "expect": "1,204", "match": "n",
+     "follow_ups": [{"query": "Is that more than 1,000?", "expect": "yes", "match": "s"}]},
+    {"query": "What is my bank balance?", "match": "r"},
+]}
+
+
+def _answers(tmp_path, document=_CHAIN):
+    path = tmp_path / "answers.json"
+    path.write_text(json.dumps(document), encoding="utf-8")
+    return path
+
+
+def test_init_needs_your_questions_and_writes_them_with_follow_ups(authoring, tmp_path):
     item, suite, tool = authoring
     suite.unlink()
     _definition(item)
-    unanswered = _run(tmp_path, tool, "init", item.name)
-    assert unanswered.returncode == 2
-    assert "--questions" in unanswered.stderr and "--answers" in unanswered.stderr
+    unattended = _run(tmp_path, tool, "init", item.name)  # CI: nobody to ask
+    assert unattended.returncode == 2
+    assert "--questions" in unattended.stderr and "--answers" in unattended.stderr
     assert not suite.exists()
     questions = _run(tmp_path, tool, "init", item.name, "--questions", "--format", "json")
     assert questions.returncode == 0, questions.stderr
     payload = json.loads(questions.stdout)
-    assert any("Orders" in q["prompt"] for q in payload["questions"])
-    assert all(q["needs_human"] and q["suggested"] is None for q in payload["questions"])
+    assert "How many rows are in the Orders table?" in payload["suggestions"]
+    assert payload["matches"]["n"] == "number" and payload["answers_example"]["tests"]
     assert not suite.exists()
-    answers = tmp_path / "answers.json"
-    answers.write_text(json.dumps({q["id"]: "verified" for q in payload["questions"]}), encoding="utf-8")
-    result = _run(tmp_path, tool, "init", item.name, "--answers", str(answers), "--format", "json")
+    result = _run(tmp_path, tool, "init", item.name, "--answers", str(_answers(tmp_path)), "--format", "json")
     assert result.returncode == 0, result.stderr
     document = yaml.safe_load(suite.read_text(encoding="utf-8"))
     assert document["fabTestDataAgent"] == "stable-id"
-    assert len({test["metadata"]["id"] for test in document["tests"]}) == len(document["tests"])
-    assert len(document["tests"]) >= 4
-    assert all(test["assert"][0]["value"] == "verified" for test in document["tests"])
+    assert [test["metadata"]["id"] for test in document["tests"]] == [
+        "how-many-orders-are-there", "how-many-orders-are-there-follow-up-1", "what-is-my-bank-balance"]
+    assert document["tests"][1]["vars"]["conversation"] == "how-many-orders-are-there"
+    assert document["tests"][0]["assert"][0]["type"] == "regex"
     assert "tests lint" in json.loads(result.stdout)["next"]
 
 
 def test_init_dry_run_and_existing_tests_are_safe(authoring, tmp_path):
     item, suite, tool = authoring
     _definition(item)
-    questions = json.loads(_run(tmp_path, tool, "init", item.name, "--questions", "--format", "json").stdout)
-    answers = tmp_path / "answers.json"
-    answers.write_text(json.dumps({q["id"]: "verified" for q in questions["questions"]}), encoding="utf-8")
     original = suite.read_bytes()
-    preview = _run(tmp_path, tool, "init", item.name, "--answers", str(answers), "--dry-run", "--format", "json")
+    preview = _run(tmp_path, tool, "init", item.name, "--answers", str(_answers(tmp_path)), "--dry-run",
+                   "--format", "json")
     assert preview.returncode == 0, preview.stderr
     assert suite.read_bytes() == original
-    result = _run(tmp_path, tool, "init", item.name, "--answers", str(answers))
+    result = _run(tmp_path, tool, "init", item.name, "--answers", str(_answers(tmp_path)))
     assert result.returncode == 0, result.stderr
     document = yaml.safe_load(suite.read_text(encoding="utf-8"))
     assert next(test for test in document["tests"] if test["metadata"]["id"] == "count")["assert"][0]["value"] == "42"
+    assert len(document["tests"]) == 4
+
+
+@pytest.mark.parametrize(("document", "message"), [
+    ({"count": "42"}, "tests"),
+    ({"tests": [{"query": "Q?", "expect": "x", "match": "q"}]}, "n number"),
+], ids=["old-shape", "bad-key"])
+def test_init_names_what_to_fix_in_an_answers_file(authoring, tmp_path, document, message):
+    item, suite, tool = authoring
+    _definition(item)
+    original = suite.read_bytes()
+    result = _run(tmp_path, tool, "init", item.name, "--answers", str(_answers(tmp_path, document)))
+    assert result.returncode == 2
+    assert message in result.stderr
+    assert suite.read_bytes() == original
+
+
+def test_init_with_no_questions_writes_no_file(authoring, tmp_path):
+    item, suite, tool = authoring
+    suite.unlink()
+    _definition(item)
+    result = _run(tmp_path, tool, "init", item.name, "--answers", str(_answers(tmp_path, {"tests": []})), "-q")
+    assert result.returncode == 0, result.stderr
+    assert not suite.exists()
 
 
 def test_init_refuses_malformed_existing_metadata_without_modifying_it(authoring, tmp_path):
@@ -147,12 +181,9 @@ def test_text_dry_run_shows_the_generated_suite(authoring, tmp_path):
     item, suite, tool = authoring
     suite.unlink()
     _definition(item)
-    questions = json.loads(_run(tmp_path, tool, "init", item.name, "--questions", "--format", "json").stdout)
-    answers = tmp_path / "answers.json"
-    answers.write_text(json.dumps({q["id"]: "verified" for q in questions["questions"]}), encoding="utf-8")
-    result = _run(tmp_path, tool, "init", item.name, "--answers", str(answers), "--dry-run")
+    result = _run(tmp_path, tool, "init", item.name, "--answers", str(_answers(tmp_path)), "--dry-run")
     assert result.returncode == 0, result.stderr
-    assert "fabTestDataAgent:" in result.stdout and "verified" in result.stdout
+    assert "fabTestDataAgent:" in result.stdout and "how-many-orders-are-there-follow-up-1" in result.stdout
     assert not suite.exists()
 
 
@@ -163,14 +194,11 @@ def test_init_extends_renamed_suite_by_identity_instead_of_creating_a_duplicate(
     suite.rename(renamed)
     questions = _run(tmp_path, tool, "init", item.name, "--questions", "--format", "json")
     assert questions.returncode == 0, questions.stderr
-    payload = json.loads(questions.stdout)
-    assert Path(payload["suite"]) == renamed
-    answers = tmp_path / "answers.json"
-    answers.write_text(json.dumps({q["id"]: "verified" for q in payload["questions"]}), encoding="utf-8")
-    result = _run(tmp_path, tool, "init", item.name, "--answers", str(answers))
+    assert Path(json.loads(questions.stdout)["suite"]) == renamed
+    result = _run(tmp_path, tool, "init", item.name, "--answers", str(_answers(tmp_path)))
     assert result.returncode == 0, result.stderr
     assert not suite.exists()
-    assert len(yaml.safe_load(renamed.read_text(encoding="utf-8"))["tests"]) > 1
+    assert len(yaml.safe_load(renamed.read_text(encoding="utf-8"))["tests"]) == 4
 
 
 def test_lint_all_rejects_duplicate_suite_claims(authoring, tmp_path):
@@ -212,33 +240,32 @@ def test_data_agent_authoring_honors_explicit_config(authoring, tmp_path):
     assert "missing.yml" in result.stderr
 
 
-def test_text_questions_show_the_suggestion_and_human_requirement(authoring, tmp_path):
+def test_text_questions_show_suggestions_keys_and_the_file_shape(authoring, tmp_path):
     item, _suite, tool = authoring
     _definition(item)
     result = _run(tmp_path, tool, "init", item.name, "--questions")
     assert result.returncode == 0, result.stderr
-    assert "suggested: none" in result.stdout.lower()
-    assert "needs human" in result.stdout.lower()
+    assert "1. How many rows are in the Orders table?" in result.stdout
+    assert "you write the expected answers" in result.stdout
+    assert "n number" in result.stdout and '"follow_ups"' in result.stdout
 
 
-def test_init_requires_force_to_replace_existing_generated_tests(authoring, tmp_path):
+def test_init_requires_force_to_replace_existing_tests(authoring, tmp_path):
     item, suite, tool = authoring
     _definition(item)
-    questions = _run(tmp_path, tool, "init", item.name, "--questions", "--format", "json")
-    answers = tmp_path / "answers.json"
-    ids = [question["id"] for question in json.loads(questions.stdout)["questions"]]
-    answers.write_text(json.dumps(dict.fromkeys(ids, "original")), encoding="utf-8")
-    first = _run(tmp_path, tool, "init", item.name, "--answers", str(answers))
+    first = _run(tmp_path, tool, "init", item.name, "--answers", str(_answers(tmp_path)))
     assert first.returncode == 0, first.stderr
-    answers.write_text(json.dumps(dict.fromkeys(ids, "updated")), encoding="utf-8")
-    kept = _run(tmp_path, tool, "init", item.name, "--answers", str(answers), "--format", "json")
+    changed = {"tests": [{**_CHAIN["tests"][0], "expect": "1,300", "follow_ups": []}]}
+    kept = _run(tmp_path, tool, "init", item.name, "--answers", str(_answers(tmp_path, changed)), "--format", "json")
     assert kept.returncode == 0, kept.stderr
-    assert set(ids).issubset(json.loads(kept.stdout)["kept"])
-    forced = _run(tmp_path, tool, "init", item.name, "--answers", str(answers), "--force", "--format", "json")
+    assert json.loads(kept.stdout)["kept"] == ["how-many-orders-are-there"]
+    forced = _run(tmp_path, tool, "init", item.name, "--answers", str(_answers(tmp_path, changed)), "--force",
+                  "--format", "json")
     assert forced.returncode == 0, forced.stderr
-    assert set(ids).issubset(json.loads(forced.stdout)["replaced"])
+    assert json.loads(forced.stdout)["replaced"] == ["how-many-orders-are-there"]
     tests = yaml.safe_load(suite.read_text(encoding="utf-8"))["tests"]
-    assert all(test["assert"][0]["value"] == "updated" for test in tests if test["metadata"]["id"] in ids)
+    first_test = next(test for test in tests if test["metadata"]["id"] == "how-many-orders-are-there")
+    assert "1,?300" in first_test["assert"][0]["value"]
 
 
 def test_init_does_not_echo_secrets_from_a_malformed_existing_suite(authoring, tmp_path):

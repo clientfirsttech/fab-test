@@ -1,7 +1,6 @@
-"""Build answer requests from the selected data in a Data Agent definition."""
+"""Suggest questions from the selected data in a Data Agent definition."""
 
 import json
-import re
 from pathlib import Path
 from typing import Any
 
@@ -20,51 +19,42 @@ def _read(path: Path) -> dict[str, Any]:
     return value
 
 
-def _id(value: str) -> str:
-    return re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
+DECLINE_SUGGESTION = "What is the current balance of my private bank account?"
 
 
-def _question(test_id: str, query: str, **variables: Any) -> dict[str, Any]:
-    return {"id": test_id, "prompt": f"Expected answer for: {query}", "query": query,
-            "suggested": None, "needs_human": True, "variables": variables}
+def _selected(element: Any, kind: str) -> bool:
+    return (isinstance(element, dict) and element.get("is_selected") is True
+            and str(element.get("type", "")).endswith(f".{kind}") and bool(element.get("display_name")))
 
 
-def build_questions(item: Path) -> list[dict[str, Any]]:
-    """Suggest questions for selected tables, a refusal, and a conversation."""
+def _table_suggestions(table: dict[str, Any]) -> tuple[list[str], list[str]]:
+    """A measure is a question someone would ask; a row count only for a table that has columns."""
+    children = table.get("children") or []
+    measures = [f"What is the {child['display_name']}?" for child in children if _selected(child, "measure")]
+    has_columns = any(_selected(child, "column") for child in children) or not children
+    counts = [f"How many rows are in the {table['display_name']} table?"] if has_columns else []
+    return measures, counts
+
+
+def build_suggestions(item: Path) -> list[str]:
+    """Questions to offer from the selected measures and tables, then one the agent should decline.
+
+    Suggestions only: the caller writes or picks each question and gives every expected answer.
+    """
     draft = item / "Files" / "Config" / "draft"
-    stage = _read(draft / "stage_config.json")
     sources = sorted(draft.rglob("datasource.json"))
     if not sources:
         raise InitInputError(f"{draft} contains no data source definitions.")
-    questions = []
+    measures: list[str] = []
+    counts: list[str] = []
     for path in sources:
-        source = _read(path)
-        source_id = source.get("artifactId")
-        elements = source.get("elements")
-        if not isinstance(source_id, str) or not source_id or not isinstance(elements, list):
-            raise InitInputError(f"{path} needs an artifactId and an elements list.")
-        for element in elements:
-            if not isinstance(element, dict):
-                raise InitInputError(f"{path}: each data source element must be an object.")
-            if element.get("is_selected") is not True or not str(element.get("type", "")).endswith(".table"):
-                continue
-            table, table_id = element.get("display_name"), element.get("id")
-            if not isinstance(table, str) or not table or not isinstance(table_id, str) or not table_id:
-                raise InitInputError(f"{path}: selected tables need display_name and id.")
-            question = _question(f"table-{_id(source_id)}-{_id(table_id)}", f"How many rows are in the {table} table?")
-            if stage.get("aiInstructions") or source.get("dataSourceInstructions"):
-                question["prompt"] += " Review the agent and source instructions before answering."
-            questions.append(question)
-    if not questions:
-        raise InitInputError(f"{draft} has no selected tables; select a source table before creating a suite.")
-    first = questions[0]["query"]
-    questions.extend([
-        _question("out-of-scope", "What is the current balance of my private bank account?"),
-        _question("conversation-first", first, conversation="starter-conversation", reset=True),
-        _question("conversation-follow-up", "Is that number greater than 10,000? Answer yes or no.",
-                  conversation="starter-conversation"),
-    ])
-    ids = [question["id"] for question in questions]
-    if len(ids) != len(set(ids)) or any(not item_id for item_id in ids):
-        raise InitInputError("Selected data source identities produce duplicate or empty question IDs.")
-    return questions
+        elements = _read(path).get("elements")
+        if not isinstance(elements, list):
+            raise InitInputError(f"{path} needs an elements list.")
+        for table in (element for element in elements if _selected(element, "table")):
+            table_measures, table_counts = _table_suggestions(table)
+            measures += table_measures
+            counts += table_counts
+    if not measures and not counts:
+        raise InitInputError(f"{draft} selects no tables; select a source table in the agent before writing tests.")
+    return list(dict.fromkeys([*measures, *counts, DECLINE_SUGGESTION]))

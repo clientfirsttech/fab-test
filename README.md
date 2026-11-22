@@ -274,8 +274,16 @@ tests run sequentially in one Python worker. Redacted native results, the
 effective config, and the envelope live under
 `fab-test-results/data_agent/<item>/`; `--report` adds the standard HTML report.
 `all` includes the enabled analyzer only with a workspace configured; `local`
-never includes it. The `tests init`/`tests lint` authoring commands are still
-pending: author the YAML directly for now.
+never includes it.
+
+`fab-test data-agent tests init Sales` asks for your questions, one at a time:
+the expected answer (Enter if the agent should decline), how it matches in one
+key (`n` number, `c` contains, `x` exact, `s` starts with, `e` ends with,
+`p` pattern, `r` refuses; Enter takes the default shown), and any follow-ups
+asked in the same conversation. `?` lists suggestions from the agent's measures
+and tables; a number picks one. In CI, or for an agent, pass the same answers as
+JSON with `--answers FILE` (`--questions` prints the shape). Then run
+`fab-test data-agent tests lint Sales` before the run.
 
 **A suite is code.** promptfoo runs its `javascript` assertions and `file://`
 hooks with your permissions. Run suites only from trusted branches, never from

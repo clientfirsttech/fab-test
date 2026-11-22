@@ -150,7 +150,14 @@ Node.js >=22.22.0 is required; promptfoo 0.124.0 installs on the first run.
 agents needs `--all`. Unpaired items are skipped. Conversation vars
 `conversation`/`reset` force one Python worker and one concurrent call.
 Reports and redacted results use `fab-test-results/data_agent/<item>/`.
-Authoring commands are pending, so keep the suite manually for now.
+`fab-test data-agent tests init Sales` asks for your questions, one at a time:
+the expected answer (Enter if the agent should decline), how it matches in one
+key (`n` number, `c` contains, `x` exact, `s` starts with, `e` ends with,
+`p` pattern, `r` refuses; Enter takes the default shown), and any follow-ups
+asked in the same conversation. `?` lists suggestions from the agent's measures
+and tables; a number picks one. In CI, or for an agent, pass the same answers as
+JSON with `--answers FILE` (`--questions` prints the shape). Then run
+`fab-test data-agent tests lint Sales` before the run.
 
 A pipeline can run an already-authored suite without prompts:
 
