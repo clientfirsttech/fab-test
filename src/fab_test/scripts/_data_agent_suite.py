@@ -65,6 +65,18 @@ def suite_index(roots: Path | list[Path], excluded: list[Path] | None = None) ->
     return paired
 
 
+def named_item(items: list[Path], target: str) -> Path:
+    """The one Data Agent item TARGET names: a folder path, or a name with or without `.DataAgent`."""
+    direct = Path(target)
+    matches = ([direct] if direct.is_dir() else
+               [item for item in items if item.name in (target, f"{target}.DataAgent")])
+    if len(matches) != 1:
+        found = ", ".join(item.name.removesuffix(".DataAgent") for item in items) or "none"
+        raise SuiteError(f"{target}: expected one Data Agent item, found {len(matches)} (items: {found}); "
+                         "pass its folder path.")
+    return matches[0]
+
+
 def pair_suite(item: Path, paired: dict[str, Path], explicit: Path | None = None) -> Path | None:
     """The explicit --tests file, or the suite claiming this item's logicalId."""
     if explicit is not None:

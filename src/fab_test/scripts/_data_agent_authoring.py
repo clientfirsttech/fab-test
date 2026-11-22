@@ -3,7 +3,7 @@
 import argparse
 import sys
 
-from ._authoring_output import add_input_flags, resolve_inputs
+from ._authoring_output import add_input_flags, resolve_inputs, run_flag
 from ._config import ConfigError
 from ._data_agent_init import init_main
 from ._data_agent_lint_command import lint_main
@@ -58,14 +58,11 @@ def authoring_parser() -> argparse.ArgumentParser:
 
 def tests_main(args: argparse.Namespace, unknown: list[str], parser: argparse.ArgumentParser) -> int:
     """Dispatch an authoring verb after refusing flags reserved for the run."""
-    from .fab_test_parser import build_parser
-
-    choices = next(a for a in build_parser()._actions if isinstance(a, argparse._SubParsersAction)).choices
-    run_options = choices["data-agent"]._option_string_actions
-    flags = [value.split("=")[0] for value in unknown if value.startswith("-")]
-    if flags and flags[0] in run_options:
-        print(f"  ✗ fab-test data-agent tests {args.action}: {flags[0]} belongs to "
-              "the run: fab-test data-agent", file=sys.stderr)
+    flag = run_flag("data-agent", unknown)
+    if flag:
+        name = (args.target or args.artifact or "AGENT").removesuffix(".DataAgent")
+        print(f"  ✗ {flag}: tests {args.action} doesn't take it; it's a flag of the run: "
+              f"fab-test data-agent {name} {flag} ...", file=sys.stderr)
         return 2
     if unknown:
         parser.error(f"unrecognized arguments: {' '.join(unknown)}")

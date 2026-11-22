@@ -82,6 +82,22 @@ def next_command(args: argparse.Namespace, command: str) -> str:
     return " ".join([command, *(f'"{word}"' if " " in word else word for word in words)])
 
 
+def run_flag(analyzer: str, unknown: list[str]) -> str | None:
+    """The first unparsed flag that belongs to ``fab-test <analyzer>``'s run, for a refusal naming the run.
+
+    One rule for every authoring verb: a run-only flag (--report, --telemetry, --timeout, ...) names the
+    run; anything else unknown stays argparse's "unrecognized arguments".
+    """
+    flags = [arg.split("=")[0] for arg in unknown if arg.startswith("-")]
+    if not flags:
+        return None
+    from .fab_test_parser import build_parser  # the run's parser, built only when a flag needs naming
+
+    subs = next(a for a in build_parser()._actions if isinstance(a, argparse._SubParsersAction))
+    run = {option for action in subs.choices[analyzer]._actions for option in action.option_strings}
+    return flags[0] if flags[0] in run else None
+
+
 def print_payload(args: argparse.Namespace, payload: dict, as_text, asked_for: bool = False, as_line=None) -> None:
     """Print JSON, detailed text, or the quiet result line as requested."""
     if args.output_format == "json":

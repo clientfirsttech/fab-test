@@ -20,7 +20,7 @@ from typing import Any
 
 from ._authoring_output import can_ask as _can_ask
 from ._authoring_output import console as _console
-from ._authoring_output import next_command
+from ._authoring_output import next_command, run_flag
 from ._pbir_rule_sources import expects
 from ._scan import find_artifact_dirs
 from ._slicer_init_calendar import describe_calendar
@@ -64,21 +64,13 @@ def parse(parser: argparse.ArgumentParser, argv: list[str]) -> tuple[argparse.Na
 
 def unknown_refusal(parser: argparse.ArgumentParser, args: argparse.Namespace, unknown: list[str]) -> str | None:
     """Refuse run-only flags while leaving unknown options to argparse."""
-    flags = [arg.split("=")[0] for arg in unknown if arg.startswith("-")]
-    if not flags or flags[0] not in _run_flags():
+    flag = run_flag("pbir", unknown)
+    if flag is None:
         if unknown:
             parser.error(f"unrecognized arguments: {' '.join(unknown)}")
         return None
     name = Path(args.target or args.artifact or "REPORT").name.removesuffix(".Report")
-    return (f"{flags[0]}: contract {args.action} doesn't take it; it's a flag of the run: "
-            f"fab-test pbir {name} {flags[0]} ...")
-
-
-def _run_flags() -> set[str]:
-    from .fab_test_parser import build_parser  # the run's parser, built only when a flag needs naming
-
-    subs = next(a for a in build_parser()._actions if isinstance(a, argparse._SubParsersAction))
-    return {option for action in subs.choices["pbir"]._actions for option in action.option_strings}
+    return f"{flag}: contract {args.action} doesn't take it; it's a flag of the run: fab-test pbir {name} {flag} ..."
 
 
 def can_ask() -> bool:

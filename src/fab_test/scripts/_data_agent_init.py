@@ -12,17 +12,17 @@ from typing import Any
 import yaml
 
 from ._authoring_output import can_ask, next_command, print_payload
-from ._data_agent_init_questions import DECLINE_SUGGESTION, InitInputError, build_suggestions
+from ._data_agent_init_questions import DECLINE_SUGGESTION, InitInputError, Suggestions, read_suggestions
 from ._data_agent_init_tests import (
     MATCH_KEYS,
     ask_tests,
     input_prompt,
+    numbered,
     question_key,
     specs_from_answers,
     tests_from_specs,
 )
-from ._data_agent_lint_command import _named_item
-from ._data_agent_suite import SuiteError, effective_config, item_identity, load_suite, suite_index
+from ._data_agent_suite import SuiteError, effective_config, item_identity, load_suite, named_item, suite_index
 from ._scan import ScanError, find_artifact_dirs
 from ._tests_dir import flow_dir, search_roots
 
@@ -112,7 +112,8 @@ def _add_or_replace(existing: dict[str, dict[str, str]]) -> bool:
         print("  a adds, r replaces", file=sys.stderr)
 
 
-def _new_tests(args: argparse.Namespace, suggestions: list[str], suite: Path, document: dict) -> list[dict[str, Any]]:
+def _new_tests(args: argparse.Namespace, suggestions: Suggestions, suite: Path, document: dict
+               ) -> list[dict[str, Any]]:
     """The caller's questions: from --answers, or asked one at a time when a person is there.
 
     A question the suite already has takes that test's id, so the merge keeps it, or replaces it
@@ -135,7 +136,8 @@ def _new_tests(args: argparse.Namespace, suggestions: list[str], suite: Path, do
         _announce(suite, existing)
         try:
             args.replace_all = bool(existing) and _add_or_replace(existing)
-            specs = ask_tests(suggestions, existing={} if args.replace_all else existing)
+            specs = ask_tests(suggestions.all(), existing={} if args.replace_all else existing,
+                              declines=set(suggestions.decline))
         except EOFError as exc:
             raise InitInputError("Input ended before the questions did; nothing was written. "
                                  "Pass --answers FILE instead.") from exc
@@ -184,9 +186,12 @@ def _write(path: Path, content: str) -> None:
 
 
 def _questions_text(payload: dict) -> str:
-    suggestions = "".join(f"  {number}. {text}\n" for number, text in enumerate(payload["suggestions"], 1))
+    suggestions = numbered(payload["suggestions"], set(payload["decline"]))
     keys = "  ".join(f"{key} {name}" for key, name in payload["matches"].items())
-    return (f"Suggested questions from the agent's data (you write the expected answers):\n{suggestions}"
+    told = "".join(f"  {text}\n" for text in payload["instructions"])
+    instructions = f"The agent's instructions, to write questions against:\n{told}" if told else ""
+    return (f"{instructions}Suggested questions from the agent's data (you write the expected answers):\n"
+            f"{suggestions}"
             f"Match keys: {keys}\n"
             "Run without --questions to be asked, or pass --answers FILE shaped like:\n"
             f"{json.dumps(payload['answers_example'], indent=2)}")
@@ -235,13 +240,14 @@ def _init(args: argparse.Namespace) -> int:
     if not target:
         found = ", ".join(item.name.removesuffix(".DataAgent") for item in items) or f"none under {args.artifact_dir}"
         raise InitInputError(f"Name the Data Agent item as TARGET or --artifact (found: {found}).")
-    item = _named_item(items, target)
+    item = named_item(items, target)
     logical_id, _ = item_identity(item)
     suite = Path(args.tests) if args.tests else _suite_path(args, item, logical_id)
     document = _existing(suite, logical_id, args.force)
-    suggestions = build_suggestions(item)
+    suggestions = read_suggestions(item)
     if args.questions:
-        print_payload(args, {"item": str(item), "suite": str(suite), "suggestions": suggestions,
+        print_payload(args, {"item": str(item), "suite": str(suite), "suggestions": suggestions.all(),
+                             "decline": suggestions.decline, "instructions": suggestions.instructions,
                              "matches": MATCH_KEYS, "answers_example": _ANSWERS_EXAMPLE}, _text, asked_for=True)
         return 0
     new_tests = _new_tests(args, suggestions, suite, document)

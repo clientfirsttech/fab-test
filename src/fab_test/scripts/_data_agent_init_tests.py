@@ -234,8 +234,18 @@ def _keep_or_replace(known: dict[str, str], ask: Ask, err: TextIO) -> bool:
         err.write("  k keeps it, r replaces it\n")
 
 
+DECLINE_NOTE = " (the agent should decline)"
+
+
+def numbered(suggestions: list[str], declines: set[str] | frozenset = frozenset()) -> str:
+    """The suggestions as `?` and --questions number them, marking what the agent should decline."""
+    return "".join(f"  {number}. {text}{DECLINE_NOTE if text in declines else ''}\n"
+                   for number, text in enumerate(suggestions, 1))
+
+
 def ask_tests(suggestions: list[str], ask: Ask | None = None, err: TextIO | None = None,
-              existing: dict[str, dict[str, str]] | None = None) -> list[dict[str, Any]]:
+              existing: dict[str, dict[str, str]] | None = None,
+              declines: set[str] | frozenset = frozenset()) -> list[dict[str, Any]]:
     """Ask for questions until Enter on an empty one; each may grow a chain of follow-ups.
 
     ``existing`` maps `question_key` to the suite's test (``id``, ``summary``). Typing one of those
@@ -249,7 +259,7 @@ def ask_tests(suggestions: list[str], ask: Ask | None = None, err: TextIO | None
     while True:
         typed = ask(f"Question {len(specs) + 1}: ").strip()
         if typed == "?":
-            err.write("".join(f"  {number}. {text}\n" for number, text in enumerate(suggestions, 1))
+            err.write(numbered(suggestions, declines)
                       or "  No suggestions: the definition selects no tables or measures.\n")
             continue
         if not typed:

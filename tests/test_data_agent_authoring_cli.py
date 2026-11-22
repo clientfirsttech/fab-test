@@ -74,7 +74,8 @@ def test_lint_refuses_a_run_only_flag(authoring, tmp_path):
     item, _suite, tool = authoring
     result = _run(tmp_path, tool, "lint", item.name, "--report")
     assert result.returncode == 2
-    assert "--report" in result.stderr and "fab-test data-agent" in result.stderr
+    meant = "--report: tests lint doesn't take it; it's a flag of the run: fab-test data-agent Sales --report"
+    assert meant in result.stderr  # the shape `contract lint` uses (one shared rule)
 
 
 def _definition(item):
