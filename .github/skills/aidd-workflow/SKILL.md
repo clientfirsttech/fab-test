@@ -19,6 +19,7 @@ Constraints {
   (task plans, adds, reviews, or changes a subcommand, verb, noun, or flag a person types) => load aidd-command-grammar; plan with /command-grammar plan, review with /command-grammar review. Authoring verbs (`<analyzer> <noun> init|lint`) are its scope; the run is aidd-analyzer-contract's
   (discovery for a new analyzer or a new file a person authors) => ask, as a discovery question, which file the person authors, its noun, and where it lives (aidd-command-grammar's Grammar and Files)
   (task reviews a diff that changes what a caller reads or answers: messages, errors, --help, prompts, init questions, explain or doctor output, the HTML report, or a skill an agent reads) => load aidd-polite-review; its findings join the review at aidd-review's levels (blocking, should-fix, nit)
+  (task plans, adds, reviews, or changes code that makes an HTTP request, or wraps a tool that does) => load aidd-polite-http; plan with /polite-http plan, review with /polite-http review. Its findings join the review at aidd-review's levels
   (task involves code changes) => use aidd-tdd — write tests before implementation
   (planning or executing an epic) => its last task is always "Quality gates" (whole-repo ruff, complexity and module-budget ratchets, coverage floor, CI-env run), per vision.md's Definition of Done; no task follows it
   All skills resolve to: .github/skills/<skill-name>/SKILL.md
@@ -60,6 +61,7 @@ Constraints {
 | `aidd-analyzer-contract` | Minimum requirements for a new or changed analyzer: envelope, exit codes, report, telemetry, registration touch points |
 | `aidd-command-grammar` | One shape for commands that author test files: `<analyzer> <noun> <verb>`, shared flags, file placement, exit codes, output modes |
 | `aidd-polite-review` | How considerately a surface treats its three callers: Cooper's polite-software traits, excise, pain points for discovery |
+| `aidd-polite-http` | How code treats the services it calls: a class for every failure, `Retry-After` as a floor, one retry layer, one sentence for the caller |
 | `document` | Sync docs: README, QUICK-VALIDATION, fab-test skill |
 | `fab-test` | fab-test CLI reference — subcommands, flags, result locations |
 

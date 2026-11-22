@@ -1,0 +1,48 @@
+import '.github/skills/aidd-polite-http/SKILL.md'
+
+userPrompt = """
+You are in a test environment. Do not run any commands and do not edit any files.
+
+/polite-http review this promptfoo Python provider. promptfoo calls `call_api` once per
+question, and promptfoo's own scheduler calls it again, up to 3 more times with 1 s, 2 s
+and 4 s backoff, whenever the returned error text contains "429", "timeout", "503" or
+"network". The provider never returns response headers to promptfoo.
+
+```python
+def _http_json(method, url, token, timeout=60, json_body=None):
+    request = urllib.request.Request(url, data=dumps(json_body), method=method,
+                                     headers={"Authorization": "Bearer " + token})
+    with urllib.request.urlopen(request, timeout=timeout) as response:
+        return json.loads(response.read() or b"{}")
+
+def _run_once(prompt, config):
+    token = get_token()
+    thread = _http_json("POST", f"{config['base_url']}/threads", token, json_body={})["id"]
+    _http_json("POST", f"{config['base_url']}/threads/{thread}/messages", token,
+               json_body={"role": "user", "content": prompt})
+    run = _http_json("POST", f"{config['base_url']}/threads/{thread}/runs", token, json_body={})
+    ...  # poll the run, then read the last assistant message
+    return {"output": answer}
+
+def call_api(prompt, options, context):
+    for attempt in range(4):
+        try:
+            return _run_once(prompt, options["config"])
+        except Exception as exc:
+            if attempt == 3:
+                return {"error": str(exc)}
+            time.sleep(2)
+```
+
+On a live run, Fabric answered the first POST with:
+
+    HTTP 429, Retry-After: 16
+    {"errorCode":"RequestBlocked","message":"Request is blocked by the upstream service until: 11/22/2026 4:23:38 PM (UTC)","isRetriable":true}
+
+and the person running it saw `{"error": "HTTP Error 429: "}` for every question.
+"""
+
+- Given a provider that sleeps 2 s between attempts after a 429 with Retry-After: 16, should report that it ignores Retry-After as a blocking finding
+- Given promptfoo's scheduler retrying an error that contains "429" around a provider that also retries, should report the nested retry layers as a blocking finding and say which layer should own retries
+- Given a loop that retries every exception the same way, should report that a final failure such as a 404 or a DNS failure is retried, and name which failures are final
+- Given the error the person saw, should propose one sentence that names the RequestBlocked cause, the block's end time and what to do

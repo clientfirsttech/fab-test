@@ -1,0 +1,85 @@
+import '.github/skills/aidd-polite-http/SKILL.md'
+
+userPrompt = """
+You are in a test environment. Do not run any commands and do not edit any files.
+
+/polite-http review this function, which a command-line tool uses to GET one JSON document
+from a Fabric REST API. Nothing else retries around it. The run's budget is passed in as `deadline`
+(a time.monotonic() value).
+
+The helpers are implemented and tested elsewhere; take these contracts as facts:
+
+- OPENER refuses every redirect: it raises Final naming the target host, so the token never follows one.
+  Its `timeout` bounds the whole request, body included, not just each socket operation.
+- get_token(force_refresh=True) fetches a new token within the same deadline and raises Final, with one
+  sentence, on any failure.
+- retry_after(headers, body) reads retry-after-ms, then Retry-After as seconds or an HTTP date; it never
+  returns a negative number (a date already past is 0). With neither header, it returns 60 for a
+  RequestBlocked body (Fabric's quota window) and None otherwise.
+- classify(status, body, delay) returns "final", "wait" or "retryable": "isRetriable": false is final;
+  a RequestBlocked body is "wait"; 408, 429, 5xx and "isRetriable": true are "wait" when a delay was
+  given and "retryable" otherwise;
+  every other 3xx and 4xx is final, with or without a delay.
+- network_class(exc) is "final" for DNS failures and certificate verification failures, otherwise
+  "retryable" (refused, reset, timed out, cut mid-read, or any other TLS error).
+- parse_body(exc) returns the error body as a JSON object, {"message": <text>} for a plain-text body, or {}.
+- describe(...), describe_network(...), describe_not_json(...) and describe_out_of_time(...) each return
+  one sentence: the host and document, the service's errorCode and message, the time to come back when
+  there is one, and what to do. None of them includes the token.
+- backoff(attempt) is exponential from 1 s with up to 20% jitter, capped at 30 s.
+- Final(message, retry_after=None) carries the sentence and, for a wait, the UTC time to come back, which
+  the tool writes to its JSON envelope as retry_after.
+
+```python
+MIN_REQUEST_SECONDS = 5
+
+def get_json(url, token, deadline, attempts=4):
+    """GET one document. GET is idempotent, so a retryable failure may be asked again."""
+    refreshed, waited, last, attempt = False, False, None, 0
+    while attempt < attempts:
+        remaining = deadline - time.monotonic()
+        if remaining < MIN_REQUEST_SECONDS:
+            raise Final(last or describe_out_of_time(url))
+        try:
+            request = Request(url, headers={"Authorization": f"Bearer {token}"})
+            with OPENER.open(request, timeout=min(30, remaining)) as response:
+                raw, content_type = response.read(), response.headers.get("Content-Type")
+            try:
+                return json.loads(raw)
+            except ValueError:
+                raise Final(describe_not_json(url, content_type, raw[:80])) from None
+        except urllib.error.HTTPError as exc:
+            if exc.code == 401 and not refreshed:
+                token, refreshed = get_token(force_refresh=True), True
+                continue                                    # a refresh doesn't use up an attempt
+            body = parse_body(exc)
+            delay = retry_after(exc.headers, body)
+            kind = classify(exc.code, body, delay)
+            last = describe(url, exc.code, body, delay)
+            if kind == "final":
+                raise Final(last) from None
+            if kind == "wait":
+                no_time = delay + MIN_REQUEST_SECONDS > deadline - time.monotonic()
+                if waited or no_time or attempt + 1 >= attempts:   # still blocked, or nothing left to wait for
+                    raise Final(last, retry_after=utc_after(delay)) from None
+                waited = True
+                time.sleep(delay)
+                attempt += 1
+                continue
+        except (OSError, http.client.HTTPException) as exc:     # URLError, timeouts, resets, TLS, cut reads
+            last = describe_network(url, exc)
+            if network_class(exc) == "final":
+                raise Final(last) from None
+        attempt += 1
+        if attempt >= attempts:
+            break
+        pause = backoff(attempt)
+        if pause + MIN_REQUEST_SECONDS > deadline - time.monotonic():
+            break                                           # never spend the budget waiting
+        time.sleep(pause)
+    raise Final(last)
+```
+"""
+
+- Given a client that classifies every failure, honors Retry-After as a floor, retries in one layer within its budget and names the cause, should report no blocking or should-fix findings
+- Given a polite client, should not invent findings to fill the report

@@ -1,0 +1,19 @@
+import '.github/skills/aidd-polite-http/SKILL.md'
+
+userPrompt = """
+You are in a test environment. Do not run any commands and do not edit any files.
+
+/polite-http review this proposed fix from a pull request description:
+
+"Multi-turn conversations with the Data Agent sometimes fail with a socket timeout on the
+POST that adds the user's message to the shared conversation thread. Today that turn is
+reported as failed and never asked again. This PR wraps the POST in our retry helper, so a
+timed-out turn is posted again up to 3 times with exponential backoff, and the conversation
+carries on:
+
+    retry(lambda: post(f"{base}/threads/{thread}/messages", {"role": "user", "content": prompt}))"
+"""
+
+- Given a retried POST that adds a message to a shared thread after a socket timeout, should report that the first POST may already have taken effect, so the retry can post the turn twice
+- Given a fix that repeats a non-idempotent request, should not recommend the change as proposed
+- Given the timeout, should propose a fix that keeps the turn safe, such as checking the thread's messages before posting again, or reporting the turn as failed with its cause

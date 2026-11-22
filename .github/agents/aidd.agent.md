@@ -187,6 +187,8 @@ All skills are in `.github/skills/<name>/SKILL.md`:
 - `aidd-module-budgets` - File-level size budgets and where to split a module
 - `aidd-analyzer-contract` - Minimum requirements every analyzer subcommand/wrapper meets (loaded by the workflow skill for any analyzer work)
 - `aidd-command-grammar` - One shape for commands that author test files (`<analyzer> <noun> init|lint`); loaded by the workflow skill whenever a command, verb, noun or flag is planned or reviewed
+- `aidd-polite-review` - How considerately a surface treats its three callers (human, pipeline, agent); loaded for discovery, and for review when a diff changes what a caller reads or answers
+- `aidd-polite-http` - How code treats the services it calls over HTTP (failure classes, `Retry-After`, one retry layer, what the caller is told); loaded by the workflow skill whenever an HTTP call is planned, changed or reviewed
 - `aidd-requirements` - Functional requirements (given/should)
 - `aidd-pr` - Pull-request review triage
 - `aidd-parallel` - Sub-agent delegation
