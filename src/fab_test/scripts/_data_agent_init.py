@@ -76,11 +76,28 @@ def _announce(suite: Path, existing: dict[str, dict[str, str]]) -> None:
     if not existing:
         print(f"Writing a new suite: {suite}", file=sys.stderr)
         return
-    plural = "test" if len(existing) == 1 else "tests"
     listed = "".join(f"  {known['id']}: {known['query']}\n" for known in existing.values())
-    print(f"Adding to {suite}, which has {len(existing)} {plural}:\n{listed}"
-          "Type one of them again to keep or replace it. For a separate suite, rerun with --tests FILE.",
-          file=sys.stderr)
+    print(f"{suite} has {_count(len(existing))}:\n{listed.rstrip()}", file=sys.stderr)
+
+
+def _count(number: int, noun: str = "test") -> str:
+    return f"{number} {noun}{'' if number == 1 else 's'}"
+
+
+def _add_or_replace(existing: dict[str, dict[str, str]]) -> bool:
+    """True to start the suite over. Enter adds, the reason init was run; r is one key away."""
+    prompt = f"[a]dd to it (Enter) or [r]eplace all {_count(len(existing))}? "
+    while True:
+        typed = input_prompt(prompt).strip().lower()
+        if typed in {"", "a", "add"}:
+            print("Type one of them again to keep or replace it. For a separate suite, rerun with --tests FILE.",
+                  file=sys.stderr)
+            return False
+        if typed in {"r", "replace"}:
+            print(f"  → starting over: the {_count(len(existing))} go only once you've written new ones",
+                  file=sys.stderr)
+            return True
+        print("  a adds, r replaces", file=sys.stderr)
 
 
 def _new_tests(args: argparse.Namespace, suggestions: list[str], suite: Path, document: dict) -> list[dict[str, Any]]:
@@ -96,18 +113,20 @@ def _new_tests(args: argparse.Namespace, suggestions: list[str], suite: Path, do
         except (OSError, UnicodeError, ValueError) as exc:
             raise InitInputError(f"Cannot read --answers {args.answers}: {exc}") from exc
         specs = specs_from_answers(answers)
+        args.replace_all = isinstance(answers, dict) and answers.get("replace_all") is True
     elif args.output_format == "json" or os.getenv("CI") or not can_ask():
         raise InitInputError("Writing tests needs your questions and expected answers, and nobody is here to "
                              "ask. Run --questions to see suggestions and the file shape, then pass --answers FILE.")
     else:
         _announce(suite, existing)
         try:
-            specs = ask_tests(suggestions, existing=existing)
+            args.replace_all = bool(existing) and _add_or_replace(existing)
+            specs = ask_tests(suggestions, existing={} if args.replace_all else existing)
         except EOFError as exc:
             raise InitInputError("Input ended before the questions did; nothing was written. "
                                  "Pass --answers FILE instead.") from exc
         args.asked_in_person = True  # typed work: a dry run offers to keep it rather than discard it
-    for spec in specs:
+    for spec in specs if not args.replace_all else []:  # starting over: nothing to match against
         known = existing.get(question_key(spec["query"]))
         if known and "id" not in spec:
             spec["id"] = known["id"]
@@ -170,9 +189,10 @@ def _text(payload: dict) -> str:
 def _line(payload: dict) -> str:
     if "document" in payload:  # --dry-run: say what would happen, never "written"
         would = " ".join(f"{verb}={len(payload[key])}" for verb, key in
-                         (("add", "added"), ("replace", "replaced"), ("keep", "kept"), ("unchanged", "unchanged")))
+                         (("add", "added"), ("replace", "replaced"), ("keep", "kept"), ("unchanged", "unchanged"),
+                          ("remove", "removed")))
         return f"tests dry run, nothing written: would {would} {payload['suite']}"
-    counts = " ".join(f"{key}={len(payload[key])}" for key in ("added", "replaced", "kept", "unchanged"))
+    counts = " ".join(f"{key}={len(payload[key])}" for key in ("added", "replaced", "kept", "unchanged", "removed"))
     return f"tests {'written' if payload['added'] or payload['replaced'] else 'unchanged'} {counts} {payload['suite']}"
 
 
@@ -208,7 +228,13 @@ def _init(args: argparse.Namespace) -> int:
                              "matches": MATCH_KEYS, "answers_example": _ANSWERS_EXAMPLE}, _text, asked_for=True)
         return 0
     new_tests = _new_tests(args, suggestions, suite, document)
+    removed = [test.get("metadata", {}).get("id") for test in document["tests"]]
+    if getattr(args, "replace_all", False) and new_tests:  # no new questions: nothing goes
+        document["tests"] = []
+    else:
+        removed = []
     counts = _merge(document, new_tests, args.force, getattr(args, "replace_ids", set()))
+    counts["removed"] = removed
     effective_config(document, "https://example.invalid/data-agent")
     content = yaml.safe_dump(document, sort_keys=False, allow_unicode=True)
     if not args.dry_run and (counts["added"] or counts["replaced"]):  # no questions: no file, not an empty one
@@ -231,8 +257,10 @@ def _keep(counts: dict[str, list[str]], suite: Path) -> bool:
     changed = len(counts["added"]) + len(counts["replaced"])
     if not changed:
         return False
+    question = (f"Replace the {_count(len(counts['removed']))} in {suite} with {_count(changed, 'new one')}? [y/N] "
+                if counts["removed"] else f"Write {_count(changed, 'new test')} to {suite}? [y/N] ")
     try:
-        reply = input_prompt(f"Write {changed} new test{'s' if changed != 1 else ''} to {suite}? [y/N] ")
+        reply = input_prompt(question)
     except EOFError:
         return False
     return reply.strip().lower() in {"y", "yes"}

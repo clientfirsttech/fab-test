@@ -285,9 +285,10 @@ key (`n` number, `c` contains, `x` exact, `s` starts with, `e` ends with,
 asked in the same conversation. `?` lists suggestions from the agent's measures
 and tables; a number picks one. In CI, or for an agent, pass the same answers as
 JSON with `--answers FILE` (`--questions` prints the shape). When the suite
-exists, init names it and lists its tests before the first question; typing
-a question it already has asks keep (Enter) or replace (`"replace": true`
-in an answers file). Then run
+exists, init lists its tests and asks `[a]dd to it (Enter) or [r]eplace all`
+(`"replace_all": true` in an answers file); replacing with no new questions
+writes nothing. Typing a question it already has asks keep (Enter) or
+replace (`"replace": true`). Then run
 `fab-test data-agent tests lint Sales` before the run.
 
 **A suite is code.** promptfoo runs its `javascript` assertions and `file://`

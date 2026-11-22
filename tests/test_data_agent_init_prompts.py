@@ -380,13 +380,93 @@ def test_init_says_where_the_questions_go_before_the_first_one(tmp_path, monkeyp
 
     from fab_test.scripts import _data_agent_init as init
 
-    replies = iter(["Top order?", "", "", "", ""])  # already there: Enter keeps it; nothing to write
+    replies = iter(["", "Top order?", "", ""])  # Enter adds; the question is there: Enter keeps it; done
     monkeypatch.setattr("builtins.input", lambda: next(replies))
     args = argparse.Namespace(target="Sales", artifact=None, artifact_dir=str(tmp_path), tests=None, force=False,
                               questions=False, answers=None, dry_run=False, output_format="text",
                               quiet=False, verbose=0, file_config={}, tests_dir=None)
     assert init.init_main(args) == 0
     second = capsys.readouterr().err
-    assert "Adding to " in second and "which has 1 test:" in second and "top-order: Top order?" in second
+    assert "has 1 test:" in second and "top-order: Top order?" in second and "[a]dd to it (Enter)" in second
     assert "--tests FILE" in second  # the way to a separate suite
-    assert second.index("Adding to ") < second.index("Question 1")
+    assert second.index("has 1 test:") < second.index("Question 1")
+
+
+# -- add to the suite, or start it over ------------------------------------------------
+
+
+def _again(tmp_path, monkeypatch, typed, *, dry_run=False, answers=None, output_format="text"):
+    """Run init a second time on the suite _console_init wrote."""
+    import argparse
+
+    from fab_test.scripts import _data_agent_init as init
+
+    replies = iter(typed)
+    monkeypatch.setattr("builtins.input", lambda: next(replies))
+    args = argparse.Namespace(target="Sales", artifact=None, artifact_dir=str(tmp_path), tests=None, force=False,
+                              questions=False, answers=answers, dry_run=dry_run, output_format=output_format,
+                              quiet=False, verbose=0, file_config={}, tests_dir=None)
+    return init.init_main(args)
+
+
+def _suite_ids(tmp_path):
+    import yaml
+
+    suite = tmp_path / "Sales.DataAgent.promptfoo.yaml"
+    return [test["metadata"]["id"] for test in yaml.safe_load(suite.read_text(encoding="utf-8"))["tests"]]
+
+
+def test_enter_adds_to_the_suite(tmp_path, monkeypatch, capsys):
+    _console_init(tmp_path, monkeypatch, ["Top order?", "42", "", "", ""], dry_run=False)
+    capsys.readouterr()
+    assert _again(tmp_path, monkeypatch, ["", "Top region?", "West", "", "", ""]) == 0
+    err = capsys.readouterr().err
+    assert "[a]dd to it (Enter) or [r]eplace all 1 test?" in err
+    assert _suite_ids(tmp_path) == ["top-order", "top-region"]
+
+
+def test_r_starts_the_suite_over_with_only_the_new_questions(tmp_path, monkeypatch, capsys):
+    _console_init(tmp_path, monkeypatch, ["Top order?", "42", "", "", ""], dry_run=False)
+    capsys.readouterr()
+    assert _again(tmp_path, monkeypatch, ["r", "Top order?", "43", "", "", ""]) == 0
+    out = capsys.readouterr().out
+    assert _suite_ids(tmp_path) == ["top-order"]  # the same question, not asked keep or replace: all were dropped
+    assert "removed=1" in out and "added=1" in out
+
+
+def test_starting_over_with_no_new_questions_leaves_the_suite_untouched(tmp_path, monkeypatch, capsys):
+    _console_init(tmp_path, monkeypatch, ["Top order?", "42", "", "", ""], dry_run=False)
+    suite = tmp_path / "Sales.DataAgent.promptfoo.yaml"
+    before = suite.read_bytes()
+    assert _again(tmp_path, monkeypatch, ["r", ""]) == 0
+    assert suite.read_bytes() == before
+
+
+def test_a_wrong_key_for_add_or_replace_asks_again(tmp_path, monkeypatch, capsys):
+    _console_init(tmp_path, monkeypatch, ["Top order?", "42", "", "", ""], dry_run=False)
+    capsys.readouterr()
+    assert _again(tmp_path, monkeypatch, ["x", "a", ""]) == 0
+    err = capsys.readouterr().err
+    assert err.count("[a]dd to it (Enter) or [r]eplace all 1 test?") == 2 and "a adds, r replaces" in err
+
+
+def test_a_dry_run_that_starts_over_says_so_when_offering_to_write(tmp_path, monkeypatch, capsys):
+    _console_init(tmp_path, monkeypatch, ["Top order?", "42", "", "", ""], dry_run=False)
+    capsys.readouterr()
+    assert _again(tmp_path, monkeypatch, ["r", "Top region?", "West", "", "", "", "y"], dry_run=True) == 0
+    assert "Replace the 1 test in " in capsys.readouterr().err
+    assert _suite_ids(tmp_path) == ["top-region"]
+
+
+def test_the_answers_file_starts_over_with_replace_all(tmp_path, monkeypatch, capsys):
+    import json
+
+    _console_init(tmp_path, monkeypatch, ["Top order?", "42", "", "", ""], dry_run=False)
+    capsys.readouterr()
+    answers = tmp_path / "answers.json"
+    answers.write_text(json.dumps({"replace_all": True, "tests": [{"query": "Top region?", "expect": "West"}]}),
+                       encoding="utf-8")
+    assert _again(tmp_path, monkeypatch, [], answers=str(answers), output_format="json") == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["removed"] == ["top-order"] and payload["added"] == ["top-region"]
+    assert _suite_ids(tmp_path) == ["top-region"]
