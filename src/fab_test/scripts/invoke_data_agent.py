@@ -48,6 +48,60 @@ class ResultError(ValueError):
     """promptfoo did not produce a valid evaluation result."""
 
 
+class RunTimeout(RuntimeError):
+    """promptfoo outlived --timeout; the message names what the provider last reported (aidd-polite-http)."""
+
+    def __init__(self, message: str, retry_after: str | None) -> None:
+        super().__init__(message)
+        self.retry_after = retry_after
+
+
+def _cause(line: dict[str, Any]) -> str:
+    return str(line.get("message") or "no reason given").removeprefix("Not asked: ")
+
+
+def progress_lines(path: Path) -> list[dict[str, Any]]:
+    """The provider's per-question lines; a half-written last line is skipped."""
+    lines = []
+    with contextlib.suppress(OSError):
+        for raw in path.read_text(encoding="utf-8").splitlines():
+            with contextlib.suppress(ValueError):
+                lines.append(json.loads(raw))
+    return [line for line in lines if isinstance(line, dict)]
+
+
+def retry_after(lines: list[dict[str, Any]]) -> str | None:
+    """When to come back, if a question failed because the service named a wait."""
+    return next((str(line["retry_after"]) for line in reversed(lines) if line.get("retry_after")), None)
+
+
+def timeout_message(seconds: float, total: int, lines: list[dict[str, Any]]) -> str:
+    """Why the run ran out of time, in the caller's terms: never the promptfoo command line."""
+    failed = [line for line in lines if line.get("error")]
+    came_back = (f"promptfoo did not finish within {seconds:.0f} s: {len(lines)} of {total} questions came back "
+                 f"({len(lines) - len(failed)} answered, {len(failed)} failed).")
+    if failed:
+        return f"{came_back} Last failure: {_cause(failed[-1])} --timeout limits the whole run."
+    return (f"{came_back} The agent is slow: raise --timeout for the whole run, or the suite's "
+            "providers[].config.timeout for one question.")
+
+
+def provider_errors(rows: list[Any]) -> str | None:
+    """Every question promptfoo could not ask, summarised once: the first cause, and how many differ from it."""
+    errors = []
+    for row in rows:
+        response = row.get("response") if isinstance(row, dict) else None
+        response = response if isinstance(response, dict) else {}
+        if isinstance(row, dict) and (row.get("failureReason") == 2 or response.get("error")):
+            errors.append(str(row.get("error") or response.get("error") or "unknown error"))
+    if not errors:
+        return None
+    causes = [error.removeprefix("Not asked: ") for error in errors]
+    others = sum(1 for cause in causes if cause != causes[0])
+    tail = f" ({others} more failed another way)" if others else ""
+    return f"{len(errors)} of {len(rows)} questions could not be asked: {causes[0]}{tail}"
+
+
 def credential_principal(env_file: str | None) -> ServicePrincipal:
     """Require a service principal without acquiring a token."""
     principal = resolve_service_principal(env_file)
@@ -144,6 +198,8 @@ def map_results(document: dict[str, Any], suite: str) -> tuple[list[dict[str, An
     rows = container.get("results") if isinstance(container, dict) else container
     if not isinstance(rows, list) or not rows:
         raise ResultError("promptfoo produced no test results; check the suite and promptfoo diagnostics.")
+    if summary := provider_errors(rows):
+        raise ResultError(summary)
     findings, results = [], []
     for index, row in enumerate(rows, 1):
         if not isinstance(row, dict) or not isinstance(row.get("success", row.get("pass")), bool):
@@ -153,9 +209,6 @@ def map_results(document: dict[str, Any], suite: str) -> tuple[list[dict[str, An
         response = row.get("response") or {}
         if not all(isinstance(field, dict) for field in (case, grading, response)):
             raise ResultError("promptfoo testCase, gradingResult and response must be objects.")
-        if row.get("failureReason") == 2 or response.get("error"):
-            error = row.get("error") or response.get("error") or "unknown error"
-            raise ResultError(f"promptfoo provider error: {error}")
         components = grading.get("componentResults") or []
         if not isinstance(components, list) or any(
             not isinstance(c, dict) or (c.get("assertion") is not None and not isinstance(c["assertion"], dict))
@@ -191,7 +244,9 @@ def absolute_references(value: Any, root: Path) -> Any:
     return value
 
 
-def _evaluate(args: argparse.Namespace, folder: Path, principal: ServicePrincipal, out=None) -> dict[str, Any]:
+def _evaluate(args: argparse.Namespace, folder: Path, principal: ServicePrincipal,
+              out=None) -> tuple[dict[str, Any], str | None]:
+    """promptfoo's results, and when to come back if the service named a wait (``retry_after``)."""
     secret = principal.client_secret
     suite = Path(args.tests).resolve()
     config = absolute_references(effective_config(load_suite(suite), args.base_url), suite.parent)
@@ -205,9 +260,16 @@ def _evaluate(args: argparse.Namespace, folder: Path, principal: ServicePrincipa
         command = [*promptfoo_command(Path(args.promptfoo_path)), "eval",
                    "--config", str(effective), "--output", str(native), "--no-cache", "--no-write", "--no-share"]
         item = Path(args.artifact_path).name.removesuffix(".DataAgent")
-        with Progress(out, Path(env[PROGRESS_VAR]), len(config.get("tests") or []), item):
-            proc = subprocess.run(command, cwd=suite.parent, env=env, capture_output=True, text=True,
-                                  encoding="utf-8", errors="replace", timeout=args.timeout, check=False)
+        total = len(config.get("tests") or [])
+        with Progress(out, Path(env[PROGRESS_VAR]), total, item):
+            try:
+                proc = subprocess.run(command, cwd=suite.parent, env=env, capture_output=True, text=True,
+                                      encoding="utf-8", errors="replace", timeout=args.timeout, check=False)
+            except subprocess.TimeoutExpired:
+                lines = progress_lines(Path(env[PROGRESS_VAR]))
+                raise RunTimeout(redact(timeout_message(args.timeout, total, lines), secret),
+                                 retry_after(lines)) from None
+        come_back = retry_after(progress_lines(Path(env[PROGRESS_VAR])))
         salvaged = shutdown_crash(proc) and _complete(native, len(config.get("tests") or []))
         if proc.returncode not in (0, 100) and not salvaged:  # never re-run eval: it would re-post turns
             raise RuntimeError(f"promptfoo eval exited {proc.returncode}: {proc.stderr or proc.stdout}")
@@ -215,7 +277,7 @@ def _evaluate(args: argparse.Namespace, folder: Path, principal: ServicePrincipa
             raise RuntimeError("promptfoo eval produced no results.json; check the suite and promptfoo installation.")
         data = redact(json.loads(native.read_text(encoding="utf-8-sig")), secret)
         (folder / "native.json").write_text(json.dumps(data, indent=2), encoding="utf-8")
-    return data
+    return data, come_back
 
 
 def run_data_agent(args: argparse.Namespace) -> int:
@@ -227,6 +289,7 @@ def run_data_agent(args: argparse.Namespace) -> int:
     native = output.parent / "native.json"
     native.unlink(missing_ok=True)
     status, message, findings, results, code, secret = "passed", "Data Agent tests passed", [], None, 0, ""
+    come_back = None
     out = _terminal()
     with Timer() as timer, contextlib.closing(out) if out is not None else contextlib.nullcontext():
         try:
@@ -236,7 +299,7 @@ def run_data_agent(args: argparse.Namespace) -> int:
             else:
                 principal = credential_principal(args.env_file)
                 secret = principal.client_secret
-                data = _evaluate(args, output.parent, principal, out)
+                data, come_back = _evaluate(args, output.parent, principal, out)
                 findings, results = map_results(data, Path(args.tests).name)
                 show_verdicts(out, redact(results, secret), redact(findings, secret))
                 if findings:
@@ -246,6 +309,8 @@ def run_data_agent(args: argparse.Namespace) -> int:
             status, message, code = "error", detail, 127
         except FileNotFoundError as exc:
             status, message, code = "error", str(exc), 127
+        except RunTimeout as exc:
+            status, message, code, come_back = "error", str(exc), 1, exc.retry_after
         except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
             status, message, code = "error", str(exc), 1
     envelope = build_envelope(
@@ -255,6 +320,8 @@ def run_data_agent(args: argparse.Namespace) -> int:
     )
     if results is not None:
         envelope["test_results"] = redact(results, secret)
+    if come_back:  # an agent can schedule its rerun (aidd-polite-http)
+        envelope["retry_after"] = come_back
     attach_report(envelope, output)
     write_envelope(output, envelope)
     if code:

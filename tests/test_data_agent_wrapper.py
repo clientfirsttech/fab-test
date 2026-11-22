@@ -165,7 +165,7 @@ def test_a_shutdown_crash_after_complete_results_is_graded(tmp_path, monkeypatch
 def test_provider_errors_are_not_assertion_failures(tmp_path, monkeypatch, error_row):
     _principal(monkeypatch)
     args = _args(tmp_path)
-    monkeypatch.setattr(wrapper, "_evaluate", lambda *_args: {"results": {"results": [error_row]}})
+    monkeypatch.setattr(wrapper, "_evaluate", lambda *_args: ({"results": {"results": [error_row]}}, None))
     assert wrapper.run_data_agent(args) == 1
     envelope = json.loads(Path(args.output_path).read_text(encoding="utf-8"))
     assert envelope["status"] == "error"

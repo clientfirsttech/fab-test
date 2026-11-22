@@ -13,6 +13,7 @@ this module using the interpreter selected by ``PROMPTFOO_PYTHON``.
 from __future__ import annotations
 
 import contextlib
+import http.client
 import json
 import os
 import re
@@ -23,6 +24,7 @@ import urllib.parse
 import urllib.request
 from typing import Any
 
+from fab_test.scripts import _http_policy as policy
 from fab_test.scripts._credentials import (
     IncompleteServicePrincipalError,
     ServicePrincipal,
@@ -43,13 +45,26 @@ _PROGRESS_LOCK = threading.Lock()
 
 _TOKEN_CACHE: dict[str, tuple[str, float]] = {}
 _THREAD_CACHE: dict[str, str] = {}
+_BLOCKED: dict[str, tuple[float, str]] = {}  # agent URL -> (blocked until, why): asked no more this run
 _SECRETS: set[str] = set()
 _TOKEN_LOCK = threading.Lock()
 _THREAD_LOCK = threading.Lock()
+_BLOCK_SECONDS_WITHOUT_HEADER = 60.0  # Fabric's request quota is counted in 60 s windows
 
 
 class _Final(RuntimeError):
     """A failure no retry can fix (credentials, a rejected token, missing access): report it at once."""
+
+    status: int | None = None  # the HTTP status behind it, when there was one
+
+
+class _Retry(RuntimeError):
+    """A failure asking again may fix. ``delay`` is the server's wait (a floor), None for plain backoff."""
+
+    def __init__(self, message: str, delay: float | None = None) -> None:
+        super().__init__(message)
+        self.delay = delay
+        self.status: int | None = None
 
 
 def _sleep(seconds: float) -> None:
@@ -178,8 +193,12 @@ def _http_json(method: str, url: str, **kwargs: Any) -> dict[str, Any]:
         headers = {**headers, "Authorization": "Bearer " + token}
     request = urllib.request.Request(parsed.geturl(), data=body, headers=headers, method=method)  # noqa: S310
     with _urlopen(request, timeout=kwargs.get("timeout", 30)) as response:
-        payload = response.read().decode("utf-8")
-    return json.loads(payload) if payload else {}
+        payload = response.read().decode("utf-8", errors="replace")
+    try:
+        return json.loads(payload) if payload else {}
+    except ValueError:
+        start = " ".join(payload.split())[:120]
+        raise _Final(_redact(f"{parsed.hostname} answered with a body that is not JSON, starting: {start}")) from None
 
 
 def _token_url(principal: ServicePrincipal) -> str:
@@ -205,11 +224,14 @@ def _get_token(*, force_refresh: bool = False) -> str:
         "client_secret": principal.client_secret,
         "scope": scope,
     }
-    data = _http_json(
-        "POST", _token_url(principal), timeout=30,
-        data=urllib.parse.urlencode(form).encode("utf-8"),
-        headers={"Content-Type": "application/x-www-form-urlencoded"},
-    )
+    try:
+        data = _http_json(
+            "POST", _token_url(principal), timeout=30,
+            data=urllib.parse.urlencode(form).encode("utf-8"),
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+        )
+    except _TRANSPORT_ERRORS as exc:
+        raise _classified(exc, _token_url(principal)) from None
     token = data["access_token"]
     with _TOKEN_LOCK:
         _TOKEN_CACHE[key] = (token, _now() + int(data.get("expires_in", 3600)))
@@ -233,17 +255,46 @@ def _rejected(exc: urllib.error.HTTPError) -> _Final | None:
 
 
 def _not_retriable(exc: urllib.error.HTTPError) -> _Final | None:
-    """Fabric's own verdict: ``"isRetriable": false`` is final, and a paused capacity names the fix."""
+    """A paused capacity names the fix; every other status is classified by ``_classified``."""
+    if _json_body(exc).get("errorCode") == "CapacityNotActive":
+        return _Final(f"the agent's Fabric capacity is paused (CapacityNotActive): resume the capacity behind the "
+                      f"workspace, then run again. {_error_text(exc)}")
+    return None
+
+
+def _json_body(exc: urllib.error.HTTPError) -> dict[str, Any]:
     try:
         body = json.loads(_http_error_body(exc) or "{}")
     except ValueError:
-        return None
-    if not isinstance(body, dict):
-        return None
-    if body.get("errorCode") == "CapacityNotActive":
-        return _Final(f"the agent's Fabric capacity is paused (CapacityNotActive): resume the capacity behind the "
-                      f"workspace, then run again. {_error_text(exc)}")
-    return _Final(_error_text(exc)) if body.get("isRetriable") is False else None
+        return {}
+    return body if isinstance(body, dict) else {}
+
+
+# OSError covers URLError (and HTTPError), timeouts, resets and TLS errors; IncompleteRead and other
+# http.client errors, and a TLS error during read(), escape urllib unwrapped
+_TRANSPORT_ERRORS = (OSError, http.client.HTTPException)
+
+
+def _classified(exc: Exception, url: str) -> _Final | _Retry:
+    """The failure as ``aidd-polite-http`` classes it, worded for the person who ran the suite."""
+    host = urllib.parse.urlsplit(url).hostname or url
+    if not isinstance(exc, urllib.error.HTTPError):
+        text = _redact(policy.describe_network(host, exc))
+        return _Final(text) if policy.network_class(exc) == policy.FINAL else _Retry(text)
+    body = _json_body(exc)
+    if "message" not in body and body.get("error_description"):  # the token endpoint's spelling
+        body = {**body, "message": body["error_description"]}
+    elif not body and (raw := _http_error_body(exc).strip()) and raw[0] not in "{[":
+        body = {"message": " ".join(raw.split())[:200]}  # plain text is still the service's own words
+    delay = policy.retry_after(exc.headers, _now())
+    kind = policy.classify(exc.code, body, delay)
+    if kind == policy.WAIT and delay is None:
+        delay = _BLOCK_SECONDS_WITHOUT_HEADER
+    text = _redact(policy.describe_http(host, exc.code, body, until=_now() + delay if delay is not None else None,
+                                        reason=str(exc.reason or "")))
+    failure = _Final(text) if kind == policy.FINAL else _Retry(text, delay if kind == policy.WAIT else None)
+    failure.status = exc.code
+    return failure
 
 
 def _authed_json(method: str, url: str, *, timeout: int, **kwargs: Any) -> dict[str, Any]:
@@ -256,7 +307,9 @@ def _authed_json(method: str, url: str, *, timeout: int, **kwargs: Any) -> dict[
             if exc.code == 401 and attempt == 0:
                 token = _get_token(force_refresh=True)
                 continue
-            raise _rejected(exc) or exc from None
+            raise _rejected(exc) or _classified(exc, url) from None
+        except _TRANSPORT_ERRORS as exc:
+            raise _classified(exc, url) from None
     raise AssertionError("unreachable")
 
 
@@ -315,7 +368,7 @@ def _thread_id(base_url: str, vars_: dict[str, Any], timeout: int) -> str:
 def _is_missing_thread(exc: Exception) -> bool:
     if isinstance(exc, urllib.error.HTTPError):
         return exc.code == 404 or "no thread found" in _http_error_body(exc).lower()
-    return "no thread found" in str(exc).lower()
+    return getattr(exc, "status", None) == 404 or "no thread found" in str(exc).lower()
 
 
 def _post_message(base_url: str, vars_: dict[str, Any], thread_id: str, prompt: str, timeout: int) -> str:
@@ -345,9 +398,12 @@ def _await_run(base_url: str, thread_id: str, run: dict[str, Any], timeout: int)
         _sleep(_POLL_SECONDS)
         url = (f"{base_url}/threads/{_segment(thread_id)}/runs/{_segment(run['id'])}"
                f"?api-version={DATA_AGENT_API_VERSION}")
-        status = str(_authed_json("GET", url, timeout=timeout).get("status", ""))
-    if status != "completed":
-        raise RuntimeError(f"Data Agent run ended with status '{status}'")
+        run = _authed_json("GET", url, timeout=timeout)
+        status = str(run.get("status", ""))
+    if status != "completed":  # failed, cancelled or expired: the agent's verdict, not a transient fault
+        error = run.get("last_error") or {}
+        detail = f": {error.get('code') or 'error'}: {error.get('message')}" if error.get("message") else ""
+        raise _Final(f"Data Agent run ended with status '{status}'{detail}")
 
 
 def _last_assistant_text(messages: dict[str, Any]) -> str:
@@ -403,7 +459,7 @@ def _run_once(prompt: str, options: dict[str, Any], context: dict[str, Any]) -> 
                              f"?api-version={DATA_AGENT_API_VERSION}", timeout=timeout)
 
 
-def _report_progress(prompt: str, started: float, result: dict[str, str]) -> None:
+def _report_progress(prompt: str, started: float, result: dict[str, Any]) -> None:
     """One line per answer for the wrapper to show live; a run of live calls must not look hung.
 
     The path comes from the wrapper's private temp dir (``FAB_TEST_*``, which a suite may not set).
@@ -412,12 +468,17 @@ def _report_progress(prompt: str, started: float, result: dict[str, str]) -> Non
     path = os.environ.get(PROGRESS_VAR)
     if not path:
         return
-    line = json.dumps({"query": prompt, "seconds": round(time.monotonic() - started), "error": "error" in result})
+    entry = {"query": prompt, "seconds": round(time.monotonic() - started), "error": "error" in result}
+    if "error" in result:  # already redacted: the same sentence promptfoo gets
+        entry["message"] = result["error"]
+        if retry_after := (result.get("metadata") or {}).get("retry_after"):
+            entry["retry_after"] = retry_after
+    line = json.dumps(entry)
     with contextlib.suppress(OSError), _PROGRESS_LOCK, open(path, "a", encoding="utf-8") as stream:
         stream.write(line + "\n")
 
 
-def call_api(prompt: str, options: dict[str, Any], context: dict[str, Any]) -> dict[str, str]:
+def call_api(prompt: str, options: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
     """promptfoo's provider contract: ``{"output": text}``, or ``{"error": message}`` with no credential in it."""
     started = time.monotonic()
     result = _call_api(prompt, options, context)
@@ -425,17 +486,57 @@ def call_api(prompt: str, options: dict[str, Any], context: dict[str, Any]) -> d
     return result
 
 
-def _call_api(prompt: str, options: dict[str, Any], context: dict[str, Any]) -> dict[str, str]:
+def _blocked_result(text: str, until: float) -> dict[str, Any]:
+    """An error with the UTC time to come back, for the wrapper's envelope (``retry_after``)."""
+    return {"error": text, "metadata": {"retry_after": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(until))}}
+
+
+def _block(base_url: str, exc: _Retry) -> dict[str, Any]:
+    """Stop asking this agent until the server's wait has passed; every later question says why at once."""
+    until = _now() + (exc.delay or _BLOCK_SECONDS_WITHOUT_HEADER)
+    with _THREAD_LOCK:
+        _BLOCKED[base_url] = (until, str(exc))
+    return _blocked_result(str(exc), until)
+
+
+def _still_blocked(base_url: str) -> dict[str, Any] | None:
+    with _THREAD_LOCK:
+        until, why = _BLOCKED.get(base_url, (0.0, ""))
+    return _blocked_result(f"Not asked: {why}", until) if _now() < until else None
+
+
+def _call_api(prompt: str, options: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+    """The one layer that retries (aidd-polite-http): promptfoo's own retries are off (``maxRetries: 0``).
+
+    A server's wait is a floor, waited once; still blocked after it, the agent is asked no more this run.
+    """
     config = options.get("config", {})
     retries = int(config.get("max_retries", 3))
     retry_delay = float(config.get("retry_delay", 2))
+    budget = float(config.get("timeout", 60))
+    try:
+        base_url = _base_url(options, context)
+    except _Final as exc:
+        return {"error": _redact(str(exc))}
+    if blocked := _still_blocked(base_url):
+        return blocked
+    waited, last = False, ""
     for attempt in range(retries + 1):
         try:
             return _run_once(prompt, options, context)
         except _Final as exc:
             return {"error": _redact(str(exc))}
+        except _Retry as exc:
+            if exc.delay is not None:
+                if waited or exc.delay > budget or attempt >= retries:
+                    return _block(base_url, exc)
+                waited = True
+                _sleep(exc.delay)
+                continue
+            last = str(exc)
         except Exception as exc:  # noqa: BLE001 - promptfoo needs every failure as an error response
-            if attempt >= retries:
-                return {"error": _error_text(exc)}
-            _sleep(retry_delay)
+            last = _error_text(exc)
+        if attempt >= retries:
+            return {"error": last}
+        _sleep(policy.backoff(attempt, retry_delay))
     raise AssertionError("unreachable")

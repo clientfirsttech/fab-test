@@ -46,6 +46,7 @@ class FakeAgent:
         self.threads_created = 0
         self.messages_posted = 0
         self.run_status = ["completed"]
+        self.run_error = None  # the run's last_error, as the Assistants API reports it
         self.reply = "42"
         self.on_message = None
         self.on_assistant = None
@@ -69,9 +70,9 @@ class FakeAgent:
                 self.on_message(url, self.messages_posted)
             return {"id": "message-1"}
         if url.endswith(f"/runs?{API}"):
-            return {"id": "run-1", "status": self.run_status[0]}
+            return {"id": "run-1", "status": self.run_status[0], "last_error": self.run_error}
         if url.endswith(f"/runs/run-1?{API}"):
-            return {"id": "run-1", "status": self.run_status[-1]}
+            return {"id": "run-1", "status": self.run_status[-1], "last_error": self.run_error}
         if "/messages?order=asc" in url:
             return {"data": [{"role": "assistant", "content": [{"type": "text", "text": {"value": self.reply}}]}]}
         if "/threads/thread-" in url and method == "DELETE":
@@ -291,7 +292,7 @@ def test_given_no_agent_url_should_say_which_keys_set_one(provider, agent):
     assert agent.calls == []
 
 
-def test_given_a_server_error_should_retry_then_report_its_status_and_body(provider, agent):
+def test_given_a_server_error_should_retry_then_report_it_in_one_sentence(provider, agent):
     def unavailable(url, token):
         raise _http_error(url, code=503, body="Service Unavailable")
 
@@ -299,7 +300,8 @@ def test_given_a_server_error_should_retry_then_report_its_status_and_body(provi
 
     result = provider.call_api("q", _options(max_retries=2), {"vars": {}})
 
-    assert result == {"error": "HTTP 503: Service Unavailable"}
+    assert result == {"error": "api.fabric.microsoft.com answered HTTP 503: Service Unavailable. "
+                               "The service failed; rerun later."}
     assert sum(1 for _m, url, _t in agent.calls if url.endswith(f"/assistants?{API}")) == 3
 
 

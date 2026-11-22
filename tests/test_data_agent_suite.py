@@ -67,8 +67,20 @@ def test_conversation_pins_both_concurrency_and_python_workers():
     assert config["evaluateOptions"] == {"maxConcurrency": 1, "showProgressBar": False}
     provider = config["providers"][0]
     assert provider["id"].endswith("fabric_data_agent_provider.py")
-    assert provider["config"] == {"base_url": "https://agent.example/openai", "workers": 1, "timeout": 90}
+    assert provider["config"] == {"base_url": "https://agent.example/openai", "workers": 1, "timeout": 90,
+                                  "maxRetries": 0}
     assert authored["providers"][0]["config"]["workers"] == 8
+
+
+@pytest.mark.parametrize("authored_retries", [None, 3])
+def test_the_provider_is_the_only_layer_that_retries(authored_retries):
+    """promptfoo's scheduler retries any error mentioning 429, 503 or timeout around a provider that
+    already retries: up to 16 requests per question while Fabric was throttling (Polite HTTP decision 3)."""
+    options = {} if authored_retries is None else {"maxRetries": authored_retries}
+    config = effective_config({"providers": [{"config": options}], "tests": [{"vars": {"query": "q"}}]},
+                              "https://agent.example/openai")
+
+    assert config["providers"][0]["config"]["maxRetries"] == 0
 
 
 def test_explicit_urls_and_template_agent_vars_are_preserved():

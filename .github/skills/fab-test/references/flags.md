@@ -54,6 +54,9 @@ Dry runs show local suite denominators, not a live workspace inventory.
 Node.js >=22.22.0, pinned promptfoo 0.124.0, and a full service principal are
 required. Results live under `data_agent/<results_stem>/`; telemetry uses
 `fabric_dynamic_analysis` with artifact type `DataAgent`.
+`--timeout` bounds the whole run. When Fabric throttles the agent, the envelope's
+`retry_after` (UTC, ISO 8601) says when to run again, and its `message` names the
+cause once for every question it stopped.
 
 `fab-test data-agent tests init [TARGET]` and `fab-test data-agent tests lint [TARGET]`, flag by flag
 (the [walkthrough](https://github.com/clientfirsttech/fab-test/blob/main/docs/DATA-AGENT-TESTS-WALKTHROUGH.md) has the same table):

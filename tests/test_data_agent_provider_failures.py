@@ -78,12 +78,14 @@ def test_given_a_conversation_should_never_post_its_turn_twice(provider, agent):
     assert agent.messages_posted == 1
 
 
-def test_given_a_lone_question_whose_run_fails_may_ask_again_on_a_new_thread(provider, agent):
+def test_given_a_lone_question_whose_run_fails_should_report_it_and_not_ask_again(provider, agent):
+    """A failed, cancelled or expired run is the agent's verdict, not a transient fault (Polite HTTP decision 5)."""
     agent.run_status = ["failed"]
 
-    provider.call_api("Lone", _options(max_retries=1), {"vars": {}})
+    result = provider.call_api("Lone", _options(max_retries=1), {"vars": {}})
 
-    assert agent.messages_posted == 2 and agent.threads_created == 2
+    assert "status 'failed'" in result["error"]
+    assert agent.messages_posted == 1 and agent.threads_created == 1
 
 
 # -- cleanup -------------------------------------------------------------------------

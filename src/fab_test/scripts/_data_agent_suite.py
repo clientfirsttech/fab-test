@@ -127,6 +127,8 @@ def _effective_provider(provider: Any, base_url: str, conversation: bool) -> dic
         effective_options["base_url"] = base_url
     if conversation:
         effective_options["workers"] = 1
+    # One retry layer (aidd-polite-http): the provider sees Retry-After, promptfoo's scheduler doesn't.
+    effective_options["maxRetries"] = 0
     return {
         **authored,
         "id": f"file://{(Path(__file__).parent.parent / 'fabric_data_agent_provider.py').resolve().as_posix()}",

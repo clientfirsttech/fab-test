@@ -78,6 +78,8 @@ class Progress:
             verb = "failed after" if entry.get("error") else "answered in"
             _say(self.out, f"  … {self.shown}/{self.total} {verb} {entry.get('seconds', '?')} s: "
                            f"{str(entry.get('query', ''))[:80]}")
+            if entry.get("error") and entry.get("message"):
+                _say(self.out, f"      {entry['message']}")  # why, in the provider's one sentence
 
 
 def show_verdicts(out: TextIO | None, results: list[dict[str, Any]], findings: list[dict[str, Any]]) -> None:

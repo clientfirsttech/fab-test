@@ -276,6 +276,11 @@ With telemetry configured, each run's redacted answers go to your Eventhouse or 
 | `HTTP 401 … Fabric rejected the token` | wrong tenant, or the tenant setting is off | check `fab-test auth status` and **Service principals can use Fabric APIs** |
 | `the agent's Fabric capacity is paused (CapacityNotActive)` | the capacity is paused | resume it, then run again |
 | `Timed out waiting for Data Agent run` | the agent took longer than the timeout | raise `--timeout` or the suite's `providers[].config.timeout` |
+| `Fabric is rate-limiting this identity (RequestBlocked) until 16:38:24 UTC`, then `Not asked: …` for the rest | the service principal used up its Fabric request quota, counted per identity in 60 s windows across every Fabric API and every run or tool using that principal | wait until the time shown (the envelope's `retry_after`), and stop other runs using the same principal; fab-test waited once and then stopped asking, so retrying sooner only extends the block |
+| `The Fabric capacity is overloaded (CapacityLimitExceeded)` | the capacity behind the workspace is out of compute, whoever is calling | rerun later; check the load in the Fabric Capacity Metrics app |
+| `promptfoo did not finish within 198 s: 3 of 7 questions came back …` | `--timeout` limits the whole run, and it ran out | read the last failure it names; raise `--timeout` only if the agent is slow |
+| `3 of 7 questions could not be asked: …` | the same failure stopped several questions, so it is said once | fix the one cause it names |
+| `cannot resolve api.fabric.microsoft.com` or `…'s certificate is not trusted` | no network or DNS, or a TLS-inspecting proxy | check the connection; behind a proxy, set `SSL_CERT_FILE` to its CA bundle |
 | `skipped`: "No paired suite. Run `fab-test data-agent tests init Sales`." | the item has no paired suite | write one, or pass `--tests FILE` |
 | `fab-test sends the Fabric token only to Fabric or Power BI hosts` | the suite names an agent URL on another host | remove `base_url`/`fabric_urls`, or allow the exact host in the caller's `FAB_TEST_DATA_AGENT_ALLOWED_HOSTS` |
 | exit 2: "Workspace contains 8 Data Agents; live tests consume capacity. Pass --all to run them." | `--workspace` with no item found more than 5 agents | name the item, or pass `--all` |
