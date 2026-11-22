@@ -98,6 +98,7 @@ def provider(monkeypatch, no_env_file):
 
     module._TOKEN_CACHE.clear()
     module._THREAD_CACHE.clear()
+    monkeypatch.delenv("FAB_TEST_DATA_AGENT_AUTH", raising=False)
     monkeypatch.setenv("FABRIC_TENANT_ID", "tenant-id")
     monkeypatch.setenv("FABRIC_CLIENT_ID", "client-id")
     monkeypatch.setenv("FABRIC_CLIENT_SECRET", SECRET)
@@ -386,6 +387,7 @@ def test_given_a_403_should_name_the_access_it_needs_and_not_retry(provider, age
 def test_given_no_service_principal_should_name_the_variables_and_call_nothing(provider, agent, monkeypatch):
     for var in _SP_VARS:
         monkeypatch.delenv(var, raising=False)
+    monkeypatch.setenv("FAB_TEST_DATA_AGENT_AUTH", "service-principal")  # else it falls back to az login
 
     result = provider.call_api("Hello", _options(max_retries=3), {"vars": {}})
 

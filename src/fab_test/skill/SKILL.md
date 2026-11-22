@@ -123,7 +123,10 @@ DataAgentTests {
   (tests init, CI | --format json | an agent) => --answers FILE {tests: [{query, expect, match, follow_ups, replace?}]}; --questions prints suggestions and the shape; never invent an expected answer
   (suggestions) => figure measures and selected tables as questions; a table the source has but the agent leaves out, then a generic out-of-scope question, as `decline`; the agent's aiInstructions and dataSourceInstructions as `instructions`
   (a provider failure) => 401 after one refresh | 403 | "isRetriable": false | CapacityNotActive | a poll timeout are final and name the fix; a conversation turn is never retried once posted
-  (the service principal) => Member or Contributor in the agent's workspace, read on every data source, tenant setting "Service principals can use Fabric APIs"; see references/credentials.md
+  (who asks the agent) => the chain every service command uses: a full service principal, else az login; --auth az uses az login even when a principal is set; --auth service-principal never falls back; see references/credentials.md
+  (running for a person signed in with az login, and the principal is blocked (RequestBlocked), rejected (401/403) or not set up for this agent) => rerun with --auth az; never loop the principal
+  (CI or another remote runner) => a service principal from secrets, or the pipeline's own az login (azure/login with OIDC, AzureCLI@2) then --auth az, which needs no client secret
+  (the identity) => Member or Contributor in the agent's workspace, read on every data source; a service principal also needs the tenant setting "Service principals can use Fabric APIs"
   (a walkthrough or pipeline is wanted) => docs/DATA-AGENT-TESTS-WALKTHROUGH.md; docs/examples/{github-actions,azure-devops}/data-agent-tests.yml (lint, then the run; weekly)
   (tests init, a suite exists) => list its path and tests, then ask [a]dd (Enter) | [r]eplace all; "replace_all": true in --answers; replacing with no new questions writes nothing
   (adding, a question it already has) => ask [k]eep (Enter) | [r]eplace; "replace": true in --answers; otherwise kept

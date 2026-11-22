@@ -97,11 +97,11 @@ def test_run_redacts_native_config_envelope_and_quiet_output(tmp_path, monkeypat
     assert envelope["test_results"][0]["passed"]
 
 
-def test_missing_credentials_exits_127_without_promptfoo(tmp_path, monkeypatch):
+def test_missing_credentials_under_auth_service_principal_exits_127_without_promptfoo(tmp_path, monkeypatch):
     for key in ("FABRIC_TENANT_ID", "FABRIC_CLIENT_ID", "FABRIC_CLIENT_SECRET",
                 "FABRIC_SERVICE_PRINCIPAL_ID", "FABRIC_SERVICE_PRINCIPAL_SECRET"):
         monkeypatch.delenv(key, raising=False)
-    args = _args(tmp_path, env_file=str(tmp_path / "absent.env"))
+    args = _args(tmp_path, env_file=str(tmp_path / "absent.env"), auth="service-principal")
     assert wrapper.run_data_agent(args) == 127
     envelope = json.loads(Path(args.output_path).read_text(encoding="utf-8"))
     assert envelope["status"] == "error"

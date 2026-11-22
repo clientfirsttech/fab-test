@@ -18,8 +18,11 @@ import yaml
 
 from ._analyzer_envelope import EnvelopeIdentity, Timer, build_envelope, envelope_path, write_envelope
 from ._credentials import (
+    AUTH_CHOICES,
+    DATA_AGENT_AUTH_VAR,
     IncompleteServicePrincipalError,
     ServicePrincipal,
+    data_agent_auth,
     redact_secrets,
     resolve_service_principal,
 )
@@ -115,21 +118,27 @@ def credential_secret(env_file: str | None) -> str:
     return credential_principal(env_file).client_secret
 
 
-def _promptfoo_env(principal: ServicePrincipal, private_dir: Path) -> dict[str, str]:
+def _promptfoo_env(principal: ServicePrincipal | None, private_dir: Path) -> dict[str, str]:
     """promptfoo's environment, with the service principal moved into a private file (decision 19).
 
     A suite can template ``{{ env.* }}`` and run JavaScript assertions, so the secret stays out of
     the environment those see. The provider reads the principal the preflight resolved from the
     file, which lives in the run's private temporary directory and is deleted with it. This is
     defense in depth, not a sandbox: a hostile suite can still read the file. Suites are code.
+
+    With no principal (az login), no file is written and the provider asks ``az`` for its own token,
+    so no token reaches the environment either.
     """
     credentials = private_dir / "service-principal.env"
-    credentials.write_text(
-        f"FABRIC_TENANT_ID={principal.tenant_id}\nFABRIC_CLIENT_ID={principal.client_id}\n"
-        f"FABRIC_CLIENT_SECRET={principal.client_secret}\n",
-        encoding="utf-8",
-    )
-    return {**worker_env(), "PROMPTFOO_PYTHON": sys.executable, "PROMPTFOO_DISABLE_TELEMETRY": "1",
+    if principal is not None:
+        credentials.write_text(
+            f"FABRIC_TENANT_ID={principal.tenant_id}\nFABRIC_CLIENT_ID={principal.client_id}\n"
+            f"FABRIC_CLIENT_SECRET={principal.client_secret}\n",
+            encoding="utf-8",
+        )
+    auth = "service-principal" if principal is not None else "az"
+    return {**worker_env(), DATA_AGENT_AUTH_VAR: auth,
+            "PROMPTFOO_PYTHON": sys.executable, "PROMPTFOO_DISABLE_TELEMETRY": "1",
             "PROMPTFOO_CONFIG_DIR": str(private_dir), "PLAYWRIGHT_ENV_FILE": str(credentials),
             PROGRESS_VAR: str(private_dir / "progress.jsonl")}
 
@@ -244,10 +253,10 @@ def absolute_references(value: Any, root: Path) -> Any:
     return value
 
 
-def _evaluate(args: argparse.Namespace, folder: Path, principal: ServicePrincipal,
+def _evaluate(args: argparse.Namespace, folder: Path, principal: ServicePrincipal | None,
               out=None) -> tuple[dict[str, Any], str | None]:
     """promptfoo's results, and when to come back if the service named a wait (``retry_after``)."""
-    secret = principal.client_secret
+    secret = principal.client_secret if principal is not None else ""
     suite = Path(args.tests).resolve()
     config = absolute_references(effective_config(load_suite(suite), args.base_url), suite.parent)
     effective = folder / "effective.promptfoo.yaml"
@@ -297,8 +306,9 @@ def run_data_agent(args: argparse.Namespace) -> int:
                 status = "skipped"
                 message = f"No paired suite. Run `fab-test data-agent tests init {artifact}`."
             else:
-                principal = credential_principal(args.env_file)
-                secret = principal.client_secret
+                auth = data_agent_auth(getattr(args, "auth", "") or "", args.env_file)
+                principal = credential_principal(args.env_file) if auth == "service-principal" else None
+                secret = principal.client_secret if principal is not None else ""
                 data, come_back = _evaluate(args, output.parent, principal, out)
                 findings, results = map_results(data, Path(args.tests).name)
                 show_verdicts(out, redact(results, secret), redact(findings, secret))
@@ -342,6 +352,8 @@ def main() -> int:
     parser.add_argument("--env-file", default=None)
     parser.add_argument("--output-path", default="")
     parser.add_argument("--timeout", type=float, default=300)
+    parser.add_argument("--auth", default="", choices=AUTH_CHOICES,
+                        help="az: your az login; service-principal: never fall back. Default: the principal if set")
     return run_data_agent(parser.parse_args())
 
 

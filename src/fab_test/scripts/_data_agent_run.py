@@ -10,7 +10,7 @@ from pathlib import Path
 
 from azure.core.exceptions import AzureError
 
-from ._credentials import IncompleteServicePrincipalError
+from ._credentials import AzureCliSignInError, IncompleteServicePrincipalError, azure_cli_token, data_agent_auth
 from ._data_agent_resolution import data_agent_base_url, list_data_agents, resolve_data_agent_url
 from ._data_agent_suite import SuiteError, item_identity, load_suite, pair_suite, suite_index
 from ._mode import ModeError, ResolvedMode
@@ -24,6 +24,7 @@ from .playwright_validation.fabric_service_client import FabricServiceClientErro
 from .playwright_validation.resolver import ServiceResolutionError, resolve_workspace_id
 
 ENUMERATION_LIMIT = 5
+_URL_SCOPE = "https://analysis.windows.net/powerbi/api/.default"  # what FabricServiceClient's own sign-in uses
 
 
 def resolve_data_agent_mode(args: argparse.Namespace) -> ResolvedMode:
@@ -59,9 +60,21 @@ def _has_urls(suite: Path) -> bool:
     )
 
 
+def _token_client_class():  # the seam tests replace
+    from .playwright_validation.fabric_service_client import FabricServiceClient
+
+    return FabricServiceClient
+
+
 def _client(args: argparse.Namespace):
-    credential_secret(getattr(args, "playwright_env_file", None))
-    client = build_service_client(args)
+    """The REST client that resolves agent URLs, signed in as the identity the questions will use."""
+    env_file = getattr(args, "playwright_env_file", None)
+    if data_agent_auth(getattr(args, "data_agent_auth", "") or "", env_file) == "az":
+        token, _expires = azure_cli_token(_URL_SCOPE)
+        client = _token_client_class().from_access_token(token, credential_source="azure-cli")
+    else:
+        credential_secret(env_file)
+        client = build_service_client(args)
     args.data_agent_workspace_id = resolve_workspace_id(client, args.data_agent_mode.workspace)
     return client
 
@@ -99,7 +112,7 @@ def discover_data_agents(args: argparse.Namespace) -> list[Path]:
     """Pair every denominator before resolving URLs; dry runs never acquire tokens."""
     try:
         return _discover_data_agents(args)
-    except IncompleteServicePrincipalError as exc:
+    except (IncompleteServicePrincipalError, AzureCliSignInError) as exc:
         raise ServiceExportError(str(exc), 127) from exc
     except SuiteError as exc:
         raise ServiceExportError(str(exc), 2) from exc
@@ -179,6 +192,9 @@ def build_data_agent_command(artifact: Path, args: argparse.Namespace, output_di
     env_file = getattr(args, "playwright_env_file", None)
     if env_file:
         command += ["--env-file", str(env_file)]
+    auth = getattr(args, "data_agent_auth", "")
+    if auth:
+        command += ["--auth", auth]
     timeout = getattr(args, "data_agent_timeout", None) or getattr(args, "timeout", None)
     if timeout:
         command += ["--timeout", str(timeout)]

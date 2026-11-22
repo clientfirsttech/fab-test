@@ -26,8 +26,13 @@ from typing import Any
 
 from fab_test.scripts import _http_policy as policy
 from fab_test.scripts._credentials import (
+    AUTH_CHOICES,
+    DATA_AGENT_AUTH_VAR,
+    AzureCliSignInError,
     IncompleteServicePrincipalError,
     ServicePrincipal,
+    azure_cli_token,
+    data_agent_auth,
     redact_secrets,
     resolve_service_principal,
 )
@@ -81,6 +86,21 @@ def _monotonic() -> float:
 
 def _scope() -> str:
     return os.environ.get("FABRIC_SCOPE") or _DEFAULT_SCOPE
+
+
+def _auth_mode() -> str:
+    """"az" or "service-principal": the wrapper's choice, else the chain (Data Agent az login epic)."""
+    requested = os.environ.get(DATA_AGENT_AUTH_VAR, "")
+    if requested in AUTH_CHOICES:
+        return requested
+    try:
+        return data_agent_auth()
+    except IncompleteServicePrincipalError as exc:
+        raise _Final(f"{exc}; `fab-test auth status` shows what is set") from None
+
+
+def _identity() -> str:
+    return "your az login identity" if os.environ.get(DATA_AGENT_AUTH_VAR) == "az" else "the service principal"
 
 
 def _principal() -> ServicePrincipal:
@@ -210,9 +230,26 @@ def _token_cache_key(scope: str, principal: ServicePrincipal | None = None) -> s
     return f"{principal.tenant_id}:{principal.client_id}:{scope}"
 
 
+def _az_token(scope: str, *, force_refresh: bool) -> str:
+    key = f"az:{scope}"
+    with _TOKEN_LOCK:
+        cached = None if force_refresh else _TOKEN_CACHE.get(key)
+    if cached and cached[1] - _now() > _TOKEN_REFRESH_MARGIN_SECONDS:
+        return cached[0]
+    try:
+        token, expires_on = azure_cli_token(scope)
+    except AzureCliSignInError as exc:
+        raise _Final(str(exc)) from None  # a sign-in no retry fixes (aidd-polite-http)
+    with _TOKEN_LOCK:
+        _TOKEN_CACHE[key] = (token, expires_on)
+    return token
+
+
 def _get_token(*, force_refresh: bool = False) -> str:
-    principal = _principal()
     scope = _scope()
+    if _auth_mode() == "az":
+        return _az_token(scope, force_refresh=force_refresh)
+    principal = _principal()
     key = _token_cache_key(scope, principal)
     with _TOKEN_LOCK:
         cached = None if force_refresh else _TOKEN_CACHE.get(key)
@@ -245,10 +282,13 @@ def _rejected(exc: urllib.error.HTTPError) -> _Final | None:
             "Fabric rejected the token (HTTP 401) -- it is for a different tenant than the workspace, expired, "
             "or the tenant does not yet let service principals use Fabric APIs. Check FABRIC_TENANT_ID and "
             "which identity `fab-test auth status` reports"
+        ) if _identity() == "the service principal" else _Final(
+            "Fabric rejected your az login token (HTTP 401) -- it is for a different tenant than the workspace "
+            "or expired. Run `az login --tenant <the workspace's tenant>`"
         )
     if exc.code == 403:
         return _Final(
-            "the service principal may not use this Data Agent (HTTP 403); it needs a role in the agent's "
+            f"{_identity()} may not use this Data Agent (HTTP 403); it needs a role in the agent's "
             "workspace and read access to the agent's data sources. Run `fab-test auth status`"
         )
     return _not_retriable(exc)

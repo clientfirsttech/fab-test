@@ -292,6 +292,57 @@ def build_azure_credential(env_file: Path | str | None = None) -> Any:
     )
 
 
+DATA_AGENT_AUTH_VAR = "FAB_TEST_DATA_AGENT_AUTH"
+AUTH_CHOICES = ("az", "service-principal")
+_AZ_PROCESS_TIMEOUT_SECONDS = 30  # a cold `az` on Windows takes several seconds
+_AZ_REMEDY = "Run `az login` (add --tenant <id> for the workspace's tenant)."
+
+
+class AzureCliSignInError(RuntimeError):
+    """`az login` gave no token: one sentence naming why and `az login`."""
+
+
+def _cli_credential() -> Any:
+    """The Azure CLI credential; the seam tests replace so no test runs the real ``az``."""
+    from azure.identity import AzureCliCredential
+
+    return AzureCliCredential(process_timeout=_AZ_PROCESS_TIMEOUT_SECONDS)
+
+
+def azure_cli_token(scope: str) -> tuple[str, float]:
+    """A token and its expiry (epoch seconds) from the Azure CLI's signed-in identity.
+
+    AzureCliCredential rather than DefaultAzureCredential: the caller asked for az login,
+    so managed identity and VS Code are not probed first (Data Agent az login epic).
+    """
+    from azure.core.exceptions import ClientAuthenticationError
+
+    try:
+        token = _cli_credential().get_token(scope)
+    except ClientAuthenticationError as exc:  # CredentialUnavailableError is one
+        reason = " ".join(str(exc.message if getattr(exc, "message", None) else exc).split())
+        raise AzureCliSignInError(
+            redact_secrets(f"az login gave no token for {scope}: {reason.rstrip('.')}. {_AZ_REMEDY}")
+        ) from None
+    return token.token, float(token.expires_on)
+
+
+def data_agent_auth(requested: str = "", env_file: Path | str | None = None) -> str:
+    """"az" or "service-principal": ``--auth az`` wins over a set principal (a blocked one is why it
+    exists); else a full principal, else az login. A half-set one raises; so does a missing one asked for."""
+    if requested == "az":
+        return "az"
+    principal = resolve_service_principal(env_file)
+    if principal is not None:
+        return "service-principal"
+    if requested == "service-principal":
+        raise IncompleteServicePrincipalError(
+            f"--auth service-principal, but none is set: set {_TENANT_VAR}, {_CLIENT_ID_VARS[1]} and "
+            f"{_CLIENT_SECRET_VARS[1]}, or drop --auth to use az login."
+        )
+    return "az"
+
+
 def probe_credentials(env_file: Path | str | None = None) -> CredentialStatus:
     """Resolve the credential chain without acquiring a token.
 

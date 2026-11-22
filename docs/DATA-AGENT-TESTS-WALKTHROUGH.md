@@ -43,6 +43,8 @@ flowchart TD
   2. A workspace Admin or Member adds it to the agent's workspace as **Member** or **Contributor**.
   3. It gets **read access to every data source** the agent uses. The agent queries under the caller's identity, so sharing only the agent isn't enough, and it can only see data the principal can see.
 
+  Or skip the principal and use your own `az login`: with no principal set, fab-test asks as you, and `--auth az` does so even when one is set. You need the same workspace role and data access.
+
   Managed identities aren't supported, and neither are agents over a KQL database yet. Put the principal in `.fab-test/.env` or the environment (`FABRIC_TENANT_ID`, `FABRIC_CLIENT_ID`, `FABRIC_CLIENT_SECRET`), and say which workspace with `FABRIC_WORKSPACE_ID`, `workspace:` in `fab-test.yml`, or `--workspace`.
 - **Python 3.12, Node.js 22.22 or later, and fab-test:**
 
@@ -257,6 +259,7 @@ With telemetry configured, each run's redacted answers go to your Eventhouse or 
 | `--dry-run` | show the suite, write nothing | — | list the items and suites; no token, no agent call |
 | `--workspace NAME_OR_ID` | refused, naming the run | refused, naming the run | the agents' workspace (`FABRIC_WORKSPACE_ID`, `workspace:`) |
 | `--env-file PATH` | refused, naming the run | refused, naming the run | the service principal's credential file |
+| `--auth az\|service-principal` | refused, naming the run | refused, naming the run | `az`: ask as your `az login` even when a principal is set; `service-principal`: never fall back. Default: the principal if set, else `az login` |
 | `--all` | refused, naming the run | refused, naming the run | allow enumerating more than 5 agents |
 | `--report`, `--open-report`, `--telemetry`, `--timeout`, `--jobs`, `--output-dir` | refused, naming the run | refused, naming the run | as for every analyzer |
 
@@ -270,13 +273,14 @@ With telemetry configured, each run's redacted answers go to your Eventhouse or 
 
 | You see | Why | What to do |
 |---|---|---|
-| exit 127 naming `FABRIC_TENANT_ID` … and `fab-test auth status` | no service principal resolved | set the three variables, `.fab-test/.env`, or `--env-file` |
+| exit 127 naming what is missing and `fab-test auth status` | part of a service principal is set, or `--auth service-principal` with none | set all three variables (`.fab-test/.env` or `--env-file`), or drop `--auth` to use `az login` |
+| `az login gave no token for … Run az login` | asking as you, and `az` is not installed or not signed in | run `az login` (`--tenant <id>` for the workspace's tenant) |
 | exit 2 naming `--workspace`, `FABRIC_WORKSPACE_ID` and `workspace:` | no workspace configured | set one of them |
 | `HTTP 403 … needs a role in the agent's workspace and read access to the agent's data sources` | the principal can't use this agent | add it to the workspace as Member or Contributor, and grant read on each source |
 | `HTTP 401 … Fabric rejected the token` | wrong tenant, or the tenant setting is off | check `fab-test auth status` and **Service principals can use Fabric APIs** |
 | `the agent's Fabric capacity is paused (CapacityNotActive)` | the capacity is paused | resume it, then run again |
 | `Timed out waiting for Data Agent run` | the agent took longer than the timeout | raise `--timeout` or the suite's `providers[].config.timeout` |
-| `Fabric is rate-limiting this identity (RequestBlocked) until 16:38:24 UTC`, then `Not asked: …` for the rest | the service principal used up its Fabric request quota, counted per identity in 60 s windows across every Fabric API and every run or tool using that principal | wait until the time shown (the envelope's `retry_after`), and stop other runs using the same principal; fab-test waited once and then stopped asking, so retrying sooner only extends the block |
+| `Fabric is rate-limiting this identity (RequestBlocked) until 16:38:24 UTC`, then `Not asked: …` for the rest | the service principal used up its Fabric request quota, counted per identity in 60 s windows across every Fabric API and every run or tool using that principal | wait until the time shown (the envelope's `retry_after`), and stop other runs using the same principal; fab-test waited once and then stopped asking, so retrying sooner only extends the block. To keep testing meanwhile, run as yourself with `--auth az` |
 | `The Fabric capacity is overloaded (CapacityLimitExceeded)` | the capacity behind the workspace is out of compute, whoever is calling | rerun later; check the load in the Fabric Capacity Metrics app |
 | `promptfoo did not finish within 198 s: 3 of 7 questions came back …` | `--timeout` limits the whole run, and it ran out | read the last failure it names; raise `--timeout` only if the agent is slow |
 | `3 of 7 questions could not be asked: …` | the same failure stopped several questions, so it is said once | fix the one cause it names |

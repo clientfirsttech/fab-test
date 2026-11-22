@@ -46,13 +46,14 @@ the suite offline.
 | `--workspace NAME_OR_ID` | `FABRIC_WORKSPACE_ID`, then config `workspace:` | Select the workspace; without TARGET, enumerate its deployed agents |
 | `--tests FILE` | logicalId-paired `*.DataAgent.promptfoo.yaml` | Override pairing; required for a service target without a local item |
 | `--env-file PATH` | existing credential-file search | Passed through as `PLAYWRIGHT_ENV_FILE` to the Python provider |
+| `--auth az\|service-principal` | the principal if set, else `az login` | `az`: ask as your `az login` even when a principal is set; `service-principal`: never fall back |
 | `--all` | off | Allow live enumeration over five agents |
 
 Common run flags (`--artifact-dir`, `--output-dir`, `--timeout`, `--jobs`,
 `--dry-run`, verbosity, JSON, reports, telemetry) keep their usual meanings.
 Dry runs show local suite denominators, not a live workspace inventory.
-Node.js >=22.22.0, pinned promptfoo 0.124.0, and a full service principal are
-required. Results live under `data_agent/<results_stem>/`; telemetry uses
+Node.js >=22.22.0, pinned promptfoo 0.124.0, and an identity (a full service
+principal, or `az login`) are required. Results live under `data_agent/<results_stem>/`; telemetry uses
 `fabric_dynamic_analysis` with artifact type `DataAgent`.
 `--timeout` bounds the whole run. When Fabric throttles the agent, the envelope's
 `retry_after` (UTC, ISO 8601) says when to run again, and its `message` names the
@@ -73,7 +74,7 @@ cause once for every question it stopped.
 | `--answers FILE` | `{"tests": [{query, expect, match, follow_ups, id?, replace?}], "replace_all"?}` | — | — |
 | `--force` | replace tests with matching ids; rewrite comments | — | — |
 | `--dry-run` | show the suite, write nothing | — | list items and suites; no token |
-| `--workspace`, `--env-file`, `--all`, `--report`, `--open-report`, `--telemetry`, `--timeout`, `--jobs`, `--output-dir` | exit 2 naming the run | exit 2 naming the run | the run's own flags |
+| `--workspace`, `--env-file`, `--auth`, `--all`, `--report`, `--open-report`, `--telemetry`, `--timeout`, `--jobs`, `--output-dir` | exit 2 naming the run | exit 2 naming the run | the run's own flags |
 
 Exit codes: init 0, 2 (refusal, unreadable suite, no answers off a terminal), 130; lint 0, 1 (findings),
 2 (nothing pairs), 127 (promptfoo can't be installed); the run as every analyzer.

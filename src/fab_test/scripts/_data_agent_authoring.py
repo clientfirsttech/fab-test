@@ -26,6 +26,10 @@ def add_data_agent_parser(subs: argparse._SubParsersAction, add_common_flags) ->
     add_tests_dir_flag(agent)
     agent.add_argument("--env-file", default=None, dest="playwright_env_file", metavar="PATH",
                        help="Path to .env file with service principal credentials")
+    agent.add_argument("--auth", default="", dest="data_agent_auth", choices=("az", "service-principal"),
+                       help="Who asks the agent: az (your az login, even when a service principal is set) or "
+                            "service-principal (never fall back). Default: the service principal if set, "
+                            "else az login")
     agent.add_argument("--all", action="store_true", dest="all_items",
                        help="Allow live workspace enumeration over 5 Data Agents")
     add_authoring_noun(agent, "tests", authoring_parser())
