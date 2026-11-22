@@ -12,7 +12,7 @@ import yaml
 
 from ._authoring_output import can_ask, next_command, print_payload
 from ._data_agent_init_questions import DECLINE_SUGGESTION, InitInputError, build_suggestions
-from ._data_agent_init_tests import MATCH_KEYS, ask_tests, tests_from_answers, tests_from_specs
+from ._data_agent_init_tests import MATCH_KEYS, ask_tests, input_prompt, tests_from_answers, tests_from_specs
 from ._data_agent_lint_command import _named_item
 from ._data_agent_suite import SuiteError, effective_config, item_identity, load_suite, suite_index
 from ._scan import ScanError, find_artifact_dirs
@@ -63,10 +63,12 @@ def _new_tests(args: argparse.Namespace, suggestions: list[str]) -> list[dict[st
         raise InitInputError("Writing tests needs your questions and expected answers, and nobody is here to "
                              "ask. Run --questions to see suggestions and the file shape, then pass --answers FILE.")
     try:
-        return tests_from_specs(ask_tests(suggestions))
+        specs = ask_tests(suggestions)
     except EOFError as exc:
         raise InitInputError("Input ended before the questions did; nothing was written. "
                              "Pass --answers FILE instead.") from exc
+    args.asked_in_person = True  # typed work: a dry run offers to keep it rather than discard it
+    return tests_from_specs(specs)
 
 
 def _merge(document: dict, new_tests: list[dict], force: bool) -> dict[str, list[str]]:
@@ -161,4 +163,21 @@ def _init(args: argparse.Namespace) -> int:
     if args.dry_run:
         payload["document"] = document
     print_payload(args, payload, _text, asked_for=args.dry_run, as_line=_line)
+    if args.dry_run and getattr(args, "asked_in_person", False) and _keep(counts, suite):
+        _write(suite, content)
+        written = {key: value for key, value in payload.items() if key != "document"}
+        print_payload(args, {**written, "next": next_command(args, "fab-test data-agent tests lint")},
+                      _text, as_line=_line)
     return 0
+
+
+def _keep(counts: dict[str, list[str]], suite: Path) -> bool:
+    """After a console dry run: write what the person typed, or let it go (Enter = no, as --dry-run asked)."""
+    changed = len(counts["added"]) + len(counts["replaced"])
+    if not changed:
+        return False
+    try:
+        reply = input_prompt(f"Write {changed} new test{'s' if changed != 1 else ''} to {suite}? [y/N] ")
+    except EOFError:
+        return False
+    return reply.strip().lower() in {"y", "yes"}

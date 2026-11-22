@@ -13,8 +13,8 @@ from typing import Any, TextIO
 
 from ._data_agent_init_questions import InitInputError
 
-__all__ = ["MATCH_KEYS", "InitInputError", "ask_tests", "assertion", "default_match", "parse_match",
-           "tests_from_answers", "tests_from_specs"]
+__all__ = ["MATCH_KEYS", "InitInputError", "ask_tests", "assertion", "default_match", "input_prompt",
+           "parse_match", "tests_from_answers", "tests_from_specs"]
 
 # key, canonical name, extra spellings accepted (the full name always is)
 _MATCHES = (
@@ -199,7 +199,8 @@ def _pick(typed: str, suggestions: list[str]) -> str:
     return suggestions[int(typed) - 1] if typed.isdigit() and 1 <= int(typed) <= len(suggestions) else typed
 
 
-def _prompt(text: str) -> str:
+def input_prompt(text: str) -> str:
+    """Prompt on stderr, so stdout stays the result."""
     sys.stderr.write(text)
     sys.stderr.flush()
     return input()
@@ -210,7 +211,7 @@ def ask_tests(suggestions: list[str], ask: Ask | None = None, err: TextIO | None
 
     Prompts go to stderr, so stdout stays the result (and one JSON document under --format json).
     """
-    ask, err = ask or _prompt, err or sys.stderr
+    ask, err = ask or input_prompt, err or sys.stderr
     err.write("Write the questions to ask the agent and what a right answer looks like.\n"
               "Enter on an empty question finishes; ? lists suggestions from the agent's data.\n")
     specs: list[dict[str, Any]] = []

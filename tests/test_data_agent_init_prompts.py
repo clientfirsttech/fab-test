@@ -271,3 +271,46 @@ def test_a_long_id_ends_on_a_whole_word():
     (test,) = init_tests.tests_from_specs([{"query": "What is the current balance of my private bank account?",
                                             "match": "r"}])
     assert test["metadata"]["id"] == "what-is-the-current-balance-of-my"
+
+
+def _console_init(tmp_path, monkeypatch, typed, *, dry_run):
+    import argparse
+    import json
+
+    from fab_test.scripts import _data_agent_init as init
+
+    item = tmp_path / "Sales.DataAgent"
+    draft = item / "Files" / "Config" / "draft" / "model"
+    draft.mkdir(parents=True)
+    (item / ".platform").write_text(json.dumps({"config": {"logicalId": "sales-id"},
+                                                "metadata": {"displayName": "Sales"}}), encoding="utf-8")
+    (draft.parent / "stage_config.json").write_text("{}", encoding="utf-8")
+    (draft / "datasource.json").write_text(json.dumps({"elements": [
+        {"type": "semantic_model.table", "display_name": "Orders", "is_selected": True}]}), encoding="utf-8")
+    replies = iter(typed)
+    monkeypatch.setattr("builtins.input", lambda: next(replies))
+    monkeypatch.setattr(init, "can_ask", lambda: True)
+    monkeypatch.delenv("CI", raising=False)
+    args = argparse.Namespace(target="Sales", artifact=None, artifact_dir=str(tmp_path), tests=None, force=False,
+                              questions=False, answers=None, dry_run=dry_run, output_format="text",
+                              quiet=False, verbose=0, file_config={})
+    return init.init_main(args), tmp_path / "Sales.DataAgent.promptfoo.yaml"
+
+
+@pytest.mark.parametrize(("keep", "written"), [("y", True), ("", False), ("n", False)])
+def test_a_console_dry_run_offers_to_keep_what_you_typed(tmp_path, monkeypatch, capsys, keep, written):
+    """Typed questions are work: a preview must not throw them away (the user lost two sessions)."""
+    code, suite = _console_init(tmp_path, monkeypatch, ["Top order?", "42", "", "", "", keep], dry_run=True)
+
+    out, err = capsys.readouterr()
+    assert code == 0
+    assert "Write 1 new test to" in err and "[y/N]" in err
+    assert suite.exists() is written
+    assert ("tests written added=1" in out) is written
+    assert "tests dry run, nothing written" in out
+
+
+def test_a_console_run_without_dry_run_writes_without_asking_again(tmp_path, monkeypatch, capsys):
+    code, suite = _console_init(tmp_path, monkeypatch, ["Top order?", "42", "", "", ""], dry_run=False)
+    assert code == 0 and suite.exists()
+    assert "[y/N]" not in capsys.readouterr().err
