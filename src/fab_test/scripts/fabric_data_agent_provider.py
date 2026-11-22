@@ -38,6 +38,8 @@ _TERMINAL = frozenset({"completed", "failed", "cancelled", "expired"})
 _BEARER = re.compile(r"(?i)\bbearer\s+[A-Za-z0-9._~+/=-]+")
 ALLOWED_HOSTS_VAR = "FAB_TEST_DATA_AGENT_ALLOWED_HOSTS"
 _TOKEN_HOST_SUFFIXES = (".fabric.microsoft.com", ".powerbi.com")
+PROGRESS_VAR = "FAB_TEST_DATA_AGENT_PROGRESS"
+_PROGRESS_LOCK = threading.Lock()
 
 _TOKEN_CACHE: dict[str, tuple[str, float]] = {}
 _THREAD_CACHE: dict[str, str] = {}
@@ -355,8 +357,29 @@ def _run_once(prompt: str, options: dict[str, Any], context: dict[str, Any]) -> 
                              f"?api-version={DATA_AGENT_API_VERSION}", timeout=timeout)
 
 
+def _report_progress(prompt: str, started: float, result: dict[str, str]) -> None:
+    """One line per answer for the wrapper to show live; a run of live calls must not look hung.
+
+    The path comes from the wrapper's private temp dir (``FAB_TEST_*``, which a suite may not set).
+    Progress is a courtesy: failing to write it never fails the test.
+    """
+    path = os.environ.get(PROGRESS_VAR)
+    if not path:
+        return
+    line = json.dumps({"query": prompt, "seconds": round(time.monotonic() - started), "error": "error" in result})
+    with contextlib.suppress(OSError), _PROGRESS_LOCK, open(path, "a", encoding="utf-8") as stream:
+        stream.write(line + "\n")
+
+
 def call_api(prompt: str, options: dict[str, Any], context: dict[str, Any]) -> dict[str, str]:
     """promptfoo's provider contract: ``{"output": text}``, or ``{"error": message}`` with no credential in it."""
+    started = time.monotonic()
+    result = _call_api(prompt, options, context)
+    _report_progress(prompt, started, result)
+    return result
+
+
+def _call_api(prompt: str, options: dict[str, Any], context: dict[str, Any]) -> dict[str, str]:
     config = options.get("config", {})
     retries = int(config.get("max_retries", 3))
     retry_delay = float(config.get("retry_delay", 2))

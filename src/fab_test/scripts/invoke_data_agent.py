@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import os
 import re
@@ -22,9 +23,11 @@ from ._credentials import (
     redact_secrets,
     resolve_service_principal,
 )
+from ._data_agent_progress import Progress, show_verdicts, terminal
 from ._data_agent_suite import effective_config, load_suite
 from ._report_html import attach_report
 from ._results_stem import results_stem
+from .fabric_data_agent_provider import PROGRESS_VAR
 
 _BEARER = re.compile(r"(?i)\bbearer\s+[A-Za-z0-9._~+/=-]+")
 _SECRET_KEYS = frozenset({"access_token", "client_secret", "clientsecret", "authorization", "password"})
@@ -74,7 +77,12 @@ def _promptfoo_env(principal: ServicePrincipal, private_dir: Path) -> dict[str, 
     )
     env = {key: value for key, value in os.environ.items() if key.upper() not in _WORKER_HIDDEN_VARS}
     return {**env, "PROMPTFOO_PYTHON": sys.executable, "PROMPTFOO_DISABLE_TELEMETRY": "1",
-            "PROMPTFOO_CONFIG_DIR": str(private_dir), "PLAYWRIGHT_ENV_FILE": str(credentials)}
+            "PROMPTFOO_CONFIG_DIR": str(private_dir), "PLAYWRIGHT_ENV_FILE": str(credentials),
+            PROGRESS_VAR: str(private_dir / "progress.jsonl")}
+
+
+def _terminal():  # a text stream or None; the seam tests replace
+    return terminal()
 
 
 def redact(value: Any, secret: str = "") -> Any:
@@ -159,7 +167,7 @@ def _absolute_references(value: Any, root: Path) -> Any:
     return value
 
 
-def _evaluate(args: argparse.Namespace, folder: Path, principal: ServicePrincipal) -> dict[str, Any]:
+def _evaluate(args: argparse.Namespace, folder: Path, principal: ServicePrincipal, out=None) -> dict[str, Any]:
     secret = principal.client_secret
     suite = Path(args.tests).resolve()
     config = _absolute_references(effective_config(load_suite(suite), args.base_url), suite.parent)
@@ -172,8 +180,10 @@ def _evaluate(args: argparse.Namespace, folder: Path, principal: ServicePrincipa
         native = Path(temporary) / "results.json"
         command = [*promptfoo_command(Path(args.promptfoo_path)), "eval",
                    "--config", str(effective), "--output", str(native), "--no-cache", "--no-write", "--no-share"]
-        proc = subprocess.run(command, cwd=suite.parent, env=env, capture_output=True, text=True,
-                              encoding="utf-8", errors="replace", timeout=args.timeout, check=False)
+        item = Path(args.artifact_path).name.removesuffix(".DataAgent")
+        with Progress(out, Path(env[PROGRESS_VAR]), len(config.get("tests") or []), item):
+            proc = subprocess.run(command, cwd=suite.parent, env=env, capture_output=True, text=True,
+                                  encoding="utf-8", errors="replace", timeout=args.timeout, check=False)
         if proc.returncode not in (0, 100):
             raise RuntimeError(f"promptfoo eval exited {proc.returncode}: {proc.stderr or proc.stdout}")
         if not native.is_file():
@@ -192,7 +202,8 @@ def run_data_agent(args: argparse.Namespace) -> int:
     native = output.parent / "native.json"
     native.unlink(missing_ok=True)
     status, message, findings, results, code, secret = "passed", "Data Agent tests passed", [], None, 0, ""
-    with Timer() as timer:
+    out = _terminal()
+    with Timer() as timer, contextlib.closing(out) if out is not None else contextlib.nullcontext():
         try:
             if not args.tests:
                 status = "skipped"
@@ -200,8 +211,9 @@ def run_data_agent(args: argparse.Namespace) -> int:
             else:
                 principal = credential_principal(args.env_file)
                 secret = principal.client_secret
-                data = _evaluate(args, output.parent, principal)
+                data = _evaluate(args, output.parent, principal, out)
                 findings, results = map_results(data, Path(args.tests).name)
+                show_verdicts(out, redact(results, secret), redact(findings, secret))
                 if findings:
                     status, message, code = "failed", f"Data Agent tests found {len(findings)} failed assertion(s)", 1
         except IncompleteServicePrincipalError as exc:

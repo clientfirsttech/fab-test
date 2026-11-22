@@ -5,6 +5,7 @@ import json
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -13,6 +14,12 @@ import yaml
 from fab_test.scripts import invoke_data_agent as wrapper
 
 pytestmark = pytest.mark.data_agent
+
+
+@pytest.fixture(autouse=True)
+def _no_terminal(monkeypatch):
+    """Progress goes to the real terminal; tests that want it hand the wrapper a buffer."""
+    monkeypatch.setattr(wrapper, "_terminal", lambda: None)
 
 
 def _args(tmp_path, **overrides):
@@ -385,3 +392,53 @@ def test_real_console_script_output_modes_and_service_mode(tmp_path):
     assert envelope["status"] == "error"
     assert envelope["started_at"]  # the wrapper, not the outer timeout fallback, recorded this failure
     assert envelope["duration_ms"] < 3000
+
+
+def test_progress_shows_each_answer_live_then_a_verdict_per_test(tmp_path, monkeypatch):
+    """Follow-up 18: a minute of live agent calls must not look hung."""
+    import io
+
+    _principal(monkeypatch)
+    args = _args(tmp_path)
+    Path(args.tests).write_text(yaml.safe_dump({"tests": [
+        {"description": "Count", "vars": {"query": "How many?"}},
+        {"description": "Refuse", "vars": {"query": "My balance?"}},
+    ]}), encoding="utf-8")
+    shown = io.StringIO()
+    shown.close = lambda: None  # the wrapper closes the terminal it opened; keep the buffer readable
+    monkeypatch.setattr(wrapper, "_terminal", lambda: shown)
+    live = []
+
+    def run(command, **kwargs):
+        progress = Path(kwargs["env"]["FAB_TEST_DATA_AGENT_PROGRESS"])
+        for query, seconds in (("How many?", 18), ("My balance?", 21)):
+            with progress.open("a", encoding="utf-8") as stream:
+                stream.write(json.dumps({"query": query, "seconds": seconds, "error": False}) + "\n")
+            time.sleep(0.8)  # the watcher polls every 0.25 s: it prints while promptfoo "runs"
+            live.append(shown.getvalue())
+        Path(command[command.index("--output") + 1]).write_text(json.dumps({"results": {"results": [
+            {"success": True, "description": "Count", "response": {"output": "42"}},
+            {"success": False, "description": "Refuse", "response": {"output": "Sure: 9"},
+             "gradingResult": {"componentResults": [{"pass": False, "reason": "did not decline"}]}},
+        ]}}), encoding="utf-8")
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    monkeypatch.setattr(wrapper.subprocess, "run", run)
+    monkeypatch.setattr(wrapper, "promptfoo_command", lambda path: ["node", str(path)])
+
+    assert wrapper.run_data_agent(args) == 1
+    text = shown.getvalue()
+    assert "asking 2 questions of Sales" in text and "live agent calls" in text
+    assert "1/2 answered in 18 s: How many?" in live[0]  # printed while the run was still going
+    assert "2/2 answered in 21 s: My balance?" in live[1]
+    assert "✓ Count" in text and "✗ Refuse: did not decline" in text
+
+
+def test_progress_stays_off_under_quiet_and_in_ci(monkeypatch):
+    monkeypatch.undo()
+    monkeypatch.delenv("CI", raising=False)
+    monkeypatch.setenv("ANALYZER_VERBOSITY", "summary")
+    assert wrapper._terminal() is None
+    monkeypatch.delenv("ANALYZER_VERBOSITY")
+    monkeypatch.setenv("CI", "true")
+    assert wrapper._terminal() is None

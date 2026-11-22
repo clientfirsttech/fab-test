@@ -439,3 +439,30 @@ def test_given_an_error_carrying_the_secret_or_a_token_should_redact_both(provid
 
     assert SECRET not in result["error"]
     assert "token-1" not in result["error"]
+
+
+# -- progress, so a minute of live calls never looks hung (follow-up 18) ---------------
+
+
+def test_each_answer_is_reported_to_the_progress_file_as_it_lands(provider, agent, monkeypatch, tmp_path):
+    import json
+
+    progress = tmp_path / "progress.jsonl"
+    monkeypatch.setenv("FAB_TEST_DATA_AGENT_PROGRESS", str(progress))
+    agent.run_status = ["failed"]
+
+    provider.call_api("How many?", _options(), {"vars": {}})
+    agent.run_status = ["completed"]
+    provider.call_api("And now?", _options(), {"vars": {}})
+
+    lines = [json.loads(line) for line in progress.read_text(encoding="utf-8").splitlines()]
+    assert [(line["query"], line["error"]) for line in lines] == [("How many?", True), ("And now?", False)]
+    assert all(isinstance(line["seconds"], int) for line in lines)
+    assert SECRET not in progress.read_text(encoding="utf-8")
+
+
+def test_without_a_progress_file_nothing_is_written(provider, agent, monkeypatch, tmp_path):
+    monkeypatch.delenv("FAB_TEST_DATA_AGENT_PROGRESS", raising=False)
+    monkeypatch.chdir(tmp_path)
+    assert provider.call_api("How many?", _options(), {"vars": {}}) == {"output": "42"}
+    assert list(tmp_path.iterdir()) == []
