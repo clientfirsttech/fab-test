@@ -55,6 +55,26 @@ Node.js >=22.22.0, pinned promptfoo 0.124.0, and a full service principal are
 required. Results live under `data_agent/<results_stem>/`; telemetry uses
 `fabric_dynamic_analysis` with artifact type `DataAgent`.
 
+`fab-test data-agent tests init [TARGET]` and `fab-test data-agent tests lint [TARGET]`, flag by flag
+(the [walkthrough](https://github.com/clientfirsttech/fab-test/blob/main/docs/DATA-AGENT-TESTS-WALKTHROUGH.md) has the same table):
+
+| Flag | `tests init` | `tests lint` | `fab-test data-agent` |
+|---|---|---|---|
+| `TARGET` / `--artifact STEM` | the item to write tests for | the item to check; none checks every suite | the item to ask; none runs every item (no suite → skipped) |
+| `--artifact-dir DIR` | where items are found (`artifact_dir:`) | same | same |
+| `--tests FILE` | write or extend this suite | check this suite | ask with this suite |
+| `--tests-dir DIR` | where a new suite goes (`fab-tests/`) | where suites are found | same |
+| `--format text\|json` | ✓ (`next` in JSON) | ✓ (`{ok, suites, next}`) | ✓ |
+| `-q` / `-v` | `tests written added=N replaced=N kept=N unchanged=N removed=N PATH` / details | `tests passed\|failed e=N w=N PATH` per suite / each finding | one line per item / per-test detail |
+| `--questions` | suggestions, `decline`, the agent's `instructions`, the answers shape | — | — |
+| `--answers FILE` | `{"tests": [{query, expect, match, follow_ups, id?, replace?}], "replace_all"?}` | — | — |
+| `--force` | replace tests with matching ids; rewrite comments | — | — |
+| `--dry-run` | show the suite, write nothing | — | list items and suites; no token |
+| `--workspace`, `--env-file`, `--all`, `--report`, `--open-report`, `--telemetry`, `--timeout`, `--jobs`, `--output-dir` | exit 2 naming the run | exit 2 naming the run | the run's own flags |
+
+Exit codes: init 0, 2 (refusal, unreadable suite, no answers off a terminal), 130; lint 0, 1 (findings),
+2 (nothing pairs), 127 (promptfoo can't be installed); the run as every analyzer.
+
 ### local
 
 Runs BPA, PBIR Inspector, and Desktop-bound `pql-test` against every `.pbip` project discovered under `--artifact-dir` — no `fabric-artifacts` layout required, no Fabric workspace, no service principal. Its subparser doesn't expose `--workspace-id` or `--env` at all, so the remote XMLA path is unreachable from `local`.

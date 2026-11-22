@@ -121,6 +121,10 @@ DataAgentTests {
   (all with a workspace configured and the flag enabled) => include data_agent; (local) => never include it
   (tests init, a person present) => ask each question, its expected answer (Enter = decline), one match key n|c|x|s|e|p|r (Enter = default), follow-ups in the same conversation; ? lists suggestions
   (tests init, CI | --format json | an agent) => --answers FILE {tests: [{query, expect, match, follow_ups, replace?}]}; --questions prints suggestions and the shape; never invent an expected answer
+  (suggestions) => figure measures and selected tables as questions; a table the source has but the agent leaves out, then a generic out-of-scope question, as `decline`; the agent's aiInstructions and dataSourceInstructions as `instructions`
+  (a provider failure) => 401 after one refresh | 403 | "isRetriable": false | CapacityNotActive | a poll timeout are final and name the fix; a conversation turn is never retried once posted
+  (the service principal) => Member or Contributor in the agent's workspace, read on every data source, tenant setting "Service principals can use Fabric APIs"; see references/credentials.md
+  (a walkthrough or pipeline is wanted) => docs/DATA-AGENT-TESTS-WALKTHROUGH.md; docs/examples/{github-actions,azure-devops}/data-agent-tests.yml (lint, then the run; weekly)
   (tests init, a suite exists) => list its path and tests, then ask [a]dd (Enter) | [r]eplace all; "replace_all": true in --answers; replacing with no new questions writes nothing
   (adding, a question it already has) => ask [k]eep (Enter) | [r]eplace; "replace": true in --answers; otherwise kept
   (tests lint) => offline checks first, then promptfoo validate (installed on first use, as the run does); run it before the run

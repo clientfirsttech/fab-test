@@ -120,11 +120,18 @@ fab-test pql-test --env DEV
 
 ### Run Data Agent tests
 
+The step-by-step version is
+[DATA-AGENT-TESTS-WALKTHROUGH.md](DATA-AGENT-TESTS-WALKTHROUGH.md).
+
 Configure a workspace plus a full
 service principal (`FABRIC_TENANT_ID`, `FABRIC_CLIENT_ID`,
-`FABRIC_CLIENT_SECRET`). Keep `Sales.DataAgent.promptfoo.yaml` beside
-`Sales.DataAgent/`, with its `fabTestDataAgent` set to the item's `.platform`
-logicalId. The suite uses inline promptfoo tests and native assertions:
+`FABRIC_CLIENT_SECRET`). The principal needs **Member** or **Contributor** in the
+agent's workspace, **read access to every data source** the agent uses, and the
+tenant setting **Service principals can use Fabric APIs**. `tests init` writes
+the suite to `fab-tests/data-agent/Sales.DataAgent.promptfoo.yaml`, outside the
+Git-connected folder, with `fabTestDataAgent` set to the item's `.platform`
+logicalId (a suite beside `Sales.DataAgent/` still pairs). The suite uses
+inline promptfoo tests and native assertions:
 
 ```yaml
 fabTestDataAgent: <config.logicalId from Sales.DataAgent/.platform>
@@ -159,7 +166,10 @@ and tables; a number picks one. In CI, or for an agent, pass the same answers as
 JSON with `--answers FILE` (`--questions` prints the shape). Then run
 `fab-test data-agent tests lint Sales` before the run.
 
-A pipeline can run an already-authored suite without prompts:
+A pipeline can run an already-authored suite without prompts. Copy the whole
+workflow from [`examples/github-actions/data-agent-tests.yml`](examples/github-actions/data-agent-tests.yml)
+or [`examples/azure-devops/data-agent-tests.yml`](examples/azure-devops/data-agent-tests.yml)
+(lint without secrets, then the run, on every change and weekly), or add the step:
 
 ```yaml
 - name: Test deployed Data Agents

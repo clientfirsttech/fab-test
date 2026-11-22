@@ -264,6 +264,8 @@ focused rerun passed; supported CI runtime behavior still needs verification.
 
 ## Authoring Grammar Parity Test
 
+**Status**: ✅ 2026-11-21 (`b8544e8`). `tests/test_authoring_grammar_parity.py` walks the parser for every `<analyzer> <noun> <verb>` and checks six touch points: shared inputs, config defaults, the file flag, `-q`/`-v`, run-only flags refused (52 cases), and listed in list/explain, `help` and both flags.md copies. `_KNOWN_GAPS` holds one entry, mirrored in known-gaps.md: `contract init` has no `--contract FILE`. pbir's run and `contract lint` now share one `--contract` help string.
+
 The parser-driven test plan.md deferred until a second authoring flow landed.
 
 **Requirements**:
@@ -272,6 +274,13 @@ The parser-driven test plan.md deferred until a second authoring flow landed.
 ---
 
 ## Document All Three Callers
+
+**Status**: ✅ 2026-11-21.
+- **Human:** `docs/DATA-AGENT-TESTS-WALKTHROUGH.md` (flowchart, the service principal's setup per Microsoft Learn, init, lint, run, break it, CI, the flag table, troubleshooting). README and QUICK-VALIDATION link to it, give the service principal's setup, and QUICK-VALIDATION's stale "beside the item" location is fixed.
+- **Pipeline:** `docs/examples/{github-actions,azure-devops}/data-agent-tests.yml`. Each lints without secrets, then runs on path changes and weekly.
+- **Agent:** the skill (both copies) gains the flags.md table and Data Agent sections in credentials.md and targeting-and-discovery.md. SKILL.md gains suggestions, final failures, the principal's setup and where the docs are.
+- **Guard:** `tests/test_data_agent_docs.py` fails if the walkthrough's flag table misses a flag of the run or either verb, or if a pipeline stops pinning this release or linting first.
+- Version: b5 is unpublished, so no bump. The CHANGELOG entry is from Review 2.
 
 **Requirements**:
 - Given the human caller, should add `docs/DATA-AGENT-TESTS-WALKTHROUGH.md` modeled on the slicer walkthrough (save the agent, init, lint, run, break it, CI, opening with an init-to-CI flowchart), and update README and `docs/QUICK-VALIDATION.md` with the mode matrix, SP setup (workspace role + data-source access, per the template's README), and the 5-agent threshold.
@@ -423,11 +432,11 @@ the remaining CLI blast-radius checks are still pending.
 - Open: the provider re-reads the principal on every call. A per-process cache would need clearing between tests, and a read costs one small file.
 
 **Still open after Review 2** (planned tasks, not review fixes):
-- Review 1 item 8: docs. Still to write: the walkthrough, `docs/examples/` CI snippets, the init/lint/run flag table, and the skill's targeting and credentials references.
-- Review 1 item 9: the shared authoring module.
-- Review 1 item 10: `tests init` suggestions from what the sources don't cover.
+- ✅ Review 1 item 8: docs (Document All Three Callers).
+- ✅ Review 1 item 9: one `run_flag` refusal for both flows; `named_item` is public (`4c70381`).
+- ✅ Review 1 item 10: unselected tables are suggested as declines, only figure measures are suggested, and the agent's instructions are shown (`4c70381`).
 - Review 1 item 15: `.github/hooks/rtk-rewrite.json` is deleted in the working tree (the user's change), so `tests/test_rtk_hook_safety.py` fails 3 tests. Restore the file, or remove it and its test, before the final gate.
-- Also still open: the Authoring Grammar Parity Test, the blast-radius pass, and Quality Gates.
+- ✅ The Authoring Grammar Parity Test. Still open: the blast-radius pass and Quality Gates.
 
 ---
 

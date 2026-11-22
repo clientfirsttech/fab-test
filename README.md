@@ -268,9 +268,21 @@ fab-test data-agent Sales.DataAgent --report
 fab-test data-agent "Dev.Workspace/Sales.DataAgent" --tests Sales.DataAgent.promptfoo.yaml
 ```
 
+**First time?** [docs/DATA-AGENT-TESTS-WALKTHROUGH.md](https://github.com/clientfirsttech/fab-test/blob/main/docs/DATA-AGENT-TESTS-WALKTHROUGH.md)
+goes from a published agent to a passing suite in CI, with the init / lint / run
+flag table. Copy a pipeline from
+[`docs/examples/github-actions/data-agent-tests.yml`](https://github.com/clientfirsttech/fab-test/blob/main/docs/examples/github-actions/data-agent-tests.yml) or
+[`docs/examples/azure-devops/data-agent-tests.yml`](https://github.com/clientfirsttech/fab-test/blob/main/docs/examples/azure-devops/data-agent-tests.yml):
+each lints every suite, then asks the agents, on every change and weekly.
+
 The run needs Node.js >=22.22.0 and a full service principal
 (`FABRIC_TENANT_ID`, `FABRIC_CLIENT_ID`, `FABRIC_CLIENT_SECRET`, or the existing
-service-principal aliases). `--env-file` supplies a credential file.
+service-principal aliases). `--env-file` supplies a credential file. The
+principal needs the tenant setting **Service principals can use Fabric APIs**,
+**Member** or **Contributor** in the agent's workspace, and **read access to
+every data source** the agent uses: the agent queries as the caller, so sharing
+only the agent isn't enough ([Microsoft Learn](https://learn.microsoft.com/fabric/data-science/data-agent-service-principal)).
+The agent must be published, on a running paid capacity.
 Promptfoo 0.124.0 installs through the existing tool bootstrap. Conversation
 tests run sequentially in one Python worker. Redacted native results, the
 effective config, and the envelope live under
@@ -283,7 +295,8 @@ the expected answer (Enter if the agent should decline), how it matches in one
 key (`n` number, `c` contains, `x` exact, `s` starts with, `e` ends with,
 `p` pattern, `r` refuses; Enter takes the default shown), and any follow-ups
 asked in the same conversation. `?` lists suggestions from the agent's measures
-and tables; a number picks one. In CI, or for an agent, pass the same answers as
+and tables, marking the ones it should decline (a table its source has but it
+leaves out); a number picks one. In CI, or for an agent, pass the same answers as
 JSON with `--answers FILE` (`--questions` prints the shape). When the suite
 exists, init lists its tests and asks `[a]dd to it (Enter) or [r]eplace all`
 (`"replace_all": true` in an answers file); replacing with no new questions

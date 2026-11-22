@@ -42,4 +42,15 @@ The optional Azure browser backend needs two more values, separate from the Fabr
 
 Service-mode runs (`bpa`/`pbir`/`a11y`/`rdl` against a workspace) use the one chain above with the Fabric REST scope `https://api.fabric.microsoft.com/.default`; the identity needs read access to the item and Fabric API access. Order: environment service principal → `--env-file`/`.fab-test/.env`/`./.env` → `DefaultAzureCredential` → `--interactive`. A partial service principal is an error, never a silent fallback. Nothing resolvable exits `127` naming the variables and `fab-test auth status`. The run names the credential it resolved once on stderr, after the mode banner — `auth=service-principal (.fab-test/.env)`, `auth=ambient:DefaultAzureCredential`, or `auth=interactive` — never a secret, and silent under `-q` and `--format json`. A service principal in `.fab-test/.env` wins over `az login`.
 
+## Data Agent credentials
+
+`fab-test data-agent` asks a deployed agent questions with a **service principal only**: no `--interactive`, no ambient credential, no managed identity (Fabric doesn't support one for Data Agents). It uses the client-credentials flow with the scope `https://analysis.windows.net/powerbi/api/.default` (`FABRIC_SCOPE` overrides it). The principal resolves through the chain above: environment → `--env-file` → `PLAYWRIGHT_ENV_FILE` → `.fab-test/.env` → `./.env`. None, or part of one, exits `127` naming the variables and `fab-test auth status` before promptfoo starts. `tests init` and `tests lint` need no credentials.
+
+The principal needs what [Microsoft Learn](https://learn.microsoft.com/fabric/data-science/data-agent-service-principal) lists:
+- the tenant setting **Service principals can use Fabric APIs**, for it or a group it's in;
+- **Member** or **Contributor** in the agent's workspace;
+- **read access to every data source** the agent uses. The agent queries under the caller's identity, so sharing only the agent isn't enough. KQL-database sources don't support service principals yet.
+
+A 401 after one token refresh, a 403, `"isRetriable": false` and `CapacityNotActive` are final, not retried, and each names its fix. The secret never enters promptfoo's environment: the wrapper strips every service-principal spelling and the Azure SDK secrets, and the provider reads the principal from a private temp file that is deleted after the run. The token goes only to `https` Fabric and Power BI hosts, plus exact hosts in the caller's `FAB_TEST_DATA_AGENT_ALLOWED_HOSTS`. A suite can't widen that.
+
 `--interactive` signs in through the browser with the token held in memory only — no device code, no cache on disk. It never prompts in CI (`CI`/`GITHUB_ACTIONS`/`TF_BUILD`; exit `2`), and `interactive_auth: off` in `fab-test.yml` or `FAB_TEST_INTERACTIVE_AUTH=0` turns it off fleet-wide (exit `2` naming the flag). `doctor` reports a per-analyzer service-readiness line without acquiring a token.

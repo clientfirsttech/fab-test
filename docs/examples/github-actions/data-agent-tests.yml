@@ -1,0 +1,47 @@
+# Ask every deployed Data Agent its suite's questions on each change to an agent
+# or a suite, and weekly: the data behind an agent changes with no commit.
+# See docs/DATA-AGENT-TESTS-WALKTHROUGH.md.
+#
+# A suite is code: promptfoo runs its javascript assertions with this job's
+# permissions. Run it only for trusted branches. GitHub withholds secrets from
+# fork pull requests on `pull_request`; never switch this to `pull_request_target`.
+name: data agent tests
+on:
+  push:
+    branches: [main]
+    paths: ["**/*.DataAgent/**", "**/*.DataAgent.promptfoo.yaml"]
+  pull_request:
+    paths: ["**/*.DataAgent/**", "**/*.DataAgent.promptfoo.yaml"]
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+jobs:
+  data-agent-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: pip install "cft-fab-test==1.10.0b5"
+      # Offline: pairing, ids, credentials, promptfoo validate. No secrets needed.
+      - name: Lint Data Agent suites
+        run: fab-test data-agent tests lint --format json
+      # Live: asks each deployed agent. Exit 1 on a wrong answer, 127 without credentials.
+      - name: Test Data Agents
+        run: fab-test data-agent --format json --report
+        env:
+          FABRIC_WORKSPACE_ID: ${{ vars.FABRIC_WORKSPACE_ID }}
+          FABRIC_TENANT_ID: ${{ secrets.FABRIC_TENANT_ID }}
+          FABRIC_CLIENT_ID: ${{ secrets.FABRIC_CLIENT_ID }}
+          FABRIC_CLIENT_SECRET: ${{ secrets.FABRIC_CLIENT_SECRET }}
+      - name: Keep the results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: data-agent-results
+          path: fab-test-results/
