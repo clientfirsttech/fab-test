@@ -75,10 +75,14 @@ def _promptfoo_env(principal: ServicePrincipal, private_dir: Path) -> dict[str, 
         f"FABRIC_CLIENT_SECRET={principal.client_secret}\n",
         encoding="utf-8",
     )
-    env = {key: value for key, value in os.environ.items() if key.upper() not in _WORKER_HIDDEN_VARS}
-    return {**env, "PROMPTFOO_PYTHON": sys.executable, "PROMPTFOO_DISABLE_TELEMETRY": "1",
+    return {**worker_env(), "PROMPTFOO_PYTHON": sys.executable, "PROMPTFOO_DISABLE_TELEMETRY": "1",
             "PROMPTFOO_CONFIG_DIR": str(private_dir), "PLAYWRIGHT_ENV_FILE": str(credentials),
             PROGRESS_VAR: str(private_dir / "progress.jsonl")}
+
+
+def worker_env() -> dict[str, str]:
+    """The caller's environment without any service-principal spelling or Azure SDK secret."""
+    return {key: value for key, value in os.environ.items() if key.upper() not in _WORKER_HIDDEN_VARS}
 
 
 def _terminal():  # a text stream or None; the seam tests replace
@@ -155,11 +159,11 @@ def map_results(document: dict[str, Any], suite: str) -> tuple[list[dict[str, An
     return findings, results
 
 
-def _absolute_references(value: Any, root: Path) -> Any:
+def absolute_references(value: Any, root: Path) -> Any:
     if isinstance(value, dict):
-        return {key: _absolute_references(item, root) for key, item in value.items()}
+        return {key: absolute_references(item, root) for key, item in value.items()}
     if isinstance(value, list):
-        return [_absolute_references(item, root) for item in value]
+        return [absolute_references(item, root) for item in value]
     if isinstance(value, str) and value.startswith("file://"):
         path = Path(value.removeprefix("file://"))
         if not path.is_absolute():
@@ -170,7 +174,7 @@ def _absolute_references(value: Any, root: Path) -> Any:
 def _evaluate(args: argparse.Namespace, folder: Path, principal: ServicePrincipal, out=None) -> dict[str, Any]:
     secret = principal.client_secret
     suite = Path(args.tests).resolve()
-    config = _absolute_references(effective_config(load_suite(suite), args.base_url), suite.parent)
+    config = absolute_references(effective_config(load_suite(suite), args.base_url), suite.parent)
     effective = folder / "effective.promptfoo.yaml"
     effective.write_text(yaml.safe_dump(redact(config, secret), sort_keys=False), encoding="utf-8")
     # promptfoo's raw output may contain answers that echo credentials; it is never a published artifact.

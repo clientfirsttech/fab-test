@@ -123,9 +123,10 @@ DataAgentTests {
   (tests init, CI | --format json | an agent) => --answers FILE {tests: [{query, expect, match, follow_ups, replace?}]}; --questions prints suggestions and the shape; never invent an expected answer
   (tests init, a suite exists) => list its path and tests, then ask [a]dd (Enter) | [r]eplace all; "replace_all": true in --answers; replacing with no new questions writes nothing
   (adding, a question it already has) => ask [k]eep (Enter) | [r]eplace; "replace": true in --answers; otherwise kept
-  (tests lint) => offline checks plus promptfoo validate; run it before the run
+  (tests lint) => offline checks first, then promptfoo validate (installed on first use, as the run does); run it before the run
+  (a suite base_url | fabric_urls on a Fabric host) => works; lint warns (w=1) that fab-test can resolve the agent
   (a suite) => code: run it only from trusted branches; never pull_request_target or fork PRs with secrets
-  (a suite base_url | fabric_urls host is not Fabric or Power BI) => refused; an exact extra host comes only from the caller's FAB_TEST_DATA_AGENT_ALLOWED_HOSTS
+  (a suite base_url | fabric_urls host is not Fabric or Power BI) => a lint finding and a refusal before promptfoo starts; an exact extra host comes only from the caller's FAB_TEST_DATA_AGENT_ALLOWED_HOSTS
   (a suite env sets FAB_TEST_* | FABRIC_* | AZURE_* | PROMPTFOO_* | PLAYWRIGHT_ENV_FILE) => refused; remove it from the suite
   (promptfoo runs) => no service principal in its environment; the provider reads a private temp file, deleted after the run
   (telemetry) => carries redacted answers like every envelope; its readers should match the agent's data-source audience

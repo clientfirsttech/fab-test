@@ -324,7 +324,7 @@ def test_real_console_script_output_modes_and_service_mode(tmp_path):
     }), encoding="utf-8")
     (tmp_path / "Sales.DataAgent.promptfoo.yaml").write_text(yaml.safe_dump({
         "fabTestDataAgent": "stable", "prompts": ["{{query}}"],
-        "providers": [{"config": {"base_url": "https://unused.example/openai"}}],
+        "providers": [{"config": {"base_url": "https://unused.fabric.microsoft.com/openai"}}],
         "tests": [{"vars": {"query": "Revenue?"}}],
     }), encoding="utf-8")
     tool = tmp_path / "fixture.js"

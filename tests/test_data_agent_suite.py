@@ -74,14 +74,14 @@ def test_conversation_pins_both_concurrency_and_python_workers():
 def test_explicit_urls_and_template_agent_vars_are_preserved():
     authored = {
         "providers": [{"config": {
-            "base_url": "https://escape.example/openai",
-            "fabric_urls": {"sales": "https://template.example/openai"},
+            "base_url": "https://escape.fabric.microsoft.com/openai",
+            "fabric_urls": {"sales": "https://template.fabric.microsoft.com/openai"},
         }}],
         "tests": [{"vars": {"agent": "sales", "query": "Revenue?"}}],
     }
     config = effective_config(authored, "https://resolved.example/openai")
-    assert config["providers"][0]["config"]["base_url"] == "https://escape.example/openai"
-    assert config["providers"][0]["config"]["fabric_urls"] == {"sales": "https://template.example/openai"}
+    assert config["providers"][0]["config"]["base_url"] == "https://escape.fabric.microsoft.com/openai"
+    assert config["providers"][0]["config"]["fabric_urls"] == {"sales": "https://template.fabric.microsoft.com/openai"}
     assert config["tests"] == authored["tests"]
     assert yaml.safe_load(yaml.safe_dump(config)) == config
 

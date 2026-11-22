@@ -141,6 +141,15 @@ def _check_destination(url: str) -> urllib.parse.SplitResult:
     return parsed
 
 
+def destination_problem(url: Any) -> str | None:
+    """The run's refusal for a URL the token must not go to, or None. Lint shares it (decision 18)."""
+    try:
+        _check_destination(str(url).rstrip("/"))
+    except _Final as exc:
+        return str(exc)
+    return None
+
+
 class _RefuseRedirects(urllib.request.HTTPRedirectHandler):
     """urllib keeps the Authorization header across a redirect, so fab-test follows none."""
 

@@ -296,7 +296,9 @@ hooks with your permissions. Run suites only from trusted branches, never from
 `pull_request_target` or fork pull requests that can reach your secrets.
 fab-test narrows what a suite can reach:
 - **Fabric hosts only.** The token goes only to Fabric and Power BI hosts. A
-  suite's `base_url` or `fabric_urls` on any other host is refused. Allow an
+  suite's `base_url` or `fabric_urls` on any other host is refused, by `tests lint`
+  and by the run before promptfoo starts, with the same message. On a Fabric host
+  it still works, and lint warns that fab-test can resolve the agent instead. Allow an
   exact extra host, such as a gateway, with `FAB_TEST_DATA_AGENT_ALLOWED_HOSTS`
   (comma-separated) in the caller's environment; a suite can't set it.
 - **No secret in promptfoo's environment.** The service principal never

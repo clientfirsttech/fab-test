@@ -10,6 +10,7 @@ from typing import Any
 import yaml
 
 from ._scan import find_files_by_suffix
+from .fabric_data_agent_provider import destination_problem
 
 SUITE_SUFFIX = ".DataAgent.promptfoo.yaml"
 
@@ -90,6 +91,13 @@ def _refuse_reserved_env(env: Any, where: str) -> None:
         )
 
 
+def authored_urls(options: dict[str, Any]) -> list[Any]:
+    """The agent URLs a suite names itself: ``base_url`` and the template's ``fabric_urls`` values."""
+    named = options.get("fabric_urls")
+    return ([options["base_url"]] if options.get("base_url") else []) + (
+        list(named.values()) if isinstance(named, dict) else [])
+
+
 def _effective_provider(provider: Any, base_url: str, conversation: bool) -> dict[str, Any]:
     """One provider entry pointed at the packaged provider, with the resolved URL unless the suite names one."""
     if not isinstance(provider, (str, dict)):
@@ -99,6 +107,9 @@ def _effective_provider(provider: Any, base_url: str, conversation: bool) -> dic
     options = authored.get("config", {})
     if not isinstance(options, dict):
         raise SuiteError("promptfoo providers[].config must be a mapping.")
+    for url in authored_urls(options):
+        if problem := destination_problem(url):
+            raise SuiteError(problem)
     effective_options = {**options}
     if not options.get("base_url") and not options.get("fabric_urls"):
         effective_options["base_url"] = base_url
