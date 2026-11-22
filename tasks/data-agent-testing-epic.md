@@ -1,6 +1,6 @@
 # Fabric Data Agent Testing Epic
 
-**Status**: 🔧 IN PROGRESS — Reviews 1 and 2 done 2026-11-21; docs and the parity test done; the blast-radius pass found four defects (2026-11-22), then Quality Gates. 11 discovery decisions recorded 2026-10-04; decisions 3 and 10 rewritten and 12–16 added 2026-11-19 against [`aidd-command-grammar`](../.github/skills/aidd-command-grammar/SKILL.md). Supersedes PR #49.
+**Status**: 🔧 IN PROGRESS — Reviews 1 and 2 done 2026-11-21; docs, the parity test, the blast-radius pass (four defects fixed) and Quality Gates done 2026-11-22. Open: a re-review of the 2026-11-22 fixes before merging to `dev`. 11 discovery decisions recorded 2026-10-04; decisions 3 and 10 rewritten and 12–16 added 2026-11-19 against [`aidd-command-grammar`](../.github/skills/aidd-command-grammar/SKILL.md). Supersedes PR #49.
 **Goal**: A new `data-agent` analyzer that evaluates deployed Fabric Data Agents by running promptfoo with a packaged Python provider, following [fabric-data-agent-testing-template](https://github.com/clientfirsttech/fabric-data-agent-testing-template), with test suites authored through `fab-test data-agent tests init` and `tests lint`.
 
 ## Overview
@@ -445,7 +445,7 @@ the remaining CLI blast-radius checks are still pending.
 
 ## Blast-Radius Pass
 
-**Status**: 🔧 2026-11-22. Both verbs and the run went through the installed console script, on a scratch copy of the item and suite and live against `agent-sample-model`. Clean: lint under `-q`, the default, `-v`, `--format json` (one JSON document on stdout), no TARGET, an unknown TARGET (2), refused run-only flags (2); init's `--questions` (text and JSON), no terminal (2), `--answers` with `--dry-run` under every mode (nothing written), a real write, its `Next:` step, and a repeat; `list`, `list --format json`, `explain` (needs a workspace, then names both verbs), `doctor`; the run's `--dry-run` under `-q`, the default and `--format json`, and workspace enumeration. The >5-agent refusal is covered by `tests/test_data_agent_run.py` with a mocked workspace; the live workspace holds one agent, so it was not exercised live. Live, `tests lint` → the run with `--report -q` on the committed suite exited 1 in 107 s: 4 passed and 2 failed on content (`1899-12-30` for the earliest appearance, `23` eye colors), with both failures in the envelope and HTML report.
+**Status**: ✅ 2026-11-22 (`3d51d41`, `ca74450`). Both verbs and the run went through the installed console script, on a scratch copy of the item and suite and live against `agent-sample-model`. Clean: lint under `-q`, the default, `-v`, `--format json` (one JSON document on stdout), no TARGET, an unknown TARGET (2), refused run-only flags (2); init's `--questions` (text and JSON), no terminal (2), `--answers` with `--dry-run` under every mode (nothing written), a real write, its `Next:` step, and a repeat; `list`, `list --format json`, `explain` (needs a workspace, then names both verbs), `doctor`; the run's `--dry-run` under `-q`, the default and `--format json`, and workspace enumeration. The >5-agent refusal is covered by `tests/test_data_agent_run.py` with a mocked workspace; the live workspace holds one agent, so it was not exercised live. Live, `tests lint` → the run with `--report -q` on the committed suite exited 1 in 107 s: 4 passed and 2 failed on content (`1899-12-30` for the earliest appearance, `23` eye colors), with both failures in the envelope and HTML report.
 
 **Findings**, each a task to do test-first:
 1. ✅ *(2026-11-22: `_REFUSAL` tests the first sentence; node evaluates five answers in `test_data_agent_init_prompts.py`; the walkthrough shows the new line. An answer opening with a bare "Sorry." now fails; widen the words if the agent does that.)* **The refusal match passes an answer** (decision 23). The agent answered "What is the recipe for Goulash?" with a recipe; the `refuses` regex matched "don't" in it.
@@ -464,6 +464,8 @@ the remaining CLI blast-radius checks are still pending.
 ---
 
 ## Quality Gates
+
+**Status**: ✅ 2026-11-22, after the blast-radius fixes. `ruff check .` clean; complexity, module-budget, mode-parity and grammar-parity tests pass; non-playwright half 3713 passed + 2 skipped (no rtk failures now that the hook and its test are gone); playwright half 204 passed, total coverage 90.75% (floor 80%), and its 16 failures are the live-parity HTTP 401 on workspace `c4698d28-…`, which the service principal no longer sees (environmental, as on 2026-11-21); the `GITHUB_ACTIONS=true CI=true` pass 3713 passed; `pip-audit` finds no known vulnerabilities (only the unpublished `cft-fab-test 1.10.0b5` skipped). A live `--format json` run after the fixes printed one JSON document and the same verdicts. Goulash still passes there because the committed suite keeps its pre-decision-23 assertion.
 
 **Requirements**:
 - Given the whole repository, should pass `ruff check .`, `tests/test_complexity_budget.py`, and `tests/test_module_budget.py` — plan the new modules' seams up front rather than grow existing files at their ceilings.
