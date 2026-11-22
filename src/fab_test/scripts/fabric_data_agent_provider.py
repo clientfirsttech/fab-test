@@ -129,12 +129,15 @@ def _check_destination(url: str) -> urllib.parse.SplitResult:
     parsed = urllib.parse.urlsplit(url)
     if parsed.scheme != "https":
         raise _Final(f"Data Agent URLs must use https: {parsed.scheme}://{parsed.hostname or ''}")
-    if parsed.username or parsed.password or not _allowed_host(parsed.hostname or ""):
+    if not _allowed_host(parsed.hostname or ""):
         raise _Final(
             f"fab-test sends the Fabric token only to Fabric or Power BI hosts, not {parsed.hostname!r}. "
             f"Remove the suite's base_url/fabric_urls, or allow the exact host in the caller's "
             f"{ALLOWED_HOSTS_VAR} (comma-separated)"
         )
+    if parsed.username or parsed.password:
+        raise _Final(f"Data Agent URLs must not carry user info ({parsed.hostname!r}); "
+                     "the token is the only credential")
     return parsed
 
 
@@ -217,7 +220,21 @@ def _rejected(exc: urllib.error.HTTPError) -> _Final | None:
             "the service principal may not use this Data Agent (HTTP 403); it needs a role in the agent's "
             "workspace and read access to the agent's data sources. Run `fab-test auth status`"
         )
-    return None
+    return _not_retriable(exc)
+
+
+def _not_retriable(exc: urllib.error.HTTPError) -> _Final | None:
+    """Fabric's own verdict: ``"isRetriable": false`` is final, and a paused capacity names the fix."""
+    try:
+        body = json.loads(_http_error_body(exc) or "{}")
+    except ValueError:
+        return None
+    if not isinstance(body, dict):
+        return None
+    if body.get("errorCode") == "CapacityNotActive":
+        return _Final(f"the agent's Fabric capacity is paused (CapacityNotActive): resume the capacity behind the "
+                      f"workspace, then run again. {_error_text(exc)}")
+    return _Final(_error_text(exc)) if body.get("isRetriable") is False else None
 
 
 def _authed_json(method: str, url: str, *, timeout: int, **kwargs: Any) -> dict[str, Any]:
@@ -314,7 +331,8 @@ def _await_run(base_url: str, thread_id: str, run: dict[str, Any], timeout: int)
     status, started = str(run.get("status", "")), _monotonic()
     while status not in _TERMINAL:
         if _monotonic() - started > timeout:
-            raise RuntimeError(f"Timed out waiting for Data Agent run after {timeout}s")
+            raise _Final(f"Timed out waiting for Data Agent run after {timeout}s; raise the suite's "
+                         "providers[].config.timeout or --timeout if the agent is slow")
         _sleep(_POLL_SECONDS)
         url = (f"{base_url}/threads/{_segment(thread_id)}/runs/{_segment(run['id'])}"
                f"?api-version={DATA_AGENT_API_VERSION}")
@@ -333,6 +351,28 @@ def _last_assistant_text(messages: dict[str, Any]) -> str:
     return ""
 
 
+def _answer_posted_turn(base_url: str, thread_id: str, assistant_id: str, timeout: int) -> dict[str, str]:
+    """A conversation's turn is on the shared thread now: a retry would post it twice, so failures are final."""
+    try:
+        return _answer(base_url, thread_id, assistant_id, timeout)
+    except _Final:
+        raise
+    except Exception as exc:
+        raise _Final(f"{_error_text(exc)} (not asked again: a retry would post this turn twice in the "
+                     "conversation)") from exc
+
+
+def _answer(base_url: str, thread_id: str, assistant_id: str, timeout: int) -> dict[str, str]:
+    """Run the assistant on the thread and read its reply."""
+    thread = f"{base_url}/threads/{_segment(thread_id)}"
+    run = _authed_json("POST", f"{thread}/runs?api-version={DATA_AGENT_API_VERSION}",
+                       timeout=timeout, json={"assistant_id": assistant_id})
+    _await_run(base_url, thread_id, run, timeout)
+    messages = _authed_json("GET", f"{thread}/messages?order=asc&api-version={DATA_AGENT_API_VERSION}",
+                            timeout=timeout)
+    return {"output": _last_assistant_text(messages)}
+
+
 def _run_once(prompt: str, options: dict[str, Any], context: dict[str, Any]) -> dict[str, str]:
     timeout = int(options.get("config", {}).get("timeout", 60))
     base_url = _base_url(options, context)
@@ -342,14 +382,11 @@ def _run_once(prompt: str, options: dict[str, Any], context: dict[str, Any]) -> 
     try:
         assistant_id = _authed_json("POST", f"{base_url}/assistants?api-version={DATA_AGENT_API_VERSION}",
                                     timeout=timeout, json={})["id"]
-        thread_id = _post_message(base_url, vars_, _thread_id(base_url, vars_, timeout), prompt, timeout)
-        thread = f"{base_url}/threads/{_segment(thread_id)}"
-        run = _authed_json("POST", f"{thread}/runs?api-version={DATA_AGENT_API_VERSION}",
-                           timeout=timeout, json={"assistant_id": assistant_id})
-        _await_run(base_url, thread_id, run, timeout)
-        messages = _authed_json("GET", f"{thread}/messages?order=asc&api-version={DATA_AGENT_API_VERSION}",
-                                timeout=timeout)
-        return {"output": _last_assistant_text(messages)}
+        thread_id = _thread_id(base_url, vars_, timeout)  # set first: a failed post still deletes it
+        thread_id = _post_message(base_url, vars_, thread_id, prompt, timeout)
+        if not own_thread:
+            return _answer_posted_turn(base_url, thread_id, assistant_id, timeout)
+        return _answer(base_url, thread_id, assistant_id, timeout)
     finally:
         if own_thread and thread_id:
             with contextlib.suppress(Exception):

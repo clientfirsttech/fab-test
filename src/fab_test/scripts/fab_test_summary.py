@@ -282,6 +282,8 @@ def _artifact_summary_line(data: dict[str, Any]) -> str:
         )
     if findings:
         return f"{len(findings)} finding(s) {sev_summary}"
+    if data.get("status") == "error" and data.get("message"):  # say why, not "no findings"
+        return "error: " + str(data["message"]).splitlines()[0]
     return "no findings"
 
 

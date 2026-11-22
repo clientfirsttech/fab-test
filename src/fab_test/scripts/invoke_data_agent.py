@@ -217,7 +217,8 @@ def run_data_agent(args: argparse.Namespace) -> int:
                 if findings:
                     status, message, code = "failed", f"Data Agent tests found {len(findings)} failed assertion(s)", 1
         except IncompleteServicePrincipalError as exc:
-            status, message, code = "error", f"{exc} {CREDENTIAL_REMEDIATION}", 127
+            detail = str(exc) if CREDENTIAL_REMEDIATION in str(exc) else f"{exc} {CREDENTIAL_REMEDIATION}"
+            status, message, code = "error", detail, 127
         except FileNotFoundError as exc:
             status, message, code = "error", str(exc), 127
         except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:

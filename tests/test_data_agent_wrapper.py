@@ -105,7 +105,7 @@ def test_missing_credentials_exits_127_without_promptfoo(tmp_path, monkeypatch):
     assert wrapper.run_data_agent(args) == 127
     envelope = json.loads(Path(args.output_path).read_text(encoding="utf-8"))
     assert envelope["status"] == "error"
-    assert "fab-test auth status" in envelope["message"]
+    assert envelope["message"].count("fab-test auth status") == 1  # the remediation once, not twice
     assert envelope["native_output_path"] == ""
 
 

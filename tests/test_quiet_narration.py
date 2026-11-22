@@ -246,3 +246,16 @@ def test_quiet_keeps_stderr_muted_when_error_findings_explain_the_exit(tmp_path,
     _run_analyzer("bpa", _quiet_args(artifact_dir, output_dir, output_format="text"), output_dir)
 
     assert "chatter" not in capsys.readouterr().out
+
+
+def test_an_error_envelope_names_its_error_not_no_findings(tmp_path, capsys):
+    """Review 2 should-fix 9: "agent -- no findings" hid why the run failed."""
+    from fab_test.scripts.fab_test_summary import _print_summary
+
+    envelope = tmp_path / "data_agent" / "agent" / "envelope.json"
+    envelope.parent.mkdir(parents=True)
+    envelope.write_text(json.dumps({"status": "error", "analyzer": "data_agent", "findings": [],
+                                    "message": "capacity is paused\nsecond line"}), encoding="utf-8")
+    _print_summary("data_agent", [("agent", 1)], tmp_path)
+    out = capsys.readouterr().out
+    assert "error: capacity is paused" in out and "no findings" not in out and "second line" not in out
