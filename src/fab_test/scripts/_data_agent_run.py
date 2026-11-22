@@ -31,7 +31,8 @@ def resolve_data_agent_mode(args: argparse.Namespace) -> ResolvedMode:
     target = getattr(args, "resolved_target", None)
     flag = getattr(args, "workspace_id", "") or ""
     inherited_mode = getattr(args, "resolved_mode", None)
-    if getattr(args, "analyzer", None) == "all" and inherited_mode and inherited_mode.source != "flag":
+    if (getattr(args, "analyzer", None) == "all" and inherited_mode and inherited_mode.source != "flag"
+            and not getattr(args, "workspace_flag_given", False)):
         flag = ""  # all may have resolved a config workspace to a GUID; that did not make it an explicit flag
     if target is not None and target.scope == "desktop":
         raise ModeError("data-agent cannot run local/NAME; it tests deployed agents. Pass --workspace NAME_OR_ID.")

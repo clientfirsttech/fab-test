@@ -1,6 +1,6 @@
 # Fabric Data Agent Testing Epic
 
-**Status**: 🔧 IN PROGRESS — Reviews 1 and 2 done 2026-11-21; docs, the parity test and the blast-radius pass remain. 11 discovery decisions recorded 2026-10-04; decisions 3 and 10 rewritten and 12–16 added 2026-11-19 against [`aidd-command-grammar`](../.github/skills/aidd-command-grammar/SKILL.md). Supersedes PR #49.
+**Status**: 🔧 IN PROGRESS — Reviews 1 and 2 done 2026-11-21; docs and the parity test done; the blast-radius pass found four defects (2026-11-22), then Quality Gates. 11 discovery decisions recorded 2026-10-04; decisions 3 and 10 rewritten and 12–16 added 2026-11-19 against [`aidd-command-grammar`](../.github/skills/aidd-command-grammar/SKILL.md). Supersedes PR #49.
 **Goal**: A new `data-agent` analyzer that evaluates deployed Fabric Data Agents by running promptfoo with a packaged Python provider, following [fabric-data-agent-testing-template](https://github.com/clientfirsttech/fabric-data-agent-testing-template), with test suites authored through `fab-test data-agent tests init` and `tests lint`.
 
 ## Overview
@@ -31,6 +31,8 @@ WHY: Teams deploying Fabric Data Agents have no way to regression-test the agent
 20. ✅ *(Review 1, decided 2026-11-21; revised the same day at the user's question)* **Telemetry carries the redacted envelope, answers included, like every analyzer.** The destination is the team's own opt-in Eventhouse or Lakehouse, not a third party. Every analyzer already embeds its redacted envelope as `results`, including sqldb-test and pql-test actuals. Answer history is what makes drift visible. Stripping it would be a one-off exception that removes the trail's main value. The residual risk (A01): Eventhouse readers see answers drawn with the service principal's access, which may exceed theirs. Document it beside the telemetry setup: grant the telemetry database to the same audience as the agent's data sources. Never send tokens, secrets or credentials; tests assert the table, `artifact_type: DataAgent`, the mode dimension and the absence of secrets.
 21. ✅ *(Review 1, decided 2026-11-21)* **The `all` banner stays the session's mode.** Each analyzer row shows its own `mode`/`source`, so `data-agent` reads `mode=service` inside an `all` run. This keeps Service Targeting's banner meaning without adding a `mixed` value.
 22. ✅ *(proposed 2026-11-21 after the user couldn't find two suites, accepted the same day as recommended: `fab-tests/` at the repo root with a subfolder per flow, pbir contracts included; "we need a non-blocking (with Fabric Git Integration) folder for the tests so it's easy to reference")* **Test files get their own folder, outside the Git-connected one.**
+23. ✅ *(blast-radius pass, decided by the user 2026-11-22)* **A refusal is in the answer's first sentence.** `tests init`'s `refuses` match tests the decline words against the first sentence only (split at `.`, `!`, `?` followed by space, or a newline). Live, the whole-answer check passed a full goulash recipe because the recipe said "don't". Fabric's canned refusal still passes. Suites written before this keep their old assertion until rewritten.
+24. ✅ *(blast-radius pass, decided by the user 2026-11-22)* **promptfoo's Windows shutdown crash is not a verdict.** Node 26.1.0 on Windows sometimes aborts at exit with a libuv assertion (`UV_HANDLE_CLOSING`, exit 3221226505 / 0xC0000409); 2 of 7 lint runs here. Lint retries `promptfoo validate` once on that signature. The run keeps a complete `results.json` written before the crash; it never re-runs eval, which would re-post turns.
     - **Where:** `fab-tests/` at the repo root by default, one subfolder per flow (`fab-tests/data-agent/agent-sample-model.DataAgent.promptfoo.yaml`, `fab-tests/pbir/Sales.Report.odcs.yaml`).
     - **Configurable:** `tests_dir:` in `fab-test.yml` and `--tests-dir`, resolved flag → env → config → packaged, like every input.
     - **Pairing:** still by logicalId, so a file's folder never matters. Discovery reads `tests_dir` as well as `--artifact-dir`, so suites next to their item keep working.
@@ -437,6 +439,27 @@ the remaining CLI blast-radius checks are still pending.
 - ✅ Review 1 item 10: unselected tables are suggested as declines, only figure measures are suggested, and the agent's instructions are shown (`4c70381`).
 - Review 1 item 15: `.github/hooks/rtk-rewrite.json` is deleted in the working tree (the user's change), so `tests/test_rtk_hook_safety.py` fails 3 tests. Restore the file, or remove it and its test, before the final gate.
 - ✅ The Authoring Grammar Parity Test. Still open: the blast-radius pass and Quality Gates.
+- ✅ Review 1 item 15: the hook and `tests/test_rtk_hook_safety.py` removed (`e97f281`), at the user's choice 2026-11-22.
+
+---
+
+## Blast-Radius Pass
+
+**Status**: 🔧 2026-11-22. Both verbs and the run went through the installed console script, on a scratch copy of the item and suite and live against `agent-sample-model`. Clean: lint under `-q`, the default, `-v`, `--format json` (one JSON document on stdout), no TARGET, an unknown TARGET (2), refused run-only flags (2); init's `--questions` (text and JSON), no terminal (2), `--answers` with `--dry-run` under every mode (nothing written), a real write, its `Next:` step, and a repeat; `list`, `list --format json`, `explain` (needs a workspace, then names both verbs), `doctor`; the run's `--dry-run` under `-q`, the default and `--format json`, and workspace enumeration. The >5-agent refusal is covered by `tests/test_data_agent_run.py` with a mocked workspace; the live workspace holds one agent, so it was not exercised live. Live, `tests lint` → the run with `--report -q` on the committed suite exited 1 in 107 s: 4 passed and 2 failed on content (`1899-12-30` for the earliest appearance, `23` eye colors), with both failures in the envelope and HTML report.
+
+**Findings**, each a task to do test-first:
+1. ✅ *(2026-11-22: `_REFUSAL` tests the first sentence; node evaluates five answers in `test_data_agent_init_prompts.py`; the walkthrough shows the new line. An answer opening with a bare "Sorry." now fails; widen the words if the agent does that.)* **The refusal match passes an answer** (decision 23). The agent answered "What is the recipe for Goulash?" with a recipe; the `refuses` regex matched "don't" in it.
+2. **promptfoo's shutdown crash reads as a finding or an error** (decision 24). Lint printed `promptfoo validate config exited 3221226505` as a suite problem and exited 1; the run raises on any exit but 0 and 100.
+3. ✅ *(2026-11-22: `_merge` compares first.)* **Init reports an identical answer as kept.** Re-running the same `--answers` printed `kept=4 unchanged=0`: `_merge` counts an existing id as kept before comparing, so `unchanged` is reachable only with `--force`, and `kept` can't tell "same as before" from "your different answer was not applied".
+4. ✅ *(2026-11-22: `_prepare_target` records `workspace_flag_given` before `all` fills `workspace_id` from config; unit and console tests.)* **`all --artifact-dir D --workspace W` drops the workspace for data-agent.** An explicit directory makes `all`'s mode local (`source=default`); `resolve_data_agent_mode` then clears the flag, prints "data-agent needs --workspace", lists the agent as `dry-run` anyway, and exits 2.
+- Nit: `explain data-agent` prints `fab-test explain data_agent`; `list` names it `data-agent`.
+
+**Requirements**:
+- Given an answer whose first sentence answers the question, should fail a `refuses` test even when a later sentence says "don't"; given Fabric's canned refusal, should pass.
+- Given `promptfoo validate` ending in the libuv shutdown crash, should retry once and report the second result; given a second crash, should report a tool failure, not a suite problem.
+- Given `promptfoo eval` ending in that crash with a complete `results.json`, should grade the results; without one, should report the error as now.
+- Given an answer identical to the existing test, should count it unchanged; given a different answer not applied, should count it kept.
+- Given `all` with an explicit `--artifact-dir` and `--workspace`, should run data-agent against that workspace with `source=flag`; given only a configured workspace, should still report `source=config`.
 
 ---
 

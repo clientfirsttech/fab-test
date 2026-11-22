@@ -6,7 +6,7 @@ import json
 import pytest
 
 from fab_test.scripts._data_agent_run import discover_data_agents, resolve_data_agent_mode
-from fab_test.scripts._mode import ModeError
+from fab_test.scripts._mode import ModeError, ResolvedMode
 from fab_test.scripts._service_export import ServiceExportError
 from fab_test.scripts._target import select_target
 from fab_test.scripts.fab_test_parser import build_parser
@@ -70,6 +70,19 @@ def test_bare_run_is_service_and_records_workspace_source(tmp_path, monkeypatch,
     assert (mode.mode, mode.workspace, mode.source) == ("service", "Dev", source)
 
 
+def test_all_keeps_a_typed_workspace_and_labels_a_configured_one(tmp_path, monkeypatch):
+    """Blast-radius finding 4: an explicit --artifact-dir made all's mode local and dropped --workspace."""
+    monkeypatch.delenv("FABRIC_WORKSPACE_ID", raising=False)
+    local = ResolvedMode("local", None, "default", str(tmp_path))
+    typed = _args(tmp_path, analyzer="all", workspace_id="Dev", workspace_flag_given=True, resolved_mode=local)
+    assert (resolve_data_agent_mode(typed).workspace, resolve_data_agent_mode(typed).source) == ("Dev", "flag")
+    # all rewrote workspace_id with the configured workspace's id; that is not a flag
+    configured = _args(tmp_path, analyzer="all", workspace_id="1111", workspace_flag_given=False,
+                       file_config={"workspace": "Dev"}, resolved_mode=local)
+    assert (resolve_data_agent_mode(configured).workspace, resolve_data_agent_mode(configured).source) == (
+        "Dev", "config")
+
+
 def test_bare_run_requires_workspace_and_desktop_is_refused(tmp_path, monkeypatch):
     monkeypatch.delenv("FABRIC_WORKSPACE_ID", raising=False)
     with pytest.raises(ModeError, match="FABRIC_WORKSPACE_ID"):
@@ -127,3 +140,25 @@ def test_missing_path_is_not_reinterpreted_as_remote_target(tmp_path):
     target = select_target(str(tmp_path / "Missing.DataAgent"), None)
     with pytest.raises(ServiceExportError, match="Check the path"):
         discover_data_agents(_args(tmp_path, resolved_target=target, tests=str(suite), workspace_id="Dev"))
+
+
+def test_all_with_an_artifact_dir_still_runs_data_agent_on_the_typed_workspace(tmp_path):
+    """Blast-radius finding 4, through the console script: the flag reaches data-agent inside all."""
+    import os
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    _item(tmp_path)
+    cli = str(Path(sys.executable).with_name("fab-test.exe")) if sys.platform == "win32" else "fab-test"
+    env = {key: value for key, value in os.environ.items() if key != "FABRIC_WORKSPACE_ID"}
+    proc = subprocess.run(
+        [cli, "all", "--artifact-dir", str(tmp_path), "--workspace", "00000000-0000-0000-0000-000000000001",
+         "--output-dir", str(tmp_path / "results"), "--dry-run", "--no-telemetry", "--format", "json"],
+        env={**env, "FAB_TEST_ENABLE_DATA_AGENT": "1"}, capture_output=True, text=True, encoding="utf-8",
+        errors="replace", check=False, timeout=120, cwd=tmp_path,
+    )
+    assert proc.returncode == 0, proc.stderr
+    rows = [row for row in json.loads(proc.stdout)["artifacts"] if row["analyzer"] == "data_agent"]
+    assert [(row["artifact"], row["status"]) for row in rows] == [("Sales", "dry-run")]
+    assert "needs --workspace" not in proc.stderr

@@ -247,6 +247,8 @@ def _prepare_target(args: argparse.Namespace) -> int | None:
         print(f"  ✗ fab-test: {exc}", file=sys.stderr)
         return 2
 
+    # all later fills workspace_id from fab-test.yml; data-agent must still know what was typed.
+    args.workspace_flag_given = bool(getattr(args, "workspace_id", ""))
     conflict = workspace_conflict(args.resolved_target, getattr(args, "workspace_id", ""))
     conflict = conflict or _pql_workspace_conflict(args)
     if conflict:

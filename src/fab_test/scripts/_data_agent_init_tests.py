@@ -32,8 +32,9 @@ _SPELLINGS = {spelling: name for key, name, extra in _MATCHES for spelling in (k
 _KEYS = ", ".join(f"{key} {name}" for key, name, _extra in _MATCHES)
 MATCH_KEYS = {key: name for key, name, _extra in _MATCHES}
 _NUMBER = re.compile(r"([-+]?)(\d{1,3}(?:,\d{3})+|\d+)(\.\d+)?")
+# Decision 23: only the first sentence counts; a long answer says "don't" somewhere.
 _REFUSAL = (r"/\b(cannot|can.t|unable|won.t|don.t|do not|no access|not (available|able|allowed|have|provide)"
-            r"|isn.t (available|something)|outside)\b/i.test(output)")
+            r"|isn.t (available|something)|outside)\b/i.test(output.trim().split(/(?<=[.!?])\s|\n/)[0])")
 _ID_LENGTH = 40
 _AS_TYPED = {"contains": "icontains", "exact": "equals", "pattern": "regex"}
 

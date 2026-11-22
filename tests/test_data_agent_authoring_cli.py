@@ -293,6 +293,18 @@ def test_text_questions_show_suggestions_keys_and_the_file_shape(authoring, tmp_
     assert "n number" in result.stdout and '"follow_ups"' in result.stdout
 
 
+def test_the_same_answers_again_are_unchanged_not_kept(authoring, tmp_path):
+    """Blast-radius finding 3: kept means a different answer was not applied, so it can't mean "the same"."""
+    item, _suite, tool = authoring
+    _definition(item)
+    first = _run(tmp_path, tool, "init", item.name, "--answers", str(_answers(tmp_path)), "--format", "json")
+    assert first.returncode == 0, first.stderr
+    again = _run(tmp_path, tool, "init", item.name, "--answers", str(_answers(tmp_path)), "--format", "json")
+    assert again.returncode == 0, again.stderr
+    payload = json.loads(again.stdout)
+    assert payload["unchanged"] == json.loads(first.stdout)["added"] and payload["kept"] == []
+
+
 def test_init_requires_force_to_replace_existing_tests(authoring, tmp_path):
     item, suite, tool = authoring
     _definition(item)

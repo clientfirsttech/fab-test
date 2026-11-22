@@ -4,7 +4,10 @@ Pure functions and an injected prompt loop: no console, no service, no promptfoo
 """
 
 import io
+import json
 import re
+import shutil
+import subprocess
 
 import pytest
 
@@ -104,6 +107,23 @@ def test_refuses_checks_for_a_decline_and_needs_no_expected_answer():
     check = assertion("refuses", None)
     assert check["type"] == "javascript"
     assert "can.t" in check["value"]
+
+
+@pytest.mark.skipif(not shutil.which("node"), reason="node evaluates the assertion as promptfoo does")
+@pytest.mark.parametrize(("output", "passes"), [
+    ("There's content here I can't work with. Try asking a new question.", True),
+    ("I'm sorry, but I cannot share private account details.", True),
+    ("Unable to help with that!\nAsk about the data instead.", True),
+    ("Here's a classic goulash recipe.\n\n- Don't overcook the onions.", False),
+    ("There are 16,376 characters. I don't have data on others.", False),
+])
+def test_a_refusal_is_declined_in_the_first_sentence(output, passes):
+    """Decision 23: a recipe that says "don't" later is an answer, not a refusal."""
+    check = assertion("refuses", None)
+    script = f"const output = {json.dumps(output)};\nprocess.stdout.write(String({check['value']}));"
+    result = subprocess.run([shutil.which("node"), "-e", script], capture_output=True, text=True,
+                            encoding="utf-8", timeout=30, check=True)
+    assert result.stdout == ("true" if passes else "false")
 
 
 # -- specs to suite tests ----------------------------------------------------

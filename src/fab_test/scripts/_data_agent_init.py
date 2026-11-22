@@ -158,14 +158,13 @@ def _merge(document: dict, new_tests: list[dict], force: bool, replace: set[str]
     for test in new_tests:
         test_id = test["metadata"]["id"]
         index = next((i for i, old in enumerate(tests) if old.get("metadata", {}).get("id") == test_id), None)
-        if index is not None and not force and test_id not in replace:
-            counts["kept"].append(test_id)
-            continue
         if index is None:
             tests.append(test)
             counts["added"].append(test_id)
         elif tests[index] == test:
             counts["unchanged"].append(test_id)
+        elif not force and test_id not in replace:
+            counts["kept"].append(test_id)  # a different answer, not applied
         else:
             tests[index] = test
             counts["replaced"].append(test_id)
