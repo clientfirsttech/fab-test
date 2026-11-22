@@ -165,8 +165,10 @@ def build_data_agent_command(artifact: Path, args: argparse.Namespace, output_di
         sys.executable, "-m", "fab_test.scripts.invoke_data_agent",
         "--artifact-path", str(artifact),
         "--output-path", str(output_dir / "data_agent" / results_stem(artifact) / "envelope.json"),
-        "--promptfoo-path", str(getattr(args, "_resolved_tool_path", "") or os.getenv("PROMPTFOO_PATH", "")),
     ]
+    tool = getattr(args, "_resolved_tool_path", "") or os.getenv("PROMPTFOO_PATH", "")
+    if tool:  # else the wrapper reads PROMPTFOO_PATH itself; never an empty flag value
+        command += ["--promptfoo-path", str(tool)]
     suite = getattr(args, "data_agent_suites", {}).get(artifact)
     if suite:
         command += ["--tests", str(suite.resolve())]

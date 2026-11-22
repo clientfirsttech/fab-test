@@ -21,6 +21,7 @@ from ._admin_output import (
     _print_list,
     _print_local_doctor,
 )
+from ._authoring_parser import authoring_verbs
 from ._command_builders import (
     build_command as _build_command,
 )
@@ -365,6 +366,7 @@ def _list_analyzers(args: argparse.Namespace) -> int:
                 "matched_artifacts": count,
                 "required_tool": _TOOL_DISPLAY_NAMES.get(name),
                 "scopes": sorted(_ANALYZER_SCOPES.get(name, frozenset())),
+                "authoring": authoring_verbs(name, canonical),
             }
         )
     # A repository-scoped analyzer always reports 1 and never discovers, so
@@ -481,6 +483,7 @@ def _explain_analyzer(args: argparse.Namespace) -> int:
         "tool_path": readiness.get("resolved_path"),
         "rules_path": rules_path,
         "output_path": str(output_dir / name / results_stem(artifact) / "envelope.json"),
+        "authoring": authoring_verbs(name, _canonical_name(name)),
     }
 
     if output_format == "json":
@@ -502,6 +505,8 @@ def _explain_analyzer(args: argparse.Namespace) -> int:
         print(f"  Rules:    {payload['rules_path']}")
     print(f"  Output:   {payload['output_path']}")
     print(f"  Command:  {' '.join(command)}")
+    if payload["authoring"]:
+        print(f"  Author:   {' | '.join(payload['authoring'])}")
     return 0
 
 

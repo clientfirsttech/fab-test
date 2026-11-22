@@ -330,3 +330,22 @@ def test_a_dry_run_never_says_written(authoring, tmp_path):
     assert first.startswith("tests dry run, nothing written: would add=3 replace=0 keep=0 unchanged=0 ")
     assert "tests written" not in result.stdout
     assert suite.read_bytes() == original
+
+
+def test_quiet_dry_run_prints_one_line(authoring, tmp_path):
+    item, suite, tool = authoring
+    _definition(item)
+    original = suite.read_bytes()
+    result = _run(tmp_path, tool, "init", item.name, "--answers", str(_answers(tmp_path)), "--dry-run", "-q")
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip().count("\n") == 0 and result.stdout.startswith("tests dry run, nothing written")
+    assert suite.read_bytes() == original
+
+
+def test_refusals_name_the_whole_command_and_the_items(authoring, tmp_path):
+    item, _suite, tool = authoring
+    _definition(item)
+    unattended = _run(tmp_path, tool, "init", item.name)
+    assert f"fab-test data-agent tests init {item.name} --questions" in unattended.stderr
+    unnamed = _run(tmp_path, tool, "init")
+    assert unnamed.returncode == 2 and "found: Sales" in unnamed.stderr

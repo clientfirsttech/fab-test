@@ -23,6 +23,12 @@ def _item_exists(name: str, args: argparse.Namespace, suffix: str) -> bool:
                for base in (Path(), root))
 
 
+def authoring_verbs(analyzer: str, spelled: str) -> list[str]:
+    """An analyzer's authoring commands as a person types them, for `list` and `explain`."""
+    noun = _AUTHORING_NOUNS.get(analyzer)
+    return [f"fab-test {spelled} {noun[0]} {verb}" for verb in sorted(_VERBS)] if noun else []
+
+
 def _shown(word: str) -> str:
     return f'"{word}"' if not word or any(ch.isspace() for ch in word) else word
 
@@ -74,4 +80,5 @@ def add_authoring_noun(parser: argparse.ArgumentParser, name: str, parent: argpa
     parser._authoring_target_action = next(action for action in parser._actions if action.dest == "target")
     nouns = parser.add_subparsers(dest="authoring_noun", metavar=f"{{{name}}}")
     parser._authoring_noun_action = nouns
-    nouns.add_parser(name, parents=[parent], add_help=False, help=f"Author or check {name} files")
+    nouns.add_parser(name, parents=[parent], add_help=False, prog=f"{parser.prog} {name}",
+                     help=f"Author or check {name} files: {name} init, {name} lint")

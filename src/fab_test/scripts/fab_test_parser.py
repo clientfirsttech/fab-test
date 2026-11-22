@@ -398,7 +398,7 @@ def _add_bpa_subparser(subs: argparse._SubParsersAction) -> None:
 def _add_pbir_subparser(subs: argparse._SubParsersAction) -> None:
     pbir_p = subs.add_parser(
         "pbir",
-        help="PBIR Inspector — static report analysis (Report artifacts)",
+        help="PBIR Inspector — static report analysis (Report artifacts); contracts: pbir contract init|lint",
     )
     _add_common_flags(pbir_p, track_artifact_dir_explicit=True)
     add_workspace_flag(pbir_p)

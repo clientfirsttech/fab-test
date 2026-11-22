@@ -134,3 +134,64 @@ def test_contract_authoring_honors_explicit_config_and_reports_missing_config(tm
     result = subprocess.run(command, capture_output=True, text=True, encoding="utf-8", timeout=60, check=False)
     assert result.returncode == 2
     assert "missing.yml" in result.stderr
+
+
+# -- discoverability (Review 2 should-fix 10, Review 1 items 6-7) ---------------------------
+
+
+def _console(*argv, env_extra=None, cwd=None):
+    import os
+
+    cli = Path(sys.executable).with_name("fab-test.exe" if sys.platform == "win32" else "fab-test")
+    env = {**os.environ, "FAB_TEST_ENABLE_DATA_AGENT": "1", **(env_extra or {})}
+    return subprocess.run([str(cli), *argv], capture_output=True, text=True, encoding="utf-8", errors="replace",
+                          env=env, cwd=cwd, timeout=120, check=False)
+
+
+@pytest.mark.parametrize("argv,usage", [
+    (["data-agent", "tests", "--help"], "usage: fab-test data-agent tests "),
+    (["pbir", "contract", "--help"], "usage: fab-test pbir contract "),
+])
+def test_the_noun_usage_shows_only_what_parses(argv, usage):
+    """`data-agent [TARGET] tests` gave "unrecognized arguments": the noun is the first word."""
+    result = _console(*argv)
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.startswith(usage) and "[TARGET]" not in result.stdout.splitlines()[0]
+
+
+def test_help_names_the_authoring_verbs():
+    result = _console("help")
+    flat = " ".join(result.stdout.split())
+    assert "data-agent tests init|lint" in flat and "pbir contract init|lint" in flat
+
+
+def test_list_names_each_analyzers_authoring_verbs(tmp_path):
+    result = _console("list", "--format", "json", "--artifact-dir", str(tmp_path))
+    rows = {row["analyzer"]: row for row in json.loads(result.stdout)["analyzers"]}
+    assert rows["data-agent"]["authoring"] == ["fab-test data-agent tests init", "fab-test data-agent tests lint"]
+    assert rows["pbir"]["authoring"] == ["fab-test pbir contract init", "fab-test pbir contract lint"]
+    assert rows["bpa"]["authoring"] == []
+
+
+def test_explain_names_the_verbs_and_no_empty_tool_flag(tmp_path):
+    result = _console("explain", "data-agent", "--workspace", "00000000-0000-0000-0000-000000000000",
+                      "--artifact-dir", str(tmp_path), "--format", "json",
+                      env_extra={"PROMPTFOO_PATH": ""})
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["authoring"] == ["fab-test data-agent tests init", "fab-test data-agent tests lint"]
+    command = payload["command"]
+    assert "" not in command
+
+
+def test_tests_help_reads_the_same_on_every_verb_and_the_run():
+    parser = build_parser()
+    analyzers = next(a for a in parser._actions if isinstance(a, argparse._SubParsersAction))
+    run = analyzers.choices["data-agent"]
+    noun = next(a for a in run._actions if isinstance(a, argparse._SubParsersAction)).choices["tests"]
+    verbs = next(a for a in noun._actions if isinstance(a, argparse._SubParsersAction)).choices
+    helps = {name: next(a.help for a in p._actions if "--tests" in a.option_strings)
+             for name, p in {"run": run, **verbs}.items()}
+    assert len(set(helps.values())) == 1, helps
+    answers = next(a.help for a in verbs["init"]._actions if "--answers" in a.option_strings)
+    assert "by question id" not in answers and "tests" in answers

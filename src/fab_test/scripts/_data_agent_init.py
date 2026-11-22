@@ -127,8 +127,10 @@ def _new_tests(args: argparse.Namespace, suggestions: list[str], suite: Path, do
         specs = specs_from_answers(answers)
         args.replace_all = isinstance(answers, dict) and answers.get("replace_all") is True
     elif args.output_format == "json" or os.getenv("CI") or not can_ask():
-        raise InitInputError("Writing tests needs your questions and expected answers, and nobody is here to "
-                             "ask. Run --questions to see suggestions and the file shape, then pass --answers FILE.")
+        target = args.target or args.artifact
+        raise InitInputError("Writing tests needs your questions and expected answers, and nobody is here to ask. "
+                             f"Run `fab-test data-agent tests init {target} --questions` to see suggestions and the "
+                             "file shape, then pass --answers FILE.")
     else:
         _announce(suite, existing)
         try:
@@ -229,9 +231,11 @@ def _suite_path(args: argparse.Namespace, item: Path, logical_id: str) -> Path:
 
 def _init(args: argparse.Namespace) -> int:
     target = args.target or args.artifact
+    items = find_artifact_dirs(Path(args.artifact_dir), [".DataAgent"])
     if not target:
-        raise InitInputError("Name the Data Agent item as TARGET or --artifact.")
-    item = _named_item(find_artifact_dirs(Path(args.artifact_dir), [".DataAgent"]), target)
+        found = ", ".join(item.name.removesuffix(".DataAgent") for item in items) or f"none under {args.artifact_dir}"
+        raise InitInputError(f"Name the Data Agent item as TARGET or --artifact (found: {found}).")
+    item = _named_item(items, target)
     logical_id, _ = item_identity(item)
     suite = Path(args.tests) if args.tests else _suite_path(args, item, logical_id)
     document = _existing(suite, logical_id, args.force)
@@ -256,7 +260,7 @@ def _init(args: argparse.Namespace) -> int:
                "next": None if args.dry_run else next_command(args, "fab-test data-agent tests lint")}
     if args.dry_run:
         payload["document"] = document
-    print_payload(args, payload, _text, asked_for=args.dry_run, as_line=_line)
+    print_payload(args, payload, _text, as_line=_line)  # -q is one line, even for a dry run
     if args.dry_run and getattr(args, "asked_in_person", False) and _keep(counts, suite):
         _write(suite, content)
         written = {key: value for key, value in payload.items() if key != "document"}

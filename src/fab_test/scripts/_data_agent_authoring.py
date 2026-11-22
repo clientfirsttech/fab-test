@@ -10,17 +10,19 @@ from ._data_agent_lint_command import lint_main
 from ._service_flags import add_workspace_flag
 from ._tests_dir import add_tests_dir_flag
 
+TESTS_HELP = "Promptfoo suite to use instead of the one paired with the item by logicalId"
+
 
 def add_data_agent_parser(subs: argparse._SubParsersAction, add_common_flags) -> None:
     """Register the Data Agent run and its authoring verbs."""
     from ._authoring_parser import add_authoring_noun
 
     agent = subs.add_parser("data-agent", aliases=["agent", "data_agent"],
-                            help="Regression-test deployed Fabric Data Agents (promptfoo)")
+                            help="Regression-test deployed Fabric Data Agents (promptfoo); "
+                                 "suites: data-agent tests init|lint")
     add_common_flags(agent, track_artifact_dir_explicit=True)
     add_workspace_flag(agent)
-    agent.add_argument("--tests", default=None, metavar="FILE",
-                       help="Promptfoo suite overriding logicalId pairing with a .DataAgent item")
+    agent.add_argument("--tests", default=None, metavar="FILE", help=TESTS_HELP)
     add_tests_dir_flag(agent)
     agent.add_argument("--env-file", default=None, dest="playwright_env_file", metavar="PATH",
                        help="Path to .env file with service principal credentials")
@@ -35,9 +37,11 @@ def authoring_parser() -> argparse.ArgumentParser:
     verbs = parser.add_subparsers(dest="action", required=True, metavar="{init,lint}")
     init = verbs.add_parser("init", help="Create or extend a paired promptfoo suite")
     add_input_flags(init, "Data Agent item to create tests for")
-    init.add_argument("--tests", default=None, metavar="FILE", help="Suite overriding logicalId pairing")
+    init.add_argument("--tests", default=None, metavar="FILE", help=TESTS_HELP)
     init.add_argument("--questions", action="store_true", help="Print questions without writing a suite")
-    init.add_argument("--answers", default=None, metavar="FILE", help="JSON expected answers by question id")
+    init.add_argument("--answers", default=None, metavar="FILE",
+                      help='JSON file of your questions and expected answers, {"tests": [...]}; '
+                           "--questions shows the shape")
     init.add_argument("--force", action="store_true", help="Replace existing tests and rewrite comments")
     init.add_argument("--dry-run", action="store_true", help="Show the suite without writing it")
     init_verbosity = init.add_mutually_exclusive_group()
@@ -45,7 +49,7 @@ def authoring_parser() -> argparse.ArgumentParser:
     init_verbosity.add_argument("-v", "--verbose", action="count", default=0, help="Show generated details")
     lint = verbs.add_parser("lint", help="Check paired suites without contacting Fabric")
     add_input_flags(lint, "Data Agent item to check; omit to check every suite")
-    lint.add_argument("--tests", default=None, metavar="FILE", help="Suite overriding logicalId pairing")
+    lint.add_argument("--tests", default=None, metavar="FILE", help=TESTS_HELP)
     verbosity = lint.add_mutually_exclusive_group()
     verbosity.add_argument("-q", "--quiet", action="store_true", help="Print one result line per suite")
     verbosity.add_argument("-v", "--verbose", action="count", default=0, help="Show each validation finding")
