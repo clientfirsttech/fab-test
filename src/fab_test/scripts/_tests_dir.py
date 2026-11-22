@@ -12,6 +12,10 @@ Files still pair by logicalId, so a file's folder never decides what it tests. D
 the nearest folder above it with a `.git`, never the caller's directory. A scratch copy outside any
 repository then never reads the repository's own test files, which would claim the same items. A
 named item outside `--artifact-dir` is searched for beside itself, not under `--artifact-dir`.
+
+With no `.git` at all (a build artifact, a `git archive` export, a Docker context), a `fab-tests/`
+folder that already exists at or up to two folders above the artifacts is used, so a pipeline stage
+never skips every item for want of a repository (Review 2).
 """
 
 from __future__ import annotations
@@ -38,20 +42,28 @@ def _repository(start: Path) -> Path | None:
     return next((folder for folder in (start, *start.parents) if (folder / ".git").exists()), None)
 
 
+def _beside(start: Path) -> Path | None:
+    """Outside a repository: an existing `fab-tests/` at the artifacts, or one or two folders above."""
+    start = start.resolve()
+    return next((folder for folder in (start, *start.parents[:2]) if (folder / TESTS_DIR).is_dir()), None)
+
+
 def tests_dir(args: argparse.Namespace, item: Path | None = None) -> Path | None:
     """`--tests-dir` → `FAB_TEST_TESTS_DIR` → `tests_dir:` → `fab-tests/` in the artifacts' repository.
 
     A relative setting is read from that repository's root, or the working directory outside one.
-    None when nothing is set and the artifacts are in no repository.
+    Outside a repository, an existing `fab-tests/` beside the artifacts; else None.
     """
-    repository = _repository(item if item is not None else Path(getattr(args, "artifact_dir", None) or "."))
+    start = item if item is not None else Path(getattr(args, "artifact_dir", None) or ".")
+    repository = _repository(start)
     value, _origin = resolve_setting("tests_dir", cli_value=getattr(args, "tests_dir", None),
                                      env_var=TESTS_DIR_ENV, file_config=getattr(args, "file_config", None) or {},
                                      packaged_default=None)
     if value:
         path = Path(os.path.expanduser(str(value)))
         return path if path.is_absolute() else (repository or Path.cwd()) / path
-    return repository / TESTS_DIR if repository else None
+    anchor = repository or _beside(start)
+    return anchor / TESTS_DIR if anchor else None
 
 
 def flow_dir(args: argparse.Namespace, flow: str, item: Path | None = None) -> Path | None:

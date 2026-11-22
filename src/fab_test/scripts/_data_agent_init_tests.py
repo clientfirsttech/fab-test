@@ -90,9 +90,10 @@ def _slug(query: str) -> str:
     return cut.rsplit("-", 1)[0] if "-" in cut else slug[:_ID_LENGTH]
 
 
-def _unique(base: str, taken: set[str]) -> str:
+def _unique(base: str, taken: set[str], follow_ups: int = 0) -> str:
+    """The slug, or the slug numbered, so neither it nor its follow-up ids are taken."""
     candidate, number = base, 2
-    while candidate in taken:
+    while candidate in taken or any(f"{candidate}-follow-up-{n}" in taken for n in range(1, follow_ups + 1)):
         candidate, number = f"{base}-{number}", number + 1
     taken.add(candidate)
     return candidate
@@ -105,18 +106,20 @@ def _test(test_id: str, spec: dict[str, Any], conversation: dict[str, Any]) -> d
             "assert": [assertion(parse_match(match), spec.get("expect"))]}
 
 
-def tests_from_specs(specs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def tests_from_specs(specs: list[dict[str, Any]], taken: set[str] | frozenset = frozenset()
+                     ) -> list[dict[str, Any]]:
     """Suite tests in order: each question, then its follow-ups in one conversation.
 
-    Two new questions never share an id. A question already in the suite keeps its id, so the
-    merge keeps it, or replaces it with --force.
+    A new question never takes an id that another new question, or the suite (``taken``), already
+    has: a clash would read as "the same test" and the merge would drop it. Only a question the
+    suite already has, or an explicit id, arrives with ``id`` set, so the merge keeps or replaces it.
     """
     tests = []
-    new: set[str] = set()
+    used = set(taken)
     for spec in specs:
-        root = spec.get("id") or _unique(_slug(spec["query"]), new)
-        new.add(root)
         follow_ups = spec.get("follow_ups") or []
+        root = spec.get("id") or _unique(_slug(spec["query"]), used, len(follow_ups))
+        used.update({root, *(f"{root}-follow-up-{n}" for n in range(1, len(follow_ups) + 1))})
         conversation = {"conversation": root, "reset": True} if follow_ups else {}
         tests.append(_test(root, spec, conversation))
         tests.extend(_test(f"{root}-follow-up-{number}", follow_up, {"conversation": root})

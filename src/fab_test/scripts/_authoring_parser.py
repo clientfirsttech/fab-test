@@ -14,9 +14,13 @@ _VERBS = frozenset({"init", "lint"})
 
 
 def _item_exists(name: str, args: argparse.Namespace, suffix: str) -> bool:
+    """An item folder: named with the analyzer's suffix, or holding a `.platform`.
+
+    A plain `lint` or `test` folder in the working directory is not an item (Review 2).
+    """
     root = Path(getattr(args, "artifact_dir", None) or ".")
-    candidates = (Path(name), Path(f"{name}{suffix}"), root / name, root / f"{name}{suffix}")
-    return any(path.exists() for path in candidates)
+    return any(base.joinpath(f"{name}{suffix}").exists() or base.joinpath(name, ".platform").is_file()
+               for base in (Path(), root))
 
 
 def _shown(word: str) -> str:

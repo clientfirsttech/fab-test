@@ -55,6 +55,33 @@ def test_outside_a_repository_there_is_no_fab_tests(tmp_path, monkeypatch):
     assert homes.search_roots(_args(tmp_path)) == [tmp_path.resolve()]
 
 
+def test_outside_a_repository_a_fab_tests_folder_beside_the_artifacts_is_read(tmp_path, monkeypatch):
+    """A build artifact, `git archive` export or Docker context has no `.git` (Review 2 blocking 2).
+
+    Without this the run skipped every item and exited 0, having tested nothing.
+    """
+    monkeypatch.delenv("FAB_TEST_TESTS_DIR", raising=False)
+    artifacts = tmp_path / "fabric-artifacts"
+    (tmp_path / "fab-tests").mkdir()
+    artifacts.mkdir()
+    assert homes.tests_dir(_args(artifacts)) == tmp_path / "fab-tests"
+    assert homes.search_roots(_args(artifacts)) == [artifacts.resolve(), (tmp_path / "fab-tests").resolve()]
+
+
+def test_the_data_agent_run_pairs_a_suite_in_fab_tests_without_a_repository(tmp_path, monkeypatch):
+    from fab_test.scripts._data_agent_run import paired_suites
+
+    monkeypatch.delenv("FAB_TEST_TESTS_DIR", raising=False)
+    artifacts = tmp_path / "fabric-artifacts"
+    artifacts.mkdir()
+    _agent(artifacts)
+    suite = tmp_path / "fab-tests" / "data-agent" / "Sales.DataAgent.promptfoo.yaml"
+    suite.parent.mkdir(parents=True)
+    suite.write_text(yaml.safe_dump({"fabTestDataAgent": _logical_id(artifacts), "tests": []}), encoding="utf-8")
+    paired = paired_suites(_args(artifacts, output_dir=str(tmp_path / "results")))
+    assert list(paired.values()) == [suite.resolve()]
+
+
 @pytest.mark.parametrize("source", ["flag", "env", "config"])
 def test_the_folder_is_configurable_relative_to_the_repository(tmp_path, monkeypatch, source):
     monkeypatch.delenv("FAB_TEST_TESTS_DIR", raising=False)

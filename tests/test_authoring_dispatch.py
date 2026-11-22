@@ -79,6 +79,22 @@ def test_an_item_really_named_like_a_verb_is_a_target(argv, item, monkeypatch, t
     assert _near_miss(argv, monkeypatch, tmp_path) is None
 
 
+@pytest.mark.parametrize("argv,folder,meant", [
+    (["pbir", "lint"], "lint", "pbir contract lint"),
+    (["data-agent", "test", "lint"], "test", "data-agent tests lint"),
+])
+def test_a_plain_folder_named_like_a_verb_is_not_an_item(argv, folder, meant, monkeypatch, tmp_path):
+    """Review 2: any `lint` folder in the working directory brought back `pbir lint` passing on nothing."""
+    (tmp_path / folder).mkdir()
+    assert _near_miss(argv, monkeypatch, tmp_path) == f"did you mean: fab-test {meant}"
+
+
+def test_an_item_folder_typed_by_its_own_name_is_a_target(monkeypatch, tmp_path):
+    (tmp_path / "lint").mkdir()
+    (tmp_path / "lint" / ".platform").write_text("{}", encoding="utf-8")
+    assert _near_miss(["pbir", "lint"], monkeypatch, tmp_path) is None
+
+
 def test_installed_console_refuses_pbir_lint_instead_of_passing_on_nothing(tmp_path):
     cli = Path(sys.executable).with_name("fab-test.exe" if sys.platform == "win32" else "fab-test")
     result = subprocess.run([str(cli), "pbir", "lint"], cwd=tmp_path, capture_output=True, text=True,

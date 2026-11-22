@@ -166,6 +166,48 @@ def test_init_with_no_questions_writes_no_file(authoring, tmp_path):
     assert not suite.exists()
 
 
+def _init_json(tmp_path, tool, item, tests):
+    result = _run(tmp_path, tool, "init", item.name, "--answers", str(_answers(tmp_path, {"tests": tests})),
+                  "--format", "json")
+    assert result.returncode == 0, result.stderr
+    return json.loads(result.stdout)
+
+
+def test_a_new_question_never_takes_an_id_the_suite_already_has(authoring, tmp_path):
+    """Review 2 blocking 1: a slug clash read as "the same test", so the new question was dropped."""
+    item, suite, tool = authoring
+    _definition(item)
+    clash = _init_json(tmp_path, tool, item, [{"query": "Count?", "expect": "7"}])  # slug "count" is taken
+    assert clash["added"] == ["count-2"] and clash["kept"] == []
+    stem = "How many rows are in the MarvelFact table for the year"
+    first = _init_json(tmp_path, tool, item, [{"query": f"{stem} 2020?", "expect": "100",
+                                               "follow_ups": [{"query": "And 2019?", "expect": "90"}]}])
+    second = _init_json(tmp_path, tool, item, [{"query": f"{stem} 2021?", "expect": "120"}])
+    assert len(first["added"]) == 2 and len(second["added"]) == 1 and second["kept"] == []
+    queries = [test["vars"]["query"] for test in yaml.safe_load(suite.read_text(encoding="utf-8"))["tests"]]
+    assert f"{stem} 2020?" in queries and f"{stem} 2021?" in queries and "Count?" in queries
+
+
+def test_the_same_question_typed_again_still_meets_its_test(authoring, tmp_path):
+    item, _suite, tool = authoring
+    _definition(item)
+    again = _init_json(tmp_path, tool, item, [{"query": "how many", "expect": "43"}])
+    assert again["kept"] == ["count"] and again["added"] == []
+
+
+def test_init_extends_its_own_output_when_a_question_holds_a_hash(authoring, tmp_path):
+    """Review 2 should-fix 3: `#` inside a quoted value is not a comment."""
+    item, suite, tool = authoring
+    _definition(item)
+    _init_json(tmp_path, tool, item, [{"query": "What is the #1 eye color?", "expect": "Blue"}])
+    added = _init_json(tmp_path, tool, item, [{"query": "Top hair color?", "expect": "Black"}])
+    assert added["added"] == ["top-hair-color"]
+    suite.write_text(suite.read_text(encoding="utf-8") + "# a note a person wrote\n", encoding="utf-8")
+    refused = _run(tmp_path, tool, "init", item.name, "--answers",
+                   str(_answers(tmp_path, {"tests": [{"query": "Q?", "expect": "x"}]})))
+    assert refused.returncode == 2 and "comments" in refused.stderr
+
+
 def test_init_refuses_malformed_existing_metadata_without_modifying_it(authoring, tmp_path):
     item, suite, tool = authoring
     _definition(item)

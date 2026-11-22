@@ -3,6 +3,7 @@
 import argparse
 import json
 import os
+import re
 import sys
 import tempfile
 from pathlib import Path
@@ -26,6 +27,17 @@ from ._scan import ScanError, find_artifact_dirs
 from ._tests_dir import flow_dir, search_roots
 
 
+def _has_comments(content: str) -> bool:
+    """A `#` that starts a YAML comment: at a line start or after whitespace, outside every scalar.
+
+    A question like "What is the #1 eye color?" is quoted, so init can extend its own output.
+    """
+    spans = [(token.start_mark.index, token.end_mark.index)
+             for token in yaml.scan(content, Loader=yaml.SafeLoader) if isinstance(token, yaml.ScalarToken)]
+    return any(not any(start <= found.start() < end for start, end in spans)
+               for found in re.finditer(r"(?:^|(?<=\s))#", content, re.MULTILINE))
+
+
 def _existing(path: Path, logical_id: str, force: bool) -> dict[str, Any]:
     if not path.exists():
         return {"fabTestDataAgent": logical_id, "prompts": ["{{query}}"], "tests": []}
@@ -34,7 +46,7 @@ def _existing(path: Path, logical_id: str, force: bool) -> dict[str, Any]:
         document = load_suite(path)
     except (OSError, UnicodeError, SuiteError) as exc:
         raise InitInputError(f"Cannot read existing suite {path}; check that it is UTF-8 YAML.") from exc
-    if "#" in content and not force:
+    if not force and _has_comments(content):
         raise InitInputError(f"{path} contains comments; rewriting would remove them. Pass --force to continue.")
     if document.get("fabTestDataAgent") != logical_id:
         raise InitInputError(f"{path} does not pair with this item's .platform logicalId.")
@@ -131,7 +143,8 @@ def _new_tests(args: argparse.Namespace, suggestions: list[str], suite: Path, do
         if known and "id" not in spec:
             spec["id"] = known["id"]
     args.replace_ids = {spec["id"] for spec in specs if spec.get("replace")}
-    return tests_from_specs(specs)
+    taken = set() if args.replace_all else {(test.get("metadata") or {}).get("id") for test in document["tests"]}
+    return tests_from_specs(specs, taken - {None})
 
 
 def _merge(document: dict, new_tests: list[dict], force: bool, replace: set[str] | frozenset = frozenset()

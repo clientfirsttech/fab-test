@@ -379,6 +379,51 @@ the remaining CLI blast-radius checks are still pending.
 
 ---
 
+## Review 2 Follow-ups
+
+**Status**: 🔧 IN PROGRESS 2026-11-21. Review 2 was done by an unanchored reviewer with the same skills as Review 1. Gates: ruff, complexity and pip-audit are clean. The non-playwright half had 3648 passed, 88%; its only failures are the rtk hook tests (Review 1 item 15). The playwright half had 204 passed, 90.48%; its 16 live-parity failures are a 401, because the service principal no longer sees the parity tests' workspace (environmental). `1.10.0b5` is not on PyPI (the user, 2026-11-21), so these fixes stay in b5. The user said "do the fixes". Each item below is done test-first, together with the open Review 1 items it names.
+
+**Blocking**:
+1. `tests init` drops a new question whose slug matches an existing id (the 40-character truncation, or a hand-written id). New ids must avoid every id already in the suite. An existing id is reused only on a matching question or an explicit `"id"`.
+2. With no `.git`, `fab-tests/` is never searched, so the run skips every item and exits 0. Outside a repository, `fab-tests/` is read from the working directory, as a relative `tests_dir` already is.
+
+**Should-fix**:
+3. A `#` inside a quoted value reads as a comment, so init can't extend its own output. Detect real YAML comments.
+4. A folder named `lint`/`test`/`init` in the working directory defeats the near-miss guard. Only an item folder (suffix or `.platform`) counts.
+5. Decision 18 (Review 1 item 4): lint warns on an allowed explicit URL and fails a disallowed host with the run's message. The run refuses a disallowed host before promptfoo starts.
+6. `tests lint` without promptfoo (Review 1 item 5): run the offline checks first, then bootstrap promptfoo the way the run does.
+7. Lint hands `promptfoo validate` the full environment. Strip it as the run does (decision 19).
+8. Provider retries (Review 1 items 14, 17):
+   - `isRetriable: false` and `CapacityNotActive` are final, and the message names the fix.
+   - Never retry after the message is posted.
+   - A poll timeout is final.
+   - A created thread is deleted even if the post fails.
+9. An error envelope reads `❌ … no findings` (Review 1 item 16). Show `error` and the message's first line.
+10. Grammar and discoverability (Review 1 items 6, 7):
+    - Fix the `[TARGET] tests` usage.
+    - Name the verbs in `help`, `list --format json` and `explain`.
+    - Update `known-gaps.md`.
+    - Fix the stale `--answers` help, and make `--tests` help the same on every verb.
+    - Print the credential remediation once.
+11. Test quality:
+    - Show requests go through the redirect-refusing opener.
+    - Test the userinfo check on an allowed host.
+    - Replace the progress test's fixed sleep with a wait-until.
+    - Add the telemetry tests (Review 1 item 11).
+12. Module budgets (Review 1 item 13): add a dated note on `fab_test_parser.py`'s exemption, or extract the wiring.
+13. CHANGELOG entry for the data-agent feature (Review 1 item 12). No version bump: b5 is unpublished.
+
+**Nits**:
+- `-q --dry-run` prints the YAML.
+- `explain` shows an empty `--promptfoo-path`.
+- `default_type="DataAgent"` is hard-coded twice.
+- `import os as os`.
+- The provider re-reads the principal on every call.
+- Refusals give partial commands.
+- Stale epic text.
+
+---
+
 ## Quality Gates
 
 **Requirements**:
