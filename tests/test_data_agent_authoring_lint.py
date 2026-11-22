@@ -118,6 +118,40 @@ def test_lint_hands_promptfoo_no_secret(paired, tmp_path, monkeypatch):
     assert "private-value" not in seen.values()
 
 
+_CRASH = "Assertion failed: !(handle->flags & UV_HANDLE_CLOSING), file src/win/async.c, line 94"
+
+
+@pytest.mark.parametrize(("exits", "outcome"), [
+    ([3221226505, 0], []),  # crashed while exiting, then validated
+    ([3221226505, 3221226505], "raises"),  # a tool failure, not a problem in the suite
+    ([1, 0], ["promptfoo validate config exited 1: tests[0] is invalid"]),  # a real finding: no retry
+])
+def test_validate_retries_once_on_the_windows_shutdown_crash(paired, tmp_path, monkeypatch, exits, outcome):
+    """Decision 24: Node 26 on Windows aborts promptfoo at exit now and then; that says nothing of the suite."""
+    import subprocess
+
+    _, suite = paired
+    _write(suite, {"fabTestDataAgent": "stable-id", "tests": [{"metadata": {"id": "one"}}]})
+    calls = []
+
+    def run(command, **_kwargs):
+        code = exits[len(calls)]
+        calls.append(command)
+        stderr = _CRASH if code == 3221226505 else ("tests[0] is invalid" if code else "")
+        return subprocess.CompletedProcess(command, code, "", stderr)
+
+    monkeypatch.setattr(subprocess, "run", run)
+    tool = tmp_path / "promptfoo.js"
+    tool.write_text("", encoding="utf-8")
+    if outcome == "raises":
+        with pytest.raises(subprocess.SubprocessError, match="Node"):
+            validate_promptfoo(suite, tool)
+        assert len(calls) == 2
+    else:
+        assert validate_promptfoo(suite, tool) == outcome
+        assert len(calls) == (2 if exits[0] == 3221226505 else 1)
+
+
 def test_upstream_validator_never_receives_a_suite_with_credentials(paired, tmp_path):
     _, suite = paired
     _write(suite, {"providers": [{"config": {"client_secret": "private-value"}}], "tests": []})

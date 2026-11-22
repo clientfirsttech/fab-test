@@ -116,6 +116,26 @@ def promptfoo_command(path: Path) -> list[str]:
     return [node, str(path.resolve())]
 
 
+def shutdown_crash(proc: subprocess.CompletedProcess) -> bool:
+    """Node 26 on Windows can abort while exiting (libuv's UV_HANDLE_CLOSING assertion, 0xC0000409).
+
+    Its work is done by then, so the crash says nothing about the suite (decision 24).
+    """
+    return proc.returncode in (0xC0000409, -0x3FFFFBF7) and "UV_HANDLE_CLOSING" in (proc.stderr or "")
+
+
+SHUTDOWN_CRASH_HINT = ("promptfoo crashed while exiting: Node's libuv assertion on Windows, a known Node 26 issue. "
+                       "Run it again, or use Node 22 or 24.")
+
+
+def _complete(native: Path, expected: int) -> bool:
+    try:
+        rows = (json.loads(native.read_text(encoding="utf-8-sig")).get("results") or {}).get("results")
+    except (OSError, ValueError, AttributeError):
+        return False
+    return isinstance(rows, list) and len(rows) == expected > 0
+
+
 def map_results(document: dict[str, Any], suite: str) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Map promptfoo verdicts to error findings and the full suite/test result list."""
     if not isinstance(document, dict):
@@ -188,7 +208,8 @@ def _evaluate(args: argparse.Namespace, folder: Path, principal: ServicePrincipa
         with Progress(out, Path(env[PROGRESS_VAR]), len(config.get("tests") or []), item):
             proc = subprocess.run(command, cwd=suite.parent, env=env, capture_output=True, text=True,
                                   encoding="utf-8", errors="replace", timeout=args.timeout, check=False)
-        if proc.returncode not in (0, 100):
+        salvaged = shutdown_crash(proc) and _complete(native, len(config.get("tests") or []))
+        if proc.returncode not in (0, 100) and not salvaged:  # never re-run eval: it would re-post turns
             raise RuntimeError(f"promptfoo eval exited {proc.returncode}: {proc.stderr or proc.stdout}")
         if not native.is_file():
             raise RuntimeError("promptfoo eval produced no results.json; check the suite and promptfoo installation.")

@@ -130,6 +130,33 @@ def test_crash_or_usage_error_never_becomes_test_verdicts(tmp_path, monkeypatch,
     assert "live-token" not in json.dumps(envelope)
 
 
+_SHUTDOWN_CRASH = (3221226505, "Assertion failed: !(handle->flags & UV_HANDLE_CLOSING), file src/win/async.c")
+
+
+@pytest.mark.parametrize(("rows", "status"), [
+    ([{"success": True, "description": "Revenue", "response": {"output": "100"}}], "passed"),
+    ([], "error"),  # nothing complete to grade: the crash stays an error
+])
+def test_a_shutdown_crash_after_complete_results_is_graded(tmp_path, monkeypatch, rows, status):
+    """Decision 24: Node's libuv abort at exit is not a verdict; eval is never run twice."""
+    _principal(monkeypatch)
+    args = _args(tmp_path)
+    calls = []
+
+    def run(command, **_kwargs):
+        calls.append(command)
+        Path(command[command.index("--output") + 1]).write_text(
+            json.dumps({"results": {"results": rows}}), encoding="utf-8")
+        return subprocess.CompletedProcess(command, _SHUTDOWN_CRASH[0], "", _SHUTDOWN_CRASH[1])
+
+    monkeypatch.setattr(wrapper.subprocess, "run", run)
+    monkeypatch.setattr(wrapper, "promptfoo_command", lambda path: ["node", str(path)])
+    wrapper.run_data_agent(args)
+    envelope = json.loads(Path(args.output_path).read_text(encoding="utf-8"))
+    assert envelope["status"] == status, envelope.get("message")
+    assert len(calls) == 1
+
+
 @pytest.mark.parametrize("error_row", [
     {"success": False, "error": "Worker failed to become ready", "failureReason": 2},
     {"success": False, "error": "Service principal unavailable",

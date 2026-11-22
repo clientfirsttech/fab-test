@@ -9,7 +9,14 @@ import yaml
 
 from ._data_agent_suite import SuiteError, authored_urls, effective_config, item_identity, load_suite
 from .fabric_data_agent_provider import destination_problem
-from .invoke_data_agent import absolute_references, promptfoo_command, redact, worker_env
+from .invoke_data_agent import (
+    SHUTDOWN_CRASH_HINT,
+    absolute_references,
+    promptfoo_command,
+    redact,
+    shutdown_crash,
+    worker_env,
+)
 
 _CREDENTIAL_KEYS = frozenset({
     "access_token", "api_key", "apikey", "authorization", "client_secret",
@@ -110,11 +117,16 @@ def validate_promptfoo(suite: Path, tool: Path) -> list[str]:
         path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
         env = {**worker_env(), "PROMPTFOO_CONFIG_DIR": str(root), "PROMPTFOO_DISABLE_TELEMETRY": "1",
                "PROMPTFOO_DISABLE_UPDATE_CHECK": "1"}
-        proc = subprocess.run(
-            [*promptfoo_command(tool), "validate", "config", "--config", str(path)],
-            cwd=suite.resolve().parent, env=env, capture_output=True, text=True, encoding="utf-8",
-            errors="replace", timeout=60, check=False,
-        )
+        for _attempt in range(2):  # validating is read-only, so a shutdown crash is retried once
+            proc = subprocess.run(
+                [*promptfoo_command(tool), "validate", "config", "--config", str(path)],
+                cwd=suite.resolve().parent, env=env, capture_output=True, text=True, encoding="utf-8",
+                errors="replace", timeout=60, check=False,
+            )
+            if not shutdown_crash(proc):
+                break
+        else:
+            raise subprocess.SubprocessError(SHUTDOWN_CRASH_HINT)
     if proc.returncode:
         detail = redact((proc.stderr or proc.stdout).strip())
         return [f"promptfoo validate config exited {proc.returncode}: {detail or 'no diagnostic output'}"]
