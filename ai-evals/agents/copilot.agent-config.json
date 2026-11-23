@@ -1,0 +1,5 @@
+{
+  "command": "node",
+  "args": ["ai-evals/agents/copilot-answers-claude-judges.mjs"],
+  "outputFormat": "json"
+}

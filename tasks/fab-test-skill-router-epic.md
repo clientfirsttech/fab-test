@@ -42,3 +42,12 @@ Move the sections, keep the must-not-miss lines, route through the reference tab
 - Given the split skill, should hold or raise the baseline pass rate on the same evals
 
 **Status**: ✅ 22 of 22, each 2/2. Two files errored before judging on the first attempt (no result written, no reason printed at four concurrent) and passed 4/4 when rerun alone.
+
+## Copilot Evals
+
+Run the same evals with GitHub Copilot CLI answering. riteway sends extraction, answer and judge prompts to one agent, so `ai-evals/agents/copilot-answers-claude-judges.mjs` routes only the answer to Copilot (`@github/copilot@1.0.114`, read-only: shell and writes denied) and keeps Claude extracting and judging, as in the Claude runs.
+
+**Requirements**:
+- Given the split skill and Copilot answering, should pass the same evals as Claude, judged by the same judge
+
+**Status**: ✅ 22 of 22, each 2/2 (Copilot's default model, claude-sonnet-5.5; 12 premium requests). 14 Copilot sessions opened during the run, so the answers were Copilot's, not a fallback.
