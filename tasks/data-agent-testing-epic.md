@@ -475,6 +475,12 @@ Found 2026-11-22 while writing evals for updating answers: in `--answers`, `"rep
 
 **Status**: ✅ 2026-11-22. `_replace_conversations` in `_data_agent_init.py`; 3 tests in `tests/test_data_agent_init_edit.py`; `references/data-agent.md` (both copies) now says how to change a conversation's answers, what `kept=N` means, and what each match key checks; walkthrough and CHANGELOG. Full parallel suite 3839 passed, 2 skipped; ruff clean.
 
+## Live Data Agent CI
+
+Asked 2026-11-22: run the live Data Agent only when what `fab-test data-agent` depends on changes, since a live agent needs a paid, running capacity. `.github/workflows/data-agent-live.yml` asks the agent in `DATA_AGENT_WORKSPACE` (default `fab-test-working-area`) as the `fabric-demo` principal on same-repository PRs and pushes to `main`/`dev` that touch the run path, or by hand; no schedule. Local runs are unchanged (the user's choice). Given an import that adds a file to the run path, should fail a test until the path filter covers it.
+
+**Status**: ✅ 2026-11-22. `tests/test_data_agent_live_workflow.py` walks the import closure of the run path (`invoke_data_agent`, the provider, `_data_agent_run`/`_resolution`/`_suite`/`_progress`: 37 files) and checks both filters cover it plus the promptfoo pin, `pyproject.toml`, the suites and the workflow; `test_workflow_triggers.py` lists the workflow. Not yet run in GitHub: the `fabric-demo` principal needs Member or Contributor in the workspace.
+
 ## Quality Gates
 
 **Status**: ✅ 2026-11-22, after the blast-radius fixes. `ruff check .` clean; complexity, module-budget, mode-parity and grammar-parity tests pass; non-playwright half 3713 passed + 2 skipped (no rtk failures now that the hook and its test are gone); playwright half 204 passed, total coverage 90.75% (floor 80%), and its 16 failures are the live-parity HTTP 401 on workspace `c4698d28-…`, which the service principal no longer sees (environmental, as on 2026-11-21); the `GITHUB_ACTIONS=true CI=true` pass 3713 passed; `pip-audit` finds no known vulnerabilities (only the unpublished `cft-fab-test 1.10.0b5` skipped). A live `--format json` run after the fixes printed one JSON document and the same verdicts. Goulash still passes there because the committed suite keeps its pre-decision-23 assertion.

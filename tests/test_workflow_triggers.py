@@ -28,6 +28,12 @@ contract tests against the `visual-error-testing` workspace on same-repository
 pull requests and pushes, behind the same `fabric-demo` Environment, and skips
 fork and dependabot PRs; `tests/test_playwright_workflows_drift.py` guards that.
 
+`data-agent-live.yml` (Data Agent Testing epic) is the third: it asks the
+deployed Data Agent with this repository's code, behind `fabric-demo`, but only
+when a file `fab-test data-agent` imports changes (a live agent needs a paid,
+running capacity), or by hand; `tests/test_data_agent_live_workflow.py` keeps
+its path filter equal to the run path's import closure.
+
 What is left is what a package repository needs: build, publish, rehearse,
 the setup GitHub Copilot's agent reads, and that one narrow demo.
 
@@ -52,6 +58,7 @@ _EXPECTED_WORKFLOWS = {
     "check-tool-updates.yml",
     "playwright-demo.yml",
     "live-ci.yml",
+    "data-agent-live.yml",
 }
 
 _SELF_STARTING_TRIGGERS = ("push", "pull_request", "pull_request_target", "schedule")
