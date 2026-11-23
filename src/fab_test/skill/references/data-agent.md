@@ -22,6 +22,7 @@ DataAgentTests {
   (all with a workspace configured and the flag enabled) => include data_agent; (local) => never include it
   (tests init, a person present) => ask each question, its expected answer (Enter = decline), one match key n|c|x|s|e|p|r (Enter = default), follow-ups in the same conversation; ? lists suggestions
   (tests init, CI | --format json | an agent) => --answers FILE {tests: [{query, expect, match, follow_ups, replace?}]}; --questions prints suggestions and the shape; never invent an expected answer
+  (match keys) => n number: expect is only the figure (1,204 or 12.5, never $4.2M), matched with or without separators and never inside a bigger one; c contains, any case; x exact: the whole answer equals expect; s starts with | e ends with, any case, end punctuation ignored; p pattern: expect is a regex; r refuses: the first sentence declines, no expect. Default: n for a figure, c for words, r with no expect
   (suggestions) => figure measures and selected tables as questions; a table the source has but the agent leaves out, then a generic out-of-scope question, as `decline`; the agent's aiInstructions and dataSourceInstructions as `instructions`
   (a provider failure) => 401 after one refresh | 403 | "isRetriable": false | CapacityNotActive | a poll timeout are final and name the fix; a conversation turn is never retried once posted
   (who asks the agent) => the chain every service command uses: a full service principal, else az login; --auth az uses az login even when a principal is set; --auth service-principal never falls back; see references/credentials.md
@@ -32,6 +33,8 @@ DataAgentTests {
   (tests init, a suite exists) => list its path and tests, then ask [a]dd (Enter) | [e]dit | [r]eplace all; "replace_all": true in --answers; replacing with no new questions writes nothing
   (editing) => tests by number until Enter, each [c]hange its answer (Enter: only its check changes, id and conversation stay) | [d]elete (with the later turns of its conversation); then new questions; "remove": [ids] at the top of --answers
   (adding, a question it already has) => ask [k]eep (Enter) | [r]eplace; "replace": true in --answers; otherwise kept
+  (changing a conversation's answers in --answers) => send its first turn with "replace": true and its follow_ups in order, each with query, expect and match; every turn sent is replaced, turns not sent stay, and the first turn stays in their conversation; never a follow-up as its own top-level test
+  (a changed answer sent without "replace") => kept, not applied: -q says kept=N and the suite is unchanged; resend with "replace": true
   (tests lint) => offline checks first, then promptfoo validate (installed on first use, as the run does); run it before the run
   (a suite base_url | fabric_urls on a Fabric host) => works; lint warns (w=1) that fab-test can resolve the agent
   (a suite) => code: run it only from trusted branches; never pull_request_target or fork PRs with secrets

@@ -136,7 +136,7 @@ fab-test data-agent tests init Sales --answers answers.json
 ]}
 ```
 
-Add `"replace": true` to a test to replace one the suite already has, `"remove": ["tell-me-a-joke"]` at the top to delete tests by id (with their conversation's later turns), or `"replace_all": true` at the top to start the suite over. A coding agent may draft the questions, but **a person supplies every expected answer**.
+Add `"replace": true` to a test to replace one the suite already has (without it, a changed answer is kept, not applied, and `-q` says `kept=1`). To change a follow-up's answer, send its whole conversation: the first turn with `"replace": true` and its `follow_ups` in order. Every turn you send is replaced; turns you leave out stay. Add `"remove": ["tell-me-a-joke"]` at the top to delete tests by id (with their conversation's later turns), or `"replace_all": true` at the top to start the suite over. A coding agent may draft the questions, but **a person supplies every expected answer**.
 
 ## Step 3: Read what it wrote, then lint it
 

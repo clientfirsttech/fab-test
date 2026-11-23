@@ -160,6 +160,40 @@ def test_answers_remove_refuses_what_it_cannot_find(tmp_path, monkeypatch, capsy
     assert code == 2 and len(ids) == 4 and message in err
 
 
+def _suite(tmp_path):
+    tests = yaml.safe_load((tmp_path / "Sales.DataAgent.promptfoo.yaml").read_text(encoding="utf-8"))["tests"]
+    return {t["metadata"]["id"]: t for t in tests}
+
+
+def test_replace_on_a_first_turn_reaches_the_follow_ups_sent_with_it(tmp_path, monkeypatch):
+    code, ids = _run(tmp_path, monkeypatch, answers={"tests": [
+        {"query": "How many orders?", "expect": "900", "match": "n", "replace": True,
+         "follow_ups": [{"query": "More than 1,000?", "expect": "no", "match": "s"}]}]})
+    tests = _suite(tmp_path)
+    assert code == 0 and ids == ["how-many-orders", "how-many-orders-follow-up-1", "how-many-orders-follow-up-2",
+                                 "tell-me-a-joke"]
+    assert "900" in json.dumps(tests["how-many-orders"]["assert"])
+    assert "yes" not in json.dumps(tests["how-many-orders-follow-up-1"]["assert"])  # was starts with yes
+    assert tests["how-many-orders-follow-up-2"]["vars"]["conversation"] == "how-many-orders"  # not sent: kept
+
+
+def test_replacing_a_first_turn_alone_keeps_it_in_its_conversation(tmp_path, monkeypatch):
+    code, _ids = _run(tmp_path, monkeypatch, answers={"tests": [
+        {"query": "How many orders?", "expect": "900", "match": "n", "replace": True}]})
+    root = _suite(tmp_path)["how-many-orders"]
+    assert code == 0 and "900" in json.dumps(root["assert"])
+    assert root["vars"]["conversation"] == "how-many-orders" and root["vars"]["reset"] is True
+
+
+def test_a_changed_follow_up_without_replace_is_kept_not_applied(tmp_path, monkeypatch, capsys):
+    code, _ids = _run(tmp_path, monkeypatch, answers={"tests": [
+        {"query": "How many orders?", "expect": "1,204", "match": "n",
+         "follow_ups": [{"query": "More than 1,000?", "expect": "no", "match": "s"}]}]})
+    out, _err = capsys.readouterr()
+    assert code == 0 and "kept=1" in out
+    assert "yes" in json.dumps(_suite(tmp_path)["how-many-orders-follow-up-1"]["assert"])  # still starts with yes
+
+
 def test_remove_is_refused_in_an_answers_test_entry():
     from fab_test.scripts._data_agent_init_tests import specs_from_answers
 

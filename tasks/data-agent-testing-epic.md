@@ -469,6 +469,12 @@ Asked 2026-11-22: the only way to drop one test was `[r]eplace all`. `tests init
 
 **Status**: ✅ 2026-11-22. `_data_agent_init_edit.py` (84 lines), 15 tests in `tests/test_data_agent_init_edit.py`; both skill copies, `flags.md`, the walkthrough and CHANGELOG. Full parallel suite: 3831 passed, 2 skipped.
 
+## Replace Reaches Follow-Ups
+
+Found 2026-11-22 while writing evals for updating answers: in `--answers`, `"replace": true` on a conversation's first turn replaced only that turn. A changed follow-up sent with it was counted `kept` and never applied (only `--force` got through), and a first turn sent without its follow-ups lost `conversation`/`reset`, leaving them detached. Given a replaced first turn, should replace every turn sent with it; should keep turns not sent, and keep the first turn in their conversation; deleting turns stays `"remove"`'s job.
+
+**Status**: ✅ 2026-11-22. `_replace_conversations` in `_data_agent_init.py`; 3 tests in `tests/test_data_agent_init_edit.py`; `references/data-agent.md` (both copies) now says how to change a conversation's answers, what `kept=N` means, and what each match key checks; walkthrough and CHANGELOG. Full parallel suite 3839 passed, 2 skipped; ruff clean.
+
 ## Quality Gates
 
 **Status**: ✅ 2026-11-22, after the blast-radius fixes. `ruff check .` clean; complexity, module-budget, mode-parity and grammar-parity tests pass; non-playwright half 3713 passed + 2 skipped (no rtk failures now that the hook and its test are gone); playwright half 204 passed, total coverage 90.75% (floor 80%), and its 16 failures are the live-parity HTTP 401 on workspace `c4698d28-…`, which the service principal no longer sees (environmental, as on 2026-11-21); the `GITHUB_ACTIONS=true CI=true` pass 3713 passed; `pip-audit` finds no known vulnerabilities (only the unpublished `cft-fab-test 1.10.0b5` skipped). A live `--format json` run after the fixes printed one JSON document and the same verdicts. Goulash still passes there because the committed suite keeps its pre-decision-23 assertion.

@@ -158,7 +158,26 @@ def _new_tests(args: argparse.Namespace, suggestions: Suggestions, suite: Path, 
             spec["id"] = known["id"]
     args.replace_ids = {spec["id"] for spec in specs if spec.get("replace")} | {t["metadata"]["id"] for t in edited}
     taken = set() if args.replace_all else {(test.get("metadata") or {}).get("id") for test in document["tests"]}
-    return [*edited, *tests_from_specs(specs, taken - {None})]
+    new_tests = tests_from_specs(specs, taken - {None})
+    if not args.replace_all:
+        _replace_conversations(args, specs, document["tests"], new_tests)
+    return [*edited, *new_tests]
+
+
+def _replace_conversations(args: argparse.Namespace, specs: list[dict[str, Any]], old_tests: list[dict[str, Any]],
+                           new_tests: list[dict[str, Any]]) -> None:
+    """"replace" on a first turn reaches the follow-ups sent with it. Turns not sent stay, and the first turn stays
+    in their conversation; deleting turns is "remove"'s job."""
+    old = {(test.get("metadata") or {}).get("id"): test for test in old_tests}
+    new = {test["metadata"]["id"]: test for test in new_tests}
+    for spec in specs:
+        root = spec.get("id")
+        if not spec.get("replace") or root not in old or root not in new:
+            continue
+        args.replace_ids |= {f"{root}-follow-up-{n}" for n in range(1, len(spec.get("follow_ups") or []) + 1)}
+        old_vars, new_vars = old[root].get("vars") or {}, new[root].setdefault("vars", {})
+        if "conversation" in old_vars and "conversation" not in new_vars:
+            new_vars.update(conversation=old_vars["conversation"], reset=old_vars.get("reset", True))
 
 
 def _merge(document: dict, new_tests: list[dict], force: bool, replace: set[str] | frozenset = frozenset()
