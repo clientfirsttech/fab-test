@@ -483,17 +483,19 @@ Asked 2026-11-22: run the live Data Agent only when what `fab-test data-agent` d
 
 ## Review 3
 
-**Status**: 🔄 2026-11-22. An unanchored reviewer (aidd-review, python, module-budgets, tdd, command-grammar, polite-review, polite-http) read the 14 commits `a95683e^..7e47ca5`, ran the suite (3839 + 2 skipped, ruff clean) and probed the CLI on scratch copies with no service calls. No secret reaches promptfoo's environment under either `--auth` mode, and no test runs the real `az`. Findings, most severe first:
+**Status**: ✅ 2026-11-22, every finding fixed, filed or accepted below; full suite 3859 passed + 2 skipped, ruff clean. An unanchored reviewer (aidd-review, python, module-budgets, tdd, command-grammar, polite-review, polite-http) read the 14 commits `a95683e^..7e47ca5`, ran the suite (3839 + 2 skipped, ruff clean) and probed the CLI on scratch copies with no service calls. No secret reaches promptfoo's environment under either `--auth` mode, and no test runs the real `az`. Findings, most severe first:
 
 1. ✅ **Blocking.** A conversation turn whose message POST timed out, was reset or got a 5xx was posted again: `_call_api` re-ran the turn and `_thread_id` returned the cached shared thread. Fixed: `_post_turn` lets only a 429 (the service refused it) be asked again; anything else is final, saying the turn may already be in the conversation. A lone question keeps its retries. 6 tests in `tests/test_data_agent_provider_http.py`.
-2. A 2xx without the expected field (`access_token`, `id`) is retried, then reported as a bare `KeyError` repr; should be final, naming the host and what came back.
-3. `"replace"` on a first turn guesses follow-up ids as `{root}-follow-up-N`; a suite whose follow-up is named otherwise (the sample's `character-count-follow-up`) gets a near-duplicate appended. Match the conversation's existing turns by position.
-4. A follow-up sent as a top-level test with `"replace"` gets `reset: true` and loses its context; copy `reset` only if the old turn had it.
-5. A remove-only `--answers` file (`{"remove": [...]}`) exits 2 asking for `"tests"`; accept it (or name `"tests": []`), and the `remove-conversation` eval's mock hides this.
-6. A second block expires at its time rather than lasting the run, as the skill says; and a server wait inside a posted turn becomes final with no `retry_after` and no block. Make code and skill agree.
-7. Nit: `describe_http` says "service principal" under `--auth az`; `_identity()` reads only the env var.
-8. Nit: `fabric_data_agent_provider.py` is 595 lines (soft budget 400) with no recorded justification; `_credentials.py` is exactly 400.
-9. Nit: a server's wait is compared to the per-question timeout, so one question can take about 4 × 60 s; only `--timeout` bounds the run.
+2. ✅ (`62fef4b`) A 2xx without the expected field (`access_token`, `id`) is retried, then reported as a bare `KeyError` repr; should be final, naming the host and what came back.
+3. ✅ Fixed: follow-ups are matched to the conversation's turns by position, so a hand-named one keeps its id. Was: `"replace"` on a first turn guesses follow-up ids as `{root}-follow-up-N`; a suite whose follow-up is named otherwise (the sample's `character-count-follow-up`) gets a near-duplicate appended. Match the conversation's existing turns by position.
+4. ✅ Fixed: `reset` is copied only when the old turn had it. Was: a follow-up sent as a top-level test with `"replace"` gets `reset: true` and loses its context; copy `reset` only if the old turn had it.
+5. ✅ Fixed: `"tests"` may be left out when `"remove"` is there, so the eval's mock is now true. Was: a remove-only `--answers` file (`{"remove": [...]}`) exits 2 asking for `"tests"`; accept it (or name `"tests": []`), and the `remove-conversation` eval's mock hides this.
+6. ✅ (`62fef4b`) Code now follows the skill. Was: a second block expires at its time rather than lasting the run, as the skill says; and a server wait inside a posted turn becomes final with no `retry_after` and no block. Make code and skill agree.
+7. ✅ (`62fef4b`) Was: `describe_http` says "service principal" under `--auth az`; `_identity()` reads only the env var.
+8. Filed: plan.md's "Split the Data Agent provider" (621 lines after these fixes; about 100 tests patch its seams). Was: `fabric_data_agent_provider.py` is 595 lines (soft budget 400) with no recorded justification; `_credentials.py` is exactly 400.
+9. Accepted: `--timeout` bounds the whole run, and a question's budget is its own config `timeout`. Was: a server's wait is compared to the per-question timeout, so one question can take about 4 × 60 s; only `--timeout` bounds the run.
+
+Also from Review 3: the eval agents could read `.fab-test/.env`, sending the principal's secret to a model. `ai-evals/agents/claude.agent-config.json` (for Claude runs) and the Copilot router now deny reading any `.env`; checked against a decoy `.env` (both answered DENIED and still read other files).
 
 ## Quality Gates
 

@@ -92,7 +92,7 @@ def test_later_turns_follow_the_suite_order():
 # -- the whole flow, at a console and from --answers ---------------------------------
 
 
-def _item(tmp_path):
+def _item(tmp_path, tests=None):
     item = tmp_path / "Sales.DataAgent"
     draft = item / "Files" / "Config" / "draft" / "model"
     draft.mkdir(parents=True)
@@ -103,12 +103,12 @@ def _item(tmp_path):
         {"type": "semantic_model.table", "display_name": "Orders", "is_selected": True}]}), encoding="utf-8")
     suite = tmp_path / "Sales.DataAgent.promptfoo.yaml"
     suite.write_text(yaml.safe_dump({"fabTestDataAgent": "sales-id", "prompts": ["{{query}}"],
-                                     "tests": _suite_tests()}, sort_keys=False), encoding="utf-8")
+                                     "tests": tests or _suite_tests()}, sort_keys=False), encoding="utf-8")
     return suite
 
 
-def _run(tmp_path, monkeypatch, typed=(), *, dry_run=False, answers=None):
-    suite = _item(tmp_path)
+def _run(tmp_path, monkeypatch, typed=(), *, dry_run=False, answers=None, tests=None):
+    suite = _item(tmp_path, tests)
     replies = iter(typed)
     monkeypatch.setattr("builtins.input", lambda: next(replies))
     monkeypatch.setattr(init, "can_ask", lambda: True)
@@ -199,3 +199,36 @@ def test_remove_is_refused_in_an_answers_test_entry():
 
     with pytest.raises(InitInputError, match="top level"):
         specs_from_answers({"tests": [{"query": "q", "expect": "1", "remove": True}]})
+
+
+def _hand_named():
+    """The sample suite's shape: a follow-up named by hand, not <root>-follow-up-N."""
+    tests = _suite_tests()[:2]
+    tests[1] = {**tests[1], "metadata": {**tests[1]["metadata"], "id": "how-many-orders-check"}}
+    return tests
+
+
+def test_replacing_a_conversation_matches_its_turns_by_position_not_by_a_guessed_id(tmp_path, monkeypatch):
+    """Review 3 item 3: a hand-named follow-up got a near-duplicate appended instead of being replaced."""
+    code, ids = _run(tmp_path, monkeypatch, tests=_hand_named(), answers={"tests": [
+        {"query": "How many orders?", "expect": "900", "match": "n", "replace": True,
+         "follow_ups": [{"query": "More than 1,000?", "expect": "no", "match": "s"}]}]})
+    tests = _suite(tmp_path)
+    assert code == 0 and ids == ["how-many-orders", "how-many-orders-check"]
+    assert "yes" not in json.dumps(tests["how-many-orders-check"]["assert"])
+    assert tests["how-many-orders-check"]["vars"]["conversation"] == "how-many-orders"
+
+
+def test_a_follow_up_replaced_on_its_own_stays_a_follow_up(tmp_path, monkeypatch):
+    """Review 3 item 4: it was given reset: true, starting a fresh thread with nothing to refer to."""
+    code, _ids = _run(tmp_path, monkeypatch, answers={"tests": [
+        {"query": "More than 1,000?", "expect": "no", "match": "s", "replace": True}]})
+    follow_up = _suite(tmp_path)["how-many-orders-follow-up-1"]
+    assert code == 0 and "yes" not in json.dumps(follow_up["assert"])
+    assert follow_up["vars"]["conversation"] == "how-many-orders" and "reset" not in follow_up["vars"]
+
+
+def test_an_answers_file_may_only_remove(tmp_path, monkeypatch):
+    """Review 3 item 5: {"remove": [...]} alone exited 2 asking for "tests"."""
+    code, ids = _run(tmp_path, monkeypatch, answers={"remove": ["tell-me-a-joke"]})
+    assert code == 0 and "tell-me-a-joke" not in ids and len(ids) == 3

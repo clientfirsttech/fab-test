@@ -167,6 +167,8 @@ def specs_from_answers(document: Any) -> list[dict[str, Any]]:
     """The --answers file: the same questions, matches, follow-ups and replace the prompts take."""
     if not isinstance(document, dict):
         raise InitInputError("--answers must be a JSON object: {\"tests\": [...]}")
+    if "tests" not in document and "remove" in document:
+        return []  # only deleting: "remove" is read by the caller
     if "tests" not in document:
         raise InitInputError("--answers needs \"tests\": a list of {query, expect, match, follow_ups}; "
                              "`fab-test data-agent tests init TARGET --questions` shows an example")

@@ -31,9 +31,9 @@ DataAgentTests {
   (the identity) => Member or Contributor in the agent's workspace, read on every data source; a service principal also needs the tenant setting "Service principals can use Fabric APIs"
   (a walkthrough or pipeline is wanted) => docs/DATA-AGENT-TESTS-WALKTHROUGH.md; docs/examples/{github-actions,azure-devops}/data-agent-tests.yml (lint, then the run; weekly)
   (tests init, a suite exists) => list its path and tests, then ask [a]dd (Enter) | [e]dit | [r]eplace all; "replace_all": true in --answers; replacing with no new questions writes nothing
-  (editing) => tests by number until Enter, each [c]hange its answer (Enter: only its check changes, id and conversation stay) | [d]elete (with the later turns of its conversation); then new questions; "remove": [ids] at the top of --answers
+  (editing) => tests by number until Enter, each [c]hange its answer (Enter: only its check changes, id and conversation stay) | [d]elete (with the later turns of its conversation); then new questions; "remove": [ids] at the top of --answers ("tests" may then be left out)
   (adding, a question it already has) => ask [k]eep (Enter) | [r]eplace; "replace": true in --answers; otherwise kept
-  (changing a conversation's answers in --answers) => send its first turn with "replace": true and its follow_ups in order, each with query, expect and match; every turn sent is replaced, turns not sent stay, and the first turn stays in their conversation; never a follow-up as its own top-level test
+  (changing a conversation's answers in --answers) => send its first turn with "replace": true and its follow_ups in order, each with query, expect and match; every turn sent is replaced, matched to the conversation's turns by position whatever their ids, turns not sent stay, and a replaced turn stays in its conversation (a follow-up stays a follow-up); never a follow-up as its own top-level test
   (a changed answer sent without "replace") => kept, not applied: -q says kept=N and the suite is unchanged; resend with "replace": true
   (tests lint) => offline checks first, then promptfoo validate (installed on first use, as the run does); run it before the run
   (a suite base_url | fabric_urls on a Fabric host) => works; lint warns (w=1) that fab-test can resolve the agent

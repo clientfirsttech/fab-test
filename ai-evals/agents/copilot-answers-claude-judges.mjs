@@ -15,6 +15,9 @@ import { join } from "node:path";
 
 const COPILOT_VERSION = "1.0.114";
 const ANSWER_PROMPT = "You are an AI assistant. Execute the following prompt";
+// Neither agent may read a .env: the repository's holds a service principal, and what an agent reads goes to its model.
+const CLAUDE_ARGS = ["--disallowedTools", "Read(**/.env)", "Read(**/.env.*)", "-p", "--output-format", "json",
+  "--no-session-persistence"];
 const prompt = process.argv.at(-1) ?? "";
 
 function copilotCli() {
@@ -44,10 +47,11 @@ function run(command, args, wrap) {
 }
 
 if (prompt.startsWith(ANSWER_PROMPT)) {
-  // Read-only, as the evals ask: no shell, no file writes, no question form, no self-update.
+  // Read-only, as the evals ask: no shell, no file writes, no .env, no question form, no self-update.
   run(process.execPath, [copilotCli(), "-s", "--no-ask-user", "--no-auto-update", "--log-level", "none",
-    "--deny-tool", "shell", "--deny-tool", "write", "-p", prompt],
+    "--deny-tool", "shell", "--deny-tool", "write", "--deny-tool", "read(.env)", "--deny-tool", "read(.env.*)",
+    "-p", prompt],
   (text) => JSON.stringify({ type: "result", result: text.trim() }));
 } else {
-  run("claude", ["-p", "--output-format", "json", "--no-session-persistence", prompt]);
+  run("claude", [...CLAUDE_ARGS, prompt]);
 }

@@ -12,7 +12,7 @@ from typing import Any
 import yaml
 
 from ._authoring_output import can_ask, next_command, print_payload
-from ._data_agent_init_edit import edit_tests, removal
+from ._data_agent_init_edit import edit_tests, later_turns, removal
 from ._data_agent_init_questions import DECLINE_SUGGESTION, InitInputError, Suggestions, read_suggestions
 from ._data_agent_init_tests import (
     MATCH_KEYS,
@@ -166,18 +166,24 @@ def _new_tests(args: argparse.Namespace, suggestions: Suggestions, suite: Path, 
 
 def _replace_conversations(args: argparse.Namespace, specs: list[dict[str, Any]], old_tests: list[dict[str, Any]],
                            new_tests: list[dict[str, Any]]) -> None:
-    """"replace" on a first turn reaches the follow-ups sent with it. Turns not sent stay, and the first turn stays
-    in their conversation; deleting turns is "remove"'s job."""
+    """"replace" on a first turn reaches the follow-ups sent with it, matched to the conversation's turns by position
+    (a hand-named follow-up keeps its id). Turns not sent stay, and the replaced turn stays in their conversation,
+    a follow-up still a follow-up; deleting turns is "remove"'s job."""
     old = {(test.get("metadata") or {}).get("id"): test for test in old_tests}
     new = {test["metadata"]["id"]: test for test in new_tests}
     for spec in specs:
         root = spec.get("id")
         if not spec.get("replace") or root not in old or root not in new:
             continue
-        args.replace_ids |= {f"{root}-follow-up-{n}" for n in range(1, len(spec.get("follow_ups") or []) + 1)}
+        sent = [new[f"{root}-follow-up-{n}"] for n in range(1, len(spec.get("follow_ups") or []) + 1)]
+        for turn, old_id in zip(sent, later_turns(old_tests, root)[1:], strict=False):
+            turn["metadata"]["id"] = old_id
+        args.replace_ids |= {turn["metadata"]["id"] for turn in sent}
         old_vars, new_vars = old[root].get("vars") or {}, new[root].setdefault("vars", {})
         if "conversation" in old_vars and "conversation" not in new_vars:
-            new_vars.update(conversation=old_vars["conversation"], reset=old_vars.get("reset", True))
+            new_vars["conversation"] = old_vars["conversation"]
+            if "reset" in old_vars:  # only a first turn starts a thread
+                new_vars["reset"] = old_vars["reset"]
 
 
 def _merge(document: dict, new_tests: list[dict], force: bool, replace: set[str] | frozenset = frozenset()
