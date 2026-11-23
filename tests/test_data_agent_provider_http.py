@@ -217,3 +217,51 @@ def test_given_a_run_that_fails_should_report_its_status_and_error_without_askin
 
     assert agent.messages_posted == 1
     assert "status 'failed'" in result["error"] and "could not query the model" in result["error"]
+
+
+# -- a conversation's turn: once its POST may have landed, never post it again ----------------
+
+
+@pytest.mark.parametrize("make", [
+    lambda _url: TimeoutError("The read operation timed out"),
+    lambda _url: urllib.error.URLError(ConnectionResetError(10054, "reset by peer")),
+    lambda url: _error(url, 503, {}),
+    lambda url: _error(url, 500, {"errorCode": "InternalError", "message": "Oops."}),
+], ids=["read-timeout", "reset", "503", "500"])
+def test_given_a_turn_whose_post_may_have_landed_should_not_post_it_again(provider, agent, clock, make):
+    """Review 3 item 1: the retry loop re-ran the whole turn and posted it to the shared thread twice."""
+    def fail_first(url, posted):
+        if posted == 1:
+            raise make(url)
+    agent.on_message = fail_first
+
+    result = provider.call_api("Turn one", _options(max_retries=3), {"vars": {"conversation": "c", "reset": True}})
+
+    assert agent.messages_posted == 1 and agent.threads_created == 1
+    assert "twice" in result["error"] and "api.fabric.microsoft.com" in result["error"]
+
+
+def test_given_a_turn_refused_with_429_should_wait_and_post_it_once_more(provider, agent, clock):
+    """A 429 means the service refused the POST, so the turn is not on the thread and asking again is safe."""
+    def throttle_first(url, posted):
+        if posted == 1:
+            raise _blocked(url)
+    agent.on_message = throttle_first
+
+    turn = {"vars": {"conversation": "c", "reset": True}}
+    result = provider.call_api("Turn one", _options(max_retries=3, timeout=60), turn)
+
+    assert result == {"output": "42"}
+    assert agent.messages_posted == 2 and clock["slept"] == [16]
+
+
+def test_given_a_lone_question_whose_post_times_out_should_still_retry(provider, agent, clock):
+    """Its thread is its own and deleted after, so a second post cannot corrupt another turn."""
+    def fail_first(url, posted):
+        if posted == 1:
+            raise TimeoutError("The read operation timed out")
+    agent.on_message = fail_first
+
+    result = provider.call_api("Lone", _options(max_retries=3, retry_delay=0), {"vars": {}})
+
+    assert result == {"output": "42"} and agent.messages_posted == 2

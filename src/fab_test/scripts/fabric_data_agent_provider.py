@@ -456,6 +456,18 @@ def _last_assistant_text(messages: dict[str, Any]) -> str:
     return ""
 
 
+def _post_turn(base_url: str, vars_: dict[str, Any], thread_id: str, prompt: str, timeout: int) -> str:
+    """A conversation's turn goes on a shared thread. Only a 429 proves the service refused it; after a timeout,
+    a reset or a 5xx it may be there already, and posting again would put it in the conversation twice."""
+    try:
+        return _post_message(base_url, vars_, thread_id, prompt, timeout)
+    except _Retry as exc:
+        if exc.status == 429:
+            raise
+        raise _Final(f"{exc} (not asked again: the turn may already be in the conversation, and asking again "
+                     "would post it twice)") from exc
+
+
 def _answer_posted_turn(base_url: str, thread_id: str, assistant_id: str, timeout: int) -> dict[str, str]:
     """A conversation's turn is on the shared thread now: a retry would post it twice, so failures are final."""
     try:
@@ -488,10 +500,11 @@ def _run_once(prompt: str, options: dict[str, Any], context: dict[str, Any]) -> 
         assistant_id = _authed_json("POST", f"{base_url}/assistants?api-version={DATA_AGENT_API_VERSION}",
                                     timeout=timeout, json={})["id"]
         thread_id = _thread_id(base_url, vars_, timeout)  # set first: a failed post still deletes it
-        thread_id = _post_message(base_url, vars_, thread_id, prompt, timeout)
-        if not own_thread:
-            return _answer_posted_turn(base_url, thread_id, assistant_id, timeout)
-        return _answer(base_url, thread_id, assistant_id, timeout)
+        if own_thread:
+            thread_id = _post_message(base_url, vars_, thread_id, prompt, timeout)
+            return _answer(base_url, thread_id, assistant_id, timeout)
+        thread_id = _post_turn(base_url, vars_, thread_id, prompt, timeout)
+        return _answer_posted_turn(base_url, thread_id, assistant_id, timeout)
     finally:
         if own_thread and thread_id:
             with contextlib.suppress(Exception):

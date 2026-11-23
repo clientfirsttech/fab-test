@@ -481,6 +481,20 @@ Asked 2026-11-22: run the live Data Agent only when what `fab-test data-agent` d
 
 **Status**: ✅ 2026-11-22. `tests/test_data_agent_live_workflow.py` walks the import closure of the run path (`invoke_data_agent`, the provider, `_data_agent_run`/`_resolution`/`_suite`/`_progress`: 37 files) and checks both filters cover it plus the promptfoo pin, `pyproject.toml`, the suites and the workflow; `test_workflow_triggers.py` lists the workflow. Not yet run in GitHub: the `fabric-demo` principal needs Member or Contributor in the workspace.
 
+## Review 3
+
+**Status**: 🔄 2026-11-22. An unanchored reviewer (aidd-review, python, module-budgets, tdd, command-grammar, polite-review, polite-http) read the 14 commits `a95683e^..7e47ca5`, ran the suite (3839 + 2 skipped, ruff clean) and probed the CLI on scratch copies with no service calls. No secret reaches promptfoo's environment under either `--auth` mode, and no test runs the real `az`. Findings, most severe first:
+
+1. ✅ **Blocking.** A conversation turn whose message POST timed out, was reset or got a 5xx was posted again: `_call_api` re-ran the turn and `_thread_id` returned the cached shared thread. Fixed: `_post_turn` lets only a 429 (the service refused it) be asked again; anything else is final, saying the turn may already be in the conversation. A lone question keeps its retries. 6 tests in `tests/test_data_agent_provider_http.py`.
+2. A 2xx without the expected field (`access_token`, `id`) is retried, then reported as a bare `KeyError` repr; should be final, naming the host and what came back.
+3. `"replace"` on a first turn guesses follow-up ids as `{root}-follow-up-N`; a suite whose follow-up is named otherwise (the sample's `character-count-follow-up`) gets a near-duplicate appended. Match the conversation's existing turns by position.
+4. A follow-up sent as a top-level test with `"replace"` gets `reset: true` and loses its context; copy `reset` only if the old turn had it.
+5. A remove-only `--answers` file (`{"remove": [...]}`) exits 2 asking for `"tests"`; accept it (or name `"tests": []`), and the `remove-conversation` eval's mock hides this.
+6. A second block expires at its time rather than lasting the run, as the skill says; and a server wait inside a posted turn becomes final with no `retry_after` and no block. Make code and skill agree.
+7. Nit: `describe_http` says "service principal" under `--auth az`; `_identity()` reads only the env var.
+8. Nit: `fabric_data_agent_provider.py` is 595 lines (soft budget 400) with no recorded justification; `_credentials.py` is exactly 400.
+9. Nit: a server's wait is compared to the per-question timeout, so one question can take about 4 × 60 s; only `--timeout` bounds the run.
+
 ## Quality Gates
 
 **Status**: ✅ 2026-11-22, after the blast-radius fixes. `ruff check .` clean; complexity, module-budget, mode-parity and grammar-parity tests pass; non-playwright half 3713 passed + 2 skipped (no rtk failures now that the hook and its test are gone); playwright half 204 passed, total coverage 90.75% (floor 80%), and its 16 failures are the live-parity HTTP 401 on workspace `c4698d28-…`, which the service principal no longer sees (environmental, as on 2026-11-21); the `GITHUB_ACTIONS=true CI=true` pass 3713 passed; `pip-audit` finds no known vulnerabilities (only the unpublished `cft-fab-test 1.10.0b5` skipped). A live `--format json` run after the fixes printed one JSON document and the same verdicts. Goulash still passes there because the committed suite keeps its pre-decision-23 assertion.
