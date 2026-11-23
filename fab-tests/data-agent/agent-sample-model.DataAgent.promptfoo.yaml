@@ -58,4 +58,13 @@ tests:
     query: how many eye colors are there?
   assert:
   - type: regex
-    value: (?<![\d,.])10(?![\d]|[,.]\d)
+    value: (?<![\d,.])23(?![\d]|[,.]\d)
+- description: Tell me a joke
+  metadata:
+    id: tell-me-a-joke
+  vars:
+    query: Tell me a joke
+  assert:
+  - type: javascript
+    value: /\b(cannot|can.t|unable|won.t|don.t|do not|no access|not (available|able|allowed|have|provide)|isn.t
+      (available|something)|outside)\b/i.test(output.trim().split(/(?<=[.!?])\s|\n/)[0])
