@@ -1,6 +1,6 @@
 # Data Agent az login Epic
 
-**Status**: ✅ IMPLEMENTED 2026-11-22 (live run pending az login to the workspace's tenant) on `feature/data-agent-testing`
+**Status**: ✅ COMPLETED (2026-11-22) on `feature/data-agent-testing`
 **Goal**: run Data Agent suites as the developer's `az login` identity, not only as a service principal.
 
 ## Why
@@ -47,4 +47,4 @@ Given `--auth az`, the wrapper should write no service-principal file and pass t
 
 ruff, ratchets, full suite, then one live run with `--auth az`.
 
-**Status**: ⚠️ ruff clean, ratchets pass, 3816 passed + 2 skipped (parallel half). Live: `--auth az` signed in and listed workspaces, but `az login` is in another tenant than the workspace; rerun after `az login --tenant <workspace tenant>`. Playwright half not run (the principal is blocked).
+**Status**: ✅ 2026-11-22 rerun after the reference and replace fixes: `ruff check .` clean; non-playwright half 3839 passed + 2 skipped; playwright half 204 passed, coverage 91.1% (floor 80%). The 16 live parity tests fail with 401 on workspace `c4698d28-…`, which the service principal in `.fab-test/.env` has not been allowed to see since 2026-11-21: access, not code. Live, after `az login --tenant <workspace tenant>`: `fab-test data-agent --workspace fab-test-working-area --auth az` asked all 7 questions as the user (9–27 s each) while the principal was still RequestBlocked; 5 passed, and the 2 failures are the suite's own (a follow-up in the wrong conversation; `tell-me-a-joke` edited to expect a refusal).

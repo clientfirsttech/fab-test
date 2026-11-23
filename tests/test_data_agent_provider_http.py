@@ -1,7 +1,7 @@
 """The Data Agent provider is polite to a throttled or failing Fabric (Polite HTTP epic, Data Agent Provider).
 
 One test per failure class: how many requests it makes, how long it waits, and the sentence the caller
-gets. Always mocked: the evidence is in tasks/polite-http-epic.md.
+gets. Always mocked: the evidence is in tasks/archive/2026-11-22-polite-http-epic.md.
 """
 
 from __future__ import annotations
