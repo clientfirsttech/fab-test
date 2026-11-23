@@ -51,3 +51,13 @@ Run the same evals with GitHub Copilot CLI answering. riteway sends extraction, 
 - Given the split skill and Copilot answering, should pass the same evals as Claude, judged by the same judge
 
 **Status**: ✅ 22 of 22, each 2/2 (Copilot's default model, claude-sonnet-5.5; 12 premium requests). 14 Copilot sessions opened during the run, so the answers were Copilot's, not a fallback.
+
+## Harder Evals
+
+Five evals whose answers are only in `references/data-agent.md`: changing a follow-up's answer (`update-follow-up-answer`), adding a conversation (`add-conversation`), a changed answer for a question the suite has (`step-1-existing-question`), reading `kept=1` (`step-2-kept-not-applied`), and choosing match keys (`match-keys`). Writing them found that `"replace"` never reached a conversation's follow-ups; fixed in b60b9fa (Data Agent Testing epic, Replace Reaches Follow-Ups), which also added the match keys and `kept=N` to the reference.
+
+**Requirements**:
+- Given the facts an eval checks, should find them in `references/data-agent.md` and not in `SKILL.md`
+- Given the reference removed, should show whether the evals depend on it
+
+**Status**: ✅ Claude 13 of 13 and Copilot 13 of 13, each 2/2. Control, Claude with `data-agent.md` and `flags.md` removed: `update-follow-up-answer` 1/3 (the follow-up sent as its own test) and `match-keys` 0/4, so those two need the reference; `step-1-existing-question` and `step-2-kept-not-applied` still pass, since SKILL.md's replace rule and the `kept=1` output are enough. They stay as regression checks.

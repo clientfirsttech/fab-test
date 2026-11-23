@@ -1,0 +1,20 @@
+import 'ai-evals/fab-test-data-agent-tests/fixtures/fab-test-skill.md'
+
+userPrompt = """
+You are in a test environment. Do not run any commands and do not edit any files. Use these mock tools instead,
+and show each command you would run with its arguments, and the content of any --answers file you would write.
+
+mock suite fab-tests/data-agent/Sales.DataAgent.promptfoo.yaml => 3 tests (id: question => its check), the first
+two one conversation:
+  how-many-orders: How many orders are there? => number 1,204
+  how-many-orders-follow-up-1: Is that more than 1,000? Answer yes or no. => starts with yes
+  out-of-scope: What is my bank balance? => the agent declines
+
+mock `fab-test data-agent tests init Sales --answers FILE -q` => tests written added=0 replaced=2 kept=0 unchanged=0 removed=0 fab-tests/data-agent/Sales.DataAgent.promptfoo.yaml
+
+We archived old orders, so there are now 940. Update the orders conversation's expected answers to match.
+"""
+
+- Given a conversation whose follow-up's answer changes, should send `How many orders are there?` with `"expect": "940"` and `"replace": true`, and the follow-up inside its `follow_ups` with an expected answer of no
+- Given a follow-up, should not send it as its own top-level test, and should not delete and re-add the conversation with `"remove"`
+- Given an agent editing a suite, should not hand-edit the suite YAML or use `"replace_all"`

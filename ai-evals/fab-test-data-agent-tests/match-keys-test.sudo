@@ -1,0 +1,20 @@
+import 'ai-evals/fab-test-data-agent-tests/fixtures/fab-test-skill.md'
+
+userPrompt = """
+You are in a test environment. Do not run any commands and do not edit any files. Use these mock tools instead,
+and show each command you would run with its arguments, and the content of any --answers file you would write.
+
+mock `fab-test data-agent tests init Sales --answers FILE -q` => tests written added=4 replaced=0 kept=0 unchanged=0 removed=0 fab-tests/data-agent/Sales.DataAgent.promptfoo.yaml
+
+Add these tests to the Sales agent's suite. Choose how each answer is checked so a right answer passes and a wrong
+one fails:
+1. "What was total revenue in 2025?" The right answer is $4,215,330.
+2. "Which region sold the most in 2025?" West, and the agent usually answers in a full sentence.
+3. "Give me one example order number." Any order number is right; they look like SO-123456 (SO-, then six digits).
+4. "Reply with only the fiscal year label for 2025." It must reply FY25 and nothing else.
+"""
+
+- Given a revenue figure, should use the number match (`n`) with expect `4,215,330`, without the dollar sign
+- Given a name inside a sentence, should use contains (`c`) with expect `West`
+- Given any order number of a known shape, should use pattern (`p`) with a regex such as `SO-\d{6}`
+- Given an answer that must be exactly FY25, should use exact (`x`) with expect `FY25`

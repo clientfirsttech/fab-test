@@ -1,0 +1,17 @@
+import 'ai-evals/fab-test-data-agent-tests/fixtures/fab-test-skill.md'
+
+userPrompt = """
+You are in a test environment. Do not run any commands and do not edit any files. Use these mock tools instead,
+and show each command you would run with its arguments, and the content of any --answers file you would write.
+
+mock suite fab-tests/data-agent/Sales.DataAgent.promptfoo.yaml => 1 test (id: question => its check):
+  out-of-scope: What is my bank balance? => the agent declines
+
+mock `fab-test data-agent tests init Sales --answers FILE -q` => tests written added=2 replaced=0 kept=0 unchanged=0 removed=0 fab-tests/data-agent/Sales.DataAgent.promptfoo.yaml
+
+Add a test that asks the Sales agent for total revenue in 2025 (the right answer is 4,215,330), then, in the same
+conversation, asks "And for 2024?" (the right answer is 3,980,100).
+"""
+
+- Given a second question that relies on the first, should write one test whose `follow_ups` holds `And for 2024?`, not two top-level tests
+- Given figures as answers, should use the number match (`n` or `number`) for both, with each expect written as only the figure (`4,215,330`, `3,980,100`)
