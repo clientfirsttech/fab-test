@@ -1,6 +1,6 @@
 ---
 name: fab-test
-description: fab-test CLI reference for running Fabric artifact analyzers locally (fab-test 1.10.0b5). Covers all subcommands, flags, artifact isolation, result locations, and how fab-test differs from pytest. Use when invoking, troubleshooting, or extending local artifact validation.
+description: fab-test CLI reference for running Fabric artifact analyzers locally and against a workspace (fab-test 1.10.0b5). Covers all subcommands, flags, results, slicer contracts, and Data Agent test suites (writing, editing, running), and how fab-test differs from pytest. Use when invoking, troubleshooting, or extending artifact validation.
 ---
 
 # fab-test
@@ -33,43 +33,13 @@ Discovery matches on folder suffix (`*.SemanticModel`, `*.Report`), never on con
 
 ## Installation
 
-From a checkout:
-
 ```bash
-pip install -e .
+pip install -e .                          # from a checkout
+pip install "cft-fab-test==1.10.0b5"      # from PyPI (a beta: or pip install --pre cft-fab-test); the command is fab-test
+pip install "cft-fab-test[playwright]" && playwright install chromium   # before the first playwright run; Linux CI: --with-deps chromium
 ```
 
-From PyPI — the package is **`cft-fab-test`** (the command is still
-`fab-test`). The current release is a beta, and pip skips PEP 440
-pre-releases unless you pass `--pre` or name the version exactly:
-
-```bash
-pip install "cft-fab-test==1.10.0b5"     # or: pip install --pre cft-fab-test
-```
-
-`fab-test playwright` has its own install path. It runs its render spec as a
-`python -m pytest` child, and those pytest packages are an extra, not base
-dependencies. Install the extra plus the browser before the first run:
-
-```bash
-pip install "cft-fab-test[playwright]"  # pytest, pytest-playwright, pytest-html, pytest-xdist
-playwright install chromium             # Linux CI: playwright install --with-deps chromium
-```
-
-Without the extra, `fab-test playwright` stops before minting any embed token
-and its error names the missing packages and that `pip install` command.
-`--plan-only` needs neither.
-
-Either way this registers the `fab-test` console script. The `.venv` is searched automatically for tool binaries (e.g. `pql-test`) even when not on `PATH`.
-
-Rules and metadata resolve in the same layer order however `fab-test` was
-installed: `.fab-test/metadata/` first, then `.github/metadata/` (legacy,
-for consumer repositories already on that layout — this repository no
-longer keeps a copy there), then the copy packaged in the wheel — except
-`environments.yml`, which has no packaged fallback by design and lives at
-`.fab-test/metadata/environments.yml` in this repository. `fab-test config
---show` names the layer each file came from.
-Release and publishing procedure: [`docs/RELEASE.md`](../../../docs/RELEASE.md).
+Without the playwright extra, `fab-test playwright` stops before minting any embed token and names the missing packages; `--plan-only` needs neither. The `.venv` is searched for tool binaries (e.g. `pql-test`) even when not on `PATH`. Rules and metadata resolve `.fab-test/metadata/` → `.github/metadata/` (legacy) → the packaged copy; see [references/configuration.md](references/configuration.md#metadata-files-and-where-they-come-from). Releasing: [`docs/RELEASE.md`](../../../docs/RELEASE.md).
 
 ## Agent Contract
 
@@ -106,40 +76,16 @@ See [references/slicer-contracts.md](references/slicer-contracts.md).
 
 ```
 DataAgentTests {
-  (FAB_TEST_ENABLE_DATA_AGENT=0) => data-agent | agent exits 2; absent from help and list; on by default
-  (enabled) => service only; workspace resolves --workspace → FABRIC_WORKSPACE_ID → workspace in config
-  (an item has a suite in fab-tests/data-agent/ or under --artifact-dir) => pair *.DataAgent.promptfoo.yaml by fabTestDataAgent == .platform config.logicalId
-  (authored test files) => fab-tests/<flow>/ at the repository root, outside the Git-connected folder; --tests-dir | FAB_TEST_TESTS_DIR | tests_dir moves it
-  (an item is selected locally) => resolve the deployed agent by .platform metadata.displayName
-  (no paired suite) => skipped; (two suites claim one logicalId) => exit 2 naming both
-  (a service target has no local item) => require --tests FILE
-  (dry-run) => list local denominators without tokens or service calls; workspace inventory remains unresolved
-  (workspace enumeration exceeds 5 agents) => require --all
-  (a test uses conversation) => maxConcurrency = 1; provider workers = 1
-  (running promptfoo) => use fab-test's Python; no cache, database writes, or sharing
-  (persisting results) => redact native.json, effective.promptfoo.yaml, envelope.json; attach the standard report
-  (all with a workspace configured and the flag enabled) => include data_agent; (local) => never include it
-  (tests init, a person present) => ask each question, its expected answer (Enter = decline), one match key n|c|x|s|e|p|r (Enter = default), follow-ups in the same conversation; ? lists suggestions
-  (tests init, CI | --format json | an agent) => --answers FILE {tests: [{query, expect, match, follow_ups, replace?}]}; --questions prints suggestions and the shape; never invent an expected answer
-  (suggestions) => figure measures and selected tables as questions; a table the source has but the agent leaves out, then a generic out-of-scope question, as `decline`; the agent's aiInstructions and dataSourceInstructions as `instructions`
-  (a provider failure) => 401 after one refresh | 403 | "isRetriable": false | CapacityNotActive | a poll timeout are final and name the fix; a conversation turn is never retried once posted
-  (who asks the agent) => the chain every service command uses: a full service principal, else az login; --auth az uses az login even when a principal is set; --auth service-principal never falls back; see references/credentials.md
-  (running for a person signed in with az login, and the principal is blocked (RequestBlocked), rejected (401/403) or not set up for this agent) => rerun with --auth az; never loop the principal
-  (CI or another remote runner) => a service principal from secrets, or the pipeline's own az login (azure/login with OIDC, AzureCLI@2) then --auth az, which needs no client secret
-  (the identity) => Member or Contributor in the agent's workspace, read on every data source; a service principal also needs the tenant setting "Service principals can use Fabric APIs"
-  (a walkthrough or pipeline is wanted) => docs/DATA-AGENT-TESTS-WALKTHROUGH.md; docs/examples/{github-actions,azure-devops}/data-agent-tests.yml (lint, then the run; weekly)
-  (tests init, a suite exists) => list its path and tests, then ask [a]dd (Enter) | [e]dit | [r]eplace all; "replace_all": true in --answers; replacing with no new questions writes nothing
-  (editing) => tests by number until Enter, each [c]hange its answer (Enter: only its check changes, id and conversation stay) | [d]elete (with the later turns of its conversation); then new questions; "remove": [ids] at the top of --answers
-  (adding, a question it already has) => ask [k]eep (Enter) | [r]eplace; "replace": true in --answers; otherwise kept
-  (tests lint) => offline checks first, then promptfoo validate (installed on first use, as the run does); run it before the run
-  (a suite base_url | fabric_urls on a Fabric host) => works; lint warns (w=1) that fab-test can resolve the agent
-  (a suite) => code: run it only from trusted branches; never pull_request_target or fork PRs with secrets
-  (a suite base_url | fabric_urls host is not Fabric or Power BI) => a lint finding and a refusal before promptfoo starts; an exact extra host comes only from the caller's FAB_TEST_DATA_AGENT_ALLOWED_HOSTS
-  (a suite env sets FAB_TEST_* | FABRIC_* | AZURE_* | PROMPTFOO_* | PLAYWRIGHT_ENV_FILE) => refused; remove it from the suite
-  (promptfoo runs) => no service principal in its environment; the provider reads a private temp file, deleted after the run
-  (telemetry) => carries redacted answers like every envelope; its readers should match the agent's data-source audience
+  (an agent builds or edits a suite) => fab-test data-agent tests init TARGET --questions --format json |> ask the person for expected answers |> tests init TARGET --answers FILE
+  (an expected answer) => from the person or the data, never invented; never copied from the agent's answer to make a failing test pass
+  (the agent should decline) => "match": "refuses", no expect
+  (changing a test) => the same query with "replace": true; (deleting) => "remove": [ids] at the top level, which also deletes that conversation's later turns, so say so first
+  (a suite was written) => fab-test data-agent tests lint TARGET before any run
+  (the service principal is blocked or rejected, a person is signed in with az login) => rerun with --auth az; never loop the principal
 }
 ```
+
+Everything else (pairing, prompts, suggestions, provider failures, identity, CI, suite safety): [references/data-agent.md](references/data-agent.md).
 
 ### Service mode
 
@@ -186,249 +132,34 @@ fab-test bpa --format json 2>/dev/null | jq .   # safe to pipe straight into jq
 
 ### Spending fewer tokens: `-q`
 
-A default run states its result several ways for a person to skim. An agent that only needs to know whether it passed should ask for less. **Make `-q` the first invocation** and escalate only if it fails: re-run with `-v`, or read the envelope path `-q` prints, to learn why.
+**Make `-q` the first invocation** and escalate only if it fails: re-run with `-v`, or read the envelope path `-q` prints.
 
 ```
-OutputBudget {
-  fn choose(need) {
-    (only pass/fail and where the result is)   => fab-test ANALYZER -q               // ~10x smaller than default
-    (the result's fields, parsed)              => fab-test ANALYZER --format json 2>/dev/null
-    (why one rule fired on one artifact)       => read the envelope path -q printed, or re-run with -v
-  }
-}
-
 QuietLine {
-  shape: "<analyzer> <status> e=<errors> w=<warnings> <where>"
-  analyzer: the registry name, so "pql_test" and never "pql-test"
+  shape: "<analyzer> <status> e=<errors> w=<warnings> <where>"   // one per artifact; ~10x smaller than default
   status: "passed" | "warning" | "failed" | "skipped"
-  where: envelope path relative to the working directory; the artifact name when the analyzer wrote no envelope. Always the last field, because artifact names contain spaces
-}
-
-Constraints {
-  -q prints exactly one QuietLine per artifact and nothing else on a passing run; exit codes and every file under fab-test-results/ are unchanged
-  -q and -v together exit 2
-  (-q and a failure the findings cannot explain: a preflight failure, a timeout, or a nonzero exit with no findings) => the remediation or the analyzer's own output is still printed
-  (-q --format json) => stdout is byte-identical to the same run without -q, and stderr is silent for passing artifacts
-  (CI is detected) => -q still passes the analyzer's ::error:: and ::warning:: annotations through, verbatim
-  (the same remediation applies to every artifact) => it is printed once per run, not once per artifact
-  Precedence: -q/-v flag > ANALYZER_VERBOSITY > `verbosity:` in fab-test.yml > default. Levels: summary (= -q), default, verbose (= -v), debug (= -vv)
+  where: the envelope path, always last (artifact names contain spaces)
 }
 ```
 
-```bash
-fab-test bpa -q                     # bpa warning e=0 w=103 fab-test-results/bpa/SampleModel-PQLAssert/envelope.json
-fab-test local -q                   # one line per artifact across bpa, pbir, and pql_test
-fab-test config --show              # verbosity = 'summary' (fab-test.yml:verbosity)
-```
-
-A repository whose agents should always be terse can pin it once with `verbosity: summary` in `fab-test.yml`; a person who wants the full output for one run passes `-v` and it wins. See [references/operations.md](references/operations.md#output-verbosity).
+`--format json 2>/dev/null` when you need the fields parsed. `verbosity: summary` in `fab-test.yml` pins it for a repository. Full rules: [references/operations.md](references/operations.md#output-verbosity).
 
 ### Discoverability: doctor → list → explain
 
-```
-Discoverability {
-  fn doctor()          // is each analyzer's tool/credential ready?
-  fn doctor(--local)   // readiness for the local Desktop workflow specifically
-  fn list()            // what subcommands exist, and how many artifacts match?
-  fn explain(analyzer) // what command would `fab-test ANALYZER` actually run?
-}
-
-Constraints {
-  doctor and list both support --format json
-  doctor --analyzer NAME checks exactly one analyzer
-  doctor --workspace NAME_OR_ID checks service readiness against that workspace, as FABRIC_WORKSPACE_ID would
-  doctor marks each row ✅ ready, ⚠ warning (one setting away, e.g. credentials but no workspace), ℹ info (not set up, or a tool fetched on first run), or ❌ error (set up, and the run would fail); JSON rows carry it as `status`
-  doctor exits 1 on any ❌ (--strict: any ⚠ too), else 0 -- a CI gate for one analyzer uses doctor --analyzer NAME
-  doctor compares the az login account with `pql-test auth status` for pql_test (❌ when they differ, as the run would refuse)
-  list's matched-artifact counts respect --artifact-dir
-  explain ANALYZER never spawns a subprocess — it only shows the resolved command, tool path, rules path, and output path
-}
-```
-
 ```bash
-fab-test doctor                       # is each analyzer's tool/credential ready?
-fab-test doctor --local               # readiness for the local Desktop workflow specifically
+fab-test doctor                          # is each analyzer's tool/credential ready? exits 1 on any ❌ (--strict: any ⚠)
+fab-test doctor --analyzer NAME          # exactly one analyzer: a CI gate
+fab-test doctor --local                  # readiness for the local Desktop workflow
 fab-test doctor --workspace "Sales Dev"  # readiness for a service run against this workspace
-fab-test list                         # what subcommands exist, and how many artifacts match?
-fab-test explain bpa                  # what command would `fab-test bpa` actually run?
+fab-test list                            # subcommands and how many artifacts match (respects --artifact-dir)
+fab-test explain bpa                     # the command fab-test bpa would run; never spawns it
 ```
 
-Plain `fab-test doctor --format json` gives every analyzer entry the same shape:
+`doctor` and `list` take `--format json`; the shapes are in [references/discoverability.md](references/discoverability.md).
 
-```
-DoctorAnalyzerEntry {
-  analyzer: String
-  ready: Boolean
-  resolved_path: String | null
-  reason: String
-  remediation: String | null
-  version: String | null   // null for an analyzer with no wrapped tool of its own (pql_test, playwright, dependencies, telemetry); the resolved pinned version from analyzers.json for one that bootstraps a binary
-}
+### The run manifest
 
-Constraints {
-  Every analyzer entry carries all five keys, version included, regardless of readiness
-  The download cache is keyed by version, so bumping the pin in a fab-test upgrade downloads the new binary rather than reusing whatever an older checkout cached
-  (a local override — an env var or a default_path file — shadows the declared pin) => reason names the variable or file and states the resolved tool will not receive automatic updates, a state a user in it can't fix by upgrading fab-test alone
-}
-```
-
-See [docs/RELEASE.md](https://github.com/clientfirsttech/fab-test/blob/main/docs/RELEASE.md#bumping-a-wrapped-tools-pin) for how a pin gets bumped and delivered.
-
-```bash
-fab-test doctor --format json
-```
-```json
-{
-  "analyzers": [
-    {"analyzer": "bpa", "ready": true, "resolved_path": "C:\\...\\TabularEditor.exe", "reason": "resolved via cached download (version 2.29.0)", "remediation": null, "version": "2.29.0"},
-    {"analyzer": "pbir", "ready": true, "resolved_path": "C:\\...\\fab-inspector.exe", "reason": "resolved via cached download (version 4.0.1)", "remediation": null, "version": "4.0.1"},
-    {"analyzer": "pql_test", "ready": false, "resolved_path": null, "reason": "no workspace, credentials, or running Desktop instance", "remediation": "Set FABRIC_WORKSPACE_ID ...", "version": null}
-  ]
-}
-```
-
-`doctor --local` checks Python version, whether a Desktop instance is running, the Desktop Bridge CLI's presence (path only — never invoked), and each of `fab-test local`'s four analyzers, then states exactly which ones would run:
-
-```
-DoctorLocalCheck {
-  check: String            // "python" | "desktop" | "bpa" | "pbir" | ...
-  ready: Boolean
-  reason: String
-  resolved_path: String | null
-  remediation: String | null
-  version                  // present only for the bootstrapped checks (bpa, pbir) — absent, not null, for python/desktop/desktop-bridge/pql_test, which have no tool version of their own
-}
-
-Constraints {
-  Only the bootstrapped checks (bpa, pbir) carry version here
-  The plain (non --local) doctor above is the one with the uniform five-key shape
-}
-```
-
-```bash
-fab-test doctor --local --format json
-```
-```json
-{
-  "checks": [
-    {"check": "python", "ready": true, "reason": "3.12.10", "resolved_path": "/usr/bin/python3.12", "remediation": null},
-    {"check": "desktop", "ready": false, "reason": "no running instance detected", "resolved_path": null, "remediation": "Open a .pbip file in Power BI Desktop"},
-    {"check": "bpa", "ready": true, "reason": "resolved via cached download (version 2.29.0)", "resolved_path": "C:\\...\\TabularEditor.exe", "remediation": null, "version": "2.29.0"}
-  ],
-  "would_run": ["bpa", "pbir", "pql_test"]
-}
-```
-
-### The run manifest (`fab-test-results/run.json`)
-
-```
-RunManifest {
-  schema_version: Integer
-  fab_test_version: String
-  origin: "local" | "github-actions" | "gitlab-ci" | "circleci" | "azure-devops"
-  target: Target | null
-  command: String[]        // sanitized — see Constraints below
-  artifacts: ArtifactResult[]
-  totals { errors: Integer, warnings: Integer }
-  telemetry_error: String | null
-  exit_code: Integer
-  started_at: String       // UTC ISO 8601, when the invocation began
-  finished_at: String      // UTC ISO 8601, when run.json was written
-  wall_ms: Integer         // what the caller waited, end to end
-  execution: Execution | null
-}
-
-Execution {                 // present only when the run included playwright
-  backend: "local" | "azure"
-  execution_config: String | null        // the selected execution YAML's path
-  execution_config_origin: String        // "flag" | "env:PLAYWRIGHT_CONFIG_PATH" | "config:playwright_config" | "default"
-  workers: Integer | null                // xdist workers per report (capped by its case count)
-  workers_origin: "flag" | "env:PLAYWRIGHT_XDIST_WORKERS" | "execution_config" | "default"
-  jobs: Integer                          // reports run at once
-  jobs_origin: "flag" | "execution_config" | "config" | "default"
-}
-
-Target {
-  raw: String
-  scope: "path" | "desktop" | "workspace"
-  name: String
-  type: String | null
-  workspace: String | null
-  workspace_id: String | null   // the GUID resolved from a workspace name; names a workspace and grants access to nothing, so it is safe to record
-  path: String | null
-}
-
-ArtifactResult {
-  analyzer: String
-  artifact: String
-  status: "passed" | "failed" | "skipped" | "timeout" | "preflight_failed"
-  envelope_path: String | null
-  errors: Integer
-  warnings: Integer
-  detail: String | null
-  duration_ms: Integer | null   // the analyzer subprocess's wall time; null when it never ran (preflight_failed)
-}
-
-Constraints {
-  Every analyzer invocation (a single subcommand or `all`) writes exactly one run.json under --output-dir (default fab-test-results/), so a caller reads one file instead of globbing result directories
-  ("timeout" or "preflight_failed") => the run was aborted without producing a result to report
-  (the run ended without a result to report) => detail carries the human-readable reason: the resolved remediation message for preflight_failed, the exceeded duration for timeout, or the analyzer's own error message when it exited non-zero before writing an envelope (status "failed"; envelope_path points at the envelope fab-test wrote in its place, whose message is that same error and whose findings are empty -- never an earlier run's envelope)
-  (the analyzer did write an envelope, however it failed) => detail is null; the findings are the reason, and envelope_path points at them
-  run.json alone is always enough to learn what to fix — a caller never has to fall back to stderr, which matters when run.json is the only file a pipeline uploads
-  (no CI environment variable is detected) => origin = "local"
-  (a CI system is detected) => origin = its name ("github-actions" | "gitlab-ci" | "circleci" | "azure-devops")
-  The envelope schema, status values, and result layout are identical whether origin is local or CI — origin is the only field that differs between a local run and a CI run
-  (target is null) => the run discovered artifacts instead of being pointed at one
-  Branch on target.scope ("path" | "desktop" | "workspace") rather than parsing target.raw
-  Where origin distinguishes local from CI, target.scope distinguishes whether the run read files on disk, a running Desktop instance, or a deployed workspace item — a distinction origin alone never answers
-  command has every known credential flag (--client-secret, --password, --token, --secret, --api-key) and any key=value-shaped token redacted before the file is written — no credential ever appears in the manifest
-  (this run's telemetry was delivered to every configured destination, or none was asked for) => telemetry_error = null
-  (telemetry failed) => telemetry_error names why: an unreachable cluster, an unreachable OneLake endpoint, a missing install extra, a missing permission grant. One destination's failure never blocks the other's delivery; if both fail, telemetry_error names both, prefixed by destination
-  telemetry_error never changes exit_code — telemetry is diagnostic and must not fail a build. See [Telemetry](references/configuration.md#telemetry)
-  doctor, list, explain, auth, and clean-tools never write a manifest — they don't run an analyzer
-  sum(artifacts[].duration_ms) / wall_ms => how much the run gained from parallelism (about 1 with jobs 1); compare runs only with their execution blocks, and only when they tested the same artifacts
-  execution never holds the service URL, a token, or any credential
-}
-```
-
-```json
-{
-  "schema_version": 1,
-  "fab_test_version": "1.0.0",
-  "origin": "local",
-  "target": {
-    "raw": "local/SampleModel-PQLAssert",
-    "scope": "desktop",
-    "name": "SampleModel-PQLAssert",
-    "type": null,
-    "workspace": null,
-    "workspace_id": null,
-    "path": null
-  },
-  "command": ["fab-test", "bpa", "--format", "json"],
-  "artifacts": [
-    {
-      "analyzer": "bpa",
-      "artifact": "SampleModel-PQLAssert",
-      "status": "passed",
-      "envelope_path": "fab-test-results/bpa/SampleModel-PQLAssert/envelope.json",
-      "errors": 0,
-      "warnings": 21,
-      "detail": null,
-      "duration_ms": 8412
-    }
-  ],
-  "totals": {"errors": 0, "warnings": 21},
-  "telemetry_error": null,
-  "exit_code": 0,
-  "started_at": "2026-10-09T20:04:12+00:00",
-  "finished_at": "2026-10-09T20:04:21+00:00",
-  "wall_ms": 9105,
-  "execution": null
-}
-```
-
-The case a pipeline meets most is a `detail` populated on an aborted run: `fab-test playwright --artifact ThinReport` with no `--env` aborts before authenticating, and `detail` carries `No environment given, so there is nothing to resolve 'ThinReport' against. Pass --env, ...`.
+Every analyzer run writes one `fab-test-results/run.json`: read it instead of globbing result folders. Its `detail` says why an aborted run produced no result, `target.scope` says whether it read files, Desktop or a workspace, and it never holds a credential. Schema: [references/run-manifest.md](references/run-manifest.md).
 
 ## Subcommands
 
@@ -473,3 +204,6 @@ use the original underscore names regardless of which spelling you invoke.
 | [references/slicer-contracts.md](references/slicer-contracts.md) | A user wants a report's slicer defaults checked (fixed or calendar-driven), you're building a contract with `fab-test pbir contract init` or checking one with `contract lint`, or a finding's rule starts with `CONTRACT.` |
 | [references/operations.md](references/operations.md) | You need `--dry-run`/verbosity behavior, the on-disk result layout, tool-resolution order, or pre-flight checks |
 | [references/source-files.md](references/source-files.md) | You're navigating or modifying the `fab-test` implementation itself |
+| [references/data-agent.md](references/data-agent.md) | You're writing, editing, linting or running a Data Agent test suite (`fab-test data-agent`, `tests init`, `tests lint`), or one failed |
+| [references/run-manifest.md](references/run-manifest.md) | You're reading `fab-test-results/run.json`: its fields, statuses, `detail`, `target.scope` or `execution` |
+| [references/discoverability.md](references/discoverability.md) | You need what `doctor`, `list` or `explain` check, or you're parsing `doctor --format json` or `doctor --local --format json` |

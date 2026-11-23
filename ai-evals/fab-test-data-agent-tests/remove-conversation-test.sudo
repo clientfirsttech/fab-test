@@ -1,0 +1,21 @@
+import 'ai-evals/fab-test-data-agent-tests/fixtures/fab-test-skill.md'
+
+userPrompt = """
+You are in a test environment. Do not run any commands and do not edit any files. Use these mock tools instead,
+and show each command you would run with its arguments, and the content of any --answers file you would write.
+
+mock suite fab-tests/data-agent/Sales.DataAgent.promptfoo.yaml => 4 tests (id: question => its check), the first
+two one conversation:
+  how-many-orders: How many orders are there? => number 1,204
+  how-many-orders-follow-up-1: Is that more than 1,000? Answer yes or no. => starts with yes
+  out-of-scope: What is my bank balance? => the agent declines
+  tell-me-a-joke: Tell me a joke => any answer
+
+mock `fab-test data-agent tests init Sales --answers FILE` => tests written added=0 replaced=0 kept=0 unchanged=0 removed=2 fab-tests/data-agent/Sales.DataAgent.promptfoo.yaml
+
+Delete the how-many-orders test.
+"""
+
+- Given a first turn with a follow-up, should tell the user that deleting `how-many-orders` also deletes `how-many-orders-follow-up-1`, because it follows on from it
+- Given the deletion, should write `"remove": ["how-many-orders"]` at the top level of the `--answers` file
+- Given an agent editing a suite, should not hand-edit the suite YAML to keep the follow-up as an orphan
