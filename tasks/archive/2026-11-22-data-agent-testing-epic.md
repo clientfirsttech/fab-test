@@ -1,6 +1,6 @@
 # Fabric Data Agent Testing Epic
 
-**Status**: 🔧 IN PROGRESS — Reviews 1 and 2 done 2026-11-21; docs, the parity test, the blast-radius pass (four defects fixed) and Quality Gates done 2026-11-22. Open: a re-review of the 2026-11-22 fixes before merging to `dev`. 11 discovery decisions recorded 2026-10-04; decisions 3 and 10 rewritten and 12–16 added 2026-11-19 against [`aidd-command-grammar`](../.github/skills/aidd-command-grammar/SKILL.md). Supersedes PR #49.
+**Status**: ✅ COMPLETED (2026-11-22). Reviews 1, 2 and 3 done and their findings fixed, filed or accepted; live-verified as a service principal (2026-11-20/21) and as `az login` (2026-11-22); full suite 3859 passed + 2 skipped, ruff clean, coverage 91.1%. Supersedes PR #49. Follow-ups are in plan.md.
 **Goal**: A new `data-agent` analyzer that evaluates deployed Fabric Data Agents by running promptfoo with a packaged Python provider, following [fabric-data-agent-testing-template](https://github.com/clientfirsttech/fabric-data-agent-testing-template), with test suites authored through `fab-test data-agent tests init` and `tests lint`.
 
 ## Overview
@@ -246,7 +246,7 @@ Polite by design (aidd-polite-review): every choice is one key, Enter takes the 
 
 Check a suite against its item without the service (decision 13).
 
-**Status**: In progress. The CLI verb now performs offline pairing, test-id, credential
+**Status**: ✅ 2026-11-22. `tests lint` is shipped and covered through the installed console script (discovery, malformed files, duplicate claims, near-miss guidance, `-q`/default/`-v`/`--format json`, the real `promptfoo validate`) and wired into the CI examples and the live workflow. Earlier note: the CLI verb performs offline pairing, test-id, credential
 and URL checks and pinned promptfoo config validation. Focused installed-console tests
 cover discovery, malformed files, duplicate suite claims and explicit config; ordinary
 analyzer targets still parse. Near-miss guidance, discovery, parity, all output modes
@@ -295,7 +295,7 @@ The parser-driven test plan.md deferred until a second authoring flow landed.
 
 ## Verify Live Against A Real Data Agent
 
-**Status**: Pending-live. Mocked Fabric calls and promptfoo's echo-provider checks do not
+**Status**: ✅ 2026-11-22. Live-evidenced below: service principal 2026-11-20 and 2026-11-21 (clean run exits 0, a wrong expectation exits 1 and restoring it returns to 0, bare, typed, enumeration and missing-credentials 127), and `az login` 2026-11-22 (`--auth az` answered all 7 questions while the principal was blocked). The feature flag defaults on; removing its row waits for a release (plan.md). Mocked Fabric calls and promptfoo's echo-provider checks do not
 satisfy this task. The checked-in `agent-sample-model.DataAgent` already declares
 `SampleModel-PQLAssert` as a semantic-model source; its published datasource has a placeholder
 workspace ID, so the deployed binding must be verified before claiming a live test.
@@ -358,7 +358,7 @@ the remaining CLI blast-radius checks are still pending.
 
 ## Review 1 Follow-ups
 
-**Status**: 📋 PLANNED. Ordered by severity; each is a task to do test-first. The **decide** points are settled by decisions 17–21 (2026-11-21): item 2 → 17, item 3 → 19, item 4 → 18, item 11 → 20, the `all` banner nit → 21.
+**Status**: ✅ 2026-11-22. Every item done except as noted: 8 (docs: the walkthrough, flag table, examples and both skill copies exist and match the code), 10 (suggestions derive from selected tables and the sources' coverage), 15 (the rtk hook and its test are removed; the other changes are the intended move to `fab-tests/`); 9 is done apart from one private import, `_SUBCOMMAND_ALIASES` in `_authoring_parser.py` (nit, accepted). Was: ordered by severity; each is a task to do test-first. The **decide** points are settled by decisions 17–21 (2026-11-21): item 2 → 17, item 3 → 19, item 4 → 18, item 11 → 20, the `all` banner nit → 21.
 
 **Blocking**:
 1. ✅ *(2026-11-21: `near_miss` in `_authoring_parser.py`, called once from `fab_test._authoring_dispatch`; verbs, `contracts`/`test` spellings, aliases, flags as typed, real `init`/`lint`/`contracts` items run as targets; installed-console test for `pbir lint` → 2; CHANGELOG line. The Data Agent changelog entry waits for its feature, item 12.)* **Near-miss guidance is unmet** (Authoring Noun Dispatch). `fab-test pbir lint` still exits 0 having checked nothing; `pbir init Sales`, `pbir contracts init`, `data-agent init Sales`, `data-agent test lint` give argparse's generic error. Implement `did you mean: <exact command>` (exit 2, TARGET and flags as typed) once in `_authoring_parser`, unless an item has that name; add the CHANGELOG line for `pbir lint` 0 → 2.
