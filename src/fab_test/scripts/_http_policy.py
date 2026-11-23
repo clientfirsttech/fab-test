@@ -103,7 +103,7 @@ def describe_http(host: str, status: int, body: dict[str, Any], *, until: float 
     if code == "RequestBlocked":
         when = f" until {utc(until)}" if until is not None else ""
         return (f"Fabric is rate-limiting this identity (RequestBlocked){when}. Every run or tool using the same "
-                "service principal shares its quota. Wait and rerun.")
+                "identity shares its quota. Wait and rerun.")
     if code == "CapacityLimitExceeded":
         return ("The Fabric capacity is overloaded (CapacityLimitExceeded). Rerun later, and check its load in "
                 "the Fabric Capacity Metrics app.")

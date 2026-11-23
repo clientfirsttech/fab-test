@@ -320,3 +320,21 @@ def test_given_auth_az_the_run_resolves_urls_with_an_az_token(tmp_path, monkeypa
     assert isinstance(run._client(args), Client)
     assert seen["token"] == "az-cli-token-value" and seen["credential_source"] == "azure-cli"
     assert fake_cli.scopes == [SCOPE]
+
+
+def test_without_the_wrapper_the_identity_named_is_the_one_the_chain_picks(monkeypatch):
+    """Review 3 item 7: run without the wrapper, the chain picked az, and the 403 still said "the service principal"."""
+    from fab_test.scripts import fabric_data_agent_provider as provider
+
+    monkeypatch.delenv("FAB_TEST_DATA_AGENT_AUTH", raising=False)
+    monkeypatch.setattr(provider, "data_agent_auth", lambda: "az")
+
+    assert provider._identity() == "your az login identity"
+
+
+def test_the_quota_sentence_fits_either_identity():
+    from fab_test.scripts import _http_policy as policy
+
+    text = policy.describe_http("api.fabric.microsoft.com", 429, {"errorCode": "RequestBlocked"})
+
+    assert "service principal" not in text and "same identity" in text

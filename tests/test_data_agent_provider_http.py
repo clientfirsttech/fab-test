@@ -89,13 +89,42 @@ def test_given_a_block_that_outlasts_one_wait_should_stop_asking_that_agent_for_
     assert second["error"].startswith("Not asked: ") and "RequestBlocked" in second["error"]
 
 
-def test_given_the_block_has_passed_should_probe_the_agent_again(provider, agent, clock):
+def test_given_a_block_still_there_after_waiting_should_last_the_run_even_past_its_time(provider, agent, clock):
+    """Review 3 item 6: Fabric's block slides; every probe renews it (aidd-polite-http: stop for the run)."""
     agent.on_assistant = _raise(_blocked)
     provider.call_api("q1", _options(timeout=60), {"vars": {}})
     agent.on_assistant = None
     clock["now"] += 600
 
-    assert provider.call_api("q2", _options(timeout=60), {"vars": {}}) == {"output": "42"}
+    second = provider.call_api("q2", _options(timeout=60), {"vars": {}})
+
+    assert second["error"].startswith("Not asked: ") and _assistant_calls(agent) == 2
+    assert second["metadata"]["retry_after"]
+
+
+def test_given_a_block_never_waited_should_probe_again_once_its_time_has_passed(provider, agent, clock):
+    """A wait longer than the budget is not spent, so nothing has shown the block outlasts its own time."""
+    agent.on_assistant = _raise(lambda url: _error(url, 429, {"errorCode": "RequestBlocked"}, Retry_After=120))
+    provider.call_api("q1", _options(timeout=30), {"vars": {}})
+    agent.on_assistant = None
+    clock["now"] += 600
+
+    assert provider.call_api("q2", _options(timeout=30), {"vars": {}}) == {"output": "42"}
+
+
+def test_given_a_block_inside_a_posted_turn_should_stop_the_later_questions_too(provider, agent, clock, monkeypatch):
+    """Review 3 item 6: the turn can't be asked again, but the block still applies to the agent."""
+    def run_blocked(method, url, **kwargs):
+        if method == "POST" and "/runs?" in url:
+            raise _blocked(url)
+        return agent(method, url, **kwargs)
+
+    monkeypatch.setattr(provider, "_http_json", run_blocked)
+    turn = provider.call_api("Turn one", _options(timeout=60), {"vars": {"conversation": "c", "reset": True}})
+    lone = provider.call_api("q2", _options(timeout=60), {"vars": {}})
+
+    assert "twice" in turn["error"] and turn["metadata"]["retry_after"]
+    assert lone["error"].startswith("Not asked: ")
 
 
 def test_given_a_wait_longer_than_the_budget_should_not_spend_the_budget_waiting(provider, agent, clock):
@@ -265,3 +294,34 @@ def test_given_a_lone_question_whose_post_times_out_should_still_retry(provider,
     result = provider.call_api("Lone", _options(max_retries=3, retry_delay=0), {"vars": {}})
 
     assert result == {"output": "42"} and agent.messages_posted == 2
+
+
+# -- a 2xx without what the call needs: final, naming the host and what came back ------------
+
+
+def test_given_a_token_response_without_a_token_should_say_so_after_one_request(provider, monkeypatch, clock):
+    """Review 3 item 2: it was asked 3 times, then reported as the bare repr "'access_token'"."""
+    asked = []
+
+    def token_endpoint(method, url, **_kwargs):
+        asked.append(url)
+        return {"token_type": "Bearer", "secret_looking": "do-not-echo-this"}
+
+    monkeypatch.setattr(provider, "_http_json", token_endpoint)
+
+    result = provider.call_api("q", _options(max_retries=3), {"vars": {}})
+
+    assert len(asked) == 1
+    assert "login.microsoftonline.com" in result["error"] and "access_token" in result["error"]
+    assert "token_type" in result["error"] and "do-not-echo-this" not in result["error"]  # names, never values
+
+
+def test_given_an_assistant_reply_without_an_id_should_say_so_after_one_request(provider, agent, clock, monkeypatch):
+    def no_id(method, url, **kwargs):
+        return {} if "/assistants?" in url else agent(method, url, **kwargs)
+
+    monkeypatch.setattr(provider, "_http_json", no_id)
+
+    result = provider.call_api("q", _options(max_retries=3), {"vars": {}})
+
+    assert "api.fabric.microsoft.com" in result["error"] and "'id'" in result["error"] and "nothing" in result["error"]

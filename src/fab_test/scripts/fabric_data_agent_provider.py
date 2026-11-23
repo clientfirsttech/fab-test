@@ -50,7 +50,7 @@ _PROGRESS_LOCK = threading.Lock()
 
 _TOKEN_CACHE: dict[str, tuple[str, float]] = {}
 _THREAD_CACHE: dict[str, str] = {}
-_BLOCKED: dict[str, tuple[float, str]] = {}  # agent URL -> (blocked until, why): asked no more this run
+_BLOCKED: dict[str, tuple[float, str, bool]] = {}  # agent URL -> (until, why, for the whole run)
 _SECRETS: set[str] = set()
 _TOKEN_LOCK = threading.Lock()
 _THREAD_LOCK = threading.Lock()
@@ -61,6 +61,7 @@ class _Final(RuntimeError):
     """A failure no retry can fix (credentials, a rejected token, missing access): report it at once."""
 
     status: int | None = None  # the HTTP status behind it, when there was one
+    wait: float | None = None  # a server's wait behind it (a posted turn's block), which still blocks the agent
 
 
 class _Retry(RuntimeError):
@@ -100,7 +101,11 @@ def _auth_mode() -> str:
 
 
 def _identity() -> str:
-    return "your az login identity" if os.environ.get(DATA_AGENT_AUTH_VAR) == "az" else "the service principal"
+    """Who asked, as the sign-in chose it: the wrapper's choice, else the chain the provider itself follows."""
+    try:
+        return "your az login identity" if _auth_mode() == "az" else "the service principal"
+    except _Final:
+        return "the service principal"  # half-set: the principal is what was meant
 
 
 def _principal() -> ServicePrincipal:
@@ -221,6 +226,16 @@ def _http_json(method: str, url: str, **kwargs: Any) -> dict[str, Any]:
         raise _Final(_redact(f"{parsed.hostname} answered with a body that is not JSON, starting: {start}")) from None
 
 
+def _field(data: Any, key: str, url: str) -> Any:
+    """A 2xx without what the call needs is final (aidd-polite-http): name the host and the fields that came back,
+    never their values."""
+    if isinstance(data, dict) and data.get(key):
+        return data[key]
+    host = urllib.parse.urlsplit(url).hostname or url
+    sent = ", ".join(sorted(map(str, data))) if isinstance(data, dict) and data else "nothing"
+    raise _Final(_redact(f"{host} answered without '{key}' (it sent: {sent}); its API may have changed"))
+
+
 def _token_url(principal: ServicePrincipal) -> str:
     return f"https://login.microsoftonline.com/{principal.tenant_id}/oauth2/v2.0/token"
 
@@ -269,7 +284,7 @@ def _get_token(*, force_refresh: bool = False) -> str:
         )
     except _TRANSPORT_ERRORS as exc:
         raise _classified(exc, _token_url(principal)) from None
-    token = data["access_token"]
+    token = _field(data, "access_token", _token_url(principal))
     with _TOKEN_LOCK:
         _TOKEN_CACHE[key] = (token, _now() + int(data.get("expires_in", 3600)))
     return token
@@ -397,8 +412,8 @@ def _thread_id(base_url: str, vars_: dict[str, Any], timeout: int) -> str:
             cached = _THREAD_CACHE.get(key)
         if cached:
             return cached
-    thread_id = _authed_json("POST", f"{base_url}/threads?api-version={DATA_AGENT_API_VERSION}",
-                             timeout=timeout, json={})["id"]
+    url = f"{base_url}/threads?api-version={DATA_AGENT_API_VERSION}"
+    thread_id = _field(_authed_json("POST", url, timeout=timeout, json={}), "id", url)
     if key:
         with _THREAD_LOCK:
             _THREAD_CACHE[key] = thread_id
@@ -475,8 +490,11 @@ def _answer_posted_turn(base_url: str, thread_id: str, assistant_id: str, timeou
     except _Final:
         raise
     except Exception as exc:
-        raise _Final(f"{_error_text(exc)} (not asked again: a retry would post this turn twice in the "
-                     "conversation)") from exc
+        final = _Final(f"{_error_text(exc)} (not asked again: a retry would post this turn twice in the "
+                       "conversation)")
+        if isinstance(exc, _Retry) and exc.delay is not None:
+            final.wait = exc.delay
+        raise final from exc
 
 
 def _answer(base_url: str, thread_id: str, assistant_id: str, timeout: int) -> dict[str, str]:
@@ -497,8 +515,8 @@ def _run_once(prompt: str, options: dict[str, Any], context: dict[str, Any]) -> 
     own_thread = not _conversation_key(base_url, vars_)
     thread_id = ""
     try:
-        assistant_id = _authed_json("POST", f"{base_url}/assistants?api-version={DATA_AGENT_API_VERSION}",
-                                    timeout=timeout, json={})["id"]
+        url = f"{base_url}/assistants?api-version={DATA_AGENT_API_VERSION}"
+        assistant_id = _field(_authed_json("POST", url, timeout=timeout, json={}), "id", url)
         thread_id = _thread_id(base_url, vars_, timeout)  # set first: a failed post still deletes it
         if own_thread:
             thread_id = _post_message(base_url, vars_, thread_id, prompt, timeout)
@@ -544,18 +562,26 @@ def _blocked_result(text: str, until: float) -> dict[str, Any]:
     return {"error": text, "metadata": {"retry_after": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(until))}}
 
 
-def _block(base_url: str, exc: _Retry) -> dict[str, Any]:
-    """Stop asking this agent until the server's wait has passed; every later question says why at once."""
-    until = _now() + (exc.delay or _BLOCK_SECONDS_WITHOUT_HEADER)
+def _block(base_url: str, why: str, delay: float | None, *, for_run: bool = False) -> dict[str, Any]:
+    """Stop asking this agent until the server's wait has passed, or, still blocked after waiting it once, for the
+    rest of the run (aidd-polite-http: a sliding block renews on every probe). Later questions say why at once."""
+    until = _now() + (delay or _BLOCK_SECONDS_WITHOUT_HEADER)
     with _THREAD_LOCK:
-        _BLOCKED[base_url] = (until, str(exc))
-    return _blocked_result(str(exc), until)
+        _BLOCKED[base_url] = (until, why, for_run)
+    return _blocked_result(why, until)
 
 
 def _still_blocked(base_url: str) -> dict[str, Any] | None:
     with _THREAD_LOCK:
-        until, why = _BLOCKED.get(base_url, (0.0, ""))
-    return _blocked_result(f"Not asked: {why}", until) if _now() < until else None
+        until, why, for_run = _BLOCKED.get(base_url, (0.0, "", False))
+    return _blocked_result(f"Not asked: {why}", until) if for_run or _now() < until else None
+
+
+def _final_result(base_url: str, exc: _Final) -> dict[str, Any]:
+    """A final failure for promptfoo; one with a server's wait behind it still blocks the agent."""
+    if exc.wait is not None:
+        return _block(base_url, _redact(str(exc)), exc.wait)
+    return {"error": _redact(str(exc))}
 
 
 def _call_api(prompt: str, options: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
@@ -578,11 +604,11 @@ def _call_api(prompt: str, options: dict[str, Any], context: dict[str, Any]) -> 
         try:
             return _run_once(prompt, options, context)
         except _Final as exc:
-            return {"error": _redact(str(exc))}
+            return _final_result(base_url, exc)
         except _Retry as exc:
             if exc.delay is not None:
                 if waited or exc.delay > budget or attempt >= retries:
-                    return _block(base_url, exc)
+                    return _block(base_url, str(exc), exc.delay, for_run=waited)
                 waited = True
                 _sleep(exc.delay)
                 continue

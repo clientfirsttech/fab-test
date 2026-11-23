@@ -21,7 +21,7 @@ pytestmark = pytest.mark.data_agent
 __all__ = ["_no_terminal"]  # an autouse fixture, used by name
 
 BLOCKED = ("Fabric is rate-limiting this identity (RequestBlocked) until 16:38:24 UTC. Every run or tool using "
-           "the same service principal shares its quota. Wait and rerun.")
+           "the same identity shares its quota. Wait and rerun.")
 RETRY_AFTER = "2026-11-22T16:38:24Z"
 
 

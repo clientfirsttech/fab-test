@@ -117,7 +117,7 @@ def test_request_blocked_names_the_identity_quota_and_the_end_time():
 
     assert "RequestBlocked" in text
     assert "until " + policy.utc(NOW + 120) in text
-    assert "service principal" in text and "Wait and rerun" in text
+    assert "same identity shares its quota" in text and "Wait and rerun" in text  # SP or az login
     assert "{" not in text and "429" not in text
 
 

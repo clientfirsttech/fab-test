@@ -53,6 +53,6 @@ identity's quota.
 
 A polite version sends one request, sees the block, waits at least its
 `Retry-After` once, stops the agent for the run if it is still blocked, and
-reports once: "Fabric is rate-limiting this service principal (RequestBlocked)
+reports once: "Fabric is rate-limiting this identity (RequestBlocked)
 until 16:38 UTC; 7 questions were not asked. Another run or tool using the same
-service principal shares its quota. Wait and rerun."
+identity shares its quota. Wait and rerun."
