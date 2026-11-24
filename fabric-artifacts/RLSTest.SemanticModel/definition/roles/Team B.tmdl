@@ -1,0 +1,7 @@
+role 'Team B'
+	modelPermission: read
+
+	tablePermission 'Table A' = FALSE
+
+	annotation PBI_Id = c4f4168c96bc4423bc352d5d5f491a5d
+

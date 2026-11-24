@@ -1,0 +1,11 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "Report",
+    "displayName": "RLSTest-ThinReport"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "72c48c76-f1f5-a5d7-41fd-51d85ec7214c"
+  }
+}
