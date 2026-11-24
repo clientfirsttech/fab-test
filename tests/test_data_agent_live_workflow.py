@@ -24,7 +24,8 @@ _RUN_PATH = {"invoke_data_agent", "fabric_data_agent_provider", "_data_agent_run
              "_data_agent_suite", "_data_agent_progress"}
 # Not Python, but the run depends on them: the promptfoo pin, the package's dependencies, the suites.
 _ALSO = ["src/fab_test/metadata/analyzers.json", "pyproject.toml",
-         "fab-tests/data-agent/agent-sample-model.DataAgent.promptfoo.yaml", ".github/workflows/data-agent-live.yml"]
+         "fab-tests/data-agent/agent-sample-model.DataAgent.promptfoo.yaml", ".github/workflows/data-agent-live.yml",
+         ".github/scripts/check_data_agent_ran.py"]
 
 
 def _module(path: Path) -> str:
@@ -84,3 +85,95 @@ def test_it_runs_only_on_change_or_by_hand():
     triggers = _triggers()
     # No schedule (capacity costs) and never pull_request_target (a suite is code).
     assert set(triggers) == {"pull_request", "push", "workflow_dispatch"}
+
+
+
+# --- The live run tests the tester -----------------------------------------------------------------
+# A Data Agent answers agentically: the same question can pass one run and fail the next, so CI never
+# judges which answers were right (the report shows that). It fails only when the tester itself did
+# not work: the run broke, or a question came back without a verdict. Exit 1 alone cannot tell, since
+# findings, a timeout and a promptfoo crash all exit 1, so a checker reads the envelope instead.
+
+_CHECKER = _ROOT / ".github" / "scripts" / "check_data_agent_ran.py"
+
+
+def _checker():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(_CHECKER.stem, _CHECKER)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _envelope(passed=("Count characters",), failed=("Tell me a joke",), status=None, message=""):
+    results = [{"test_name": name, "passed": True} for name in passed]
+    results += [{"test_name": name, "passed": False} for name in failed]
+    return {"status": status or ("failed" if failed else "passed"), "message": message,
+            "test_results": results}
+
+
+@pytest.mark.parametrize("failed", [(), ("Tell me a joke",)], ids=["all-pass", "some-fail"])
+def test_any_mix_of_verdicts_passes(failed):
+    assert _checker().problems(_envelope(failed=failed), asked=1 + len(failed)) == []
+
+
+def test_a_run_that_broke_fails_even_though_it_exited_1():
+    envelope = {"status": "error", "message": "promptfoo eval exited 3: boom"}
+    problems = _checker().problems(envelope, asked=2)
+    assert len(problems) == 1 and "promptfoo eval exited 3: boom" in problems[0]
+
+
+def test_a_skipped_run_fails():
+    assert _checker().problems(_envelope(status="skipped"), asked=2)
+
+
+def test_a_question_without_a_verdict_fails():
+    assert _checker().problems(_envelope(), asked=3) == ["2 of 3 questions came back with a verdict."]
+
+
+def test_a_run_with_no_results_fails():
+    assert _checker().problems({"status": "passed", "message": ""}, asked=2)
+
+
+def _write_run(root, item, envelope, tests):
+    import json
+
+    (root / item).mkdir()
+    (root / item / "envelope.json").write_text(json.dumps(envelope), encoding="utf-8")
+    (root / item / "effective.promptfoo.yaml").write_text(
+        yaml.safe_dump({"tests": [{"description": f"t{i}"} for i in range(tests)]}), encoding="utf-8")
+
+
+def test_main_fails_without_an_envelope(tmp_path, capsys):
+    assert _checker().main(tmp_path) == 1
+    assert "No Data Agent envelope" in capsys.readouterr().out
+
+
+def test_main_reads_every_envelope(tmp_path, capsys):
+    _write_run(tmp_path, "good", _envelope(), tests=2)
+    _write_run(tmp_path, "bad", {"status": "error", "message": "x"}, tests=2)
+    assert _checker().main(tmp_path) == 1
+    out = capsys.readouterr().out
+    assert "bad" in out and "good: all 2 questions answered (1 passed, 1 failed)" in out
+
+
+def test_main_passes_when_every_run_answered(tmp_path):
+    _write_run(tmp_path, "good", _envelope(), tests=2)
+    assert _checker().main(tmp_path) == 0
+
+
+def _live_steps() -> list[dict]:
+    return yaml.safe_load(_WORKFLOW.read_text(encoding="utf-8"))["jobs"]["live"]["steps"]
+
+
+def test_the_workflow_tolerates_findings_but_not_a_usage_or_credential_exit():
+    ask = next(step for step in _live_steps() if "fab-test data-agent --workspace" in step.get("run", ""))
+    assert "set +e" in ask["run"] and '[ "$code" -le 1 ]' in ask["run"]
+
+
+def test_the_workflow_checks_the_run_completed():
+    steps = _live_steps()
+    ask = next(i for i, step in enumerate(steps) if "fab-test data-agent --workspace" in step.get("run", ""))
+    check = next(i for i, step in enumerate(steps) if _CHECKER.name in step.get("run", ""))
+    assert check == ask + 1

@@ -56,6 +56,7 @@ on:
       - "fab-tests/data-agent/**"
       - "**/*.DataAgent/**"
       - ".github/workflows/data-agent-live.yml"
+      - ".github/scripts/check_data_agent_ran.py"
   push:
     branches: [main, dev]
     paths: *data-agent-paths
@@ -106,9 +107,23 @@ jobs:
       - name: Lint the suites (offline)
         run: fab-test data-agent tests lint
 
-      # Exit 1 when an answer is wrong; 127 without credentials.
+      # Wrong answers (exit 1) do not fail CI; a usage or credential failure
+      # (2, 126, 127) does.
+      # Exit 1 also covers a timeout or a promptfoo crash, so the next step
+      # reads the envelope to tell those apart.
       - name: Ask the deployed agent
-        run: fab-test data-agent --workspace "$DATA_AGENT_WORKSPACE" --report
+        run: |
+          set +e
+          fab-test data-agent --workspace "$DATA_AGENT_WORKSPACE" --report
+          code=$?
+          echo "data-agent exit code: $code"
+          [ "$code" -le 1 ]
+
+      # Tests the tester, not the agent: the agent answers agentically, so
+      # which answers pass varies by run (see the report). This fails only
+      # when the run broke or a question came back without a verdict.
+      - name: Check every question was asked and judged
+        run: python .github/scripts/check_data_agent_ran.py
 
       - name: Keep the results
         if: always()
