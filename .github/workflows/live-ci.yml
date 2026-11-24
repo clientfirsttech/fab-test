@@ -66,6 +66,11 @@ jobs:
         with:
           dotnet-version: "10.0.x"
 
+      # a11y builds pbir-a11y with npm, which the playwright image lacks.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
       - name: Install fab-test from the checkout
         id: install
         run: |
@@ -79,14 +84,13 @@ jobs:
         run: fab-test auth status --workspace "$FAB_TEST_LIVE_WORKSPACE"
 
       # Each analyzer locally and against the live workspace, matched with
-      # recordings (rdl and pbir service mode included); pql-test's deployed
-      # model must pass and fail exactly as recorded. The PBIR Inspector rule
-      # tests need .NET 10, set up above, so in build.yml they skip.
+      # recordings (rdl and pbir service mode included). The PBIR Inspector
+      # rule tests need .NET 10, set up above, so in build.yml they skip.
+      # pql-test runs in the Windows job: on Linux it queries no tests.
       - name: Live analyzer tests
         run: >-
           pytest -m integration -q -rs -p no:cacheprovider
           tests/test_analyzers_live.py
-          tests/test_pql_test_live.py
           tests/test_slicer_rules_live.py
           tests/test_bookmark_navigators_live.py
           tests/test_pbir_filter_pane_rules_live.py
@@ -116,10 +120,10 @@ jobs:
             fab-test-results/**/envelope.json
             fab-test-results/**/report.html
 
-  # Tabular Editor (bpa) runs on Windows only, so bpa's live tests get their
-  # own job; on the Linux job above they skip.
+  # Tabular Editor (bpa) runs on Windows only, and pql-test reaches a deployed
+  # model's tests only on Windows (pyadomd), so both live tests run here.
   live-windows:
-    name: Live (bpa, Windows)
+    name: Live (Windows - bpa, pql-test)
     if: >-
       github.event_name != 'pull_request' ||
       (github.event.pull_request.head.repo.full_name == github.repository &&
@@ -142,5 +146,9 @@ jobs:
       - name: Install fab-test from the checkout
         run: pip install -e ".[dev]"
 
-      - name: Live bpa tests
-        run: pytest -m integration -q -rs -p no:cacheprovider tests/test_analyzers_live.py -k bpa
+      # SampleModel-PQLAssert's tests must pass and fail exactly as recorded.
+      - name: Live bpa and pql-test tests
+        run: >-
+          pytest -m integration -q -rs -p no:cacheprovider
+          tests/test_analyzers_live.py -k "bpa or test_pql_test_live"
+          tests/test_pql_test_live.py
