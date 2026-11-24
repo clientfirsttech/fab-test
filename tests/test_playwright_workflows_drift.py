@@ -180,5 +180,6 @@ def test_live_ci_runs_the_live_tests_and_uploads_results_after_failure() -> None
 
     assert "test_playwright_result_parity_live.py" in text
     assert "test_playwright_generation_parity_live.py" in text
+    assert "test_pql_test_live.py" in text
     assert "fab-test rdl --workspace" in text
     assert upload["if"] == "always()"

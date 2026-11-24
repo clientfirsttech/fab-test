@@ -1,0 +1,438 @@
+{
+ "workspace": "fab-test-working-area",
+ "model": "SampleModel-PQLAssert",
+ "recorded": "2026-11-23",
+ "pql_test": "0.2.1",
+ "results": [
+  {
+   "suite_name": "BestPractices.DEV.Tests",
+   "test_name": "[DAX Expressions] Column references should be fully qualified",
+   "passed": false
+  },
+  {
+   "suite_name": "BestPractices.DEV.Tests",
+   "test_name": "[DAX Expressions] Use the TREATAS function instead of INTERSECT",
+   "passed": true
+  },
+  {
+   "suite_name": "BestPractices.DEV.Tests",
+   "test_name": "[Error Prevention] Relationship columns should be of the same data type",
+   "passed": true
+  },
+  {
+   "suite_name": "BestPractices.DEV.Tests",
+   "test_name": "[Formatting] Do not summarize numeric columns",
+   "passed": false
+  },
+  {
+   "suite_name": "BestPractices.DEV.Tests",
+   "test_name": "[Formatting] Hide fact table columns",
+   "passed": true
+  },
+  {
+   "suite_name": "BestPractices.DEV.Tests",
+   "test_name": "[Formatting] Mark primary keys",
+   "passed": false
+  },
+  {
+   "suite_name": "BestPractices.DEV.Tests",
+   "test_name": "[Formatting] Mark row labels",
+   "passed": false
+  },
+  {
+   "suite_name": "BestPractices.DEV.Tests",
+   "test_name": "[Formatting] Provide format string for measures",
+   "passed": false
+  },
+  {
+   "suite_name": "BestPractices.DEV.Tests",
+   "test_name": "[Performance] Avoid bi-directional relationships against high-cardinality columns",
+   "passed": true
+  },
+  {
+   "suite_name": "BestPractices.DEV.Tests",
+   "test_name": "[Performance] Do not use floating point data types",
+   "passed": false
+  },
+  {
+   "suite_name": "BestPractices.DEV.Tests",
+   "test_name": "[Performance] Remove auto-date table",
+   "passed": true
+  },
+  {
+   "suite_name": "BestPractices.DEV.Tests",
+   "test_name": "[Performance] Set IsAvailableInMdx to false on non-attribute columns",
+   "passed": false
+  },
+  {
+   "suite_name": "DataContent.PROD.Tests",
+   "test_name": "DataContent: AlignmentDim has data",
+   "passed": true
+  },
+  {
+   "suite_name": "DataContent.PROD.Tests",
+   "test_name": "DataContent: DateDim has data",
+   "passed": true
+  },
+  {
+   "suite_name": "DataContent.PROD.Tests",
+   "test_name": "DataContent: EyeColorDim has data",
+   "passed": true
+  },
+  {
+   "suite_name": "DataContent.PROD.Tests",
+   "test_name": "DataContent: MarvelFact has data",
+   "passed": true
+  },
+  {
+   "suite_name": "DataContent.PROD.Tests",
+   "test_name": "DataContent: MarvelFact has more than 10000 characters",
+   "passed": true
+  },
+  {
+   "suite_name": "DataContent.PROD.Tests",
+   "test_name": "DataContent: Timezone has data",
+   "passed": true
+  },
+  {
+   "suite_name": "DataQuality.ANY.Tests",
+   "test_name": "AlignmentDim Alignment should not be blank",
+   "passed": true
+  },
+  {
+   "suite_name": "DataQuality.ANY.Tests",
+   "test_name": "AlignmentDim AlignmentID should be unique",
+   "passed": true
+  },
+  {
+   "suite_name": "DataQuality.ANY.Tests",
+   "test_name": "AlignmentDim AlignmentID should not contain nulls",
+   "passed": true
+  },
+  {
+   "suite_name": "DataQuality.ANY.Tests",
+   "test_name": "AlignmentDim table should contain data",
+   "passed": true
+  },
+  {
+   "suite_name": "DataQuality.ANY.Tests",
+   "test_name": "DateDim Date should be unique",
+   "passed": true
+  },
+  {
+   "suite_name": "DataQuality.ANY.Tests",
+   "test_name": "DateDim Date should not contain nulls",
+   "passed": true
+  },
+  {
+   "suite_name": "DataQuality.ANY.Tests",
+   "test_name": "DateDim DateID should be unique",
+   "passed": true
+  },
+  {
+   "suite_name": "DataQuality.ANY.Tests",
+   "test_name": "DateDim DateID should not contain nulls",
+   "passed": true
+  },
+  {
+   "suite_name": "DataQuality.ANY.Tests",
+   "test_name": "DateDim Year should be reasonable range",
+   "passed": false
+  },
+  {
+   "suite_name": "DataQuality.ANY.Tests",
+   "test_name": "DateDim dates should be valid",
+   "passed": true
+  },
+  {
+   "suite_name": "DataQuality.ANY.Tests",
+   "test_name": "DateDim should have at least 365 days",
+   "passed": true
+  },
+  {
+   "suite_name": "DataQuality.ANY.Tests",
+   "test_name": "DateDim should have chronological dates",
+   "passed": true
+  },
+  {
+   "suite_name": "DataQuality.ANY.Tests",
+   "test_name": "DateDim table should contain data",
+   "passed": true
+  },
+  {
+   "suite_name": "DataQuality.ANY.Tests",
+   "test_name": "EyeColorDim Eye Color should not be blank",
+   "passed": true
+  },
+  {
+   "suite_name": "DataQuality.ANY.Tests",
+   "test_name": "EyeColorDim EyeID should be unique",
+   "passed": true
+  },
+  {
+   "suite_name": "DataQuality.ANY.Tests",
+   "test_name": "EyeColorDim EyeID should not contain nulls",
+   "passed": true
+  },
+  {
+   "suite_name": "DataQuality.ANY.Tests",
+   "test_name": "EyeColorDim should have multiple eye colors",
+   "passed": true
+  },
+  {
+   "suite_name": "DataQuality.ANY.Tests",
+   "test_name": "EyeColorDim table should contain data",
+   "passed": true
+  },
+  {
+   "suite_name": "DataQuality.ANY.Tests",
+   "test_name": "MarvelFact AlignmentID should not contain nulls",
+   "passed": true
+  },
+  {
+   "suite_name": "DataQuality.ANY.Tests",
+   "test_name": "MarvelFact Appearances should be non-negative",
+   "passed": true
+  },
+  {
+   "suite_name": "DataQuality.ANY.Tests",
+   "test_name": "MarvelFact DateID should not contain nulls",
+   "passed": true
+  },
+  {
+   "suite_name": "DataQuality.ANY.Tests",
+   "test_name": "MarvelFact EyeID should not contain nulls",
+   "passed": true
+  },
+  {
+   "suite_name": "DataQuality.ANY.Tests",
+   "test_name": "MarvelFact ID should be unique",
+   "passed": true
+  },
+  {
+   "suite_name": "DataQuality.ANY.Tests",
+   "test_name": "MarvelFact ID should not contain nulls",
+   "passed": true
+  },
+  {
+   "suite_name": "DataQuality.ANY.Tests",
+   "test_name": "MarvelFact Name should not be blank",
+   "passed": true
+  },
+  {
+   "suite_name": "DataQuality.ANY.Tests",
+   "test_name": "MarvelFact should have more than 100 rows",
+   "passed": true
+  },
+  {
+   "suite_name": "DataQuality.ANY.Tests",
+   "test_name": "MarvelFact table should contain data",
+   "passed": true
+  },
+  {
+   "suite_name": "DataQuality.ANY.Tests",
+   "test_name": "MarvelSource table should contain data",
+   "passed": true
+  },
+  {
+   "suite_name": "DataQuality.PROD.Tests",
+   "test_name": "Data Quality: AlignmentDim[AlignmentID] has no duplicates",
+   "passed": true
+  },
+  {
+   "suite_name": "DataQuality.PROD.Tests",
+   "test_name": "Data Quality: DateDim[DateID] has no duplicates",
+   "passed": true
+  },
+  {
+   "suite_name": "DataQuality.PROD.Tests",
+   "test_name": "Data Quality: EyeColorDim[EyeID] has no duplicates",
+   "passed": true
+  },
+  {
+   "suite_name": "DataQuality.PROD.Tests",
+   "test_name": "Data Quality: MarvelFact[AlignmentID] has no null values",
+   "passed": true
+  },
+  {
+   "suite_name": "DataQuality.PROD.Tests",
+   "test_name": "Data Quality: MarvelFact[DateID] has no null values",
+   "passed": true
+  },
+  {
+   "suite_name": "DataQuality.PROD.Tests",
+   "test_name": "Data Quality: MarvelFact[EyeID] has no null values",
+   "passed": true
+  },
+  {
+   "suite_name": "DataQuality.PROD.Tests",
+   "test_name": "Data Quality: MarvelFact[ID] has no null values",
+   "passed": true
+  },
+  {
+   "suite_name": "DataQuality.PROD.Tests",
+   "test_name": "Data Quality: MarvelFact[Name] has no null or blank values",
+   "passed": true
+  },
+  {
+   "suite_name": "Example.DEV.Tests",
+   "test_name": "Number of Characters should not be blank or null",
+   "passed": true
+  },
+  {
+   "suite_name": "Example.DEV.Tests",
+   "test_name": "Number of Good Aligned Characters is 4636",
+   "passed": true
+  },
+  {
+   "suite_name": "Measures.DEV.Tests",
+   "test_name": "Measures: Current Date Time should not be null",
+   "passed": true
+  },
+  {
+   "suite_name": "Measures.DEV.Tests",
+   "test_name": "Measures: Number of Good Aligned Characters equals 4636",
+   "passed": true
+  },
+  {
+   "suite_name": "Measures.DEV.Tests",
+   "test_name": "Measures: Title By Date starts with 'Number of Characters'",
+   "passed": true
+  },
+  {
+   "suite_name": "Measures.DEV.Tests",
+   "test_name": "Measures: Total Characters exceeds Good-aligned count of 4636",
+   "passed": true
+  },
+  {
+   "suite_name": "Measures.DEV.Tests",
+   "test_name": "Measures: Total Number of Characters is greater than 0",
+   "passed": true
+  },
+  {
+   "suite_name": "QuickChecks.PROD.Tests",
+   "test_name": "AlignmentDim Should Have Rows",
+   "passed": true
+  },
+  {
+   "suite_name": "QuickChecks.PROD.Tests",
+   "test_name": "There should be no duplicates in EyeColorDim",
+   "passed": true
+  },
+  {
+   "suite_name": "Schema.DEV.Tests",
+   "test_name": "Schema: AlignmentDim table exists",
+   "passed": true
+  },
+  {
+   "suite_name": "Schema.DEV.Tests",
+   "test_name": "Schema: AlignmentDim[AlignmentID] column exists",
+   "passed": true
+  },
+  {
+   "suite_name": "Schema.DEV.Tests",
+   "test_name": "Schema: AlignmentDim[Alignment] column exists",
+   "passed": true
+  },
+  {
+   "suite_name": "Schema.DEV.Tests",
+   "test_name": "Schema: DataTypes table exists",
+   "passed": true
+  },
+  {
+   "suite_name": "Schema.DEV.Tests",
+   "test_name": "Schema: DateDim table exists",
+   "passed": true
+  },
+  {
+   "suite_name": "Schema.DEV.Tests",
+   "test_name": "Schema: DateDim[DateID] column exists",
+   "passed": true
+  },
+  {
+   "suite_name": "Schema.DEV.Tests",
+   "test_name": "Schema: DateDim[Date] column exists",
+   "passed": true
+  },
+  {
+   "suite_name": "Schema.DEV.Tests",
+   "test_name": "Schema: DateDim[Year] column exists",
+   "passed": true
+  },
+  {
+   "suite_name": "Schema.DEV.Tests",
+   "test_name": "Schema: EyeColorDim table exists",
+   "passed": true
+  },
+  {
+   "suite_name": "Schema.DEV.Tests",
+   "test_name": "Schema: EyeColorDim[Eye Color] column exists",
+   "passed": true
+  },
+  {
+   "suite_name": "Schema.DEV.Tests",
+   "test_name": "Schema: EyeColorDim[EyeID] column exists",
+   "passed": true
+  },
+  {
+   "suite_name": "Schema.DEV.Tests",
+   "test_name": "Schema: MarvelFact table exists",
+   "passed": true
+  },
+  {
+   "suite_name": "Schema.DEV.Tests",
+   "test_name": "Schema: MarvelFact to AlignmentDim relationship exists",
+   "passed": true
+  },
+  {
+   "suite_name": "Schema.DEV.Tests",
+   "test_name": "Schema: MarvelFact to DateDim relationship exists",
+   "passed": true
+  },
+  {
+   "suite_name": "Schema.DEV.Tests",
+   "test_name": "Schema: MarvelFact to EyeColorDim relationship exists",
+   "passed": true
+  },
+  {
+   "suite_name": "Schema.DEV.Tests",
+   "test_name": "Schema: MarvelFact[AlignmentID] column exists",
+   "passed": true
+  },
+  {
+   "suite_name": "Schema.DEV.Tests",
+   "test_name": "Schema: MarvelFact[Appearances] column exists",
+   "passed": true
+  },
+  {
+   "suite_name": "Schema.DEV.Tests",
+   "test_name": "Schema: MarvelFact[DateID] column exists",
+   "passed": true
+  },
+  {
+   "suite_name": "Schema.DEV.Tests",
+   "test_name": "Schema: MarvelFact[EyeID] column exists",
+   "passed": true
+  },
+  {
+   "suite_name": "Schema.DEV.Tests",
+   "test_name": "Schema: MarvelFact[ID] column exists",
+   "passed": true
+  },
+  {
+   "suite_name": "Schema.DEV.Tests",
+   "test_name": "Schema: MarvelFact[Name] column exists",
+   "passed": true
+  },
+  {
+   "suite_name": "Schema.DEV.Tests",
+   "test_name": "Schema: MarvelSource table exists",
+   "passed": true
+  },
+  {
+   "suite_name": "Schema.DEV.Tests",
+   "test_name": "Schema: Timezone table exists",
+   "passed": true
+  }
+ ]
+}

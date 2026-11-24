@@ -56,7 +56,8 @@ on:
       - "fab-tests/data-agent/**"
       - "**/*.DataAgent/**"
       - ".github/workflows/data-agent-live.yml"
-      - ".github/scripts/check_data_agent_ran.py"
+      - "tests/test_data_agent_live.py"
+      - "tests/test_playwright_generation_parity_live.py"
   push:
     branches: [main, dev]
     paths: *data-agent-paths
@@ -97,7 +98,7 @@ jobs:
           node-version: "22"
 
       - name: Install fab-test from the checkout
-        run: pip install -e .
+        run: pip install -e ".[dev]"
 
       # Fails fast, with the remediation, when the secrets are missing or the
       # principal cannot see the workspace.
@@ -107,23 +108,14 @@ jobs:
       - name: Lint the suites (offline)
         run: fab-test data-agent tests lint
 
-      # Wrong answers (exit 1) do not fail CI; a usage or credential failure
-      # (2, 126, 127) does.
-      # Exit 1 also covers a timeout or a promptfoo crash, so the next step
-      # reads the envelope to tell those apart.
-      - name: Ask the deployed agent
-        run: |
-          set +e
-          fab-test data-agent --workspace "$DATA_AGENT_WORKSPACE" --report
-          code=$?
-          echo "data-agent exit code: $code"
-          [ "$code" -le 1 ]
-
-      # Tests the tester, not the agent: the agent answers agentically, so
-      # which answers pass varies by run (see the report). This fails only
-      # when the run broke or a question came back without a verdict.
-      - name: Check every question was asked and judged
-        run: python .github/scripts/check_data_agent_ran.py
+      # The live integration test runs the real CLI: auth status, listing the
+      # deployed agents, and one run that asks every question. It fails only
+      # when the tester did not work (the run broke, or a question came back
+      # without a verdict); which answers pass varies by run, so see the report.
+      - name: Live integration tests
+        run: >-
+          pytest tests/test_data_agent_live.py -v -rs -p no:cacheprovider
+          --basetemp=fab-test-results/live
 
       - name: Keep the results
         if: always()
@@ -133,3 +125,4 @@ jobs:
           path: |
             fab-test-results/**/envelope.json
             fab-test-results/**/report.html
+            fab-test-results/**/effective.promptfoo.yaml

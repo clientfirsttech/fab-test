@@ -46,6 +46,8 @@ jobs:
       FABRIC_CLIENT_SECRET: ${{ secrets.FABRIC_CLIENT_SECRET }}
       VISUAL_ERROR_TESTING_WORKSPACE: visual-error-testing
       VISUAL_ERROR_TESTING_WORKSPACE_ID: c4698d28-b05c-40bc-926c-707563ac85e7
+      # SampleModel-PQLAssert, which fails some of its pql tests on purpose.
+      PQL_TEST_WORKSPACE: fab-test-working-area
     steps:
       - uses: actions/checkout@v4
 
@@ -86,12 +88,18 @@ jobs:
 
       # The credential-gated contract tests: the generated matrix must match
       # the goldens, and every case must pass or fail as the reference
-      # implementation did.
+      # implementation did. pql-test's deployed model must pass and fail
+      # exactly as recorded. The PBIR Inspector rule tests need .NET 10, set
+      # up above, so in build.yml they skip.
       - name: Live parity tests
         run: >-
-          pytest -m integration -q -p no:cacheprovider
+          pytest -m integration -q -rs -p no:cacheprovider
           tests/test_playwright_generation_parity_live.py
           tests/test_playwright_result_parity_live.py
+          tests/test_pql_test_live.py
+          tests/test_slicer_rules_live.py
+          tests/test_bookmark_navigators_live.py
+          tests/test_pbir_filter_pane_rules_live.py
 
       - name: Upload results
         if: always()
