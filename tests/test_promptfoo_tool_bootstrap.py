@@ -296,6 +296,10 @@ def test_data_agent_readiness_probes_promptfoo(monkeypatch):
 @pytest.mark.fab_test
 def test_data_agent_preflight_exits_127_naming_node_when_npm_is_missing(tmp_path, monkeypatch):
     monkeypatch.setenv("FAB_TEST_ENABLE_DATA_AGENT", "1")
+    # The credential check runs before the tool check, so supply a fake principal to reach Node.
+    for key, value in (("FABRIC_TENANT_ID", "tenant"), ("FABRIC_CLIENT_ID", "client"),
+                       ("FABRIC_CLIENT_SECRET", "secret")):
+        monkeypatch.setenv(key, value)
     monkeypatch.setattr(readiness, "REPO_ROOT", tmp_path)
     monkeypatch.delenv("PROMPTFOO_PATH", raising=False)
     monkeypatch.delenv("PROMPTFOO_INSTALL_URL", raising=False)
