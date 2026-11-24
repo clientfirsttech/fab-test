@@ -181,5 +181,19 @@ def test_live_ci_runs_the_live_tests_and_uploads_results_after_failure() -> None
     assert "test_playwright_result_parity_live.py" in text
     assert "test_playwright_generation_parity_live.py" in text
     assert "test_pql_test_live.py" in text
-    assert "fab-test rdl --workspace" in text
+    assert "test_analyzers_live.py" in text  # rdl and pbir service mode, with recordings
     assert upload["if"] == "always()"
+
+
+@pytest.mark.fab_test
+def test_live_ci_workspaces_come_from_variables_and_match_the_goldens() -> None:
+    """Workspaces are repository variables with defaults, and the parity default is the goldens' own."""
+    import csv
+
+    env = _load(_LIVE_CI)["jobs"]["live"]["env"]
+    for name in ("FAB_TEST_LIVE_WORKSPACE", "PLAYWRIGHT_PARITY_WORKSPACE_ID"):
+        assert f"vars.{name} ||" in env[name], name
+    golden = {row["workspace_id"] for path in (_ROOT / "tests" / "fixtures" / "playwright-parity").glob("*.csv")
+              for row in csv.DictReader(path.open(newline="", encoding="utf-8-sig"))}
+    assert len(golden) == 1 and golden.pop() in env["PLAYWRIGHT_PARITY_WORKSPACE_ID"]
+
