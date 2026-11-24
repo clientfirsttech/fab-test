@@ -35,8 +35,10 @@ Copied 2026-11-23 from the `visual-error-testing` repository (Azure DevOps), unc
 | `RLSTest-ThinReport.Report` | Binds to `RLSTest.SemanticModel` |
 | `RLSTest-WithBookmarks.Report`, `Report with Bookmarks.Report`, `Working Visuals.Report` | Each binds to its own model, data embedded |
 | `RDLSource.SemanticModel` | Reads a CSV with `Web.Contents`: set its web credential once after the first sync |
+| `PaginatedExample.PaginatedReport`, `PaginatedExample-WithFilter`, `PaginatedExample-WithMultiFilter` | Connect to `Working Visuals` by dataset ID |
+| `PaginatedExample-BrokenRDL.PaginatedReport` | Connects to `RDLSource` by dataset ID |
 
-The four `PaginatedExample*.PaginatedReport` items follow in a second sync: each RDL connects to its dataset by ID (`Initial Catalog=sobe_wowvirtualserver-<dataset id>`), and those IDs exist only once this sync creates `Working Visuals` and `RDLSource` here. The loose `PaginatedExample-*.rdl` files beside them are different reports that unit tests read.
+Each RDL connects to its dataset by ID (`Initial Catalog=sobe_wowvirtualserver-<dataset id>`), so the paginated reports came in a second sync (2026-11-24), rebound to the IDs the first sync gave `Working Visuals` (`559c5822-62f9-4a74-91a9-79bd3f50ace1`) and `RDLSource` (`d665ad6e-f348-460f-8b24-cfabafbff48d`). If either model is deleted and recreated, rebind them. The loose `PaginatedExample-*.rdl` files are different reports that unit tests read.
 
 ## SampleModel-DefaultState test bed
 
