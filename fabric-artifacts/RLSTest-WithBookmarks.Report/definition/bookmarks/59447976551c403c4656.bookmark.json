@@ -1,0 +1,86 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/bookmark/2.1.0/schema.json",
+  "displayName": "Show Broken",
+  "name": "59447976551c403c4656",
+  "options": {
+    "targetVisualNames": []
+  },
+  "explorationState": {
+    "version": "1.15",
+    "activeSection": "0e66f25d564bd6d4c710",
+    "sections": {
+      "0e66f25d564bd6d4c710": {
+        "visualContainers": {
+          "7dd92b68db890cebe277": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "c173e0bad1052be3eae6",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Table B"
+                        }
+                      },
+                      "Property": "Table B"
+                    }
+                  },
+                  "howCreated": 0
+                },
+                {
+                  "name": "e94e263e74b6ff4537af",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Table A"
+                        }
+                      },
+                      "Property": "Column1"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "tableEx",
+              "autoSelectVisualType": false,
+              "objects": {}
+            }
+          },
+          "c8b7831205787013164b": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "db9dd47bea423830fe2d",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Table A"
+                        }
+                      },
+                      "Property": "Column1"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "tableEx",
+              "autoSelectVisualType": false,
+              "objects": {}
+            }
+          }
+        }
+      }
+    },
+    "objects": {}
+  }
+}

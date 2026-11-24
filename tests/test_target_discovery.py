@@ -440,7 +440,12 @@ def test_a_nested_checkout_does_not_multiply_this_repository():
 
     assert [p.name for p in found] == [
         "Not Working Visuals.SemanticModel",
+        "RDLSource.SemanticModel",
         "Report with Bookmarks - Broken Visuals.SemanticModel",
+        "Report with Bookmarks.SemanticModel",
+        "RLSTest-WithBookmarks.SemanticModel",
+        "RLSTest.SemanticModel",
         "SampleModel-PQLAssert.SemanticModel",
         "ThinReport.SemanticModel",
+        "Working Visuals.SemanticModel",
     ]

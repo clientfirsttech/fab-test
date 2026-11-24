@@ -1,0 +1,38 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.13.0/schema.json",
+  "name": "9ca97b9d46aebc5cf345",
+  "position": {
+    "x": 344,
+    "y": 40,
+    "z": 1000,
+    "height": 280,
+    "width": 280,
+    "tabOrder": 1000
+  },
+  "visual": {
+    "visualType": "tableEx",
+    "query": {
+      "queryState": {
+        "Values": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Table B"
+                    }
+                  },
+                  "Property": "Table B"
+                }
+              },
+              "queryRef": "Table B.Table B",
+              "nativeQueryRef": "Table B"
+            }
+          ]
+        }
+      }
+    },
+    "drillFilterOtherVisuals": true
+  }
+}
