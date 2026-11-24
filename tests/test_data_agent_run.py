@@ -112,6 +112,10 @@ def test_enumeration_limit_refuses_before_resolving_urls(tmp_path, monkeypatch):
     from fab_test.scripts import _data_agent_run as run
 
     agents = [{"id": str(i), "displayName": f"Agent{i}"} for i in range(6)]
+    # A fake principal, so auth never falls back to az (CI has no .fab-test/.env to supply one).
+    for key, value in (("FABRIC_TENANT_ID", "tenant"), ("FABRIC_CLIENT_ID", "client"),
+                       ("FABRIC_CLIENT_SECRET", "test-secret")):
+        monkeypatch.setenv(key, value)
     monkeypatch.setattr(run, "credential_secret", lambda _env: "test-secret")
     monkeypatch.setattr(run, "build_service_client", lambda _args: object())
     monkeypatch.setattr(run, "list_data_agents", lambda _client, _ws: agents)

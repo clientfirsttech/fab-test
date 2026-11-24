@@ -198,7 +198,8 @@ def _capture_worker(monkeypatch):
 
 
 def test_worker_uses_the_preflight_env_file_from_the_callers_directory(tmp_path, monkeypatch):
-    for key in (*_SP_VARS, "PLAYWRIGHT_ENV_FILE"):
+    # GITHUB_WORKSPACE (set in CI) would make the checkout, not the caller's directory, the repo root.
+    for key in (*_SP_VARS, "PLAYWRIGHT_ENV_FILE", "GITHUB_WORKSPACE"):
         monkeypatch.delenv(key, raising=False)
     monkeypatch.chdir(tmp_path)
     env_file = tmp_path / ".fab-test" / ".env"
