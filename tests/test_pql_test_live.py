@@ -6,7 +6,7 @@ passes or fails exactly as recorded in tests/fixtures/pql-test-live/. pql-test i
 a difference is a regression in fab-test, pql-test or the model, never noise; and because the model
 fails on purpose, a run that reports everything passing (a tester that can't see a failure) fails too.
 
-Opt-in: skips unless PQL_TEST_WORKSPACE is set, since querying the model needs its Fabric capacity
+Opt-in: skips unless FAB_TEST_LIVE_WORKSPACE is set, since querying the model needs its Fabric capacity
 running. `.github/workflows/live-ci.yml` sets it. To re-record after an intended change, run the
 command below and copy each test's suite_name, test_name and passed into the fixture.
 """
@@ -25,13 +25,13 @@ from .test_playwright_generation_parity_live import _credentials_present
 
 pytestmark = [pytest.mark.pql_test, pytest.mark.integration]
 
-_WORKSPACE = os.environ.get("PQL_TEST_WORKSPACE", "")
+_WORKSPACE = os.environ.get("FAB_TEST_LIVE_WORKSPACE", "")
 _RECORDING = json.loads((Path(__file__).parent / "fixtures" / "pql-test-live" / "SampleModel-PQLAssert.json")
                         .read_text(encoding="utf-8"))
 
 pytestmark.append(pytest.mark.skipif(
     not (_WORKSPACE and _credentials_present()),
-    reason="opt-in: set PQL_TEST_WORKSPACE and a service principal (FABRIC_TENANT_ID, FABRIC_CLIENT_ID, "
+    reason="opt-in: set FAB_TEST_LIVE_WORKSPACE and a service principal (FABRIC_TENANT_ID, FABRIC_CLIENT_ID, "
            "FABRIC_CLIENT_SECRET, or .fab-test/.env); querying the model needs a running Fabric capacity",
 ))
 
