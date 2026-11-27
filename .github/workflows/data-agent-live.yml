@@ -64,8 +64,8 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: data-agent-live-${{ github.ref }}
-  cancel-in-progress: true
+  group: data-agent-live-${{ vars.DATA_AGENT_WORKSPACE || 'fab-test-working-area' }}
+  cancel-in-progress: false
 
 permissions:
   contents: read

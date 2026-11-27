@@ -88,6 +88,14 @@ def test_it_runs_only_on_change_or_by_hand():
     assert set(triggers) == {"pull_request", "push", "workflow_dispatch"}
 
 
+def test_it_serializes_every_run_for_the_deployed_workspace():
+    concurrency = yaml.safe_load(_WORKFLOW.read_text(encoding="utf-8"))["concurrency"]
+    assert concurrency == {
+        "group": "data-agent-live-${{ vars.DATA_AGENT_WORKSPACE || 'fab-test-working-area' }}",
+        "cancel-in-progress": False,
+    }
+
+
 
 
 def test_the_workflow_runs_the_live_integration_test():
