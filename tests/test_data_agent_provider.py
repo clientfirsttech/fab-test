@@ -117,6 +117,14 @@ def agent(provider, monkeypatch):
 # -- promptfoo's loader ------------------------------------------------------
 
 
+def test_given_the_provider_modules_should_fit_one_maintenance_read():
+    from fab_test.scripts import fabric_data_agent_provider as packaged
+
+    modules = Path(packaged.__file__).parent.glob("*data_agent_provider*.py")
+    sizes = {path.name: len(path.read_text(encoding="utf-8").splitlines()) for path in modules}
+    assert sizes and max(sizes.values()) <= 400, sizes
+
+
 def test_given_promptfoos_loader_should_import_the_provider_by_file_path():
     """promptfoo 0.124.0 (dist/src/python/wrapper.py) loads a provider with
     spec_from_file_location(<file stem>, path): no parent package, so a relative import fails."""
@@ -128,6 +136,8 @@ def test_given_promptfoos_loader_should_import_the_provider_by_file_path():
     spec.loader.exec_module(module)
 
     assert callable(module.call_api)
+    result = module.call_api("q", _options(base_url="http://example.test/agent"), {"vars": {}})
+    assert "https" in result["error"]
 
 
 # -- the lifecycle -----------------------------------------------------------
