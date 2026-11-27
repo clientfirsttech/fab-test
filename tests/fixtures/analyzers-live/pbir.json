@@ -31,6 +31,86 @@
    ],
    "status": "failed"
   },
+  "RLSTest-ThinReport": {
+   "findings": [
+    [
+     "ENSURE_ALTTEXT",
+     "error",
+     "Page 1"
+    ],
+    [
+     "ENSURE_ALTTEXT",
+     "error",
+     "Page 2"
+    ],
+    [
+     "ENSURE_NON_DEFAULT_TITLES",
+     "error",
+     "Page 1"
+    ],
+    [
+     "ENSURE_NON_DEFAULT_TITLES",
+     "error",
+     "Page 2"
+    ]
+   ],
+   "status": "failed"
+  },
+  "RLSTest-WithBookmarks": {
+   "findings": [
+    [
+     "ENSURE_ALTTEXT",
+     "error",
+     "Page 1"
+    ],
+    [
+     "ENSURE_ALTTEXT",
+     "error",
+     "Page 2"
+    ],
+    [
+     "ENSURE_NON_DEFAULT_TITLES",
+     "error",
+     "Page 1"
+    ],
+    [
+     "ENSURE_NON_DEFAULT_TITLES",
+     "error",
+     "Page 2"
+    ],
+    [
+     "FIRST_TAB_DEFAULT",
+     "error",
+     "N/A"
+    ],
+    [
+     "NO_VISUAL_LEVEL_FILTERS_UNLOCKED_IN_FILTER_PANEL",
+     "error",
+     "Page 1"
+    ],
+    [
+     "NO_VISUAL_LEVEL_FILTERS_VISIBLE_IN_FILTER_PANEL",
+     "error",
+     "Page 1"
+    ]
+   ],
+   "status": "failed"
+  },
+  "Report with Bookmarks": {
+   "findings": [
+    [
+     "ENSURE_ALTTEXT",
+     "error",
+     "Page 1"
+    ],
+    [
+     "ENSURE_NON_DEFAULT_TITLES",
+     "error",
+     "Page 1"
+    ]
+   ],
+   "status": "failed"
+  },
   "Report with Bookmarks - Broken Visuals": {
    "findings": [
     [
@@ -180,6 +260,21 @@
     ]
    ],
    "status": "failed"
+  },
+  "Working Visuals": {
+   "findings": [
+    [
+     "ENSURE_ALTTEXT",
+     "error",
+     "Page 1"
+    ],
+    [
+     "ENSURE_NON_DEFAULT_TITLES",
+     "error",
+     "Page 1"
+    ]
+   ],
+   "status": "failed"
   }
  },
  "service": {
@@ -209,6 +304,86 @@
      "FIRST_TAB_DEFAULT",
      "error",
      "N/A"
+    ]
+   ],
+   "status": "failed"
+  },
+  "RLSTest-ThinReport": {
+   "findings": [
+    [
+     "ENSURE_ALTTEXT",
+     "error",
+     "Page 1"
+    ],
+    [
+     "ENSURE_ALTTEXT",
+     "error",
+     "Page 2"
+    ],
+    [
+     "ENSURE_NON_DEFAULT_TITLES",
+     "error",
+     "Page 1"
+    ],
+    [
+     "ENSURE_NON_DEFAULT_TITLES",
+     "error",
+     "Page 2"
+    ]
+   ],
+   "status": "failed"
+  },
+  "RLSTest-WithBookmarks": {
+   "findings": [
+    [
+     "ENSURE_ALTTEXT",
+     "error",
+     "Page 1"
+    ],
+    [
+     "ENSURE_ALTTEXT",
+     "error",
+     "Page 2"
+    ],
+    [
+     "ENSURE_NON_DEFAULT_TITLES",
+     "error",
+     "Page 1"
+    ],
+    [
+     "ENSURE_NON_DEFAULT_TITLES",
+     "error",
+     "Page 2"
+    ],
+    [
+     "FIRST_TAB_DEFAULT",
+     "error",
+     "N/A"
+    ],
+    [
+     "NO_VISUAL_LEVEL_FILTERS_UNLOCKED_IN_FILTER_PANEL",
+     "error",
+     "Page 1"
+    ],
+    [
+     "NO_VISUAL_LEVEL_FILTERS_VISIBLE_IN_FILTER_PANEL",
+     "error",
+     "Page 1"
+    ]
+   ],
+   "status": "failed"
+  },
+  "Report with Bookmarks": {
+   "findings": [
+    [
+     "ENSURE_ALTTEXT",
+     "error",
+     "Page 1"
+    ],
+    [
+     "ENSURE_NON_DEFAULT_TITLES",
+     "error",
+     "Page 1"
     ]
    ],
    "status": "failed"
@@ -353,6 +528,21 @@
      "NO_VISUAL_LEVEL_FILTERS_VISIBLE_IN_FILTER_PANEL",
      "error",
      "Page 1, Page 2"
+    ]
+   ],
+   "status": "failed"
+  },
+  "Working Visuals": {
+   "findings": [
+    [
+     "ENSURE_ALTTEXT",
+     "error",
+     "Page 1"
+    ],
+    [
+     "ENSURE_NON_DEFAULT_TITLES",
+     "error",
+     "Page 1"
     ]
    ],
    "status": "failed"

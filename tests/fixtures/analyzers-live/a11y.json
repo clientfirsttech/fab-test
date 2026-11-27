@@ -41,6 +41,141 @@
    ],
    "status": "failed"
   },
+  "RLSTest-ThinReport": {
+   "findings": [
+    [
+     "481eef1a13d264ebe5de-alt-missing",
+     "error",
+     "Page 2 / 481eef1a13d264ebe5de"
+    ],
+    [
+     "481eef1a13d264ebe5de-title-missing",
+     "warning",
+     "Page 2 / 481eef1a13d264ebe5de"
+    ],
+    [
+     "612d474f3b1cafae45f9-alt-missing",
+     "error",
+     "Page 1 / 612d474f3b1cafae45f9"
+    ],
+    [
+     "76b3b7e1b330753127fa-page-title-missing",
+     "warning",
+     "Page 2"
+    ],
+    [
+     "76b3b7e1b330753127fa-tab-layout-mismatch",
+     "warning",
+     "Page 2"
+    ],
+    [
+     "8189e52cdb8f5fb2b2cf-page-title-missing",
+     "warning",
+     "Page 1"
+    ],
+    [
+     "8189e52cdb8f5fb2b2cf-tab-layout-mismatch",
+     "warning",
+     "Page 1"
+    ],
+    [
+     "9ca97b9d46aebc5cf345-alt-missing",
+     "error",
+     "Page 1 / 9ca97b9d46aebc5cf345"
+    ],
+    [
+     "f4364e5b41077311fa18-alt-missing",
+     "error",
+     "Page 2 / f4364e5b41077311fa18"
+    ]
+   ],
+   "status": "failed"
+  },
+  "RLSTest-WithBookmarks": {
+   "findings": [
+    [
+     "0e66f25d564bd6d4c710-page-title-missing",
+     "warning",
+     "Page 2"
+    ],
+    [
+     "0e66f25d564bd6d4c710-tab-layout-mismatch",
+     "warning",
+     "Page 2"
+    ],
+    [
+     "4ef1c6d50103a322676b-alt-missing",
+     "error",
+     "Page 1 / 4ef1c6d50103a322676b"
+    ],
+    [
+     "649f1f7f10c6be403a2d-alt-missing",
+     "error",
+     "Page 1 / 649f1f7f10c6be403a2d"
+    ],
+    [
+     "7dd92b68db890cebe277-alt-missing",
+     "error",
+     "Page 2 / 7dd92b68db890cebe277"
+    ],
+    [
+     "c8b7831205787013164b-alt-missing",
+     "error",
+     "Page 2 / c8b7831205787013164b"
+    ],
+    [
+     "fe83bc0c21cae0d63c03-page-title-missing",
+     "warning",
+     "Page 1"
+    ],
+    [
+     "fe83bc0c21cae0d63c03-tab-layout-mismatch",
+     "warning",
+     "Page 1"
+    ]
+   ],
+   "status": "failed"
+  },
+  "Report with Bookmarks": {
+   "findings": [
+    [
+     "0527edb48c081ba68836-alt-missing",
+     "error",
+     "Page 1 / 0527edb48c081ba68836"
+    ],
+    [
+     "0527edb48c081ba68836-title-missing",
+     "warning",
+     "Page 1 / 0527edb48c081ba68836"
+    ],
+    [
+     "52c8fb32b166701a40c0-alt-missing",
+     "error",
+     "Page 1 / 52c8fb32b166701a40c0"
+    ],
+    [
+     "52c8fb32b166701a40c0-title-missing",
+     "warning",
+     "Page 1 / 52c8fb32b166701a40c0"
+    ],
+    [
+     "5da315eb042003e41290-clutter",
+     "warning",
+     "Page 1"
+    ],
+    [
+     "5da315eb042003e41290-tab-layout-mismatch",
+     "warning",
+     "Page 1"
+    ],
+    [
+     "d829760585346b0a0050-alt-missing",
+     "error",
+     "Page 1 / d829760585346b0a0050"
+    ]
+   ],
+   "status": "failed"
+  },
   "Report with Bookmarks - Broken Visuals": {
    "findings": [
     [
@@ -317,6 +452,31 @@
      "bce4d7a0c0826ba2b322-alt-missing",
      "error",
      "Page 2 / bce4d7a0c0826ba2b322"
+    ]
+   ],
+   "status": "failed"
+  },
+  "Working Visuals": {
+   "findings": [
+    [
+     "52c8fb32b166701a40c0-alt-missing",
+     "error",
+     "Page 1 / 52c8fb32b166701a40c0"
+    ],
+    [
+     "52c8fb32b166701a40c0-title-missing",
+     "warning",
+     "Page 1 / 52c8fb32b166701a40c0"
+    ],
+    [
+     "5da315eb042003e41290-tab-layout-mismatch",
+     "warning",
+     "Page 1"
+    ],
+    [
+     "d829760585346b0a0050-alt-missing",
+     "error",
+     "Page 1 / d829760585346b0a0050"
     ]
    ],
    "status": "failed"
@@ -363,6 +523,141 @@
    ],
    "status": "failed"
   },
+  "RLSTest-ThinReport": {
+   "findings": [
+    [
+     "481eef1a13d264ebe5de-alt-missing",
+     "error",
+     "Page 2 / 481eef1a13d264ebe5de"
+    ],
+    [
+     "481eef1a13d264ebe5de-title-missing",
+     "warning",
+     "Page 2 / 481eef1a13d264ebe5de"
+    ],
+    [
+     "612d474f3b1cafae45f9-alt-missing",
+     "error",
+     "Page 1 / 612d474f3b1cafae45f9"
+    ],
+    [
+     "76b3b7e1b330753127fa-page-title-missing",
+     "warning",
+     "Page 2"
+    ],
+    [
+     "76b3b7e1b330753127fa-tab-layout-mismatch",
+     "warning",
+     "Page 2"
+    ],
+    [
+     "8189e52cdb8f5fb2b2cf-page-title-missing",
+     "warning",
+     "Page 1"
+    ],
+    [
+     "8189e52cdb8f5fb2b2cf-tab-layout-mismatch",
+     "warning",
+     "Page 1"
+    ],
+    [
+     "9ca97b9d46aebc5cf345-alt-missing",
+     "error",
+     "Page 1 / 9ca97b9d46aebc5cf345"
+    ],
+    [
+     "f4364e5b41077311fa18-alt-missing",
+     "error",
+     "Page 2 / f4364e5b41077311fa18"
+    ]
+   ],
+   "status": "failed"
+  },
+  "RLSTest-WithBookmarks": {
+   "findings": [
+    [
+     "0e66f25d564bd6d4c710-page-title-missing",
+     "warning",
+     "Page 2"
+    ],
+    [
+     "0e66f25d564bd6d4c710-tab-layout-mismatch",
+     "warning",
+     "Page 2"
+    ],
+    [
+     "4ef1c6d50103a322676b-alt-missing",
+     "error",
+     "Page 1 / 4ef1c6d50103a322676b"
+    ],
+    [
+     "649f1f7f10c6be403a2d-alt-missing",
+     "error",
+     "Page 1 / 649f1f7f10c6be403a2d"
+    ],
+    [
+     "7dd92b68db890cebe277-alt-missing",
+     "error",
+     "Page 2 / 7dd92b68db890cebe277"
+    ],
+    [
+     "c8b7831205787013164b-alt-missing",
+     "error",
+     "Page 2 / c8b7831205787013164b"
+    ],
+    [
+     "fe83bc0c21cae0d63c03-page-title-missing",
+     "warning",
+     "Page 1"
+    ],
+    [
+     "fe83bc0c21cae0d63c03-tab-layout-mismatch",
+     "warning",
+     "Page 1"
+    ]
+   ],
+   "status": "failed"
+  },
+  "Report with Bookmarks": {
+   "findings": [
+    [
+     "0527edb48c081ba68836-alt-missing",
+     "error",
+     "Page 1 / 0527edb48c081ba68836"
+    ],
+    [
+     "0527edb48c081ba68836-title-missing",
+     "warning",
+     "Page 1 / 0527edb48c081ba68836"
+    ],
+    [
+     "52c8fb32b166701a40c0-alt-missing",
+     "error",
+     "Page 1 / 52c8fb32b166701a40c0"
+    ],
+    [
+     "52c8fb32b166701a40c0-title-missing",
+     "warning",
+     "Page 1 / 52c8fb32b166701a40c0"
+    ],
+    [
+     "5da315eb042003e41290-clutter",
+     "warning",
+     "Page 1"
+    ],
+    [
+     "5da315eb042003e41290-tab-layout-mismatch",
+     "warning",
+     "Page 1"
+    ],
+    [
+     "d829760585346b0a0050-alt-missing",
+     "error",
+     "Page 1 / d829760585346b0a0050"
+    ]
+   ],
+   "status": "failed"
+  },
   "Report with Bookmarks - Broken Visuals": {
    "findings": [
     [
@@ -639,6 +934,31 @@
      "bce4d7a0c0826ba2b322-alt-missing",
      "error",
      "Page 2 / bce4d7a0c0826ba2b322"
+    ]
+   ],
+   "status": "failed"
+  },
+  "Working Visuals": {
+   "findings": [
+    [
+     "52c8fb32b166701a40c0-alt-missing",
+     "error",
+     "Page 1 / 52c8fb32b166701a40c0"
+    ],
+    [
+     "52c8fb32b166701a40c0-title-missing",
+     "warning",
+     "Page 1 / 52c8fb32b166701a40c0"
+    ],
+    [
+     "5da315eb042003e41290-tab-layout-mismatch",
+     "warning",
+     "Page 1"
+    ],
+    [
+     "d829760585346b0a0050-alt-missing",
+     "error",
+     "Page 1 / d829760585346b0a0050"
     ]
    ],
    "status": "failed"

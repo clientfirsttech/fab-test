@@ -44,6 +44,9 @@ Inventory 2026-11-23. "Real" means the real CLI and tools with nothing patched.
 
 `tests/test_live_tests_run_in_ci.py` fails when a `tests/*_live.py` file is not named by a `fabric-demo` workflow. It found the three PBIR Inspector rule files, which now run in `live-ci.yml`.
 
+**Requirements**:
+- Given artifacts of the same type under differently named parent folders, should discover them in one stable artifact-name order on Windows and Linux so fixture recordings do not drift by platform.
+
 ---
 
 ## Analyzers Locally And Against The Workspace ✅

@@ -301,6 +301,7 @@ def discover_artifacts(
         if is_folder_suffix
         else find_files_by_suffix(artifact_dir, suffix, excluded_paths=excluded_paths)
     )
+    artifacts = sorted(artifacts, key=lambda path: (path.name.casefold(), str(path).casefold()))
     # Collisions are judged over everything the scan found, before any target narrows it, so the
     # stems do not depend on which analyzer's discovery ran last.
     register_stems(artifacts, artifact_dir)
