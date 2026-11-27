@@ -24,7 +24,9 @@ _RUN_PATH = {"invoke_data_agent", "fabric_data_agent_provider", "_data_agent_run
              "_data_agent_suite", "_data_agent_progress"}
 # Not Python, but the run depends on them: the promptfoo pin, the package's dependencies, the suites.
 _ALSO = ["src/fab_test/metadata/analyzers.json", "pyproject.toml",
-         "fab-tests/data-agent/agent-sample-model.DataAgent.promptfoo.yaml", ".github/workflows/data-agent-live.yml"]
+         "fab-tests/data-agent/agent-sample-model.DataAgent.promptfoo.yaml", ".github/workflows/data-agent-live.yml",
+         "tests/test_data_agent_live.py",
+         "tests/test_playwright_generation_parity_live.py"]
 
 
 def _module(path: Path) -> str:
@@ -84,3 +86,12 @@ def test_it_runs_only_on_change_or_by_hand():
     triggers = _triggers()
     # No schedule (capacity costs) and never pull_request_target (a suite is code).
     assert set(triggers) == {"pull_request", "push", "workflow_dispatch"}
+
+
+
+
+def test_the_workflow_runs_the_live_integration_test():
+    steps = yaml.safe_load(_WORKFLOW.read_text(encoding="utf-8"))["jobs"]["live"]["steps"]
+    runs = " ".join(str(step.get("run", "")) for step in steps)
+    assert "pytest tests/test_data_agent_live.py" in runs
+    assert "DATA_AGENT_WORKSPACE" in yaml.safe_load(_WORKFLOW.read_text(encoding="utf-8"))["jobs"]["live"]["env"]

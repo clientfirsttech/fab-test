@@ -1,8 +1,9 @@
-# Live CI: runs this repository's own code against the real
-# `visual-error-testing` workspace on every pull request and push, using the
-# service principal in the protected `fabric-demo` Environment. The live
-# contract tests (generation parity, result parity) skip silently without
-# credentials, so without this workflow they never ran in CI.
+# Live CI: runs this repository's own code against real Fabric workspaces on
+# every pull request and push, using the service principal in the protected
+# `fabric-demo` Environment: each analyzer locally and against
+# FAB_TEST_LIVE_WORKSPACE, and the playwright parity tests against
+# PLAYWRIGHT_PARITY_WORKSPACE_ID. The live tests skip without credentials, so
+# without this workflow they never ran in CI.
 #
 # Same-repository PRs only: a fork PR has no access to Environment secrets,
 # and dependabot's secrets are a separate store, so both are skipped rather
@@ -27,7 +28,7 @@ permissions:
 
 jobs:
   live:
-    name: Live (visual-error-testing)
+    name: Live (Linux)
     if: >-
       github.event_name != 'pull_request' ||
       (github.event.pull_request.head.repo.full_name == github.repository &&
@@ -44,8 +45,14 @@ jobs:
       FABRIC_TENANT_ID: ${{ secrets.FABRIC_TENANT_ID }}
       FABRIC_CLIENT_ID: ${{ secrets.FABRIC_CLIENT_ID }}
       FABRIC_CLIENT_SECRET: ${{ secrets.FABRIC_CLIENT_SECRET }}
-      VISUAL_ERROR_TESTING_WORKSPACE: visual-error-testing
-      VISUAL_ERROR_TESTING_WORKSPACE_ID: c4698d28-b05c-40bc-926c-707563ac85e7
+      # Repository variables (Settings > Secrets and variables > Actions >
+      # Variables) override these defaults without a code change.
+      # The Git-connected workspace of fabric-artifacts/: each analyzer runs
+      # locally and against it (SampleModel-PQLAssert fails pql tests on purpose).
+      FAB_TEST_LIVE_WORKSPACE: ${{ vars.FAB_TEST_LIVE_WORKSPACE || 'fab-test-working-area' }}
+      # Where the playwright parity goldens were recorded; it must match their
+      # workspace_id (tests/fixtures/playwright-parity/*.csv).
+      PLAYWRIGHT_PARITY_WORKSPACE_ID: ${{ vars.PLAYWRIGHT_PARITY_WORKSPACE_ID || 'c4698d28-b05c-40bc-926c-707563ac85e7' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -59,37 +66,48 @@ jobs:
         with:
           dotnet-version: "10.0.x"
 
+      # a11y builds pbir-a11y with npm, which the playwright image lacks.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
       - name: Install fab-test from the checkout
+        id: install
         run: |
           pip install --user -e ".[dev]" "playwright==$PLAYWRIGHT_PIN"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
-      # Fails fast, and with the right remediation, when the secrets are
+      # One check per workspace, so losing access to one doesn't hide the
+      # other's results. Fails fast, with the remediation, when the secrets are
       # missing or the principal cannot see the workspace.
-      - name: Verify the credential and workspace access
-        run: fab-test auth status --workspace-id "$VISUAL_ERROR_TESTING_WORKSPACE_ID"
+      - name: Verify access to the live workspace
+        run: fab-test auth status --workspace "$FAB_TEST_LIVE_WORKSPACE"
 
-      # Service mode (Service Targeting epic): export every deployed
-      # paginated report read-only and run the rdl rules over it. Findings
-      # (exit 1) are expected -- the workspace is built to contain errors --
-      # but a usage, credential or export failure (2, 126, 127) fails CI.
-      - name: Service mode smoke (rdl --workspace)
-        run: |
-          set +e
-          fab-test rdl --workspace "$VISUAL_ERROR_TESTING_WORKSPACE" --output-dir fab-test-results/live-rdl -q
-          code=$?
-          echo "rdl exit code: $code"
-          [ "$code" -le 1 ]
-
-      - name: Service mode smoke (pbir --workspace --dry-run)
-        run: fab-test pbir --workspace "$VISUAL_ERROR_TESTING_WORKSPACE" --dry-run
-
-      # The credential-gated contract tests: the generated matrix must match
-      # the goldens, and every case must pass or fail as the reference
-      # implementation did.
-      - name: Live parity tests
+      # Each analyzer locally and against the live workspace, matched with
+      # recordings (rdl and pbir service mode included). The PBIR Inspector
+      # rule tests need .NET 10, set up above, so in build.yml they skip.
+      # pql-test runs in the Windows job: on Linux it queries no tests.
+      - name: Live analyzer tests
         run: >-
-          pytest -m integration -q -p no:cacheprovider
+          pytest -m integration -q -rs -p no:cacheprovider
+          tests/test_analyzers_live.py
+          tests/test_slicer_rules_live.py
+          tests/test_bookmark_navigators_live.py
+          tests/test_pbir_filter_pane_rules_live.py
+
+      # Playwright parity: the generated matrix must match the goldens, and
+      # every case must pass or fail as the reference implementation did.
+      # The goldens pin this workspace's report, page and dataset IDs, so it
+      # has its own access check, and runs even when the analyzer tests fail.
+      - name: Verify access to the playwright parity workspace
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        id: parity-access
+        run: fab-test auth status --workspace-id "$PLAYWRIGHT_PARITY_WORKSPACE_ID"
+
+      - name: Live playwright parity tests
+        if: ${{ !cancelled() && steps.parity-access.outcome == 'success' }}
+        run: >-
+          pytest -m integration -q -rs -p no:cacheprovider
           tests/test_playwright_generation_parity_live.py
           tests/test_playwright_result_parity_live.py
 
@@ -101,3 +119,36 @@ jobs:
           path: |
             fab-test-results/**/envelope.json
             fab-test-results/**/report.html
+
+  # Tabular Editor (bpa) runs on Windows only, and pql-test reaches a deployed
+  # model's tests only on Windows (pyadomd), so both live tests run here.
+  live-windows:
+    name: Live (Windows - bpa, pql-test)
+    if: >-
+      github.event_name != 'pull_request' ||
+      (github.event.pull_request.head.repo.full_name == github.repository &&
+       github.actor != 'dependabot[bot]')
+    runs-on: windows-latest
+    environment: fabric-demo
+    timeout-minutes: 30
+    env:
+      FABRIC_TENANT_ID: ${{ secrets.FABRIC_TENANT_ID }}
+      FABRIC_CLIENT_ID: ${{ secrets.FABRIC_CLIENT_ID }}
+      FABRIC_CLIENT_SECRET: ${{ secrets.FABRIC_CLIENT_SECRET }}
+      FAB_TEST_LIVE_WORKSPACE: ${{ vars.FAB_TEST_LIVE_WORKSPACE || 'fab-test-working-area' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install fab-test from the checkout
+        run: pip install -e ".[dev]"
+
+      # SampleModel-PQLAssert's tests must pass and fail exactly as recorded.
+      - name: Live bpa and pql-test tests
+        run: >-
+          pytest -m integration -q -rs -p no:cacheprovider
+          tests/test_analyzers_live.py -k "bpa or test_pql_test_live"
+          tests/test_pql_test_live.py

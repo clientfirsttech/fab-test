@@ -56,6 +56,8 @@ on:
       - "fab-tests/data-agent/**"
       - "**/*.DataAgent/**"
       - ".github/workflows/data-agent-live.yml"
+      - "tests/test_data_agent_live.py"
+      - "tests/test_playwright_generation_parity_live.py"
   push:
     branches: [main, dev]
     paths: *data-agent-paths
@@ -96,7 +98,7 @@ jobs:
           node-version: "22"
 
       - name: Install fab-test from the checkout
-        run: pip install -e .
+        run: pip install -e ".[dev]"
 
       # Fails fast, with the remediation, when the secrets are missing or the
       # principal cannot see the workspace.
@@ -106,9 +108,14 @@ jobs:
       - name: Lint the suites (offline)
         run: fab-test data-agent tests lint
 
-      # Exit 1 when an answer is wrong; 127 without credentials.
-      - name: Ask the deployed agent
-        run: fab-test data-agent --workspace "$DATA_AGENT_WORKSPACE" --report
+      # The live integration test runs the real CLI: auth status, listing the
+      # deployed agents, and one run that asks every question. It fails only
+      # when the tester did not work (the run broke, or a question came back
+      # without a verdict); which answers pass varies by run, so see the report.
+      - name: Live integration tests
+        run: >-
+          pytest tests/test_data_agent_live.py -v -rs -p no:cacheprovider
+          --basetemp=fab-test-results/live
 
       - name: Keep the results
         if: always()
@@ -118,3 +125,4 @@ jobs:
           path: |
             fab-test-results/**/envelope.json
             fab-test-results/**/report.html
+            fab-test-results/**/effective.promptfoo.yaml

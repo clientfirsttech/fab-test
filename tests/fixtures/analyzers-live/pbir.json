@@ -1,0 +1,362 @@
+{
+ "as_of": "2026-11-23",
+ "local": {
+  "Not Working Visuals": {
+   "findings": [
+    [
+     "ENSURE_ALTTEXT",
+     "error",
+     "Page 1"
+    ],
+    [
+     "ENSURE_ALTTEXT",
+     "error",
+     "Page 2"
+    ],
+    [
+     "ENSURE_NON_DEFAULT_TITLES",
+     "error",
+     "Page 1"
+    ],
+    [
+     "ENSURE_NON_DEFAULT_TITLES",
+     "error",
+     "Page 2"
+    ],
+    [
+     "FIRST_TAB_DEFAULT",
+     "error",
+     "N/A"
+    ]
+   ],
+   "status": "failed"
+  },
+  "Report with Bookmarks - Broken Visuals": {
+   "findings": [
+    [
+     "ENSURE_ALTTEXT",
+     "error",
+     "Page A"
+    ],
+    [
+     "ENSURE_ALTTEXT",
+     "error",
+     "Page B"
+    ],
+    [
+     "ENSURE_ALTTEXT",
+     "error",
+     "Page C"
+    ],
+    [
+     "ENSURE_NON_DEFAULT_TITLES",
+     "error",
+     "Page A"
+    ],
+    [
+     "ENSURE_NON_DEFAULT_TITLES",
+     "error",
+     "Page B"
+    ],
+    [
+     "ENSURE_NON_DEFAULT_TITLES",
+     "error",
+     "Page C"
+    ],
+    [
+     "FIRST_TAB_DEFAULT",
+     "error",
+     "N/A"
+    ],
+    [
+     "NO_VISUAL_LEVEL_FILTERS_UNLOCKED_IN_FILTER_PANEL",
+     "error",
+     "Page C"
+    ],
+    [
+     "NO_VISUAL_LEVEL_FILTERS_VISIBLE_IN_FILTER_PANEL",
+     "error",
+     "Page C"
+    ]
+   ],
+   "status": "failed"
+  },
+  "SampleModel-DefaultState": {
+   "findings": [
+    [
+     "CONTRACT.half-year-current",
+     "error",
+     "Standard Slicers"
+    ]
+   ],
+   "status": "failed"
+  },
+  "SampleModel-PQLAssert": {
+   "findings": [
+    [
+     "ENSURE_ALTTEXT",
+     "error",
+     "Page 1"
+    ],
+    [
+     "ENSURE_ALTTEXT",
+     "error",
+     "Page 2"
+    ],
+    [
+     "ENSURE_ALTTEXT",
+     "error",
+     "Page 3"
+    ],
+    [
+     "ENSURE_ALTTEXT",
+     "error",
+     "Page 4"
+    ],
+    [
+     "ENSURE_NON_DEFAULT_TITLES",
+     "error",
+     "Page 1"
+    ],
+    [
+     "ENSURE_NON_DEFAULT_TITLES",
+     "error",
+     "Page 2"
+    ],
+    [
+     "ENSURE_NON_DEFAULT_TITLES",
+     "error",
+     "Page 3"
+    ],
+    [
+     "ENSURE_NON_DEFAULT_TITLES",
+     "error",
+     "Page 4"
+    ],
+    [
+     "ENSURE_THEME_COLOURS",
+     "warning",
+     "Page 1"
+    ],
+    [
+     "NO_VISUAL_HEADERS_FOR_CERTAIN_VISUALS_1",
+     "error",
+     "Page 1"
+    ]
+   ],
+   "status": "failed"
+  },
+  "ThinReport": {
+   "findings": [
+    [
+     "ENSURE_ALTTEXT",
+     "error",
+     "Page 1"
+    ],
+    [
+     "ENSURE_ALTTEXT",
+     "error",
+     "Page 2"
+    ],
+    [
+     "ENSURE_NON_DEFAULT_TITLES",
+     "error",
+     "Page 1"
+    ],
+    [
+     "ENSURE_NON_DEFAULT_TITLES",
+     "error",
+     "Page 2"
+    ],
+    [
+     "NO_VISUAL_LEVEL_FILTERS_UNLOCKED_IN_FILTER_PANEL",
+     "error",
+     "Page 1, Page 2"
+    ],
+    [
+     "NO_VISUAL_LEVEL_FILTERS_VISIBLE_IN_FILTER_PANEL",
+     "error",
+     "Page 1, Page 2"
+    ]
+   ],
+   "status": "failed"
+  }
+ },
+ "service": {
+  "Not Working Visuals": {
+   "findings": [
+    [
+     "ENSURE_ALTTEXT",
+     "error",
+     "Page 1"
+    ],
+    [
+     "ENSURE_ALTTEXT",
+     "error",
+     "Page 2"
+    ],
+    [
+     "ENSURE_NON_DEFAULT_TITLES",
+     "error",
+     "Page 1"
+    ],
+    [
+     "ENSURE_NON_DEFAULT_TITLES",
+     "error",
+     "Page 2"
+    ],
+    [
+     "FIRST_TAB_DEFAULT",
+     "error",
+     "N/A"
+    ]
+   ],
+   "status": "failed"
+  },
+  "Report with Bookmarks - Broken Visuals": {
+   "findings": [
+    [
+     "ENSURE_ALTTEXT",
+     "error",
+     "Page A"
+    ],
+    [
+     "ENSURE_ALTTEXT",
+     "error",
+     "Page B"
+    ],
+    [
+     "ENSURE_ALTTEXT",
+     "error",
+     "Page C"
+    ],
+    [
+     "ENSURE_NON_DEFAULT_TITLES",
+     "error",
+     "Page A"
+    ],
+    [
+     "ENSURE_NON_DEFAULT_TITLES",
+     "error",
+     "Page B"
+    ],
+    [
+     "ENSURE_NON_DEFAULT_TITLES",
+     "error",
+     "Page C"
+    ],
+    [
+     "FIRST_TAB_DEFAULT",
+     "error",
+     "N/A"
+    ],
+    [
+     "NO_VISUAL_LEVEL_FILTERS_UNLOCKED_IN_FILTER_PANEL",
+     "error",
+     "Page C"
+    ],
+    [
+     "NO_VISUAL_LEVEL_FILTERS_VISIBLE_IN_FILTER_PANEL",
+     "error",
+     "Page C"
+    ]
+   ],
+   "status": "failed"
+  },
+  "SampleModel-DefaultState": {
+   "findings": [],
+   "status": "passed"
+  },
+  "SampleModel-PQLAssert": {
+   "findings": [
+    [
+     "ENSURE_ALTTEXT",
+     "error",
+     "Page 1"
+    ],
+    [
+     "ENSURE_ALTTEXT",
+     "error",
+     "Page 2"
+    ],
+    [
+     "ENSURE_ALTTEXT",
+     "error",
+     "Page 3"
+    ],
+    [
+     "ENSURE_ALTTEXT",
+     "error",
+     "Page 4"
+    ],
+    [
+     "ENSURE_NON_DEFAULT_TITLES",
+     "error",
+     "Page 1"
+    ],
+    [
+     "ENSURE_NON_DEFAULT_TITLES",
+     "error",
+     "Page 2"
+    ],
+    [
+     "ENSURE_NON_DEFAULT_TITLES",
+     "error",
+     "Page 3"
+    ],
+    [
+     "ENSURE_NON_DEFAULT_TITLES",
+     "error",
+     "Page 4"
+    ],
+    [
+     "ENSURE_THEME_COLOURS",
+     "warning",
+     "Page 1"
+    ],
+    [
+     "NO_VISUAL_HEADERS_FOR_CERTAIN_VISUALS_1",
+     "error",
+     "Page 1"
+    ]
+   ],
+   "status": "failed"
+  },
+  "ThinReport": {
+   "findings": [
+    [
+     "ENSURE_ALTTEXT",
+     "error",
+     "Page 1"
+    ],
+    [
+     "ENSURE_ALTTEXT",
+     "error",
+     "Page 2"
+    ],
+    [
+     "ENSURE_NON_DEFAULT_TITLES",
+     "error",
+     "Page 1"
+    ],
+    [
+     "ENSURE_NON_DEFAULT_TITLES",
+     "error",
+     "Page 2"
+    ],
+    [
+     "NO_VISUAL_LEVEL_FILTERS_UNLOCKED_IN_FILTER_PANEL",
+     "error",
+     "Page 1, Page 2"
+    ],
+    [
+     "NO_VISUAL_LEVEL_FILTERS_VISIBLE_IN_FILTER_PANEL",
+     "error",
+     "Page 1, Page 2"
+    ]
+   ],
+   "status": "failed"
+  }
+ },
+ "workspace": "fab-test-working-area"
+}
