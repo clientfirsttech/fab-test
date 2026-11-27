@@ -33,6 +33,9 @@ Inventory 2026-11-23. "Real" means the real CLI and tools with nothing patched.
 
 `tests/test_data_agent_live.py`: auth status, a service-mode `--dry-run` listing, and one module-scoped run (every request counts against the principal's quota) asserting each envelope completed and every question got a verdict. `data-agent-live.yml` runs it instead of the CLI step and checker script. Live-verified locally 2026-11-23: 4 passed.
 
+**Requirements**:
+- Given push and pull-request workflows can target the same deployed Data Agent workspace, should serialize their live runs across Git refs so one never races a run already in progress.
+
 ## pql-test Live Test ✅
 
 `tests/test_pql_test_live.py` against `SampleModel-PQLAssert` in `fab-test-working-area`: a `--dry-run` listing, then every one of the 86 tests must pass or fail as recorded in `tests/fixtures/pql-test-live/` (78 pass, 8 fail on purpose, pql-test 0.2.1). Live-verified locally; flipping one recorded outcome fails the test, naming it. Runs in `live-ci.yml`.
