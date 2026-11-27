@@ -1,12 +1,12 @@
 [
     {
         "test_case": "2381c637-7a08-4ddf-bb9e-68dd01a245e7",
-        "workspace_id": "c4698d28-b05c-40bc-926c-707563ac85e7",
-        "report_id": "65339f9f-7488-4d72-af60-5669775e6428",
+        "workspace_id": "2aea22b0-2e68-485a-8902-e8e5da32e3ef",
+        "report_id": "f0210a26-11af-4bb7-855b-411ad42e1cca",
         "report_name": "PaginatedExample-BrokenRDL",
         "dataset_ids": [
             {
-                "id": "5bf5a7e1-65e5-4d74-944b-1ada5941a664",
+                "id": "d665ad6e-f348-460f-8b24-cfabafbff48d",
                 "xmlaPermissions": "ReadOnly"
             }
         ],

@@ -20,10 +20,10 @@
       <rd:SecurityType>None</rd:SecurityType>
       <ConnectionProperties>
         <DataProvider>PBIDATASET</DataProvider>
-        <ConnectString>Data Source=pbiazure://api.powerbi.com/;Identity Provider="https://login.microsoftonline.com/organizations, https://analysis.windows.net/powerbi/api, f0b72488-7082-488a-a7e8-eada97bd842d";Initial Catalog=sobe_wowvirtualserver-5bf5a7e1-65e5-4d74-944b-1ada5941a664;Integrated Security=ClaimsToken</ConnectString>
+        <ConnectString>Data Source=pbiazure://api.powerbi.com/;Identity Provider="https://login.microsoftonline.com/organizations, https://analysis.windows.net/powerbi/api, f0b72488-7082-488a-a7e8-eada97bd842d";Initial Catalog=sobe_wowvirtualserver-d665ad6e-f348-460f-8b24-cfabafbff48d;Integrated Security=ClaimsToken</ConnectString>
       </ConnectionProperties>
       <rd:DataSourceID>da7cecf3-f0fa-4dc0-b5f2-da288663f04a</rd:DataSourceID>
-      <rd:PowerBIWorkspaceName>visual-error-testing</rd:PowerBIWorkspaceName>
+      <rd:PowerBIWorkspaceName>fab-test-working-area</rd:PowerBIWorkspaceName>
       <rd:PowerBIDatasetName>RDLSource</rd:PowerBIDatasetName>
     </DataSource>
   </DataSources>

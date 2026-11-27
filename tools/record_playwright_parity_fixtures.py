@@ -45,6 +45,9 @@ from fab_test.scripts.playwright_validation.fabric_service_client import (  # no
 from fab_test.scripts.playwright_validation.rdl_datasource import (  # noqa: E402
     parse_rdl_report_parameters_text,
 )
+from fab_test.scripts.playwright_validation.resolver import (  # noqa: E402
+    resolve_workspace_id,
+)
 from fab_test.scripts.playwright_validation.service_client import (  # noqa: E402
     FabricRestClient,
     FabricToken,
@@ -79,6 +82,88 @@ def _targets_from_goldens(fixture_dir: Path) -> list[dict[str, str]]:
             }
         )
     return targets
+
+
+def _item_by_name(items: list[dict[str, Any]], name: str) -> dict[str, Any]:
+    matches = [item for item in items if item.get("displayName") == name]
+    if len(matches) != 1:
+        visible = ", ".join(str(item.get("displayName", "")) for item in items)
+        raise ValueError(
+            f"Expected one deployed item named {name!r}, found {len(matches)}. "
+            f"Visible: {visible or 'none'}"
+        )
+    return matches[0]
+
+
+def rewrite_interactive_golden(
+    rows: list[dict[str, str]], recorded: dict[str, Any]
+) -> list[dict[str, str]]:
+    """Rebind a golden's service-issued IDs while preserving its semantic cases."""
+    page_ids = {page["page_name"]: page["page_id"] for page in recorded["pages"]}
+    bookmark_ids = {
+        bookmark["bookmark_name"]: bookmark["bookmark_id"]
+        for bookmark in recorded["bookmarks"]
+    }
+    migrated = []
+    for source in rows:
+        row = dict(source)
+        row["workspace_id"] = recorded["workspace_id"]
+        row["report_id"] = recorded["report_id"]
+        row["dataset_id"] = recorded["dataset_id"]
+        page_name = row.get("page_name", "")
+        if page_name not in page_ids:
+            raise ValueError(f"Page {page_name!r} is missing from the new workspace report")
+        row["page_id"] = page_ids[page_name]
+        bookmark_name = row.get("bookmark_name", "")
+        if bookmark_name:
+            if bookmark_name not in bookmark_ids:
+                raise ValueError(
+                    f"Bookmark {bookmark_name!r} is missing from the new workspace report"
+                )
+            row["bookmark_id"] = bookmark_ids[bookmark_name]
+        elif "bookmark_id" in row:
+            row["bookmark_id"] = ""
+        migrated.append(row)
+    return migrated
+
+
+def rewrite_paginated_golden(
+    cases: list[dict[str, Any]], recorded: dict[str, Any]
+) -> list[dict[str, Any]]:
+    """Rebind a paginated golden to the new workspace and datasource IDs."""
+    migrated = []
+    for source in cases:
+        case = dict(source)
+        case["workspace_id"] = recorded["workspace_id"]
+        case["report_id"] = recorded["report_id"]
+        permissions = [
+            dataset.get("xmlaPermissions", "ReadOnly")
+            for dataset in case.get("dataset_ids", [])
+        ]
+        case["dataset_ids"] = [
+            {
+                "id": dataset_id,
+                "xmlaPermissions": (
+                    permissions[index] if index < len(permissions) else "ReadOnly"
+                ),
+            }
+            for index, dataset_id in enumerate(recorded["dataset_ids"])
+        ]
+        migrated.append(case)
+    return migrated
+
+
+def _read_csv(path: Path) -> tuple[list[str], list[dict[str, str]]]:
+    with open(path, newline="", encoding="utf-8-sig") as fh:
+        reader = csv.DictReader(fh)
+        return list(reader.fieldnames or []), list(reader)
+
+
+def _write_csv(path: Path, fieldnames: list[str], rows: list[dict[str, str]]) -> None:
+    with open(path, "w", newline="", encoding="utf-8") as fh:
+        writer = csv.DictWriter(fh, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
 
 
 def _record_one(client: FabricRestClient, target: dict[str, Any]) -> dict[str, Any]:
@@ -188,6 +273,13 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="Path to the .env holding the service principal (default: the CLI search order).",
     )
+    parser.add_argument(
+        "--workspace",
+        help=(
+            "Rebind every golden by report name to this workspace and rewrite its "
+            "workspace/report/dataset/page/bookmark IDs."
+        ),
+    )
     args = parser.parse_args(argv)
 
     fixture_dir = Path(args.fixture_dir).resolve()
@@ -219,15 +311,41 @@ def main(argv: list[str] | None = None) -> int:
     client = FabricRestClient(
         FabricToken(access_token=service_client.access_token, cloud=config.cloud)
     )
+    workspace_id = (
+        resolve_workspace_id(service_client, args.workspace) if args.workspace else ""
+    )
+    reports = service_client.list_items(workspace_id, "Report") if workspace_id else []
+    paginated = (
+        service_client.list_items(workspace_id, "PaginatedReport") if workspace_id else []
+    )
 
     failures = 0
     for target in targets:
+        old_report_id = target["report_id"]
+        if workspace_id:
+            item = _item_by_name(reports, target["report_name"])
+            target["workspace_id"] = workspace_id
+            target["report_id"] = item["id"]
+            target["dataset_id"] = service_client.get_report_dataset_id(
+                workspace_id, item["id"]
+            )
         recorded = _record_one(client, target)
+        if workspace_id:
+            golden_path = fixture_dir / target["golden_csv"]
+            fieldnames, rows = _read_csv(golden_path)
+            _write_csv(
+                golden_path,
+                fieldnames,
+                rewrite_interactive_golden(rows, recorded),
+            )
         out_path = fixture_dir / "recorded" / f"{target['report_id']}.json"
         out_path.parent.mkdir(parents=True, exist_ok=True)
         with open(out_path, "w", encoding="utf-8") as fh:
             json.dump(recorded, fh, indent=2, sort_keys=True)
             fh.write("\n")
+        old_path = fixture_dir / "recorded" / f"{old_report_id}.json"
+        if old_path != out_path and old_path.exists():
+            old_path.unlink()
         summary = (
             f"{len(recorded['pages'])} page(s), "
             f"{len(recorded['bookmarks'])} bookmark(s), "
@@ -239,11 +357,26 @@ def main(argv: list[str] | None = None) -> int:
         print(f"{target['report_name']}: {summary} -> {out_path.name}")
 
     for target in _paginated_targets(fixture_dir):
+        old_report_id = target["report_id"]
+        if workspace_id:
+            item = _item_by_name(paginated, target["report_name"])
+            target["workspace_id"] = workspace_id
+            target["report_id"] = item["id"]
         recorded = _record_paginated(client, target)
+        if workspace_id:
+            golden_path = fixture_dir / target["golden_json"]
+            cases = json.loads(golden_path.read_text(encoding="utf-8-sig"))
+            golden_path.write_text(
+                json.dumps(rewrite_paginated_golden(cases, recorded), indent=4) + "\n",
+                encoding="utf-8",
+            )
         out_path = fixture_dir / "recorded" / f"{target['report_id']}.json"
         with open(out_path, "w", encoding="utf-8") as fh:
             json.dump(recorded, fh, indent=2, sort_keys=True)
             fh.write("\n")
+        old_path = fixture_dir / "recorded" / f"{old_report_id}.json"
+        if old_path != out_path and old_path.exists():
+            old_path.unlink()
         summary = (
             f"{len(recorded['dataset_ids'])} dataset(s), "
             f"{len(recorded['query_rows'])} valid-values quer(ies)"
