@@ -46,6 +46,7 @@ Inventory 2026-11-23. "Real" means the real CLI and tools with nothing patched.
 
 **Requirements**:
 - Given artifacts of the same type under differently named parent folders, should discover them in one stable artifact-name order on Windows and Linux so fixture recordings do not drift by platform.
+- Given Playwright parity fixtures move to another Fabric workspace, should rebind each golden and recording by report/page/bookmark/dataset names rather than replace only the workspace ID.
 
 ---
 
@@ -56,7 +57,7 @@ Inventory 2026-11-23. "Real" means the real CLI and tools with nothing patched.
 ## First Live CI Run
 
 **Requirements**:
-- Given the `fabric-demo` principal, should see `fab-test-working-area` (Member or Contributor) as well as `visual-error-testing`; the local principal in `.fab-test/.env` sees only the former (2026-11-21), so the playwright live tests 401 locally.
+- Given the `fabric-demo` principal, should see `fab-test-working-area` (Member or Contributor), where analyzer and Playwright parity fixtures now live.
 - Given `live-ci.yml` in its Linux container, should run `test_pql_test_live.py` and `test_analyzers_live.py` green (a11y needs Node; pbir needs the .NET 10 set up there), and the Windows job should run bpa's.
 - Given `live-ci.yml`, should run `test_pql_test_live.py` green. pql-test's `pyadomd` is Windows-only; if service mode can't query XMLA on Linux, move the test to a Windows job (decision 5's job).
 

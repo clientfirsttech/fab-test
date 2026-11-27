@@ -29,7 +29,10 @@ from .test_playwright_result_parity import FIXTURE_DIR, expectations, parameters
 pytestmark = [pytest.mark.playwright, pytest.mark.integration]
 
 # Where the goldens were recorded; live-ci.yml sets it from the PLAYWRIGHT_PARITY_WORKSPACE_ID variable.
-DEV_WORKSPACE_ID = os.environ.get("PLAYWRIGHT_PARITY_WORKSPACE_ID") or "c4698d28-b05c-40bc-926c-707563ac85e7"
+DEV_WORKSPACE_ID = (
+    os.environ.get("PLAYWRIGHT_PARITY_WORKSPACE_ID")
+    or "2aea22b0-2e68-485a-8902-e8e5da32e3ef"
+)
 
 _BY_REPORT = defaultdict(list)
 for _expectation in expectations():

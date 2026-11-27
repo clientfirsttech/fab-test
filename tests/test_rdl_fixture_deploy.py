@@ -92,6 +92,18 @@ class TestRoundTrip:
         assert _TOOL.round_trip(["LAY-01"], tmp_path, _WS, fabric.call) == 0
         assert fabric.items == {"id-9": {"name": "LAY-01", "rdl": b"<Report>v2</Report>"}}
 
+    def test_a_zero_service_platform_does_not_replace_a_git_identity(self, tmp_path):
+        _fixture(tmp_path, "LAY-01")
+        platform = (
+            tmp_path / "LAY-01.PaginatedReport" / ".platform"
+        )
+        existing = '{"config":{"logicalId":"11111111-2222-4333-8444-555555555555"}}'
+        platform.write_text(existing, encoding="utf-8")
+
+        assert _TOOL.round_trip(["LAY-01"], tmp_path, _WS, FakeWorkspace().call) == 0
+
+        assert platform.read_text(encoding="utf-8") == existing
+
     def test_a_rejected_fixture_fails_the_run_but_the_rest_still_deploy(self, tmp_path):
         _fixture(tmp_path, "PRM-04")
         _fixture(tmp_path, "LAY-01")

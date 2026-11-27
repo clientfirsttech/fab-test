@@ -24,11 +24,13 @@ from __future__ import annotations
 
 import argparse
 import base64
+import json
 import sys
 import time
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
+from uuid import UUID
 
 import requests
 
@@ -81,6 +83,14 @@ def _item_ids(workspace_id: str, call: Call) -> dict[str, str]:
     return {item["displayName"]: item["id"] for item in reply["value"]}
 
 
+def _has_git_identity(platform: bytes) -> bool:
+    try:
+        logical_id = json.loads(platform).get("config", {}).get("logicalId", "")
+        return UUID(logical_id).int != 0
+    except (AttributeError, TypeError, ValueError):
+        return False
+
+
 def _round_trip_one(name: str, folder: Path, workspace_id: str, call: Call) -> str:
     """Upload, read back, keep the .platform; return what happened, or raise DeployError."""
     rdl = (folder / f"{name}.rdl").read_bytes()
@@ -97,7 +107,15 @@ def _round_trip_one(name: str, folder: Path, workspace_id: str, call: Call) -> s
     }
     if parts.get(f"{name}.rdl") != rdl:
         raise DeployError(f"{name}: the service returned a different .rdl; regenerate from what it accepts")
-    (folder / ".platform").write_bytes(parts[".platform"])
+    platform_path = folder / ".platform"
+    returned_platform = parts[".platform"]
+    if (
+        platform_path.exists()
+        and _has_git_identity(platform_path.read_bytes())
+        and not _has_git_identity(returned_platform)
+    ):
+        returned_platform = platform_path.read_bytes()
+    platform_path.write_bytes(returned_platform)
     if name.endswith("-Pass"):
         call("DELETE", f"{items}/{item_id}")
         return "accepted, saved, removed from the workspace"

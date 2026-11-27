@@ -36,7 +36,13 @@ def test_given_a_single_analyzer_should_still_print_its_own_document(capsys):
 
 @pytest.mark.parametrize("command", ["all", "local"])
 def test_given_format_json_should_write_one_parseable_document(tmp_path, command):
-    shutil.copy(ROOT / "fabric-artifacts" / "PaginatedExample-BrokenRDL.rdl", tmp_path / "Sample.rdl")
+    shutil.copy(
+        ROOT
+        / "fabric-artifacts"
+        / "PaginatedExample-BrokenRDL.PaginatedReport"
+        / "PaginatedExample-BrokenRDL.rdl",
+        tmp_path / "Sample.rdl",
+    )
     result = subprocess.run(
         [sys.executable, "-m", "fab_test.scripts.fab_test", command, "--format", "json", "--output-dir", "out"],
         cwd=tmp_path,

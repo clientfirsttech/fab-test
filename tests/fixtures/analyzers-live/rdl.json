@@ -453,6 +453,21 @@
    "findings": [],
    "status": "passed"
   },
+  "PaginatedExample": {
+   "findings": [
+    [
+     "ACC-03",
+     "warning",
+     "Tablix1"
+    ],
+    [
+     "STR-03",
+     "warning",
+     "DataSet1 \u203a Column_B"
+    ]
+   ],
+   "status": "warning"
+  },
   "PaginatedExample-BrokenRDL": {
    "findings": [
     [
@@ -1206,6 +1221,106 @@
   "PRM-07-Pass": {
    "findings": [],
    "status": "passed"
+  },
+  "PaginatedExample": {
+   "findings": [
+    [
+     "ACC-03",
+     "warning",
+     "Tablix1"
+    ],
+    [
+     "STR-03",
+     "warning",
+     "DataSet1 \u203a Column_B"
+    ]
+   ],
+   "status": "warning"
+  },
+  "PaginatedExample-BrokenRDL": {
+   "findings": [
+    [
+     "ACC-03",
+     "warning",
+     "Tablix1"
+    ],
+    [
+     "STR-03",
+     "warning",
+     "DataSet1 \u203a Test_Change"
+    ]
+   ],
+   "status": "warning"
+  },
+  "PaginatedExample-WithFilter": {
+   "findings": [
+    [
+     "ACC-03",
+     "warning",
+     "Tablix1"
+    ],
+    [
+     "PRM-01",
+     "warning",
+     "ReportParameter1"
+    ],
+    [
+     "PRM-02",
+     "error",
+     "ReportParameter1"
+    ],
+    [
+     "QRY-01",
+     "error",
+     "DataSet1"
+    ],
+    [
+     "STR-03",
+     "warning",
+     "DataSet1 \u203a Column_B"
+    ],
+    [
+     "STR-03",
+     "warning",
+     "DefautlValues \u203a Column_B"
+    ]
+   ],
+   "status": "failed"
+  },
+  "PaginatedExample-WithMultiFilter": {
+   "findings": [
+    [
+     "ACC-03",
+     "warning",
+     "Tablix1"
+    ],
+    [
+     "PRM-01",
+     "warning",
+     "ReportParameter1"
+    ],
+    [
+     "PRM-02",
+     "error",
+     "ReportParameter1"
+    ],
+    [
+     "QRY-01",
+     "error",
+     "DataSet1"
+    ],
+    [
+     "STR-03",
+     "warning",
+     "DataSet1 \u203a Column_B"
+    ],
+    [
+     "STR-03",
+     "warning",
+     "DefautlValues \u203a Column_B"
+    ]
+   ],
+   "status": "failed"
   },
   "QRY-01": {
    "findings": [

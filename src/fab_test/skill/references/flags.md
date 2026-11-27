@@ -548,7 +548,7 @@ denominator.
 fab-test playwright --workspace "Sales Dev"
 
 # Equivalent -- same shared flag
-fab-test playwright --workspace-id c4698d28-b05c-40bc-926c-707563ac85e7
+fab-test playwright --workspace-id 2aea22b0-2e68-485a-8902-e8e5da32e3ef
 
 # A real --artifact-dir keeps the repository as the denominator instead
 fab-test playwright --workspace "Sales Dev" --artifact-dir .

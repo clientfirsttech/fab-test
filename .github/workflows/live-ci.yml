@@ -52,7 +52,7 @@ jobs:
       FAB_TEST_LIVE_WORKSPACE: ${{ vars.FAB_TEST_LIVE_WORKSPACE || 'fab-test-working-area' }}
       # Where the playwright parity goldens were recorded; it must match their
       # workspace_id (tests/fixtures/playwright-parity/*.csv).
-      PLAYWRIGHT_PARITY_WORKSPACE_ID: ${{ vars.PLAYWRIGHT_PARITY_WORKSPACE_ID || 'c4698d28-b05c-40bc-926c-707563ac85e7' }}
+      PLAYWRIGHT_PARITY_WORKSPACE_ID: ${{ vars.PLAYWRIGHT_PARITY_WORKSPACE_ID || '2aea22b0-2e68-485a-8902-e8e5da32e3ef' }}
     steps:
       - uses: actions/checkout@v4
 
