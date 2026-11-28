@@ -41,7 +41,7 @@ _RESULTS = [  # envelope test_results, tagged with their source; one rule yields
      "status": "pass", "source": "rules"},
 ]
 _PAIRED = ""
-_NONE = "no *.odcs.yaml under --artifact-dir has fabTestReport abc; only the PBIR rules run"
+_NONE = "no *.odcs.yaml under --artifact-dir or fab-tests/ has fabTestReport abc; only the PBIR rules run"
 _CONTRACT_SOURCE = "Slicer contract (Sales.Report.odcs.yaml)"
 
 
@@ -186,7 +186,7 @@ def test_given_no_contract_should_say_why_and_still_list_the_pbir_rules(tmp_path
 
     page = _page(tmp_path, _envelope(rules_only, contract=None), note=_NONE)
 
-    assert ("Slicer contract: none paired: no *.odcs.yaml under --artifact-dir has fabTestReport abc; "
+    assert ("Slicer contract: none paired: no *.odcs.yaml under --artifact-dir or fab-tests/ has fabTestReport abc; "
             "only the PBIR rules run") in _sources(page)
     assert "Slicer contract (" not in _table(page)
     assert "<td>PBIR rules</td><td>SHOW_VISUAL_HEADER</td>" in _table(page)

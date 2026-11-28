@@ -16,7 +16,7 @@ every command in this README are unchanged.
 
 ### From PyPI (beta)
 
-The current release is the beta `1.10.0b4`. pip skips pre-releases unless you
+The current release is the beta `1.10.0b5`. pip skips pre-releases unless you
 pass `--pre` or name the version, so a bare `pip install cft-fab-test` finds
 nothing until the first final release.
 
@@ -24,7 +24,7 @@ nothing until the first final release.
 python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
 
-pip install --pre cft-fab-test          # or pin it: "cft-fab-test==1.10.0b4"
+pip install --pre cft-fab-test          # or pin it: "cft-fab-test==1.10.0b5"
 
 fab-test --version
 ```
@@ -246,6 +246,84 @@ fab-test playwright --dataset-id <DATASET_GUID> --dataset-workspace-id <WORKSPAC
 fab-test dependencies --semantic-model SalesModel --env dev --env-file .env
 ```
 
+### Data Agent regression tests
+
+`fab-test data-agent` (alias `agent`) is on by default;
+`FAB_TEST_ENABLE_DATA_AGENT=0` turns it off. It tests deployed agents, never Power BI Desktop. A bare run takes
+its workspace from `FABRIC_WORKSPACE_ID` or `workspace:` in `fab-test.yml`;
+`--workspace NAME_OR_ID` overrides it and enumerates deployed agents.
+Enumeration over five agents requires `--all`.
+
+Each item's suite is `fab-tests/data-agent/Sales.DataAgent.promptfoo.yaml`:
+test files live in `fab-tests/` at the repository root, outside the Fabric
+Git-connected folder, where Commit to Git can't delete them and you can find
+them (`--tests-dir` or `tests_dir:` moves it). A suite pairs by
+`fabTestDataAgent`, equal to the item's `.platform` `config.logicalId`. The `.platform` display name identifies
+the deployed agent. Renaming either file does not break pairing. Missing suites
+are skipped; duplicate identity claims fail before evaluation.
+
+```bash
+fab-test data-agent --artifact-dir fabric-artifacts --dry-run --format json
+fab-test data-agent Sales.DataAgent --report
+fab-test data-agent "Dev.Workspace/Sales.DataAgent" --tests Sales.DataAgent.promptfoo.yaml
+```
+
+**First time?** [docs/DATA-AGENT-TESTS-WALKTHROUGH.md](https://github.com/clientfirsttech/fab-test/blob/main/docs/DATA-AGENT-TESTS-WALKTHROUGH.md)
+goes from a published agent to a passing suite in CI, with the init / lint / run
+flag table. Copy a pipeline from
+[`docs/examples/github-actions/data-agent-tests.yml`](https://github.com/clientfirsttech/fab-test/blob/main/docs/examples/github-actions/data-agent-tests.yml) or
+[`docs/examples/azure-devops/data-agent-tests.yml`](https://github.com/clientfirsttech/fab-test/blob/main/docs/examples/azure-devops/data-agent-tests.yml):
+each lints every suite, then asks the agents, on every change and weekly.
+
+The run needs Node.js >=22.22.0 and a full service principal
+(`FABRIC_TENANT_ID`, `FABRIC_CLIENT_ID`, `FABRIC_CLIENT_SECRET`, or the existing
+service-principal aliases). `--env-file` supplies a credential file. The
+principal needs the tenant setting **Service principals can use Fabric APIs**,
+**Member** or **Contributor** in the agent's workspace, and **read access to
+every data source** the agent uses: the agent queries as the caller, so sharing
+only the agent isn't enough ([Microsoft Learn](https://learn.microsoft.com/fabric/data-science/data-agent-service-principal)).
+The agent must be published, on a running paid capacity.
+Promptfoo 0.124.0 installs through the existing tool bootstrap. Conversation
+tests run sequentially in one Python worker. Redacted native results, the
+effective config, and the envelope live under
+`fab-test-results/data_agent/<item>/`; `--report` adds the standard HTML report.
+`all` includes the enabled analyzer only with a workspace configured; `local`
+never includes it.
+
+`fab-test data-agent tests init Sales` asks for your questions, one at a time:
+the expected answer (Enter if the agent should decline), how it matches in one
+key (`n` number, `c` contains, `x` exact, `s` starts with, `e` ends with,
+`p` pattern, `r` refuses; Enter takes the default shown), and any follow-ups
+asked in the same conversation. `?` lists suggestions from the agent's measures
+and tables, marking the ones it should decline (a table its source has but it
+leaves out); a number picks one. In CI, or for an agent, pass the same answers as
+JSON with `--answers FILE` (`--questions` prints the shape). When the suite
+exists, init lists its tests and asks `[a]dd to it (Enter) or [r]eplace all`
+(`"replace_all": true` in an answers file); replacing with no new questions
+writes nothing. Typing a question it already has asks keep (Enter) or
+replace (`"replace": true`). Then run
+`fab-test data-agent tests lint Sales` before the run.
+
+**A suite is code.** promptfoo runs its `javascript` assertions and `file://`
+hooks with your permissions. Run suites only from trusted branches, never from
+`pull_request_target` or fork pull requests that can reach your secrets.
+fab-test narrows what a suite can reach:
+- **Fabric hosts only.** The token goes only to Fabric and Power BI hosts. A
+  suite's `base_url` or `fabric_urls` on any other host is refused, by `tests lint`
+  and by the run before promptfoo starts, with the same message. On a Fabric host
+  it still works, and lint warns that fab-test can resolve the agent instead. Allow an
+  exact extra host, such as a gateway, with `FAB_TEST_DATA_AGENT_ALLOWED_HOSTS`
+  (comma-separated) in the caller's environment; a suite can't set it.
+- **No secret in promptfoo's environment.** The service principal never
+  appears in promptfoo's environment. It goes to the provider through a private
+  temporary file that is deleted after the run.
+- **Reserved `env:` keys.** A suite's `env:` may not set `FAB_TEST_*`,
+  `FABRIC_*`, `AZURE_*`, `PROMPTFOO_*` or `PLAYWRIGHT_ENV_FILE`.
+
+Telemetry includes the agent's redacted answers, as every analyzer's envelope
+does. Anyone who can read the telemetry database sees them, so grant it to the
+same audience as the agent's data sources.
+
 ### Keep the output short: `-q`
 
 A default run explains itself for a person: a banner, a result line, and a summary per artifact. When you only need to know whether it passed (an AI agent in an edit loop, a busy CI log), add `-q`:
@@ -447,7 +525,7 @@ a case with no role embeds with no identity at all.
 
 ### Checking what a report's slicers open with
 
-A slicer contract (`<Report>.Report.odcs.yaml`, beside the report) states the
+A slicer contract (`fab-tests/pbir/<Report>.Report.odcs.yaml`) states the
 values each slicer is preselected with, fixed or following the calendar (the
 current semester). `fab-test pbir` checks it with the packaged rules;
 `fab-test pbir contract init` builds it by asking about each slicer.

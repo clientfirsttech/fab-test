@@ -14,11 +14,13 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from ._data_agent_run import build_data_agent_command
 from ._desktop import (
     DesktopMatchError,
     detect_desktop_instances,
     match_instance_to_artifact,
 )
+from ._feature_flags import is_enabled, not_enabled_message
 from ._report_html import resolve_report
 from ._results_stem import results_stem
 from ._rule_overlay import apply_overlay, apply_pbir_overlay, apply_rdl_overlay
@@ -498,6 +500,7 @@ _COMMAND_BUILDERS: dict[str, Any] = {
     "playwright": build_playwright_command,
     "dependencies": build_dependencies_command,
     "rdl": build_rdl_command,
+    "data_agent": build_data_agent_command,
 }
 
 
@@ -508,5 +511,7 @@ def build_command(
     output_dir: Path,
 ) -> list[str]:
     """Return the subprocess command for analyzer ``name`` and ``artifact``."""
+    if not is_enabled(name):
+        raise RuntimeError(not_enabled_message(name))
     builder = _COMMAND_BUILDERS[name]
     return builder(artifact, args, output_dir)

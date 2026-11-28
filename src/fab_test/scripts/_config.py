@@ -27,6 +27,9 @@ VERBOSITY_LEVELS = ("summary", "default", "verbose", "debug")
 # formalizes this as a JSON schema and asserts the two can't drift.
 _VALID_KEYS: dict[str, type] = {
     "artifact_dir": str,
+    # Authored test files (Data Agent suites, slicer contracts), outside the Git-connected
+    # folder; default fab-tests/ at the repository root (Data Agent decision 22).
+    "tests_dir": str,
     "output_dir": str,
     "jobs": int,
     "format": str,

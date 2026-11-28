@@ -13,12 +13,14 @@ Usage:
 
 Global flags (all subcommands):
     --artifact STEM      Only analyze the artifact matching this stem
-    --artifact-dir DIR   Root to discover artifacts under (default: the working directory)
+    --artifact-dir DIR   Root to discover artifacts under (default: artifact_dir in fab-test.yml, else the working
+                         directory)
     --output-dir DIR     Root for result envelopes (default: fab-test-results)
     --dry-run            List matching artifacts without running any analyzer
     --telemetry          Stream telemetry to Eventhouse when configured
     --no-telemetry       Suppress telemetry even when configured
-    --format {text,json} Output format for aggregate summaries (default: text)
+    --format {text,json} Output format: text for people, json for agents and scripts (default: format in
+                         fab-test.yml, else text)
     -v, --verbose        Increase output verbosity (one -v = verbose, two -v = debug)
 """
 
@@ -30,6 +32,7 @@ from pathlib import Path
 
 from fab_test import __version__ as _FAB_TEST_VERSION
 
+from ._authoring_parser import near_miss
 from ._cli_utils import narrate
 from ._config import (
     ConfigError,
@@ -59,8 +62,9 @@ from ._service_export import (
     service_item_type,
     service_target_refusal,
 )
-from ._slicer_contract_init import contract_main
+from ._slicer_contract_init import contract_args_main
 from ._slicer_contract_run import prepare_contracts
+from ._slicer_init_output import unknown_refusal
 from ._target import TargetError, select_target, workspace_conflict
 
 # Re-exported: `_dispatch_admin_command`'s handler table and `_prepare_target`
@@ -237,12 +241,14 @@ def _prepare_target(args: argparse.Namespace) -> int | None:
         args.resolved_target = select_target(
             getattr(args, "target", None),
             getattr(args, "artifact", None),
-            default_type=service_item_type(args.analyzer),
+            default_type="DataAgent" if args.analyzer == "data_agent" else service_item_type(args.analyzer),
         )
     except TargetError as exc:
         print(f"  ✗ fab-test: {exc}", file=sys.stderr)
         return 2
 
+    # all later fills workspace_id from fab-test.yml; data-agent must still know what was typed.
+    args.workspace_flag_given = bool(getattr(args, "workspace_id", ""))
     conflict = workspace_conflict(args.resolved_target, getattr(args, "workspace_id", ""))
     conflict = conflict or _pql_workspace_conflict(args)
     if conflict:
@@ -263,6 +269,10 @@ def _prepare_target(args: argparse.Namespace) -> int | None:
             artifact_dir_explicit=getattr(args, "artifact_dir_explicit", False),
             artifact_dir=str(getattr(args, "artifact_dir", ".")),
         )
+        if args.analyzer == "data_agent":
+            from ._data_agent_run import resolve_data_agent_mode
+
+            args.resolved_mode = resolve_data_agent_mode(args)
     except ModeError as exc:
         print(f"  ✗ fab-test: {exc}", file=sys.stderr)
         return 2
@@ -283,7 +293,11 @@ def _prepare_target(args: argparse.Namespace) -> int | None:
     # Under --format json or -q stderr stays silent; the mode is in the envelope.
     if getattr(args, "output_format", "text") != "json" and not getattr(args, "quiet", False):
         print(args.resolved_mode.banner(), file=sys.stderr)
-    if getattr(args, "dry_run", False) and is_service_run(args.analyzer, args) and args.resolved_target:
+    if args.analyzer == "data_agent":
+        args.workspace_id = args.resolved_mode.workspace
+    if args.analyzer == "data_agent" or (
+        getattr(args, "dry_run", False) and is_service_run(args.analyzer, args) and args.resolved_target
+    ):
         # A typed target is listed from its name alone: no token, no API call.
         return None
     return _resolve_workspace_target(args)
@@ -335,6 +349,11 @@ def _dispatch_run(args: argparse.Namespace) -> int:
 
     if args.analyzer == "all":
         analyzers = _all_analyzers()
+        from ._credentials import configured_workspace
+        from ._feature_flags import is_enabled
+
+        if is_enabled("data_agent") and configured_workspace(args, playwright=False):
+            analyzers = (*analyzers, *(("data_agent",) if "data_agent" not in analyzers else ()))
         # An analyzer that cannot honor the target is skipped rather than
         # failing the batch: `all local/Sales` should still run everything
         # that reads files, and saying which were skipped is more useful
@@ -385,6 +404,22 @@ def _dispatch_run(args: argparse.Namespace) -> int:
     return exit_code
 
 
+def _authoring_dispatch(parser: argparse.ArgumentParser, args: argparse.Namespace, unknown: list[str]) -> int | None:
+    """Run an authoring verb, or refuse a near miss naming the command meant; None for a run."""
+    meant = near_miss(args, sys.argv[1:]) if getattr(args, "analyzer", None) else None
+    if meant:
+        print(f"  ✗ fab-test: {meant}", file=sys.stderr)
+        return 2
+    noun = getattr(args, "authoring_noun", None)
+    if noun == "contract":
+        return contract_args_main(args, unknown_refusal(parser, args, unknown))
+    if noun == "tests":
+        from ._data_agent_authoring import tests_main
+
+        return tests_main(args, unknown, parser)
+    return None
+
+
 def main() -> int:
     """Parse arguments, run the preparation chain, then dispatch.
 
@@ -393,10 +428,13 @@ def main() -> int:
     keeps the guards out of here -- they used to be ten early returns
     inline, one per failure mode added over time.
     """
-    if sys.argv[1:3] == ["pbir", "contract"]:  # `contract` is reserved in pbir's TARGET position
-        return contract_main(sys.argv[3:])
     parser = build_parser()
-    args = parser.parse_args()
+    args, unknown = parser.parse_known_args()
+    authoring_code = _authoring_dispatch(parser, args, unknown)
+    if authoring_code is not None:
+        return authoring_code
+    if unknown:
+        parser.error(f"unrecognized arguments: {' '.join(unknown)}")
     if args.analyzer == "help":
         # Answered before the config is read: help is what you reach for
         # when something is already wrong, including the config itself.

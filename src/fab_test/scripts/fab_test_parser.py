@@ -12,6 +12,8 @@ import re
 
 from fab_test import __version__ as _FAB_TEST_VERSION
 
+from ._authoring_parser import add_authoring_noun, parse_authoring_analyzer
+from ._cli_utils import ARTIFACT_DIR_HELP, ARTIFACT_HELP, FORMAT_HELP
 from ._config import CONFIG_FILENAME
 from ._fab_test_context import (
     _DEFAULT_SUBPROCESS_TIMEOUT,
@@ -20,7 +22,7 @@ from ._fab_test_context import (
     REPO_ROOT,
     RESULTS_ROOT,
 )
-from ._feature_flags import add_disabled_stubs
+from ._feature_flags import add_disabled_stubs, is_enabled
 from ._service_flags import add_service_flags, add_workspace_flag
 from ._slicer_contract_run import add_contract_flags
 from .fab_test_registry import (
@@ -79,7 +81,7 @@ def _add_common_flags(
         default=str(_PYPROJECT_CONFIG.get("artifact_dir", artifact_dir_default)),
         metavar="DIR",
         action=_ArtifactDirAction if track_artifact_dir_explicit else "store",
-        help="Root to discover artifacts under, recursively (default: the working directory)",
+        help=ARTIFACT_DIR_HELP,
     )
     if track_artifact_dir_explicit:
         parser.set_defaults(artifact_dir_explicit=False)
@@ -109,7 +111,7 @@ def _add_common_flags(
         "--artifact",
         default=None,
         metavar="STEM",
-        help="Deprecated alias for the TARGET argument; only analyze this stem",
+        help=ARTIFACT_HELP,
     )
     parser.add_argument(
         "--timeout",
@@ -194,11 +196,14 @@ def _add_common_flags(
         choices=["text", "json"],
         default=_PYPROJECT_CONFIG.get("format", "text"),
         dest="output_format",
-        help="Output format for aggregate summaries (default: text)",
+        help=FORMAT_HELP,
     )
 
 
 _SUBCOMMAND_ALIASES = {
+    "data-agent": "data_agent",
+    "data_agent": "data_agent",
+    "agent": "data_agent",
     "pql-test": "pql_test",
     "pql_test": "pql_test",
     "pql-lint": "pql_lint",
@@ -209,6 +214,7 @@ _SUBCOMMAND_ALIASES = {
 # for the handful where they diverge. Result directories (fab-test-results/
 # <key>/...) stay on the registry key so historical results remain readable.
 _CANONICAL_TO_REGISTRY_KEY = {
+    "data-agent": "data_agent",
     "pql-test": "pql_test",
     "pql-lint": "pql_lint",
 }
@@ -240,7 +246,7 @@ _COMMON_COMPLETION_FLAGS = (
 def _completion_subcommands() -> str:
     return " ".join(
         (
-            *(_canonical_name(name) for name in _ANALYZER_REGISTRY),
+            *(_canonical_name(name) for name in _ANALYZER_REGISTRY if is_enabled(name)),
             "all",
             "clean-tools",
             "help",
@@ -340,6 +346,11 @@ class _FabTestParser(argparse.ArgumentParser):
     #: to match a typo — answering a direct question is not advertising.
     accepted_subcommands: tuple[str, ...] = ()
 
+    def parse_known_args(self, args=None, namespace=None):
+        if hasattr(self, "_authoring_noun_action"):
+            return parse_authoring_analyzer(self, args, namespace)
+        return super().parse_known_args(args, namespace)
+
     def error(self, message: str):
         match = re.match(r"argument ANALYZER: invalid choice: '([^']*)'", message)
         if match and self.advertised_subcommands:
@@ -387,7 +398,7 @@ def _add_bpa_subparser(subs: argparse._SubParsersAction) -> None:
 def _add_pbir_subparser(subs: argparse._SubParsersAction) -> None:
     pbir_p = subs.add_parser(
         "pbir",
-        help="PBIR Inspector — static report analysis (Report artifacts)",
+        help="PBIR Inspector — static report analysis (Report artifacts); contracts: pbir contract init|lint",
     )
     _add_common_flags(pbir_p, track_artifact_dir_explicit=True)
     add_workspace_flag(pbir_p)
@@ -410,6 +421,9 @@ def _add_pbir_subparser(subs: argparse._SubParsersAction) -> None:
         help=f"PBIR Inspector rules JSON [default: {_DEFAULT_PBIR_RULES}]",
     )
     add_contract_flags(pbir_p)
+    from ._slicer_contract_init import _parser as contract_parser
+
+    add_authoring_noun(pbir_p, "contract", contract_parser())
 
 def _add_a11y_subparser(subs: argparse._SubParsersAction) -> None:
     a11y_p = subs.add_parser(
@@ -958,7 +972,7 @@ def _add_list_subparser(subs: argparse._SubParsersAction) -> None:
         "--artifact-dir",
         default=str(_PYPROJECT_CONFIG.get("artifact_dir", ARTIFACT_ROOT)),
         metavar="DIR",
-        help="Root to discover artifacts under, recursively (default: the working directory)",
+        help=ARTIFACT_DIR_HELP,
     )
     list_p.add_argument(
         "--format",
@@ -990,7 +1004,7 @@ def _add_explain_subparser(subs: argparse._SubParsersAction) -> None:
         "--artifact-dir",
         default=str(_PYPROJECT_CONFIG.get("artifact_dir", ARTIFACT_ROOT)),
         metavar="DIR",
-        help="Root to discover artifacts under, recursively (default: the working directory)",
+        help=ARTIFACT_DIR_HELP,
     )
     explain_p.add_argument(
         "--output-dir",
@@ -1096,6 +1110,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     for add_subparser in _SUBPARSER_BUILDERS:
         add_subparser(subs)
+    if is_enabled("data_agent"):
+        from ._data_agent_authoring import add_data_agent_parser
+        add_data_agent_parser(subs, _add_common_flags)
     stubs = add_disabled_stubs(subs)
 
     # Read back from the subparser table rather than maintained by hand, so

@@ -131,5 +131,5 @@ def test_given_a_broken_contract_for_another_report_should_say_every_contract_is
     _write(tmp_path / "Other.Report.odcs.yaml", _contract(selected=["{nope}"]))
 
     assert prepare_contracts(_args(tmp_path, artifact="Sales")) == 2
-    assert ("every *.odcs.yaml under --artifact-dir is read before any report runs, including ones for reports "
-            "--artifact doesn't select") in capsys.readouterr().err
+    assert ("every *.odcs.yaml under --artifact-dir and fab-tests/ is read before any report runs, "
+            "including ones for reports --artifact doesn't select") in capsys.readouterr().err

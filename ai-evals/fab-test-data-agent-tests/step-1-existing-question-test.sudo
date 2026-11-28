@@ -1,0 +1,16 @@
+import 'ai-evals/fab-test-data-agent-tests/fixtures/fab-test-skill.md'
+
+userPrompt = """
+You are in a test environment. Do not run any commands and do not edit any files. Use these mock tools instead,
+and show each command you would run with its arguments, and the content of any --answers file you would write.
+
+mock suite fab-tests/data-agent/Sales.DataAgent.promptfoo.yaml => 3 tests (id: question => its check):
+  how-many-customers: How many customers are there? => number 310
+  out-of-scope: What is my bank balance? => the agent declines
+  tell-me-a-joke: Tell me a joke => any answer
+
+Add this test to the Sales agent's suite: "How many customers are there?" The right answer is 312.
+"""
+
+- Given a question the suite already has, should point out that `how-many-customers` already asks it, expecting 310
+- Given a different answer for an existing question, should send it with `"replace": true`, because without it the old answer is kept and the suite does not change

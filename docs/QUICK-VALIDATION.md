@@ -118,6 +118,82 @@ fab-test rdl                             # active rules for paginated (.rdl) rep
 fab-test pql-test --env DEV
 ```
 
+### Run Data Agent tests
+
+The step-by-step version is
+[DATA-AGENT-TESTS-WALKTHROUGH.md](DATA-AGENT-TESTS-WALKTHROUGH.md).
+
+Configure a workspace plus a full
+service principal (`FABRIC_TENANT_ID`, `FABRIC_CLIENT_ID`,
+`FABRIC_CLIENT_SECRET`). The principal needs **Member** or **Contributor** in the
+agent's workspace, **read access to every data source** the agent uses, and the
+tenant setting **Service principals can use Fabric APIs**. `tests init` writes
+the suite to `fab-tests/data-agent/Sales.DataAgent.promptfoo.yaml`, outside the
+Git-connected folder, with `fabTestDataAgent` set to the item's `.platform`
+logicalId (a suite beside `Sales.DataAgent/` still pairs). The suite uses
+inline promptfoo tests and native assertions:
+
+```yaml
+fabTestDataAgent: <config.logicalId from Sales.DataAgent/.platform>
+prompts:
+  - "{{query}}"
+tests:
+  - description: Revenue regression
+    vars:
+      query: What was revenue last year?
+    assert:
+      - type: contains
+        value: "<verified expected answer>"
+```
+
+```bash
+fab-test data-agent --dry-run --format json  # pair local suites; no token or agent calls
+fab-test data-agent Sales.DataAgent --report
+fab-test data-agent "Dev.Workspace/Sales.DataAgent" --tests Sales.DataAgent.promptfoo.yaml --env-file .env
+```
+
+Node.js >=22.22.0 is required; promptfoo 0.124.0 installs on the first run.
+`--workspace NAME_OR_ID` without a target enumerates the workspace; over five
+agents needs `--all`. Unpaired items are skipped. Conversation vars
+`conversation`/`reset` force one Python worker and one concurrent call.
+Reports and redacted results use `fab-test-results/data_agent/<item>/`.
+`fab-test data-agent tests init Sales` asks for your questions, one at a time:
+the expected answer (Enter if the agent should decline), how it matches in one
+key (`n` number, `c` contains, `x` exact, `s` starts with, `e` ends with,
+`p` pattern, `r` refuses; Enter takes the default shown), and any follow-ups
+asked in the same conversation. `?` lists suggestions from the agent's measures
+and tables; a number picks one. In CI, or for an agent, pass the same answers as
+JSON with `--answers FILE` (`--questions` prints the shape). Then run
+`fab-test data-agent tests lint Sales` before the run.
+
+A pipeline can run an already-authored suite without prompts. Copy the whole
+workflow from [`examples/github-actions/data-agent-tests.yml`](examples/github-actions/data-agent-tests.yml)
+or [`examples/azure-devops/data-agent-tests.yml`](examples/azure-devops/data-agent-tests.yml)
+(lint without secrets, then the run, on every change and weekly), or add the step:
+
+```yaml
+- name: Test deployed Data Agents
+  env:
+    FABRIC_WORKSPACE_ID: ${{ vars.FABRIC_WORKSPACE_ID }}
+    FABRIC_TENANT_ID: ${{ secrets.FABRIC_TENANT_ID }}
+    FABRIC_CLIENT_ID: ${{ secrets.FABRIC_CLIENT_ID }}
+    FABRIC_CLIENT_SECRET: ${{ secrets.FABRIC_CLIENT_SECRET }}
+  run: fab-test data-agent --artifact-dir fabric-artifacts --format json --report
+```
+
+Run this step only for trusted branches. A suite is code: promptfoo runs its
+`javascript` assertions with the job's permissions. Never run it on
+`pull_request_target` or fork pull requests that receive these secrets.
+fab-test sends the token only to Fabric and Power BI hosts. To add an exact
+host, set `FAB_TEST_DATA_AGENT_ALLOWED_HOSTS` in the job's `env`, never in the
+suite. The secret is kept out of promptfoo's environment. Grant the telemetry
+database to the same audience as the agent's data sources, because its rows
+carry the agent's redacted answers.
+
+Install fab-test and Node.js first. See the
+[CLI skill](../.github/skills/fab-test/SKILL.md) for the shared output modes and
+exit codes.
+
 ### Isolate one artifact
 
 ```bash

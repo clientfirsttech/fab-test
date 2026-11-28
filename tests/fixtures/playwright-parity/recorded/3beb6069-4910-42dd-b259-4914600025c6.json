@@ -1,0 +1,23 @@
+{
+  "bookmarks": [],
+  "dataset_id": "0a85c339-5678-4aa6-96d9-becfe722bbdd",
+  "golden_csv": "RLSTest-ThinReport.csv",
+  "pages": [
+    {
+      "page_id": "8189e52cdb8f5fb2b2cf",
+      "page_name": "Page 1"
+    },
+    {
+      "page_id": "76b3b7e1b330753127fa",
+      "page_name": "Page 2"
+    }
+  ],
+  "report_id": "3beb6069-4910-42dd-b259-4914600025c6",
+  "report_name": "RLSTest-ThinReport",
+  "roles": [
+    "Team A",
+    "Team B"
+  ],
+  "use_rls": true,
+  "workspace_id": "2aea22b0-2e68-485a-8902-e8e5da32e3ef"
+}

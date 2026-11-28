@@ -51,6 +51,38 @@ def test_command_table_reads_trigger_and_skills():
     }
 
 
+def _section(text: str, heading: str) -> str:
+    """The text under heading, up to the next heading of the same or a higher level."""
+    level = heading.split(" ", 1)[0]
+    body = text.split(heading, 1)[1]
+    return re.split(rf"\n#{{1,{len(level)}}} ", body, maxsplit=1)[0]
+
+
+def _project_skills() -> set[str]:
+    """Skill names in the router's Project-Specific Skills table, first column only."""
+    rows = _section(_ROUTER.read_text(encoding="utf-8"), "## Project-Specific Skills").splitlines()
+    return {match for line in rows if line.startswith("| `")
+            for match in _SKILL_NAME.findall(line.split("|")[1])}
+
+
+@pytest.mark.fab_test
+def test_router_lists_polite_http_and_loads_it_for_http_work():
+    router = _ROUTER.read_text(encoding="utf-8")
+
+    assert "aidd-polite-http" in _project_skills()
+    assert "load aidd-polite-http" in _section(router, "## Pre-Flight")
+
+
+@pytest.mark.fab_test
+def test_every_project_skill_exists_and_the_agent_lists_it():
+    agent_skills = set(_SKILL_NAME.findall(_section(_AGENT.read_text(encoding="utf-8"), "## Skill Locations")))
+    project = _project_skills()
+
+    assert project, "found no Project-Specific Skills rows in aidd-workflow"
+    assert sorted(s for s in project if not (_ROOT / ".github" / "skills" / s / "SKILL.md").is_file()) == []
+    assert sorted(project - agent_skills) == []
+
+
 @pytest.mark.fab_test
 def test_agent_command_table_mirrors_the_router():
     router = _command_table(_ROUTER.read_text(encoding="utf-8"), "## Command Map")

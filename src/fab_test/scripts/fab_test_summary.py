@@ -282,6 +282,8 @@ def _artifact_summary_line(data: dict[str, Any]) -> str:
         )
     if findings:
         return f"{len(findings)} finding(s) {sev_summary}"
+    if data.get("status") == "error" and data.get("message"):  # say why, not "no findings"
+        return "error: " + str(data["message"]).splitlines()[0]
     return "no findings"
 
 
@@ -426,6 +428,8 @@ def build_all_summary_rows(
     for analyzer, code in zip(analyzers, codes):
         glob, _ = ANALYZER_REGISTRY[analyzer]
         stems = service_row_stems(analyzer, args)  # a service run names what it ran, never the checkout
+        if analyzer == "data_agent" and hasattr(args, "data_agent_artifacts"):
+            stems = [results_stem(a) for a in args.data_agent_artifacts]
         if stems is None:
             stems = [results_stem(a) for a in discover_artifacts(artifact_dir, glob, target, output_dir=output_dir)]
         if not stems:

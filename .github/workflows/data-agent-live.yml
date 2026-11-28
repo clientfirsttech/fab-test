@@ -1,0 +1,128 @@
+# Live Data Agent: asks the deployed agent in DATA_AGENT_WORKSPACE (default
+# fab-test-working-area) its suite's questions with this repository's own code.
+#
+# Only when what `fab-test data-agent` depends on changes: asking a real agent
+# needs a paid Fabric capacity that is running (F2 or larger; a paused one
+# fails with CapacityNotActive and names the fix), so this does not run on
+# every change or on a schedule. Run it by hand (workflow_dispatch) after
+# scaling the capacity up. The path list is the run path's import closure;
+# tests/test_data_agent_live_workflow.py fails when an import adds a file
+# this list misses.
+#
+# Identity: the service principal in the protected `fabric-demo` Environment.
+# It needs Member or Contributor in the workspace and read on the agent's
+# data sources. A suite is code (promptfoo runs its javascript assertions), so
+# same-repository PRs only; never switch this to pull_request_target.
+
+name: Data Agent Live
+
+on:
+  pull_request:
+    paths: &data-agent-paths
+      - "src/fab_test/fabric_data_agent_provider.py"
+      - "src/fab_test/scripts/*data_agent*.py"
+      - "src/fab_test/scripts/__init__.py"
+      - "src/fab_test/scripts/_analyzer_envelope.py"
+      - "src/fab_test/scripts/_analyzer_process.py"
+      - "src/fab_test/scripts/_artifact_types.py"
+      - "src/fab_test/scripts/_cli_utils.py"
+      - "src/fab_test/scripts/_config.py"
+      - "src/fab_test/scripts/_credentials.py"
+      - "src/fab_test/scripts/_feature_flags.py"
+      - "src/fab_test/scripts/_git_context.py"
+      - "src/fab_test/scripts/_http_policy.py"
+      - "src/fab_test/scripts/_metadata.py"
+      - "src/fab_test/scripts/_mode.py"
+      - "src/fab_test/scripts/_pbip_discovery.py"
+      - "src/fab_test/scripts/_pql_identity.py"
+      - "src/fab_test/scripts/_pql_test_status.py"
+      - "src/fab_test/scripts/_report_html.py"
+      - "src/fab_test/scripts/_results_stem.py"
+      - "src/fab_test/scripts/_run_manifest.py"
+      - "src/fab_test/scripts/_run_timing.py"
+      - "src/fab_test/scripts/_scan.py"
+      - "src/fab_test/scripts/_service_export.py"
+      - "src/fab_test/scripts/_target.py"
+      - "src/fab_test/scripts/_tests_dir.py"
+      - "src/fab_test/scripts/fab_test_registry.py"
+      - "src/fab_test/scripts/invoke_pql_test.py"
+      - "src/fab_test/scripts/playwright_validation/config.py"
+      - "src/fab_test/scripts/playwright_validation/fabric_service_client.py"
+      - "src/fab_test/scripts/playwright_validation/resolver.py"
+      - "src/fab_test/scripts/playwright_validation/service_client.py"
+      - "src/fab_test/scripts/playwright_validation/xmla_roles.py"
+      - "src/fab_test/metadata/analyzers.json"
+      - "pyproject.toml"
+      - "fab-tests/data-agent/**"
+      - "**/*.DataAgent/**"
+      - ".github/workflows/data-agent-live.yml"
+      - "tests/test_data_agent_live.py"
+      - "tests/test_playwright_generation_parity_live.py"
+  push:
+    branches: [main, dev]
+    paths: *data-agent-paths
+  workflow_dispatch:
+
+concurrency:
+  group: data-agent-live-${{ vars.DATA_AGENT_WORKSPACE || 'fab-test-working-area' }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  live:
+    name: Live (Data Agent)
+    if: >-
+      github.event_name != 'pull_request' ||
+      (github.event.pull_request.head.repo.full_name == github.repository &&
+       github.actor != 'dependabot[bot]')
+    runs-on: ubuntu-latest
+    environment: fabric-demo
+    timeout-minutes: 30
+    env:
+      DATA_AGENT_WORKSPACE: ${{ vars.DATA_AGENT_WORKSPACE || 'fab-test-working-area' }}
+      FABRIC_TENANT_ID: ${{ secrets.FABRIC_TENANT_ID }}
+      FABRIC_CLIENT_ID: ${{ secrets.FABRIC_CLIENT_ID }}
+      FABRIC_CLIENT_SECRET: ${{ secrets.FABRIC_CLIENT_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # promptfoo 0.124.0 needs Node >= 22.22.0; fab-test installs it on first use.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install fab-test from the checkout
+        run: pip install -e ".[dev]"
+
+      # Fails fast, with the remediation, when the secrets are missing or the
+      # principal cannot see the workspace.
+      - name: Verify the credential and workspace access
+        run: fab-test auth status --workspace "$DATA_AGENT_WORKSPACE"
+
+      - name: Lint the suites (offline)
+        run: fab-test data-agent tests lint
+
+      # The live integration test runs the real CLI: auth status, listing the
+      # deployed agents, and one run that asks every question. It fails only
+      # when the tester did not work (the run broke, or a question came back
+      # without a verdict); which answers pass varies by run, so see the report.
+      - name: Live integration tests
+        run: >-
+          pytest tests/test_data_agent_live.py -v -rs -p no:cacheprovider
+          --basetemp=fab-test-results/live
+
+      - name: Keep the results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: data-agent-live-results
+          path: |
+            fab-test-results/**/envelope.json
+            fab-test-results/**/report.html
+            fab-test-results/**/effective.promptfoo.yaml

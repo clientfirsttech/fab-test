@@ -1,0 +1,20 @@
+{
+  "bookmarks": [],
+  "dataset_id": "4c02f7f9-7ecf-43cf-a351-966ab7976081",
+  "golden_csv": "Not Working Visuals.csv",
+  "pages": [
+    {
+      "page_id": "14c428845591d434b53c",
+      "page_name": "Page 1"
+    },
+    {
+      "page_id": "c144c2bbb3cde1c9195b",
+      "page_name": "Page 2"
+    }
+  ],
+  "report_id": "d26ef04f-5252-45b3-9a31-b16e59eec23d",
+  "report_name": "Not Working Visuals",
+  "roles": [],
+  "use_rls": false,
+  "workspace_id": "2aea22b0-2e68-485a-8902-e8e5da32e3ef"
+}

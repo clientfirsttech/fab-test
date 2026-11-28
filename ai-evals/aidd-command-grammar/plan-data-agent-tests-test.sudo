@@ -1,0 +1,19 @@
+import '.github/skills/aidd-command-grammar/SKILL.md'
+
+userPrompt = """
+You are in a test environment. Do not run any commands and do not edit any files. You may read files in this repository.
+
+/command-grammar plan data-agent tests
+
+fab-test is adding a `data-agent` analyzer that runs a promptfoo test suite against a deployed Fabric Data Agent
+(`fab-test data-agent Sales.DataAgent`). People need a command that writes a starter suite for an agent from its
+definition, asking which questions to test, and a command that checks a suite is valid before it runs. An AI agent
+will often build the suite for the developer. List the commands, where the suite file lives, and the epic's
+Given/should requirements for them.
+"""
+
+- Given the grammar, should plan the commands as `fab-test data-agent tests init` and `fab-test data-agent tests lint`, never `fab-test data-agent init` or a top-level `fab-test lint`
+- Given Fabric's Commit to Git, should place the suite beside the `Sales.DataAgent` folder (e.g. `Sales.DataAgent.<suffix>`), not inside it
+- Given an AI agent builds the suite, should require `--questions` and `--answers FILE`, and exit 2 naming them when no one can answer a prompt
+- Given the run's inputs, should require TARGET to be the item (`Sales.DataAgent`), with `--artifact-dir` and `--format` defaults resolved from config as the run's are
+- Given output modes, should require `-q`, the default, `-v` and `--format json` with the run's meanings, and the next step named after each command

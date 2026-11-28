@@ -37,9 +37,12 @@ REQUIRED = [
     "fab_test/skill/SKILL.md",
     "fab_test/skill/references/configuration.md",
     "fab_test/skill/references/credentials.md",
+    "fab_test/skill/references/data-agent.md",
+    "fab_test/skill/references/discoverability.md",
     "fab_test/skill/references/flags.md",
     "fab_test/skill/references/operations.md",
     "fab_test/skill/references/reports.md",
+    "fab_test/skill/references/run-manifest.md",
     "fab_test/skill/references/source-files.md",
     "fab_test/skill/references/targeting-and-discovery.md",
 ]

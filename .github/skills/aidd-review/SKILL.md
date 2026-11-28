@@ -12,6 +12,7 @@ Criteria {
   Important: The skill references below (e.g. /aidd-javascript) are files in this repository at `.github/skills/<skill-name>/SKILL.md`. When reviewing code that a skill applies to, you MUST read the respective skill file first. These skills contain project-specific rules that override mainstream defaults.
   Before beginning, read and respect the constraints in /aidd-please.
   This project is Python. Use /aidd-python for code quality and best practices; skip the JavaScript/TypeScript skills below unless the diff actually contains JS/TS.
+  Use /aidd-command-grammar on any diff that adds or changes a command, verb, noun, or flag (the parser, `fab_test.py`'s dispatch, an `init` or `lint` module): report each unmet Constraint with its checklist row.
   Use /aidd-module-budgets on every diff: check the size of each file the diff touches, not only the size of the diff. A small diff on an oversized file is a finding.
   Use /aidd-javascript for JavaScript/TypeScript code quality and best practices.
   Use /aidd-tdd for test coverage and test quality assessment.

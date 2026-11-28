@@ -33,7 +33,7 @@ from fab_test.scripts.fab_test_execution import (
 )
 from fab_test.scripts.fab_test_parser import build_parser
 
-WORKSPACE = "c4698d28-b05c-40bc-926c-707563ac85e7"
+WORKSPACE = "2aea22b0-2e68-485a-8902-e8e5da32e3ef"
 
 _CLIENT = "fab_test.scripts.playwright_validation.fabric_service_client.build_fabric_service_client"
 

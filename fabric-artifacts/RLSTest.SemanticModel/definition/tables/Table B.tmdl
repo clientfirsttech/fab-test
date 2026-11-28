@@ -1,0 +1,22 @@
+table 'Table B'
+	lineageTag: 0a7ef678-1530-43eb-913b-f8b94cd9b3e5
+
+	column 'Table B'
+		dataType: string
+		lineageTag: 81d682c5-b248-48a4-b125-8f93545fb488
+		summarizeBy: none
+		sourceColumn: Table B
+
+		annotation SummarizationSetBy = Automatic
+
+	partition 'Table B' = m
+		mode: import
+		source =
+				let
+				    Source = Table.FromRows(Json.Document(Binary.Decompress(Binary.FromText("i45WilCK1YlWigSTUUqxsQA=", BinaryEncoding.Base64), Compression.Deflate)), let _t = ((type nullable text) meta [Serialized.Text = true]) in type table [#"Table B" = _t]),
+				    #"Changed Type" = Table.TransformColumnTypes(Source,{{"Table B", type text}})
+				in
+				    #"Changed Type"
+
+	annotation PBI_ResultType = Table
+

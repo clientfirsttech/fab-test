@@ -30,14 +30,15 @@ _SPELLINGS = [(name, spelling) for name in _FEATURES for spelling in flags.FEATU
 
 
 @pytest.fixture(autouse=True)
-def _flags_at_defaults(monkeypatch):
+def _flags_off(monkeypatch):
+    """Every flag explicitly off: these tests are about the disabled path, whatever a flag's default."""
     for name in _FEATURES:
-        monkeypatch.delenv(flags.env_var(name), raising=False)
+        monkeypatch.setenv(flags.env_var(name), "0")
 
 
 def _run_cli(*argv, enable=()):
     env = {k: v for k, v in os.environ.items() if not k.startswith("FAB_TEST_ENABLE_")}
-    env.update({flags.env_var(name): "1" for name in enable})
+    env.update({flags.env_var(name): "1" if name in enable else "0" for name in _FEATURES})
     return subprocess.run(
         [sys.executable, "-m", "fab_test.scripts.fab_test", *argv],
         capture_output=True,
@@ -55,10 +56,16 @@ def _run_cli(*argv, enable=()):
 
 
 @pytest.mark.fab_test
-def test_every_flag_defaults_off():
-    """A flag exists only while its feature is unreleased; releasing deletes the row."""
-    assert flags._FEATURES
-    assert not any(flags._FEATURES.values())
+def test_flag_defaults_follow_each_features_release_step(monkeypatch):
+    """Off until a feature is ready; then the default flips on before the row is deleted (module docstring).
+
+    data_agent flipped on 2026-11-21 after a live run against a deployed agent; sqldb_test is still off.
+    """
+    assert flags._FEATURES == {"data_agent": True, "sqldb_test": False}
+    for name in _FEATURES:
+        monkeypatch.delenv(flags.env_var(name))
+    assert flags.is_enabled("data_agent")
+    assert not flags.is_enabled("sqldb_test")
 
 
 @pytest.mark.fab_test
@@ -139,7 +146,9 @@ def test_enabling_a_flag_removes_its_stub(monkeypatch):
     monkeypatch.setenv(flags.env_var("data_agent"), "1")
     subs = next(a for a in build_parser()._actions if isinstance(a, argparse._SubParsersAction))
 
-    assert not set(flags.FEATURE_SPELLINGS["data_agent"]) & set(subs.choices)
+    assert set(flags.FEATURE_SPELLINGS["data_agent"]) <= set(subs.choices)
+    assert all(not isinstance(subs.choices[name], flags._DisabledFeatureParser)
+               for name in flags.FEATURE_SPELLINGS["data_agent"])
     assert "sqldb-test" in subs.choices
 
 
@@ -149,13 +158,14 @@ def test_enabling_a_flag_removes_its_stub(monkeypatch):
 
 
 @pytest.mark.fab_test
-def test_top_level_help_is_identical_with_flags_on_or_off():
-    """Stubs add nothing to --help, so a release diff shows only shipped commands."""
+def test_top_level_help_advertises_only_enabled_implementations():
+    """Stubs stay invisible; enabling an implemented feature advertises its real command."""
     off = _run_cli("--help")
     on = _run_cli("--help", enable=_FEATURES)
 
     assert off.returncode == on.returncode == 0
-    assert off.stdout == on.stdout
+    assert "data-agent (agent, data_agent)" in on.stdout
+    assert "sqldb-test" not in on.stdout
     for name in _FEATURES:  # primary spellings; a bare alias like "agent" is ordinary prose
         assert flags.FEATURE_SPELLINGS[name][0] not in off.stdout
 

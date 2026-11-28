@@ -37,7 +37,13 @@ def test_every_wrapper_places_native_output_beside_its_envelope(wrapper):
 
 
 def test_given_output_dir_should_write_no_native_output_under_the_default_root(tmp_path):
-    shutil.copy(ROOT / "fabric-artifacts" / "PaginatedExample-BrokenRDL.rdl", tmp_path / "Sample.rdl")
+    shutil.copy(
+        ROOT
+        / "fabric-artifacts"
+        / "PaginatedExample-BrokenRDL.PaginatedReport"
+        / "PaginatedExample-BrokenRDL.rdl",
+        tmp_path / "Sample.rdl",
+    )
     result = subprocess.run(
         [sys.executable, "-m", "fab_test.scripts.fab_test", "rdl", "Sample.rdl", "--output-dir", "out"],
         cwd=tmp_path,

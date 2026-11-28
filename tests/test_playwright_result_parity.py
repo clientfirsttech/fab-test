@@ -37,8 +37,8 @@ PAGINATED_RESULTS = (
 
 #: The size of the golden set. A golden that silently loses rows proves less
 #: than it claims, so a change to either number has to be deliberate.
-INTERACTIVE_CASES = 26
-PAGINATED_CASES = 6
+INTERACTIVE_CASES = 27
+PAGINATED_CASES = 4
 
 _GUID = re.compile(r"test ([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}) - ")
 
@@ -162,15 +162,11 @@ def test_the_goldens_expect_the_failures_the_dev_environment_was_built_to_show()
     failing = {e.key for e in expectations() if e.expected_status == "fail"}
     assert failing == {
         ("Not Working Visuals", "Page 1", "", "", ()),
+        ("Not Working Visuals", "Page 2", "", "", ()),
+        ("Report with Bookmarks - Broken Visuals", "Page A", "", "", ()),
         ("Report with Bookmarks - Broken Visuals", "Page A", "Bookmark 3", "", ()),
+        ("Report with Bookmarks - Broken Visuals", "Page A", "---", "", ()),
         ("RLSTest-WithBookmarks", "Page 2", "Show Broken", "Team A", ()),
         ("RLSTest-WithBookmarks", "Page 2", "Show Broken", "Team B", ()),
         ("PaginatedExample-BrokenRDL", "", "", "", ()),
-        (
-            "PaginatedExample-WithMultiFilter",
-            "",
-            "",
-            "",
-            (("ReportParameter1", "2"), ("ReportParameter1", "4")),
-        ),
     }

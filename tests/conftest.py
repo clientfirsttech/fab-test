@@ -12,7 +12,7 @@ from fab_test.scripts._analyzer_envelope import EnvelopeIdentity, build_envelope
 from fab_test.scripts._analyzer_report import AnalyzerReporter, _resolve_verbosity
 
 # pytest markers that belong to the analyzer contract tier.
-_ANALYZER_MARKERS = {"bpa", "pbir", "pql_test", "pql_lint", "rdl"}
+_ANALYZER_MARKERS = {"bpa", "pbir", "pql_test", "pql_lint", "rdl", "data_agent"}
 
 # Artifact glob per marker — used by zero-artifact detection.
 _MARKER_SUFFIX = {
@@ -21,6 +21,7 @@ _MARKER_SUFFIX = {
     "pql_test": "*.SemanticModel",
     "pql_lint": "*.SemanticModel",
     "rdl": "*.rdl",
+    "data_agent": "*.DataAgent",
 }
 
 
@@ -264,6 +265,18 @@ def _reset_results_stems():
     from fab_test.scripts._results_stem import _SUFFIXED
 
     _SUFFIXED.clear()
+
+
+@pytest.fixture(autouse=True)
+def _no_real_az(monkeypatch):
+    """No test runs the real `az`: with no service principal set, Data Agent auth falls back to az login,
+    which on a developer's machine would quietly succeed. A test that wants az patches AzureCliCredential."""
+    from fab_test.scripts import _credentials
+
+    def refuse():
+        raise _credentials.AzureCliSignInError("tests never run the real az; patch AzureCliCredential")
+
+    monkeypatch.setattr(_credentials, "_cli_credential", refuse)
 
 
 @pytest.fixture(autouse=True)

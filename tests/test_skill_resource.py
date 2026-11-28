@@ -77,6 +77,24 @@ def test_skill_main_file_keeps_its_required_sudolang_constructs():
     )
 
 
+def test_skill_main_file_stays_a_router():
+    """Claude Code and Copilot load the whole main file whenever the skill triggers; detail belongs
+    in references/ (fab-test Skill Router epic). The character cap also leaves a riteway eval room
+    to import it on Windows, where the prompt travels as one argument of about 32K characters."""
+    content = _AUTHORED_SKILL_MD.read_text(encoding="utf-8")
+    assert len(content.splitlines()) < 250, "main SKILL.md is growing back: move detail to references/"
+    assert len(content) < 16_000, "main SKILL.md is growing back: move detail to references/"
+
+
+def test_every_reference_file_is_routed_from_the_main_file():
+    """An agent finds a reference only through the main file's table."""
+    content = _AUTHORED_SKILL_MD.read_text(encoding="utf-8")
+    table = content.split("## Reference files", 1)[1]
+    unrouted = [p.name for p in sorted((_AUTHORED_SKILL_DIR / "references").glob("*.md"))
+                if f"(references/{p.name})" not in table]
+    assert unrouted == []
+
+
 def test_resolve_skill_dir_falls_back_to_packaged_with_no_override(tmp_path):
     resolved = resolve_skill_dir(tmp_path)
 

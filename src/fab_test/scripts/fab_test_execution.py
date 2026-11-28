@@ -376,7 +376,8 @@ def _stamp_mode(
     envelope: dict[str, Any], args: argparse.Namespace, output_dir: Path, name: str, artifact: Path
 ) -> None:
     """Add the additive ``mode``/``source`` fields, in memory and in the envelope file."""
-    resolved = getattr(args, "resolved_mode", None)
+    resolved = (getattr(args, "data_agent_mode", None) if name == "data_agent"
+                else getattr(args, "resolved_mode", None))
     if resolved is None:
         return
     envelope["mode"] = resolved.mode
@@ -581,6 +582,13 @@ def _report_dry_run(
                     "dry_run": True,
                     "target": resolved,
                     "artifacts": [a.name for a in artifacts],
+                    **({"mode": args.data_agent_mode.mode, "source": args.data_agent_mode.source,
+                        "denominators": [
+                            {"artifact": str(a), "agent": args.data_agent_names[a],
+                             "tests": str(args.data_agent_suites[a]) if args.data_agent_suites[a] else None,
+                             "status": "planned" if args.data_agent_suites[a] else "skipped"}
+                            for a in artifacts
+                        ]} if name == "data_agent" else {}),
                 },
                 indent=2,
             )
@@ -691,6 +699,8 @@ def _run_analyzer(
 
     verbosity = _verbosity_env(args)
     timeout, timeout_is_default = _resolve_timeout(args)
+    if name == "data_agent":
+        args.data_agent_timeout = max(0.1, timeout - 2)  # leave the wrapper time to persist a timeout envelope
     ctx = _RunContext(
         in_ci=_is_ci(),
         sub_env=_analyzer_sub_env(args, output_format),

@@ -1,0 +1,119 @@
+# User journey: one grammar for the commands that author test files
+# Source: the maintainer's concern (2026-11-19). PBIR slicer contracts shipped an
+# init -> lint -> run -> CI flow; Data Agents and later analyzers will need the
+# same flow, and nothing makes them reuse its shape. Run commands already have
+# aidd-analyzer-contract; authoring commands have nothing.
+# Epic: tasks/authoring-command-grammar-epic.md
+id: mlu1u46l87h3sq1igafep9ma
+name: Authoring Command Grammar
+description: >
+  Every command that authors a test file (a contract, a test suite) follows
+  one grammar -- `fab-test <analyzer> <noun> <verb>` -- with the same verbs,
+  flags, file placement, exit codes and next-step hints, so a person, an
+  agent, or a pipeline that learned the PBIR contract flow already knows the
+  Data Agent one. The rules are an AIDD skill loaded when a new command is
+  planned and when one is reviewed.
+createdAt: 1795128050292
+updatedAt: 1795128050292
+personas: [bd5dhqpf414d91ulyndy3sph, s6ua5spy9sn1snxsdgivqour, vzm8qmbzgyzjoh0d42xuf7ch, hxl1drwi9gxpwvszy63j5hla]
+
+painPoints:
+  - id: pyjmbpf86lygcbn469pwrtrl
+    name: Each authoring flow invents its own grammar
+    description: >
+      `fab-test init` scaffolds config at the top level; `fab-test pbir
+      contract init` is caught by an argv check before argparse; the planned
+      `fab-test data-agent init` collides with the analyzer's TARGET. Three
+      flows, three shapes, decided one epic at a time.
+    impact: 7
+    frequency: 5
+  - id: x134mtj0zld8yc2hcc0kt2jh
+    name: The flow leaves fab-test half way through
+    description: >
+      The slicer walkthrough goes init (fab-test) -> lint (`pql-test contract
+      lint`) -> run (fab-test). The lint step has its own flags, output and
+      exit codes, and a pipeline or agent has to learn a second tool to run it.
+    impact: 5
+    frequency: 6
+  - id: mk8crok8gvh9tjyf252dgq09
+    name: Consistency is checked from memory
+    description: >
+      aidd-analyzer-contract gives run commands a checklist at plan and review
+      time. Authoring commands have none, so parity with the last flow depends
+      on someone remembering it -- the Data Agent epic was planned without it.
+    impact: 6
+    frequency: 5
+  - id: cm37f5dx64wvl1zjwnrukbcx
+    name: Authored files placed where Fabric deletes them
+    description: >
+      Fabric's Commit to Git deletes files inside an item folder that aren't
+      part of its definition. PBIR contracts learned this and live beside the
+      folder; the Data Agent plan still puts its tests inside.
+    impact: 8
+    frequency: 3
+  - id: l7a9u63prk3oxv29tkczajbt
+    name: An agent relearns each flow
+    description: >
+      The agent path (questions as JSON, an answers file, no prompts off a
+      terminal) exists for slicer contracts only. A new flow that varies it
+      makes the agent guess.
+    impact: 6
+    frequency: 5
+
+steps:
+  - id: xmgo5hz7axx08pargn3hsgne
+    name: Plan a new command
+    description: >
+      Planning an epic that adds a verb, a noun, or a flag a person types
+      loads the grammar skill, which turns the rules into Given/should
+      requirements in the epic before any code.
+    userStories:
+      - id: zpfmgt0pcse4eo28yr0gbrg9
+        name: Grammar requirements at planning
+        story: As a Maintainer, I want the grammar rules written into a new command's epic when it is planned, so that consistency is designed in rather than found in review.
+        painPoint: mk8crok8gvh9tjyf252dgq09
+        priority: 30
+        status: { state: backlog, comment: Authoring Command Grammar epic, planned 2026-11-19 }
+      - id: vraubdwd1fzapsq6vw72oztl
+        name: Known deviations named, not copied
+        story: As a Maintainer, I want the existing flows' deviations listed as known gaps, so that a new command doesn't copy the argv check or the outside lint step.
+        painPoint: pyjmbpf86lygcbn469pwrtrl
+        priority: 35
+        status: { state: backlog, comment: Authoring Command Grammar epic, planned 2026-11-19 }
+  - id: zfmos3bohjycps6paj63qodi
+    name: Review the command
+    description: >
+      aidd-review loads the same skill for any diff that adds or changes a
+      command, and reports each unmet rule against its checklist row.
+    userStories:
+      - id: jqj8y2b7u5fwvzl77p96h2bi
+        name: Grammar check at review
+        story: As a Maintainer, I want review to check a new command against the grammar, so that a deviation is a finding, not a habit.
+        painPoint: mk8crok8gvh9tjyf252dgq09
+        priority: 30
+        status: { state: backlog, comment: Authoring Command Grammar epic, planned 2026-11-19 }
+  - id: yoe0lj7o7xi9rhxivbqntb5u
+    name: Author, lint, run
+    description: >
+      The person, agent, or pipeline runs `<analyzer> <noun> init`, then
+      `<analyzer> <noun> lint`, then `<analyzer>`, all in fab-test with one
+      meaning per exit code, each step naming the next.
+    userStories:
+      - id: lzfzt8mpfire7f8axf4flcka
+        name: Lint inside fab-test
+        story: As a CI Pipeline, I want `fab-test pbir contract lint` with fab-test's exit codes, so that the whole flow is one tool.
+        painPoint: x134mtj0zld8yc2hcc0kt2jh
+        priority: 30
+        status: { state: backlog, comment: Authoring Command Grammar epic, planned 2026-11-19 }
+      - id: bd5dhqpf414d91ulyndy3spi
+        name: One agent path for every flow
+        story: As an AI Agent, I want every init to take --questions and --answers the same way, so that I build a Data Agent suite the way I built a slicer contract.
+        painPoint: l7a9u63prk3oxv29tkczajbt
+        priority: 30
+        status: { state: backlog, comment: Rule in the grammar skill; Data Agent applies it when built }
+      - id: mlu1u46l87h3sq1igafep9mb
+        name: Test files in one folder outside the connected folder
+        story: As a Local Developer, I want every authored file in fab-tests/, outside the Git-connected folder, so that Fabric's Commit to Git never deletes my tests and I can always find them.
+        painPoint: cm37f5dx64wvl1zjwnrukbcx
+        priority: 24
+        status: { state: backlog, comment: Rule in the grammar skill; Data Agent decision 3 to be amended when that epic resumes }

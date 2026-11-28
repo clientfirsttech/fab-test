@@ -1,12 +1,12 @@
 [
     {
         "test_case": "039afa29-e0a1-4863-aefd-e2aa8adb1012",
-        "workspace_id": "c4698d28-b05c-40bc-926c-707563ac85e7",
-        "report_id": "b0662655-6e66-436e-9671-a09b3fe9ed41",
+        "workspace_id": "2aea22b0-2e68-485a-8902-e8e5da32e3ef",
+        "report_id": "22bcc115-f1d9-420f-b1f9-b36111bae585",
         "report_name": "PaginatedExample",
         "dataset_ids": [
             {
-                "id": "4c353b5c-d311-4e90-b9d1-5766b87f59dc",
+                "id": "559c5822-62f9-4a74-91a9-79bd3f50ace1",
                 "xmlaPermissions": "ReadOnly"
             }
         ],

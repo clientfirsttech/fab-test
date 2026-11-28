@@ -21,6 +21,7 @@ from ._admin_output import (
     _print_list,
     _print_local_doctor,
 )
+from ._authoring_parser import authoring_verbs
 from ._command_builders import (
     build_command as _build_command,
 )
@@ -54,12 +55,12 @@ from ._run_targets import (
     _target_of,
 )
 from ._scan import find_skipped_checkouts as _find_skipped_checkouts
-from ._service_export import service_item_type, service_readiness
+from ._service_export import ServiceExportError, service_item_type, service_readiness
 from ._slicer_contract_run import prepare_contracts
 from ._target import TargetError, select_target
 from ._telemetry import eventhouse_rows, lakehouse_rows
 from .fab_test_local import _LOCAL_ANALYZERS, _local_readiness
-from .fab_test_parser import _aliases_for, _canonical_name
+from .fab_test_parser import _SUBCOMMAND_ALIASES, _aliases_for, _canonical_name
 from .fab_test_registry import (
     _DEFAULT_BPA_RULES,
     _DEFAULT_PBIR_RULES,
@@ -305,6 +306,7 @@ def _doctor(args: argparse.Namespace) -> int:
 
     output_format = getattr(args, "output_format", "text")
     only = getattr(args, "analyzer_filter", None)
+    only = _SUBCOMMAND_ALIASES.get(only, only)
     if only and not is_enabled(only):
         print(f"  ✗ fab-test doctor: {not_enabled_message(only)}", file=sys.stderr)
         return 2
@@ -336,6 +338,7 @@ _TOOL_DISPLAY_NAMES = {
     "bpa": "Tabular Editor",
     "pbir": "PBIR Inspector",
     "a11y": "pbir-a11y",
+    "data_agent": "promptfoo",
 }
 
 
@@ -363,6 +366,7 @@ def _list_analyzers(args: argparse.Namespace) -> int:
                 "matched_artifacts": count,
                 "required_tool": _TOOL_DISPLAY_NAMES.get(name),
                 "scopes": sorted(_ANALYZER_SCOPES.get(name, frozenset())),
+                "authoring": authoring_verbs(name, canonical),
             }
         )
     # A repository-scoped analyzer always reports 1 and never discovers, so
@@ -382,7 +386,7 @@ def _explain_mode(args: argparse.Namespace, name: str) -> ResolvedMode | int:
         args.resolved_target = select_target(
             getattr(args, "target", None),
             getattr(args, "artifact", None),
-            default_type=service_item_type(name),
+            default_type="DataAgent" if name == "data_agent" else service_item_type(name),
         )
     except TargetError as exc:
         print(f"  ✗ fab-test explain: {exc}", file=sys.stderr)
@@ -399,7 +403,14 @@ def _explain_mode(args: argparse.Namespace, name: str) -> ResolvedMode | int:
             workspace_flag=getattr(args, "workspace_id", ""),
             artifact_dir=str(getattr(args, "artifact_dir", ".")),
         )
-    except ModeError as exc:
+        if name == "data_agent":
+            from ._data_agent_run import discover_data_agents, resolve_data_agent_mode
+
+            resolved_mode = resolve_data_agent_mode(args)
+            args.dry_run = True
+            planned = discover_data_agents(args)
+            args.data_agent_example = planned[0] if planned else None
+    except (ModeError, ServiceExportError) as exc:
         print(f"  ✗ fab-test explain: {exc}", file=sys.stderr)
         return 2
     args.mode = resolved_mode.mode
@@ -409,11 +420,12 @@ def _explain_mode(args: argparse.Namespace, name: str) -> ResolvedMode | int:
 
 def _explain_analyzer(args: argparse.Namespace) -> int:
     """Show the resolved command for one analyzer without running it."""
-    name = args.analyzer_name
-    if name not in _ANALYZER_REGISTRY:
+    name = _SUBCOMMAND_ALIASES.get(args.analyzer_name, args.analyzer_name)
+    args.analyzer_name = name
+    if name not in _ANALYZER_REGISTRY or not is_enabled(name):
         print(
-            f"  ✗ fab-test explain: unknown analyzer '{name}'. "
-            f"Valid names: {', '.join(_ANALYZER_REGISTRY)}",
+            f"  ✗ fab-test explain: {not_enabled_message(name)}" if not is_enabled(name) else
+            f"  ✗ fab-test explain: unknown analyzer '{name}'. Valid names: {', '.join(_ANALYZER_REGISTRY)}",
             file=sys.stderr,
         )
         return 2
@@ -439,6 +451,7 @@ def _explain_analyzer(args: argparse.Namespace) -> int:
         matches = _discover(artifact_dir, glob, _target_of(args), output_dir=output_dir)
         # No real artifact to point at; show an illustrative command shape.
         artifact = matches[0] if matches else artifact_dir / f"<artifact>{glob.lstrip('*')}"
+    artifact = getattr(args, "data_agent_example", None) or artifact
 
     readiness = _check_readiness(name, args)
     if readiness.get("resolved_path"):
@@ -470,6 +483,7 @@ def _explain_analyzer(args: argparse.Namespace) -> int:
         "tool_path": readiness.get("resolved_path"),
         "rules_path": rules_path,
         "output_path": str(output_dir / name / results_stem(artifact) / "envelope.json"),
+        "authoring": authoring_verbs(name, _canonical_name(name)),
     }
 
     if output_format == "json":
@@ -491,6 +505,8 @@ def _explain_analyzer(args: argparse.Namespace) -> int:
         print(f"  Rules:    {payload['rules_path']}")
     print(f"  Output:   {payload['output_path']}")
     print(f"  Command:  {' '.join(command)}")
+    if payload["authoring"]:
+        print(f"  Author:   {' | '.join(payload['authoring'])}")
     return 0
 
 

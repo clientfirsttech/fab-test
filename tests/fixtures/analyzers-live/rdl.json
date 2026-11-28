@@ -1,0 +1,1577 @@
+{
+ "as_of": "2026-11-23",
+ "local": {
+  "ACC-01": {
+   "findings": [
+    [
+     "ACC-01",
+     "error",
+     "Logo"
+    ]
+   ],
+   "status": "failed"
+  },
+  "ACC-01-Pass": {
+   "findings": [],
+   "status": "passed"
+  },
+  "ACC-02": {
+   "findings": [
+    [
+     "ACC-02",
+     "error",
+     "Chart1"
+    ]
+   ],
+   "status": "failed"
+  },
+  "ACC-02-Pass": {
+   "findings": [],
+   "status": "passed"
+  },
+  "ACC-03-36802f4c": {
+   "findings": [
+    [
+     "ACC-03",
+     "warning",
+     "Tablix2"
+    ],
+    [
+     "DS-02",
+     "error",
+     "RawSourceExample"
+    ],
+    [
+     "DS-05",
+     "error",
+     "DataSet1"
+    ],
+    [
+     "DS-07",
+     "warning",
+     "DataSet1"
+    ],
+    [
+     "LAY-05",
+     "warning",
+     "Tablix2"
+    ],
+    [
+     "QRY-01",
+     "error",
+     "DataSet1"
+    ],
+    [
+     "QRY-02",
+     "warning",
+     "RawSourceExample \u203a Test"
+    ],
+    [
+     "QRY-04",
+     "warning",
+     "Tablix2"
+    ],
+    [
+     "QRY-04",
+     "warning",
+     "Tablix2 \u203a PieID"
+    ]
+   ],
+   "status": "failed"
+  },
+  "ACC-03-4fcec748": {
+   "findings": [
+    [
+     "ACC-03",
+     "warning",
+     "Tablix2"
+    ],
+    [
+     "DS-02",
+     "error",
+     "RawSourceExample"
+    ],
+    [
+     "DS-05",
+     "error",
+     "DataSet1"
+    ],
+    [
+     "DS-07",
+     "warning",
+     "DataSet1"
+    ],
+    [
+     "LAY-05",
+     "warning",
+     "Tablix2"
+    ],
+    [
+     "QRY-01",
+     "error",
+     "DataSet1"
+    ],
+    [
+     "QRY-02",
+     "warning",
+     "RawSourceExample \u203a Test"
+    ],
+    [
+     "QRY-04",
+     "warning",
+     "Tablix2"
+    ],
+    [
+     "QRY-04",
+     "warning",
+     "Tablix2 \u203a PieID"
+    ]
+   ],
+   "status": "failed"
+  },
+  "ACC-03-Pass": {
+   "findings": [],
+   "status": "passed"
+  },
+  "ACC-06": {
+   "findings": [
+    [
+     "ACC-06",
+     "error",
+     "Subtitle"
+    ]
+   ],
+   "status": "failed"
+  },
+  "ACC-06-Pass": {
+   "findings": [],
+   "status": "passed"
+  },
+  "ACC-08": {
+   "findings": [
+    [
+     "ACC-08",
+     "warning",
+     "DocsLink"
+    ]
+   ],
+   "status": "warning"
+  },
+  "ACC-08-Pass": {
+   "findings": [],
+   "status": "passed"
+  },
+  "DS-01": {
+   "findings": [
+    [
+     "DS-01",
+     "warning",
+     "EscapeRoom"
+    ]
+   ],
+   "status": "warning"
+  },
+  "DS-01-Pass": {
+   "findings": [],
+   "status": "passed"
+  },
+  "DS-02": {
+   "findings": [
+    [
+     "DS-02",
+     "error",
+     "RawSourceExample"
+    ]
+   ],
+   "status": "failed"
+  },
+  "DS-02-Pass": {
+   "findings": [],
+   "status": "passed"
+  },
+  "DS-03": {
+   "findings": [
+    [
+     "DS-03",
+     "warning",
+     "Alignment \u203a AlignmentList"
+    ]
+   ],
+   "status": "warning"
+  },
+  "DS-03-Pass": {
+   "findings": [],
+   "status": "passed"
+  },
+  "DS-04": {
+   "findings": [
+    [
+     "DS-04",
+     "warning",
+     "GoodCharacters \u2248 BadCharacters"
+    ]
+   ],
+   "status": "warning"
+  },
+  "DS-04-Pass": {
+   "findings": [],
+   "status": "passed"
+  },
+  "DS-05": {
+   "findings": [
+    [
+     "DS-02",
+     "error",
+     "DataSet1"
+    ],
+    [
+     "DS-02",
+     "error",
+     "RawSourceExample"
+    ],
+    [
+     "DS-05",
+     "error",
+     "DataSet1"
+    ],
+    [
+     "DS-07",
+     "warning",
+     "DataSet1"
+    ]
+   ],
+   "status": "failed"
+  },
+  "DS-05-Pass": {
+   "findings": [],
+   "status": "passed"
+  },
+  "DS-06": {
+   "findings": [
+    [
+     "DS-06",
+     "warning",
+     "Characters \u203a MarvelFact[AlignmentID]"
+    ]
+   ],
+   "status": "warning"
+  },
+  "DS-06-Pass": {
+   "findings": [],
+   "status": "passed"
+  },
+  "DS-07": {
+   "findings": [
+    [
+     "DS-02",
+     "error",
+     "DataSet1"
+    ],
+    [
+     "DS-02",
+     "error",
+     "RawSourceExample"
+    ],
+    [
+     "DS-05",
+     "error",
+     "DataSet1"
+    ],
+    [
+     "DS-07",
+     "warning",
+     "DataSet1"
+    ],
+    [
+     "QRY-01",
+     "error",
+     "DataSet1"
+    ]
+   ],
+   "status": "failed"
+  },
+  "DS-07-Pass": {
+   "findings": [],
+   "status": "passed"
+  },
+  "LAY-01": {
+   "findings": [
+    [
+     "LAY-01",
+     "error",
+     "ReportSection"
+    ]
+   ],
+   "status": "failed"
+  },
+  "LAY-01-Pass": {
+   "findings": [],
+   "status": "passed"
+  },
+  "LAY-02": {
+   "findings": [
+    [
+     "LAY-02",
+     "warning",
+     "ExecutionTime"
+    ]
+   ],
+   "status": "warning"
+  },
+  "LAY-02-Pass": {
+   "findings": [],
+   "status": "passed"
+  },
+  "LAY-03": {
+   "findings": [
+    [
+     "LAY-03/SUB-01",
+     "error",
+     "AlignmentTable \u203a AlignmentDetail"
+    ]
+   ],
+   "status": "failed"
+  },
+  "LAY-03-Pass": {
+   "findings": [],
+   "status": "passed"
+  },
+  "LAY-04": {
+   "findings": [
+    [
+     "LAY-04",
+     "warning",
+     "CharacterTable \u203a CharacterTable_H0"
+    ]
+   ],
+   "status": "warning"
+  },
+  "LAY-04-Pass": {
+   "findings": [],
+   "status": "passed"
+  },
+  "LAY-05": {
+   "findings": [
+    [
+     "LAY-05",
+     "warning",
+     "CharacterTable"
+    ]
+   ],
+   "status": "warning"
+  },
+  "LAY-05-Pass": {
+   "findings": [],
+   "status": "passed"
+  },
+  "LAY-06": {
+   "findings": [
+    [
+     "LAY-06",
+     "warning",
+     "Logo"
+    ],
+    [
+     "LAY-06",
+     "warning",
+     "logo"
+    ]
+   ],
+   "status": "warning"
+  },
+  "LAY-06-Pass": {
+   "findings": [],
+   "status": "passed"
+  },
+  "PRM-01": {
+   "findings": [
+    [
+     "PRM-01",
+     "warning",
+     "WORKSPACE_ID"
+    ]
+   ],
+   "status": "warning"
+  },
+  "PRM-01-Pass": {
+   "findings": [],
+   "status": "passed"
+  },
+  "PRM-02": {
+   "findings": [
+    [
+     "PRM-02",
+     "error",
+     "AlignmentID"
+    ]
+   ],
+   "status": "failed"
+  },
+  "PRM-02-Pass": {
+   "findings": [],
+   "status": "passed"
+  },
+  "PRM-03": {
+   "findings": [
+    [
+     "PRM-03",
+     "warning",
+     "Year, Month"
+    ]
+   ],
+   "status": "warning"
+  },
+  "PRM-03-Pass": {
+   "findings": [],
+   "status": "passed"
+  },
+  "PRM-05": {
+   "findings": [
+    [
+     "PRM-05",
+     "warning",
+     "Region"
+    ]
+   ],
+   "status": "warning"
+  },
+  "PRM-05-Pass": {
+   "findings": [],
+   "status": "passed"
+  },
+  "PRM-07": {
+   "findings": [
+    [
+     "PRM-07",
+     "error",
+     "Characters \u203a @AlignmentIDs"
+    ]
+   ],
+   "status": "failed"
+  },
+  "PRM-07-Pass": {
+   "findings": [],
+   "status": "passed"
+  },
+  "PaginatedExample": {
+   "findings": [
+    [
+     "ACC-03",
+     "warning",
+     "Tablix1"
+    ],
+    [
+     "STR-03",
+     "warning",
+     "DataSet1 \u203a Column_B"
+    ]
+   ],
+   "status": "warning"
+  },
+  "PaginatedExample-BrokenRDL": {
+   "findings": [
+    [
+     "ACC-03",
+     "warning",
+     "Tablix1"
+    ],
+    [
+     "STR-03",
+     "warning",
+     "DataSet1 \u203a Test_Change"
+    ]
+   ],
+   "status": "warning"
+  },
+  "PaginatedExample-LocalSemanticModel": {
+   "findings": [
+    [
+     "ACC-03",
+     "warning",
+     "Tablix1"
+    ],
+    [
+     "DS-02",
+     "error",
+     "Table"
+    ]
+   ],
+   "status": "failed"
+  },
+  "PaginatedExample-WithFilter": {
+   "findings": [
+    [
+     "ACC-03",
+     "warning",
+     "Tablix1"
+    ],
+    [
+     "PRM-01",
+     "warning",
+     "ReportParameter1"
+    ],
+    [
+     "PRM-02",
+     "error",
+     "ReportParameter1"
+    ],
+    [
+     "QRY-01",
+     "error",
+     "DataSet1"
+    ],
+    [
+     "STR-03",
+     "warning",
+     "DataSet1 \u203a Column_B"
+    ],
+    [
+     "STR-03",
+     "warning",
+     "DefautlValues \u203a Column_B"
+    ]
+   ],
+   "status": "failed"
+  },
+  "PaginatedExample-WithMultiFilter": {
+   "findings": [
+    [
+     "ACC-03",
+     "warning",
+     "Tablix1"
+    ],
+    [
+     "PRM-01",
+     "warning",
+     "ReportParameter1"
+    ],
+    [
+     "PRM-02",
+     "error",
+     "ReportParameter1"
+    ],
+    [
+     "QRY-01",
+     "error",
+     "DataSet1"
+    ],
+    [
+     "STR-03",
+     "warning",
+     "DataSet1 \u203a Column_B"
+    ],
+    [
+     "STR-03",
+     "warning",
+     "DefautlValues \u203a Column_B"
+    ]
+   ],
+   "status": "failed"
+  },
+  "QRY-01": {
+   "findings": [
+    [
+     "DS-02",
+     "error",
+     "DataSet1"
+    ],
+    [
+     "DS-02",
+     "error",
+     "RawSourceExample"
+    ],
+    [
+     "DS-05",
+     "error",
+     "DataSet1"
+    ],
+    [
+     "DS-07",
+     "warning",
+     "DataSet1"
+    ],
+    [
+     "QRY-01",
+     "error",
+     "DataSet1"
+    ]
+   ],
+   "status": "failed"
+  },
+  "QRY-01-Pass": {
+   "findings": [],
+   "status": "passed"
+  },
+  "QRY-02": {
+   "findings": [
+    [
+     "ACC-03",
+     "warning",
+     "Tablix1"
+    ],
+    [
+     "DS-02",
+     "error",
+     "DataSet1"
+    ],
+    [
+     "DS-05",
+     "error",
+     "DataSet1"
+    ],
+    [
+     "DS-07",
+     "warning",
+     "DataSet1"
+    ],
+    [
+     "QRY-01",
+     "error",
+     "DataSet1"
+    ],
+    [
+     "QRY-02",
+     "warning",
+     "RawSourceExample \u203a Test"
+    ]
+   ],
+   "status": "failed"
+  },
+  "QRY-02-Pass": {
+   "findings": [],
+   "status": "passed"
+  },
+  "QRY-03": {
+   "findings": [
+    [
+     "QRY-03",
+     "error",
+     "RawSourceExample"
+    ]
+   ],
+   "status": "failed"
+  },
+  "QRY-03-Pass": {
+   "findings": [],
+   "status": "passed"
+  },
+  "QRY-04": {
+   "findings": [
+    [
+     "DS-02",
+     "error",
+     "RawSourceExample"
+    ],
+    [
+     "DS-05",
+     "error",
+     "DataSet1"
+    ],
+    [
+     "DS-07",
+     "warning",
+     "DataSet1"
+    ],
+    [
+     "LAY-05",
+     "warning",
+     "Tablix2"
+    ],
+    [
+     "QRY-01",
+     "error",
+     "DataSet1"
+    ],
+    [
+     "QRY-02",
+     "warning",
+     "RawSourceExample \u203a Test"
+    ],
+    [
+     "QRY-04",
+     "warning",
+     "Tablix2"
+    ],
+    [
+     "QRY-04",
+     "warning",
+     "Tablix2 \u203a PieID"
+    ]
+   ],
+   "status": "failed"
+  },
+  "QRY-04-Pass": {
+   "findings": [],
+   "status": "passed"
+  },
+  "QRY-05": {
+   "findings": [
+    [
+     "QRY-05",
+     "warning",
+     "Fields!Appearances.Value"
+    ]
+   ],
+   "status": "warning"
+  },
+  "QRY-05-Pass": {
+   "findings": [],
+   "status": "passed"
+  },
+  "QRY-06": {
+   "findings": [
+    [
+     "QRY-06",
+     "error",
+     "CharacterTable \u203a CharacterTable_D1"
+    ]
+   ],
+   "status": "failed"
+  },
+  "QRY-06-Pass": {
+   "findings": [],
+   "status": "passed"
+  },
+  "QRY-07": {
+   "findings": [
+    [
+     "DS-07",
+     "warning",
+     "Pies"
+    ],
+    [
+     "QRY-07",
+     "warning",
+     "Pies"
+    ]
+   ],
+   "status": "warning"
+  },
+  "QRY-07-Pass": {
+   "findings": [
+    [
+     "DS-07",
+     "warning",
+     "Pies"
+    ]
+   ],
+   "status": "warning"
+  },
+  "STR-01": {
+   "findings": [
+    [
+     "DS-02",
+     "error",
+     "RawSourceExample"
+    ],
+    [
+     "STR-01",
+     "warning",
+     "Report"
+    ]
+   ],
+   "status": "failed"
+  },
+  "STR-01-Pass": {
+   "findings": [],
+   "status": "passed"
+  },
+  "STR-03": {
+   "findings": [
+    [
+     "STR-03",
+     "warning",
+     "Changes \u203a Test_Change"
+    ]
+   ],
+   "status": "warning"
+  },
+  "STR-03-Pass": {
+   "findings": [],
+   "status": "passed"
+  },
+  "SUB-01": {
+   "findings": [
+    [
+     "LAY-03/SUB-01",
+     "error",
+     "AlignmentTable \u203a AlignmentDetail"
+    ]
+   ],
+   "status": "failed"
+  },
+  "SUB-01-Pass": {
+   "findings": [],
+   "status": "passed"
+  },
+  "SUB-02": {
+   "findings": [
+    [
+     "SUB-02",
+     "error",
+     "50 subreports"
+    ]
+   ],
+   "status": "failed"
+  },
+  "SUB-02-Pass": {
+   "findings": [],
+   "status": "passed"
+  }
+ },
+ "service": {
+  "ACC-01": {
+   "findings": [
+    [
+     "ACC-01",
+     "error",
+     "Logo"
+    ]
+   ],
+   "status": "failed"
+  },
+  "ACC-01-Pass": {
+   "findings": [],
+   "status": "passed"
+  },
+  "ACC-02": {
+   "findings": [
+    [
+     "ACC-02",
+     "error",
+     "Chart1"
+    ]
+   ],
+   "status": "failed"
+  },
+  "ACC-02-Pass": {
+   "findings": [],
+   "status": "passed"
+  },
+  "ACC-03": {
+   "findings": [
+    [
+     "ACC-03",
+     "warning",
+     "Tablix2"
+    ],
+    [
+     "DS-02",
+     "error",
+     "RawSourceExample"
+    ],
+    [
+     "DS-05",
+     "error",
+     "DataSet1"
+    ],
+    [
+     "DS-07",
+     "warning",
+     "DataSet1"
+    ],
+    [
+     "LAY-05",
+     "warning",
+     "Tablix2"
+    ],
+    [
+     "QRY-01",
+     "error",
+     "DataSet1"
+    ],
+    [
+     "QRY-02",
+     "warning",
+     "RawSourceExample \u203a Test"
+    ],
+    [
+     "QRY-04",
+     "warning",
+     "Tablix2"
+    ],
+    [
+     "QRY-04",
+     "warning",
+     "Tablix2 \u203a PieID"
+    ]
+   ],
+   "status": "failed"
+  },
+  "ACC-03-Pass": {
+   "findings": [],
+   "status": "passed"
+  },
+  "ACC-06": {
+   "findings": [
+    [
+     "ACC-06",
+     "error",
+     "Subtitle"
+    ]
+   ],
+   "status": "failed"
+  },
+  "ACC-06-Pass": {
+   "findings": [],
+   "status": "passed"
+  },
+  "ACC-08": {
+   "findings": [
+    [
+     "ACC-08",
+     "warning",
+     "DocsLink"
+    ]
+   ],
+   "status": "warning"
+  },
+  "ACC-08-Pass": {
+   "findings": [],
+   "status": "passed"
+  },
+  "DS-01": {
+   "findings": [
+    [
+     "DS-01",
+     "warning",
+     "EscapeRoom"
+    ]
+   ],
+   "status": "warning"
+  },
+  "DS-01-Pass": {
+   "findings": [],
+   "status": "passed"
+  },
+  "DS-02": {
+   "findings": [
+    [
+     "DS-02",
+     "error",
+     "RawSourceExample"
+    ]
+   ],
+   "status": "failed"
+  },
+  "DS-02-Pass": {
+   "findings": [],
+   "status": "passed"
+  },
+  "DS-03": {
+   "findings": [
+    [
+     "DS-03",
+     "warning",
+     "Alignment \u203a AlignmentList"
+    ]
+   ],
+   "status": "warning"
+  },
+  "DS-03-Pass": {
+   "findings": [],
+   "status": "passed"
+  },
+  "DS-04": {
+   "findings": [
+    [
+     "DS-04",
+     "warning",
+     "GoodCharacters \u2248 BadCharacters"
+    ]
+   ],
+   "status": "warning"
+  },
+  "DS-04-Pass": {
+   "findings": [],
+   "status": "passed"
+  },
+  "DS-05": {
+   "findings": [
+    [
+     "DS-02",
+     "error",
+     "DataSet1"
+    ],
+    [
+     "DS-02",
+     "error",
+     "RawSourceExample"
+    ],
+    [
+     "DS-05",
+     "error",
+     "DataSet1"
+    ],
+    [
+     "DS-07",
+     "warning",
+     "DataSet1"
+    ]
+   ],
+   "status": "failed"
+  },
+  "DS-05-Pass": {
+   "findings": [],
+   "status": "passed"
+  },
+  "DS-06": {
+   "findings": [
+    [
+     "DS-06",
+     "warning",
+     "Characters \u203a MarvelFact[AlignmentID]"
+    ]
+   ],
+   "status": "warning"
+  },
+  "DS-06-Pass": {
+   "findings": [],
+   "status": "passed"
+  },
+  "DS-07": {
+   "findings": [
+    [
+     "DS-02",
+     "error",
+     "DataSet1"
+    ],
+    [
+     "DS-02",
+     "error",
+     "RawSourceExample"
+    ],
+    [
+     "DS-05",
+     "error",
+     "DataSet1"
+    ],
+    [
+     "DS-07",
+     "warning",
+     "DataSet1"
+    ],
+    [
+     "QRY-01",
+     "error",
+     "DataSet1"
+    ]
+   ],
+   "status": "failed"
+  },
+  "DS-07-Pass": {
+   "findings": [],
+   "status": "passed"
+  },
+  "LAY-01": {
+   "findings": [
+    [
+     "LAY-01",
+     "error",
+     "ReportSection"
+    ]
+   ],
+   "status": "failed"
+  },
+  "LAY-01-Pass": {
+   "findings": [],
+   "status": "passed"
+  },
+  "LAY-02": {
+   "findings": [
+    [
+     "LAY-02",
+     "warning",
+     "ExecutionTime"
+    ]
+   ],
+   "status": "warning"
+  },
+  "LAY-02-Pass": {
+   "findings": [],
+   "status": "passed"
+  },
+  "LAY-03": {
+   "findings": [
+    [
+     "LAY-03/SUB-01",
+     "error",
+     "AlignmentTable \u203a AlignmentDetail"
+    ]
+   ],
+   "status": "failed"
+  },
+  "LAY-03-Pass": {
+   "findings": [],
+   "status": "passed"
+  },
+  "LAY-04": {
+   "findings": [
+    [
+     "LAY-04",
+     "warning",
+     "CharacterTable \u203a CharacterTable_H0"
+    ]
+   ],
+   "status": "warning"
+  },
+  "LAY-04-Pass": {
+   "findings": [],
+   "status": "passed"
+  },
+  "LAY-05": {
+   "findings": [
+    [
+     "LAY-05",
+     "warning",
+     "CharacterTable"
+    ]
+   ],
+   "status": "warning"
+  },
+  "LAY-05-Pass": {
+   "findings": [],
+   "status": "passed"
+  },
+  "LAY-06": {
+   "findings": [
+    [
+     "LAY-06",
+     "warning",
+     "Logo"
+    ],
+    [
+     "LAY-06",
+     "warning",
+     "logo"
+    ]
+   ],
+   "status": "warning"
+  },
+  "LAY-06-Pass": {
+   "findings": [],
+   "status": "passed"
+  },
+  "PRM-01": {
+   "findings": [
+    [
+     "PRM-01",
+     "warning",
+     "WORKSPACE_ID"
+    ]
+   ],
+   "status": "warning"
+  },
+  "PRM-01-Pass": {
+   "findings": [],
+   "status": "passed"
+  },
+  "PRM-02": {
+   "findings": [
+    [
+     "PRM-02",
+     "error",
+     "AlignmentID"
+    ]
+   ],
+   "status": "failed"
+  },
+  "PRM-02-Pass": {
+   "findings": [],
+   "status": "passed"
+  },
+  "PRM-03": {
+   "findings": [
+    [
+     "PRM-03",
+     "warning",
+     "Year, Month"
+    ]
+   ],
+   "status": "warning"
+  },
+  "PRM-03-Pass": {
+   "findings": [],
+   "status": "passed"
+  },
+  "PRM-05": {
+   "findings": [
+    [
+     "PRM-05",
+     "warning",
+     "Region"
+    ]
+   ],
+   "status": "warning"
+  },
+  "PRM-05-Pass": {
+   "findings": [],
+   "status": "passed"
+  },
+  "PRM-07": {
+   "findings": [
+    [
+     "PRM-07",
+     "error",
+     "Characters \u203a @AlignmentIDs"
+    ]
+   ],
+   "status": "failed"
+  },
+  "PRM-07-Pass": {
+   "findings": [],
+   "status": "passed"
+  },
+  "PaginatedExample": {
+   "findings": [
+    [
+     "ACC-03",
+     "warning",
+     "Tablix1"
+    ],
+    [
+     "STR-03",
+     "warning",
+     "DataSet1 \u203a Column_B"
+    ]
+   ],
+   "status": "warning"
+  },
+  "PaginatedExample-BrokenRDL": {
+   "findings": [
+    [
+     "ACC-03",
+     "warning",
+     "Tablix1"
+    ],
+    [
+     "STR-03",
+     "warning",
+     "DataSet1 \u203a Test_Change"
+    ]
+   ],
+   "status": "warning"
+  },
+  "PaginatedExample-WithFilter": {
+   "findings": [
+    [
+     "ACC-03",
+     "warning",
+     "Tablix1"
+    ],
+    [
+     "PRM-01",
+     "warning",
+     "ReportParameter1"
+    ],
+    [
+     "PRM-02",
+     "error",
+     "ReportParameter1"
+    ],
+    [
+     "QRY-01",
+     "error",
+     "DataSet1"
+    ],
+    [
+     "STR-03",
+     "warning",
+     "DataSet1 \u203a Column_B"
+    ],
+    [
+     "STR-03",
+     "warning",
+     "DefautlValues \u203a Column_B"
+    ]
+   ],
+   "status": "failed"
+  },
+  "PaginatedExample-WithMultiFilter": {
+   "findings": [
+    [
+     "ACC-03",
+     "warning",
+     "Tablix1"
+    ],
+    [
+     "PRM-01",
+     "warning",
+     "ReportParameter1"
+    ],
+    [
+     "PRM-02",
+     "error",
+     "ReportParameter1"
+    ],
+    [
+     "QRY-01",
+     "error",
+     "DataSet1"
+    ],
+    [
+     "STR-03",
+     "warning",
+     "DataSet1 \u203a Column_B"
+    ],
+    [
+     "STR-03",
+     "warning",
+     "DefautlValues \u203a Column_B"
+    ]
+   ],
+   "status": "failed"
+  },
+  "QRY-01": {
+   "findings": [
+    [
+     "DS-02",
+     "error",
+     "DataSet1"
+    ],
+    [
+     "DS-02",
+     "error",
+     "RawSourceExample"
+    ],
+    [
+     "DS-05",
+     "error",
+     "DataSet1"
+    ],
+    [
+     "DS-07",
+     "warning",
+     "DataSet1"
+    ],
+    [
+     "QRY-01",
+     "error",
+     "DataSet1"
+    ]
+   ],
+   "status": "failed"
+  },
+  "QRY-01-Pass": {
+   "findings": [],
+   "status": "passed"
+  },
+  "QRY-02": {
+   "findings": [
+    [
+     "ACC-03",
+     "warning",
+     "Tablix1"
+    ],
+    [
+     "DS-02",
+     "error",
+     "DataSet1"
+    ],
+    [
+     "DS-05",
+     "error",
+     "DataSet1"
+    ],
+    [
+     "DS-07",
+     "warning",
+     "DataSet1"
+    ],
+    [
+     "QRY-01",
+     "error",
+     "DataSet1"
+    ],
+    [
+     "QRY-02",
+     "warning",
+     "RawSourceExample \u203a Test"
+    ]
+   ],
+   "status": "failed"
+  },
+  "QRY-02-Pass": {
+   "findings": [],
+   "status": "passed"
+  },
+  "QRY-03": {
+   "findings": [
+    [
+     "QRY-03",
+     "error",
+     "RawSourceExample"
+    ]
+   ],
+   "status": "failed"
+  },
+  "QRY-03-Pass": {
+   "findings": [],
+   "status": "passed"
+  },
+  "QRY-04": {
+   "findings": [
+    [
+     "DS-02",
+     "error",
+     "RawSourceExample"
+    ],
+    [
+     "DS-05",
+     "error",
+     "DataSet1"
+    ],
+    [
+     "DS-07",
+     "warning",
+     "DataSet1"
+    ],
+    [
+     "LAY-05",
+     "warning",
+     "Tablix2"
+    ],
+    [
+     "QRY-01",
+     "error",
+     "DataSet1"
+    ],
+    [
+     "QRY-02",
+     "warning",
+     "RawSourceExample \u203a Test"
+    ],
+    [
+     "QRY-04",
+     "warning",
+     "Tablix2"
+    ],
+    [
+     "QRY-04",
+     "warning",
+     "Tablix2 \u203a PieID"
+    ]
+   ],
+   "status": "failed"
+  },
+  "QRY-04-Pass": {
+   "findings": [],
+   "status": "passed"
+  },
+  "QRY-05": {
+   "findings": [
+    [
+     "QRY-05",
+     "warning",
+     "Fields!Appearances.Value"
+    ]
+   ],
+   "status": "warning"
+  },
+  "QRY-05-Pass": {
+   "findings": [],
+   "status": "passed"
+  },
+  "QRY-06": {
+   "findings": [
+    [
+     "QRY-06",
+     "error",
+     "CharacterTable \u203a CharacterTable_D1"
+    ]
+   ],
+   "status": "failed"
+  },
+  "QRY-06-Pass": {
+   "findings": [],
+   "status": "passed"
+  },
+  "QRY-07": {
+   "findings": [
+    [
+     "DS-07",
+     "warning",
+     "Pies"
+    ],
+    [
+     "QRY-07",
+     "warning",
+     "Pies"
+    ]
+   ],
+   "status": "warning"
+  },
+  "QRY-07-Pass": {
+   "findings": [
+    [
+     "DS-07",
+     "warning",
+     "Pies"
+    ]
+   ],
+   "status": "warning"
+  },
+  "STR-01": {
+   "findings": [
+    [
+     "DS-02",
+     "error",
+     "RawSourceExample"
+    ],
+    [
+     "STR-01",
+     "warning",
+     "Report"
+    ]
+   ],
+   "status": "failed"
+  },
+  "STR-01-Pass": {
+   "findings": [],
+   "status": "passed"
+  },
+  "STR-03": {
+   "findings": [
+    [
+     "STR-03",
+     "warning",
+     "Changes \u203a Test_Change"
+    ]
+   ],
+   "status": "warning"
+  },
+  "STR-03-Pass": {
+   "findings": [],
+   "status": "passed"
+  },
+  "SUB-01": {
+   "findings": [
+    [
+     "LAY-03/SUB-01",
+     "error",
+     "AlignmentTable \u203a AlignmentDetail"
+    ]
+   ],
+   "status": "failed"
+  },
+  "SUB-01-Pass": {
+   "findings": [],
+   "status": "passed"
+  },
+  "SUB-02": {
+   "findings": [
+    [
+     "SUB-02",
+     "error",
+     "50 subreports"
+    ]
+   ],
+   "status": "failed"
+  },
+  "SUB-02-Pass": {
+   "findings": [],
+   "status": "passed"
+  }
+ },
+ "workspace": "fab-test-working-area"
+}

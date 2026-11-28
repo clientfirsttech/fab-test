@@ -5,8 +5,8 @@ This walks you from a Power BI report with no checks to a pipeline that fails wh
 You will:
 
 1. Save the report the way the customer agreed it should open.
-2. Run `fab-test pbir contract init` to write that state down.
-3. Run `fab-test pbir` to check it, then break a slicer to see it caught.
+2. Run `fab-test pbir contract init` to write that state down, and `fab-test pbir contract lint` to check what it wrote.
+3. Run `fab-test pbir` to check the report against it, then break a slicer to see it caught.
 4. Commit the contract and run the check in CI, on a schedule too.
 
 ```mermaid
@@ -32,9 +32,9 @@ flowchart TD
     L -->|"Navigators differ, bookmark deleted,<br/>or a display name two bookmarks share"| M["skip"]
     L -->|"Yes, or nothing preselected"| N["keep or skip"]
 
-    M --> O["Written only if it reads back as a valid contract:<br/>Sales.Report.odcs.yaml beside the report"]
+    M --> O["Written only if it reads back as a valid contract:<br/>fab-tests/pbir/Sales.Report.odcs.yaml"]
     N --> O
-    O --> P["Step 3: read it, and optionally<br/>pql-test contract lint Sales.Report.odcs.yaml Sales.SemanticModel"]
+    O --> P["Step 3: read it, then check it<br/>fab-test pbir contract lint Sales"]
     P --> Q["Step 4: fab-test pbir --artifact Sales<br/>every CONTRACT.* rule passes"]
     Q --> R["Step 5: break a slicer in Desktop, save, re-run:<br/>a CONTRACT.* finding. Undo it."]
     R --> S["Step 6: commit report and contract together;<br/>CI runs on every push and weekly"]
@@ -118,9 +118,9 @@ Is July 2026 to June 2027 called FY27 (the year it ends in) or FY26 (the year it
 
 A calendar period (`2026 H2`, `2026-11`) doesn't need these, and a January fiscal year skips the second. Next time you run `init` on this report, your answers are the defaults. If a slicer isn't on today's period under the fiscal year you give, `init` stops and says so: either the answer is wrong, or the report is out of date and needs fixing in Desktop.
 
-`init` writes `Sales.Report.odcs.yaml` **beside** the report folder, never inside it: Fabric's Git sync deletes files inside a report folder that aren't part of the report. It pairs with the report through the `logicalId` in `Sales.Report/.platform`, so renaming the report folder doesn't break the pairing.
+`init` writes `fab-tests/pbir/Sales.Report.odcs.yaml` at the repository root, **outside** the Git-connected folder and never inside the report: Fabric's Git sync deletes files inside a report folder that aren't part of the report, and keeping test files out of the connected folder keeps them in one place you can find. It pairs with the report through the `logicalId` in `Sales.Report/.platform`, so renaming the report folder doesn't break the pairing.
 
-Add `--dry-run` to see the file without writing it. `-q` prints nothing when it succeeds (the exit code says it did), and `-v` lists every rule in the contract with what it checks and whether it was added, kept or replaced.
+Add `--dry-run` to see the file without writing it. `-q` prints one line when it succeeds (`contract written added=12 replaced=0 kept=0 unchanged=0 Sales.Report.odcs.yaml`), and `-v` lists every rule in the contract with what it checks and whether it was added, kept or replaced.
 
 ### Letting an agent build it instead
 
@@ -179,12 +179,15 @@ Bookmark navigators are listed under `customProperties`, by the bookmark's displ
 
 The contract lists only the tables and columns your slicers use, not the whole model. A report with navigators but no slicers can leave `schema` out entirely.
 
-It's a standard ODCS contract, so pql-test (installed with fab-test) can lint it. Passing the semantic model checks that every table and column it names exists:
+Check it before you run it. `contract lint` takes the report as `init` and `fab-test pbir` do, finds its contract, and checks that fab-test reads it as the run will, that it's valid ODCS, and that every table and column it names is in the report's semantic model (via pql-test, installed with fab-test):
 
 ```bash
-pql-test contract lint "Sales.Report.odcs.yaml" "Sales.SemanticModel"
-# Sales.Report.odcs.yaml: valid ODCS v3.1.0, ... rules, names resolve.
+fab-test pbir contract lint Sales
+#   ✓ Sales.Report.odcs.yaml: valid ODCS v3.1.0, 24 rules, names resolve in Sales.SemanticModel
+#   Next: fab-test pbir Sales
 ```
+
+It exits `1` and names each problem when something is wrong (`pql-test: Region.Regoin: column 'Regoin' not found in model table 'Region'`), and writes nothing. With no report named, it checks every contract under `--artifact-dir`, as `fab-test pbir` checks every report. To run pql-test's own check directly: `pql-test contract lint Sales.Report.odcs.yaml Sales.SemanticModel`.
 
 Things you can change by hand:
 
@@ -244,7 +247,7 @@ Then add a pipeline. Copy one of these into your repository:
 - GitHub Actions: [`examples/github-actions/slicer-defaults.yml`](examples/github-actions/slicer-defaults.yml)
 - Azure DevOps: [`examples/azure-devops/slicer-defaults.yml`](examples/azure-devops/slicer-defaults.yml)
 
-Both run on every change to a report or contract, **and on a weekly schedule**. Keep the schedule: a calendar-driven default goes stale at rollover with no commit, so a push-only pipeline never notices.
+Both lint every contract (`fab-test pbir contract lint`), then check every report, on every change to a report or contract, **and on a weekly schedule**. Keep the schedule: a calendar-driven default goes stale at rollover with no commit, so a push-only pipeline never notices.
 
 `fab-test pbir` exits `1` when a contract rule fails and `2` when a contract can't be read (a typo in the YAML, an unknown calendar field), before any check runs.
 

@@ -1,0 +1,20 @@
+import 'ai-evals/fab-test-data-agent-tests/fixtures/fab-test-skill.md'
+
+userPrompt = """
+You are in a test environment. Do not run any commands and do not edit any files. Use these mock tools instead,
+and show each command you would run with its arguments, and the content of any --answers file you would write.
+
+mock suite fab-tests/data-agent/Sales.DataAgent.promptfoo.yaml => 3 tests (id: question => its check):
+  how-many-customers: How many customers are there? => number 310
+  out-of-scope: What is my bank balance? => the agent declines
+  tell-me-a-joke: Tell me a joke => any answer
+
+mock `fab-test data-agent tests init Sales --answers FILE` => tests written added=0 replaced=0 kept=0 unchanged=0 removed=1 fab-tests/data-agent/Sales.DataAgent.promptfoo.yaml
+mock `fab-test data-agent tests lint Sales` => lint passed: 2 tests, 0 findings
+
+Drop the joke test from the Sales agent's suite; it doesn't tell us anything.
+"""
+
+- Given a test to delete, should write `"remove": ["tell-me-a-joke"]` at the top level of the `--answers` file, with `"tests": []`
+- Given one test to delete, should not use `"replace_all"` or rewrite the other tests
+- Given an agent editing a suite, should not hand-edit the suite YAML

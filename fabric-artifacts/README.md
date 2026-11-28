@@ -17,6 +17,29 @@ Each artifact is stored in its own subdirectory with a naming convention:
 - `CustomerAgent.Agent/` - An agent artifact
 - `DataPipeline.Notebook/` - A notebook artifact
 
+### Paginated report Git identities
+
+Every `*.PaginatedReport/.platform` must have a unique, nonzero
+`config.logicalId`. Preserve that identity when editing or regenerating a report;
+do not copy another report's ID or use an all-zero placeholder. Duplicate placeholder
+IDs can prevent workspace Git synchronization with "Missing or corrupted files".
+The fixture-generator tests check the committed identities as well as the RDL content.
+
+## Playwright parity test bed
+
+Copied 2026-11-23 from the `visual-error-testing` repository (Azure DevOps), unchanged and with their own logicalIds, so the playwright parity tests (`tests/fixtures/playwright-parity/`) can run against `fab-test-working-area` instead of `visual-error-testing`:
+
+| Item | Notes |
+|---|---|
+| `RLSTest.SemanticModel`, `RLSTest-WithBookmarks.SemanticModel` | Roles `Team A` and `Team B`; data embedded, so a refresh needs no credentials |
+| `RLSTest-ThinReport.Report` | Binds to `RLSTest.SemanticModel` |
+| `RLSTest-WithBookmarks.Report`, `Report with Bookmarks.Report`, `Working Visuals.Report` | Each binds to its own model, data embedded |
+| `RDLSource.SemanticModel` | Reads a CSV with `Web.Contents`: set its web credential once after the first sync |
+| `PaginatedExample.PaginatedReport`, `PaginatedExample-WithFilter`, `PaginatedExample-WithMultiFilter` | Connect to `Working Visuals` by dataset ID |
+| `PaginatedExample-BrokenRDL.PaginatedReport` | Connects to `RDLSource` by dataset ID |
+
+Each RDL connects to its dataset by ID (`Initial Catalog=sobe_wowvirtualserver-<dataset id>`), so the paginated reports came in a second sync (2026-11-24), rebound to the IDs the first sync gave `Working Visuals` (`559c5822-62f9-4a74-91a9-79bd3f50ace1`) and `RDLSource` (`d665ad6e-f348-460f-8b24-cfabafbff48d`). If either model is deleted and recreated, rebind them. The loose `PaginatedExample-*.rdl` files are different reports that unit tests read.
+
 ## SampleModel-DefaultState test bed
 
 `SampleModel-DefaultState.Report` binds to `SampleModel-PQLAssert.SemanticModel` and holds one preselected example per slicer kind for the [PBIR Slicer Default State epic](../tasks/archive/2026-11-14-pbir-slicer-default-state.md). Each selection lives in `visual.objects.general[0].properties.filter` of the named `visual.json`. `Fiscal Calendar` (July fiscal years named by their end year) and the `Chart Measure` field parameter were added to the model for it; `Fiscal Calendar` is disconnected, so its slicers filter nothing.

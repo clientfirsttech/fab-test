@@ -1,4 +1,10 @@
 {
+  "permissions": {
+    "allow": [
+      "ClaudeInChromeDomain(127.0.0.1:8765)",
+      "ClaudeInChromeDomain(127.0.0.1:8766)"
+    ]
+  },
   "hooks": {
     "PreToolUse": [
       {

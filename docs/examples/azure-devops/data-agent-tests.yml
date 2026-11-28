@@ -1,0 +1,49 @@
+# Ask every deployed Data Agent its suite's questions on each change to an agent
+# or a suite, and weekly: the data behind an agent changes with no commit.
+# See docs/DATA-AGENT-TESTS-WALKTHROUGH.md.
+#
+# A suite is code: promptfoo runs its javascript assertions with this job's
+# permissions. Keep the `fabric-service-principal` variable group off pipelines
+# that build fork pull requests.
+trigger:
+  branches:
+    include: [main]
+  paths:
+    include: ["**/*.DataAgent/**", "**/*.DataAgent.promptfoo.yaml"]
+
+schedules:
+  - cron: "0 6 * * 1"
+    displayName: Weekly Data Agent tests
+    branches:
+      include: [main]
+    always: true
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  - group: fabric-service-principal  # FABRIC_WORKSPACE_ID, FABRIC_TENANT_ID, FABRIC_CLIENT_ID, FABRIC_CLIENT_SECRET (secret)
+
+steps:
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: "3.12"
+  - task: NodeTool@0
+    inputs:
+      versionSpec: "22.x"
+  - script: pip install "cft-fab-test==1.10.0b5"
+    displayName: Install fab-test
+  # Offline: pairing, ids, credentials, promptfoo validate. No secrets needed.
+  - script: fab-test data-agent tests lint --format json
+    displayName: Lint Data Agent suites
+  # Live: asks each deployed agent. Exit 1 on a wrong answer, 127 without credentials.
+  - script: fab-test data-agent --format json --report
+    displayName: Test Data Agents
+    env:
+      FABRIC_WORKSPACE_ID: $(FABRIC_WORKSPACE_ID)
+      FABRIC_TENANT_ID: $(FABRIC_TENANT_ID)
+      FABRIC_CLIENT_ID: $(FABRIC_CLIENT_ID)
+      FABRIC_CLIENT_SECRET: $(FABRIC_CLIENT_SECRET)
+  - publish: fab-test-results
+    artifact: data-agent-results
+    condition: always()

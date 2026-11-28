@@ -12,6 +12,10 @@ produce no HTML report, send the wrong telemetry type, or be missing from
 `fab-test local`. This skill is the list of what "behaves like the other
 checks" means, so parity is planned up front instead of found in review.
 
+Its scope is the run (`fab-test <analyzer> [TARGET]`). Commands that author
+the files a run reads (`fab-test <analyzer> <noun> init|lint`) follow
+`aidd-command-grammar`.
+
 import references/checklist.md
 import references/known-gaps.md
 

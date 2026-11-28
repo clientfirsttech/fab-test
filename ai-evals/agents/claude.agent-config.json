@@ -1,0 +1,5 @@
+{
+  "command": "claude",
+  "args": ["--disallowedTools", "Read(**/.env)", "Read(**/.env.*)", "-p", "--output-format", "json", "--no-session-persistence"],
+  "outputFormat": "json"
+}

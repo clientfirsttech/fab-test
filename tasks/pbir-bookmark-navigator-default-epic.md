@@ -73,6 +73,17 @@ Docs for people, agents and pipelines.
 
 ---
 
+## ODCS References to Names with Spaces (follow-up, added 2026-11-17)
+
+Make sure the report-test YAML fab-test writes stays valid ODCS when a model name has a space, as Power BI names usually do (found in pql-test: `to: Date_Dim.Date ID` fails schema validation).
+
+**Requirements**:
+- Given a `table.column` reference fab-test writes (a relationship end, or any future reference field), should write it only when both names match ODCS's shorthand pattern (letters, digits, `_`; v3.2 also `-`), because ODCS has no escape syntax: quotes, brackets, backticks, `\ `, and `%20` all fail.
+- Given a name outside that pattern, should give the referenced schema object and property an `id` and write the reference as `schema/<object id>/properties/<property id>` (resolved by pql-test from the release after 0.3.0), never rename the element.
+- Given `init`'s output, should validate it against the bundled ODCS schema in a test whose model has a table and a column with spaces in their names.
+
+---
+
 ## AIDD Review
 
 `aidd-review` over the whole epic diff before the gates; fix what it finds.

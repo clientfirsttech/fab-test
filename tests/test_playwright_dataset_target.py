@@ -28,7 +28,7 @@ from fab_test.scripts.fab_test_execution import (
 )
 
 DATASET_ID = "5bf5a7e1-65e5-4d74-944b-1ada5941a664"
-DATASET_WS = "c4698d28-b05c-40bc-926c-707563ac85e7"
+DATASET_WS = "2aea22b0-2e68-485a-8902-e8e5da32e3ef"
 REPORT_WS = "798dfd00-0000-4000-8000-000000000000"
 
 _CLIENT = "fab_test.scripts.playwright_validation.fabric_service_client.build_fabric_service_client"

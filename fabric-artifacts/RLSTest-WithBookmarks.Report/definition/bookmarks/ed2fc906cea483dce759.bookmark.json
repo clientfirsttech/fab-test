@@ -1,0 +1,110 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/bookmark/2.1.0/schema.json",
+  "displayName": "Page 1 Bookmark",
+  "name": "ed2fc906cea483dce759",
+  "options": {
+    "targetVisualNames": []
+  },
+  "explorationState": {
+    "version": "1.15",
+    "activeSection": "fe83bc0c21cae0d63c03",
+    "sections": {
+      "fe83bc0c21cae0d63c03": {
+        "visualContainers": {
+          "649f1f7f10c6be403a2d": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "af7efa4a3515d7a23216",
+                  "type": "Categorical",
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Table A"
+                        }
+                      },
+                      "Property": "Column1"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "tableEx",
+              "autoSelectVisualType": false,
+              "objects": {}
+            }
+          },
+          "4ef1c6d50103a322676b": {
+            "filters": {
+              "byExpr": [
+                {
+                  "name": "f1e73be4a92bd0d6b8c3",
+                  "type": "Categorical",
+                  "filter": {
+                    "Version": 2,
+                    "From": [
+                      {
+                        "Name": "t",
+                        "Entity": "Table B",
+                        "Type": 0
+                      }
+                    ],
+                    "Where": [
+                      {
+                        "Condition": {
+                          "In": {
+                            "Expressions": [
+                              {
+                                "Column": {
+                                  "Expression": {
+                                    "SourceRef": {
+                                      "Source": "t"
+                                    }
+                                  },
+                                  "Property": "Table B"
+                                }
+                              }
+                            ],
+                            "Values": [
+                              [
+                                {
+                                  "Literal": {
+                                    "Value": "'X'"
+                                  }
+                                }
+                              ]
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "Table B"
+                        }
+                      },
+                      "Property": "Table B"
+                    }
+                  },
+                  "howCreated": 0
+                }
+              ]
+            },
+            "singleVisual": {
+              "visualType": "tableEx",
+              "autoSelectVisualType": false,
+              "objects": {}
+            }
+          }
+        }
+      }
+    },
+    "objects": {}
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "bookmarks": [
+    {
+      "bookmark_id": "4069a31f88c3cdcda01c",
+      "bookmark_name": "Bookmark 1",
+      "page_id": "5da315eb042003e41290"
+    },
+    {
+      "bookmark_id": "abec14a043093db454bd",
+      "bookmark_name": "Bookmark 2",
+      "page_id": "5da315eb042003e41290"
+    }
+  ],
+  "dataset_id": "133657d4-6f79-4510-a577-10653b3d7989",
+  "golden_csv": "Report with Bookmarks.csv",
+  "pages": [
+    {
+      "page_id": "5da315eb042003e41290",
+      "page_name": "Page 1"
+    }
+  ],
+  "report_id": "605bb7a0-316d-432e-9ca7-881d84017f19",
+  "report_name": "Report with Bookmarks",
+  "roles": [],
+  "use_rls": false,
+  "workspace_id": "2aea22b0-2e68-485a-8902-e8e5da32e3ef"
+}

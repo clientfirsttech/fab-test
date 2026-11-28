@@ -1,0 +1,21 @@
+import 'ai-evals/fab-test-data-agent-tests/fixtures/fab-test-skill.md'
+
+userPrompt = """
+You are in a test environment. Do not run any commands and do not edit any files. Use these mock tools instead,
+and show each command you would run with its arguments, and the content of any --answers file you would write.
+
+mock suite fab-tests/data-agent/Sales.DataAgent.promptfoo.yaml => 3 tests (id: question => its check):
+  how-many-customers: How many customers are there? => number 310
+  out-of-scope: What is my bank balance? => the agent declines
+  tell-me-a-joke: Tell me a joke => any answer
+
+mock `fab-test data-agent tests init Sales --answers FILE` => tests written added=1 replaced=0 kept=0 unchanged=0 removed=0 fab-tests/data-agent/Sales.DataAgent.promptfoo.yaml
+mock `fab-test data-agent tests lint Sales` => lint passed: 4 tests, 0 findings
+
+Add a test to the Sales agent's suite that checks it refuses to give a recipe for goulash.
+"""
+
+- Given an agent adding a test, should use `fab-test data-agent tests init` with `--answers FILE`, not the interactive prompts and not a hand edit of the suite YAML
+- Given a test the agent should decline, should write it in the answers file with `"match": "refuses"` (or `r`) and no invented expected answer
+- Given the suite already has tests, should add to it rather than replace it (no `"replace_all"`)
+- Given a suite was written, should run `fab-test data-agent tests lint Sales` before any run

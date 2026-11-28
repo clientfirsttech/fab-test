@@ -432,6 +432,19 @@ def test_the_run_output_directory_is_not_rediscovered(tmp_path):
 
 
 @pytest.mark.fab_test
+def test_artifact_order_does_not_depend_on_the_parent_folder(tmp_path):
+    (tmp_path / "a" / "RLSTest.SemanticModel").mkdir(parents=True)
+    (tmp_path / "z" / "Report.SemanticModel").mkdir(parents=True)
+
+    found = discover_artifacts(tmp_path, "*.SemanticModel", None)
+
+    assert [path.name for path in found] == [
+        "Report.SemanticModel",
+        "RLSTest.SemanticModel",
+    ]
+
+
+@pytest.mark.fab_test
 def test_a_nested_checkout_does_not_multiply_this_repository():
     """Measured before the change: a naive recursive scan of this repository
     returns 8 artifacts, 5 of them worktree copies of the other 3."""
@@ -440,7 +453,12 @@ def test_a_nested_checkout_does_not_multiply_this_repository():
 
     assert [p.name for p in found] == [
         "Not Working Visuals.SemanticModel",
+        "RDLSource.SemanticModel",
         "Report with Bookmarks - Broken Visuals.SemanticModel",
+        "Report with Bookmarks.SemanticModel",
+        "RLSTest-WithBookmarks.SemanticModel",
+        "RLSTest.SemanticModel",
         "SampleModel-PQLAssert.SemanticModel",
         "ThinReport.SemanticModel",
+        "Working Visuals.SemanticModel",
     ]

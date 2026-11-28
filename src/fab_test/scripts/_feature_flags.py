@@ -16,7 +16,7 @@ import os
 
 # Registry key -> default. Off until the epic that owns it releases.
 _FEATURES: dict[str, bool] = {
-    "data_agent": False,
+    "data_agent": True,  # on 2026-11-21 after a live run; FAB_TEST_ENABLE_DATA_AGENT=0 turns it off
     "sqldb_test": False,
 }
 

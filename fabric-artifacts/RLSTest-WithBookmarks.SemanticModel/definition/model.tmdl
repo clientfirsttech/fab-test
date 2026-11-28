@@ -1,0 +1,23 @@
+model Model
+	culture: en-US
+	defaultPowerBIDataSourceVersion: powerBI_V3
+	sourceQueryCulture: en-US
+	dataAccessOptions
+		legacyRedirects
+		returnErrorValuesAsNull
+
+annotation PBI_QueryOrder = ["Table A","Table B"]
+
+annotation __PBI_TimeIntelligenceEnabled = 1
+
+annotation PBI_ProTooling = ["DevMode"]
+
+ref table 'Table A'
+ref table DateTableTemplate_a6351269-47d5-49d1-ac6c-e139d9fc9da9
+ref table 'Table B'
+
+ref role 'Team A'
+ref role 'Team B'
+
+ref cultureInfo en-US
+

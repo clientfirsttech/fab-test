@@ -1,0 +1,11 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "Report",
+    "displayName": "RLSTest-WithBookmarks"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "598d3510-c76b-8564-4c73-bbf20bdee57b"
+  }
+}

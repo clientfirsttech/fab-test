@@ -1,0 +1,16 @@
+{
+  "bookmarks": [],
+  "dataset_id": "559c5822-62f9-4a74-91a9-79bd3f50ace1",
+  "golden_csv": "Working Visuals.csv",
+  "pages": [
+    {
+      "page_id": "5da315eb042003e41290",
+      "page_name": "Page 1"
+    }
+  ],
+  "report_id": "9bbbe74e-eebc-4ea7-be51-b24d40ec4ddd",
+  "report_name": "Working Visuals",
+  "roles": [],
+  "use_rls": false,
+  "workspace_id": "2aea22b0-2e68-485a-8902-e8e5da32e3ef"
+}

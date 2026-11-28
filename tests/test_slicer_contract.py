@@ -25,7 +25,7 @@ from fab_test.scripts._slicer_contract import (
 )
 
 ROOT = Path(__file__).resolve().parent.parent
-EXAMPLE = ROOT / "fabric-artifacts" / "SampleModel-DefaultState.Report.odcs.yaml"
+EXAMPLE = ROOT / "fab-tests" / "pbir" / "SampleModel-DefaultState.Report.odcs.yaml"
 
 
 def _rule(**implementation):

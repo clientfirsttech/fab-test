@@ -6,7 +6,7 @@
 |------|---------|-------------|
 | `TARGET` (positional) | (discover all) | What to test — see [Targeting](targeting-and-discovery.md#targeting) for the grammar |
 | `--artifact STEM` | (all) | Deprecated alias for `TARGET`; passing both exits `2` |
-| `--artifact-dir DIR` | the working directory | Root to discover artifacts under, recursively |
+| `--artifact-dir DIR` | `artifact_dir` in `fab-test.yml`, else the working directory | Root to discover artifacts under, recursively |
 | `--output-dir DIR` | `fab-test-results` | Root directory for result envelopes |
 | `--dry-run` | off | List matching artifacts without running any analyzer |
 | `--telemetry` / `--no-telemetry` | config-driven | Force/suppress Eventhouse telemetry. A configured destination already enables it; `--telemetry` with none configured exits `2` — see [Telemetry](configuration.md#telemetry) |
@@ -31,6 +31,53 @@ The stem is the artifact folder name without its extension (`.SemanticModel`, `.
 The older spelling still works: `fab-test bpa --artifact SampleModel-PQLAssert`.
 
 ## Subcommand-Specific Flags
+
+### data-agent
+
+On by default (`FAB_TEST_ENABLE_DATA_AGENT=0` turns it off); aliases: `agent`, `data_agent`.
+Runs against deployed agents only. Suites live in `fab-tests/data-agent/`, outside
+the Git-connected folder (`--tests-dir` moves it). `tests init` writes your questions, one-key match
+types and follow-ups (`--answers FILE` without a person); `tests lint` checks
+the suite offline.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `TARGET` | local items with paired suites | Item name/path or `WORKSPACE.Workspace/NAME.DataAgent` |
+| `--workspace NAME_OR_ID` | `FABRIC_WORKSPACE_ID`, then config `workspace:` | Select the workspace; without TARGET, enumerate its deployed agents |
+| `--tests FILE` | logicalId-paired `*.DataAgent.promptfoo.yaml` | Override pairing; required for a service target without a local item |
+| `--env-file PATH` | existing credential-file search | Passed through as `PLAYWRIGHT_ENV_FILE` to the Python provider |
+| `--auth az\|service-principal` | the principal if set, else `az login` | `az`: ask as your `az login` even when a principal is set; `service-principal`: never fall back |
+| `--all` | off | Allow live enumeration over five agents |
+
+Common run flags (`--artifact-dir`, `--output-dir`, `--timeout`, `--jobs`,
+`--dry-run`, verbosity, JSON, reports, telemetry) keep their usual meanings.
+Dry runs show local suite denominators, not a live workspace inventory.
+Node.js >=22.22.0, pinned promptfoo 0.124.0, and an identity (a full service
+principal, or `az login`) are required. Results live under `data_agent/<results_stem>/`; telemetry uses
+`fabric_dynamic_analysis` with artifact type `DataAgent`.
+`--timeout` bounds the whole run. When Fabric throttles the agent, the envelope's
+`retry_after` (UTC, ISO 8601) says when to run again, and its `message` names the
+cause once for every question it stopped.
+
+`fab-test data-agent tests init [TARGET]` and `fab-test data-agent tests lint [TARGET]`, flag by flag
+(the [walkthrough](https://github.com/clientfirsttech/fab-test/blob/main/docs/DATA-AGENT-TESTS-WALKTHROUGH.md) has the same table):
+
+| Flag | `tests init` | `tests lint` | `fab-test data-agent` |
+|---|---|---|---|
+| `TARGET` / `--artifact STEM` | the item to write tests for | the item to check; none checks every suite | the item to ask; none runs every item (no suite → skipped) |
+| `--artifact-dir DIR` | where items are found (`artifact_dir:`) | same | same |
+| `--tests FILE` | write or extend this suite | check this suite | ask with this suite |
+| `--tests-dir DIR` | where a new suite goes (`fab-tests/`) | where suites are found | same |
+| `--format text\|json` | ✓ (`next` in JSON) | ✓ (`{ok, suites, next}`) | ✓ |
+| `-q` / `-v` | `tests written added=N replaced=N kept=N unchanged=N removed=N PATH` / details | `tests passed\|failed e=N w=N PATH` per suite / each finding | one line per item / per-test detail |
+| `--questions` | suggestions, `decline`, the agent's `instructions`, the answers shape | — | — |
+| `--answers FILE` | `{"tests": [{query, expect, match, follow_ups, id?, replace?}], "replace_all"?, "remove"?: [ids]}` (`"tests"` optional with `"remove"`) | — | — |
+| `--force` | replace tests with matching ids; rewrite comments | — | — |
+| `--dry-run` | show the suite, write nothing | — | list items and suites; no token |
+| `--workspace`, `--env-file`, `--auth`, `--all`, `--report`, `--open-report`, `--telemetry`, `--timeout`, `--jobs`, `--output-dir` | exit 2 naming the run | exit 2 naming the run | the run's own flags |
+
+Exit codes: init 0, 2 (refusal, unreadable suite, no answers off a terminal), 130; lint 0, 1 (findings),
+2 (nothing pairs), 127 (promptfoo can't be installed); the run as every analyzer.
 
 ### local
 
@@ -76,7 +123,8 @@ fab-test bpa
 | `--contract FILE` | — | none: each report pairs with the `*.odcs.yaml` under `--artifact-dir` whose `fabTestReport` is its `.platform` logicalId. A named file applies to every report in the run |
 | `--as-of YYYY-MM-DD` | — | today; the date calendar-driven slicer defaults resolve against |
 
-`fab-test pbir contract init [REPORT | --artifact NAME [--artifact-dir DIR]]` builds or extends `<Report>.Report.odcs.yaml`: `--questions` (print them, then stop), `--answers FILE`, `--as-of`, `--dry-run`, `--force`, `--format text|json`. See [Slicer contracts](slicer-contracts.md).
+`fab-test pbir contract init [TARGET]` builds or extends `<Report>.Report.odcs.yaml`. TARGET is the report as `fab-test pbir` takes it: a path, or a name (`Sales`, `Sales.Report`) found under `--artifact-dir` (`--artifact` is its deprecated alias); `--artifact-dir` and `--format` default from `fab-test.yml` as the run's do. Flags: `--questions` (print them, then stop), `--answers FILE`, `--as-of`, `--dry-run` (show the contract, write nothing), `--force`, `--format text|json`, `-q` (one result line, `contract written|unchanged added=N replaced=N kept=N unchanged=N PATH`), `-v` (every rule and what happened to it).
+`fab-test pbir contract lint [TARGET]` checks a contract before a run, or with no TARGET every contract under `--artifact-dir`: `--contract FILE`, `--as-of`, `-q` (`contract lint passed|failed problems=N PATH`), `-v`, `--format json`. Exit 0 clean, 1 problems, 2 nothing to check. See [Slicer contracts](slicer-contracts.md#linting-a-contract), which also has the init / lint / run flag table.
 
 **Requires the .NET 10 runtime.** The `fab-inspector` release (4.0 and later) is a framework-dependent build (`Requires the .NET 10.0 runtime (not included)`, per its release notes; it will not start on an older runtime) — the binary can be present, executable, and correctly versioned and still be unable to run. `fab-test doctor --analyzer pbir` checks for an installed .NET 10+ runtime (via `dotnet --list-runtimes`) rather than reporting the binary alone as sufficient. **Temporary .NET 8 fallback:** on a machine with .NET 8 but not .NET 10, fab-test downloads and runs fab-inspector `3.4.0`, the last release that runs on .NET 8 (same findings; its native JSON lacks `TagsFilter`/`Tags`). Every such run prints `pbir_inspector: using fallback version 3.4.0; .NET 10+ runtime not found (installed: 8.x)` with the .NET 10 link (a `::warning::` annotation in CI), and `doctor` shows pbir as ⚠ with the same remedy, which `doctor --strict` fails on. The fallback is declared as `runtime_fallback` in `analyzers.json` and will be removed by 2027-02-10, since .NET 8 is past end of support; install .NET 10. With neither runtime, `doctor` reports not-ready with the .NET 10 download link. If the runtime check somehow passes on a machine where the tool still can't run, the wrapper's own exit code and stderr are surfaced as an `error` envelope status (never a silent `passed` with zero findings) — see [Envelope schema keys](operations.md) for how `error` differs from `passed`.
 
@@ -500,7 +548,7 @@ denominator.
 fab-test playwright --workspace "Sales Dev"
 
 # Equivalent -- same shared flag
-fab-test playwright --workspace-id c4698d28-b05c-40bc-926c-707563ac85e7
+fab-test playwright --workspace-id 2aea22b0-2e68-485a-8902-e8e5da32e3ef
 
 # A real --artifact-dir keeps the repository as the denominator instead
 fab-test playwright --workspace "Sales Dev" --artifact-dir .

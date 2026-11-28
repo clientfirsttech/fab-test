@@ -24,6 +24,7 @@ Run `fab-test list` for this table at any time — it has a Scopes column.
 | `bpa`, `pbir`, `a11y`, `rdl` | yes | yes | yes — exports the deployed definition read-only |
 | `pql-test` | yes | yes | yes |
 | `playwright`, `dependencies` | yes | **no** | yes |
+| `data-agent` | yes (pairs the suite; the run asks the deployed agent) | **no** (exit 2) | yes |
 
 The file-reading analyzers accept `local/` because the artifact is on disk either way — only `pql-test` actually *binds* to the running instance. They accept a workspace target by exporting the deployed item's definition through Fabric `getDefinition` (TMDL for a semantic model, PBIR for a report, the `.rdl` for a paginated report) into the run's output directory and analyzing that, so a service run reports through the same envelope, exit codes, HTML report and telemetry as a repo run. `pql-test` exports nothing: under `--workspace` (or `all`) it is handed each deployed model as `WORKSPACE.Workspace/NAME.SemanticModel` and discovers and runs its tests over XMLA. The export is **read-only and ephemeral**: it is deleted after the run unless `--keep-export` is passed (kept files are redacted for connection-string secrets). Exporting a deployed item *for testing* is in scope; deploying remains out of scope. Targets that no analyzer can honor — `pql-lint` with a workspace target — still exit `2` and name the forms that work:
 
@@ -49,6 +50,17 @@ $ fab-test pql_lint "Sales Dev.Workspace/Sales.SemanticModel"
 | `--workspace X` with a target naming workspace Y, or `local/NAME` with `--workspace` | exit `2` |
 
 `workspace:` in `fab-test.yml` and `FABRIC_WORKSPACE_ID` supply a default workspace; they never flip a bare invocation to service. A workspace enumeration over **50** items stops with exit `2` naming `--all` (never a prompt); `--all` forces it. `--dry-run` lists the items; a typed target needs no token. A `getDefinition` 404 (item not in enhanced/Git-integration format) or 403 exits `1` with a named remediation; any other `getDefinition` failure exits `1` naming Fabric's own error code and message; an export that cannot be written exits `1` naming the path — a path over Windows' 260-character limit (PBIR's nested `visuals/` folders under a deep `--output-dir`) names a shorter `--output-dir` or Windows long-path support as the fix; missing credentials exit `127`. A report is exported in its stored format: a PBIR-Legacy report (a single `report.json`) is skipped with a `⏭ <name>.Report skipped` line — never analyzed, since the rules read PBIR and would pass it vacuously — and the run exits `1`; when every report is legacy it exits `1` naming them. Convert the report to PBIR to test it.
+
+**`data-agent` is the one exception: a bare run is `service`.** A Data Agent only exists deployed, so `fab-test data-agent` reads the suites from `--artifact-dir` (and `fab-tests/`) but asks the agents in the workspace from `--workspace` → `FABRIC_WORKSPACE_ID` → `workspace:` in `fab-test.yml`, and exits `2` naming all three when none is set. The banner's `source` says which one it was.
+
+| Invocation | Mode |
+|------------|------|
+| `fab-test data-agent`, `data-agent Sales` | `service`: each local `*.DataAgent` item with a paired suite (no suite → `skipped`) |
+| `fab-test data-agent "Dev.Workspace/Sales.DataAgent" --tests FILE` | `service`: that deployed agent, with that suite |
+| `fab-test data-agent --workspace Dev` | `service`: every deployed agent, each paired with a local item by display name. Over **5** agents stops with exit `2` naming `--all` |
+| `fab-test data-agent local/Sales` | exit `2` |
+
+`fab-test all` includes `data-agent` only when a workspace is configured, and shows its row as `mode=service` inside a local session. `fab-test local` never includes it.
 
 `fab-test all` **skips** an analyzer that cannot honor the target and says so, rather than failing the batch — so `fab-test all local/Sales` still runs everything that reads files.
 

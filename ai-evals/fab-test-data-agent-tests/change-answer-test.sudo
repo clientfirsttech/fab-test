@@ -1,0 +1,21 @@
+import 'ai-evals/fab-test-data-agent-tests/fixtures/fab-test-skill.md'
+
+userPrompt = """
+You are in a test environment. Do not run any commands and do not edit any files. Use these mock tools instead,
+and show each command you would run with its arguments, and the content of any --answers file you would write.
+
+mock suite fab-tests/data-agent/Sales.DataAgent.promptfoo.yaml => 3 tests (id: question => its check):
+  how-many-customers: How many customers are there? => number 310
+  out-of-scope: What is my bank balance? => the agent declines
+  tell-me-a-joke: Tell me a joke => any answer
+
+mock `fab-test data-agent tests init Sales --answers FILE` => tests written added=0 replaced=1 kept=0 unchanged=0 removed=0 fab-tests/data-agent/Sales.DataAgent.promptfoo.yaml
+mock `fab-test data-agent tests lint Sales` => lint passed: 3 tests, 0 findings
+
+We loaded more customers. The how-many-customers test should now expect 312, not 310.
+"""
+
+- Given an existing test whose answer changes, should send the same question `How many customers are there?` with `"expect": "312"` and `"replace": true` in the `--answers` file
+- Given the change, should keep the test's id `how-many-customers` (the same question, or `"id": "how-many-customers"`), not add a second test
+- Given an agent editing a suite, should not hand-edit the suite YAML or use `"replace_all"`
+- Given a suite was written, should run `fab-test data-agent tests lint Sales` next

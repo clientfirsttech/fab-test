@@ -44,7 +44,7 @@ pbir failed e=29 w=1 fab-test-results/pbir/SampleModel-PQLAssert/envelope.json
 playwright failed e=0 w=0 ThinReport
 ```
 
-`<analyzer>` is the registry name (`pql_test`, not `pql-test`). `<status>` is `passed`, `warning`, `failed`, or `skipped`. `<where>` is the envelope path relative to the working directory, or the artifact name when the analyzer wrote no envelope — it is last because artifact names contain spaces. Exit codes are unchanged, and a failure the findings cannot explain still prints its remediation above the lines: a missing credential, a timeout, or a crash with no findings. In CI the analyzer's `::error::`/`::warning::` annotations still pass through. When every artifact fails the same check, its message is printed once.
+`<analyzer>` is the registry name (`pql_test`, not `pql-test`). `<status>` is `passed`, `warning`, `failed`, or `skipped`. `<where>` is the envelope path relative to the working directory, or the artifact name when the analyzer wrote no envelope — it is last because artifact names contain spaces. Exit codes are unchanged, and a failure the findings cannot explain still prints its remediation above the lines: a missing credential, a timeout, or a crash with no findings. In CI the analyzer's `::error::`/`::warning::` annotations still pass through. When every artifact fails the same check, its message is printed once. With `--format json`, `-q` leaves stdout byte-identical to the same run without it, and stderr is silent for passing artifacts.
 
 Under `fab-test all`, each analyzer prints its own lines as it finishes and the aggregate table is left out.
 

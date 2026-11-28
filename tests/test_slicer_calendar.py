@@ -20,7 +20,7 @@ from fab_test.scripts._slicer_calendar import (
 )
 from fab_test.scripts._slicer_contract import SlicerContract, SlicerExpectation, load_contract
 
-EXAMPLE = Path(__file__).resolve().parent.parent / "fabric-artifacts" / "SampleModel-DefaultState.Report.odcs.yaml"
+EXAMPLE = Path(__file__).resolve().parent.parent / "fab-tests" / "pbir" / "SampleModel-DefaultState.Report.odcs.yaml"
 JULY_END = {"fiscal_year_start_month": 7, "fiscal_year_named_by": "end"}
 
 

@@ -193,8 +193,10 @@ def _discover_for(name: str, args: argparse.Namespace, glob: str) -> list[Path]:
     against the repo metadata, and impact-manifest- or dataset-driven
     Playwright validates a service-resolved set whatever exists locally.
     """
-    if _is_repository_scoped(name):
-        return [Path(".")]
+    if _is_repository_scoped(name) or name == "data_agent":
+        from ._data_agent_run import discover_data_agents
+
+        return discover_data_agents(args) if name == "data_agent" else [Path(".")]
     if is_service_run(name, args):
         return export_for_analyzer(name, args, Path(getattr(args, "output_dir", RESULTS_ROOT)))
     if name == "playwright":

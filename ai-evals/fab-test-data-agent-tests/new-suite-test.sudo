@@ -1,0 +1,24 @@
+import 'ai-evals/fab-test-data-agent-tests/fixtures/fab-test-skill.md'
+
+userPrompt = """
+You are in a test environment. Do not run any commands and do not edit any files. Use these mock tools instead,
+and show each command you would run with its arguments, and the content of any --answers file you would write.
+
+The Sales agent at fab-tests/Sales.DataAgent has no test suite yet.
+
+mock `fab-test data-agent tests init Sales --questions --format json` => {"suggestions": [
+  {"query": "What is the total of Revenue?", "source": "measure Revenue"},
+  {"query": "How many rows are in Customers?", "source": "table Customers"},
+  {"query": "What does the Payroll table hold?", "decline": true, "source": "a table the agent leaves out"},
+  {"query": "What is my bank balance?", "decline": true, "source": "generic out of scope"}],
+  "shape": {"tests": [{"query": "...", "expect": "...", "match": "n|c|x|s|e|p|r", "follow_ups": []}]}}
+mock `fab-test data-agent tests init Sales --answers FILE` => tests written added=N ... fab-tests/data-agent/Sales.DataAgent.promptfoo.yaml
+mock `fab-test data-agent tests lint Sales` => lint passed
+
+Write a test suite for the Sales Data Agent.
+"""
+
+- Given no suite and an agent building one, should run `tests init Sales --questions --format json` before writing answers
+- Given suggestions without expected values, should ask the user for the right answers to the Revenue and Customers questions rather than invent numbers
+- Given the decline suggestions, should offer them as tests with `"match": "refuses"`, which need no expected answer
+- Given the answers, should write them with `--answers FILE` and run `tests lint Sales` next

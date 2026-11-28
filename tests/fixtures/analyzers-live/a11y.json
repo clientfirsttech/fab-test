@@ -1,0 +1,968 @@
+{
+ "as_of": "2026-11-23",
+ "local": {
+  "Not Working Visuals": {
+   "findings": [
+    [
+     "144603c1297bb424d840-alt-missing",
+     "error",
+     "Page 2 / 144603c1297bb424d840"
+    ],
+    [
+     "144603c1297bb424d840-title-missing",
+     "warning",
+     "Page 2 / 144603c1297bb424d840"
+    ],
+    [
+     "14c428845591d434b53c-page-title-missing",
+     "warning",
+     "Page 1"
+    ],
+    [
+     "14c428845591d434b53c-tab-layout-mismatch",
+     "warning",
+     "Page 1"
+    ],
+    [
+     "9be253a594a2130c259a-alt-missing",
+     "error",
+     "Page 1 / 9be253a594a2130c259a"
+    ],
+    [
+     "d0e0f896e76232615d32-alt-missing",
+     "error",
+     "Page 1 / d0e0f896e76232615d32"
+    ],
+    [
+     "d0e0f896e76232615d32-title-missing",
+     "warning",
+     "Page 1 / d0e0f896e76232615d32"
+    ]
+   ],
+   "status": "failed"
+  },
+  "RLSTest-ThinReport": {
+   "findings": [
+    [
+     "481eef1a13d264ebe5de-alt-missing",
+     "error",
+     "Page 2 / 481eef1a13d264ebe5de"
+    ],
+    [
+     "481eef1a13d264ebe5de-title-missing",
+     "warning",
+     "Page 2 / 481eef1a13d264ebe5de"
+    ],
+    [
+     "612d474f3b1cafae45f9-alt-missing",
+     "error",
+     "Page 1 / 612d474f3b1cafae45f9"
+    ],
+    [
+     "76b3b7e1b330753127fa-page-title-missing",
+     "warning",
+     "Page 2"
+    ],
+    [
+     "76b3b7e1b330753127fa-tab-layout-mismatch",
+     "warning",
+     "Page 2"
+    ],
+    [
+     "8189e52cdb8f5fb2b2cf-page-title-missing",
+     "warning",
+     "Page 1"
+    ],
+    [
+     "8189e52cdb8f5fb2b2cf-tab-layout-mismatch",
+     "warning",
+     "Page 1"
+    ],
+    [
+     "9ca97b9d46aebc5cf345-alt-missing",
+     "error",
+     "Page 1 / 9ca97b9d46aebc5cf345"
+    ],
+    [
+     "f4364e5b41077311fa18-alt-missing",
+     "error",
+     "Page 2 / f4364e5b41077311fa18"
+    ]
+   ],
+   "status": "failed"
+  },
+  "RLSTest-WithBookmarks": {
+   "findings": [
+    [
+     "0e66f25d564bd6d4c710-page-title-missing",
+     "warning",
+     "Page 2"
+    ],
+    [
+     "0e66f25d564bd6d4c710-tab-layout-mismatch",
+     "warning",
+     "Page 2"
+    ],
+    [
+     "4ef1c6d50103a322676b-alt-missing",
+     "error",
+     "Page 1 / 4ef1c6d50103a322676b"
+    ],
+    [
+     "649f1f7f10c6be403a2d-alt-missing",
+     "error",
+     "Page 1 / 649f1f7f10c6be403a2d"
+    ],
+    [
+     "7dd92b68db890cebe277-alt-missing",
+     "error",
+     "Page 2 / 7dd92b68db890cebe277"
+    ],
+    [
+     "c8b7831205787013164b-alt-missing",
+     "error",
+     "Page 2 / c8b7831205787013164b"
+    ],
+    [
+     "fe83bc0c21cae0d63c03-page-title-missing",
+     "warning",
+     "Page 1"
+    ],
+    [
+     "fe83bc0c21cae0d63c03-tab-layout-mismatch",
+     "warning",
+     "Page 1"
+    ]
+   ],
+   "status": "failed"
+  },
+  "Report with Bookmarks": {
+   "findings": [
+    [
+     "0527edb48c081ba68836-alt-missing",
+     "error",
+     "Page 1 / 0527edb48c081ba68836"
+    ],
+    [
+     "0527edb48c081ba68836-title-missing",
+     "warning",
+     "Page 1 / 0527edb48c081ba68836"
+    ],
+    [
+     "52c8fb32b166701a40c0-alt-missing",
+     "error",
+     "Page 1 / 52c8fb32b166701a40c0"
+    ],
+    [
+     "52c8fb32b166701a40c0-title-missing",
+     "warning",
+     "Page 1 / 52c8fb32b166701a40c0"
+    ],
+    [
+     "5da315eb042003e41290-clutter",
+     "warning",
+     "Page 1"
+    ],
+    [
+     "5da315eb042003e41290-tab-layout-mismatch",
+     "warning",
+     "Page 1"
+    ],
+    [
+     "d829760585346b0a0050-alt-missing",
+     "error",
+     "Page 1 / d829760585346b0a0050"
+    ]
+   ],
+   "status": "failed"
+  },
+  "Report with Bookmarks - Broken Visuals": {
+   "findings": [
+    [
+     "0527edb48c081ba68836-alt-missing",
+     "error",
+     "Page B / 0527edb48c081ba68836"
+    ],
+    [
+     "0527edb48c081ba68836-title-missing",
+     "warning",
+     "Page B / 0527edb48c081ba68836"
+    ],
+    [
+     "52c8fb32b166701a40c0-alt-missing",
+     "error",
+     "Page B / 52c8fb32b166701a40c0"
+    ],
+    [
+     "52c8fb32b166701a40c0-title-missing",
+     "warning",
+     "Page B / 52c8fb32b166701a40c0"
+    ],
+    [
+     "5da315eb042003e41290-clutter",
+     "warning",
+     "Page B"
+    ],
+    [
+     "5da315eb042003e41290-tab-layout-mismatch",
+     "warning",
+     "Page B"
+    ],
+    [
+     "86afba28cc7855ea0150-alt-missing",
+     "error",
+     "Page A / 86afba28cc7855ea0150"
+    ],
+    [
+     "9c05e390048999766512-alt-missing",
+     "error",
+     "Page A / 9c05e390048999766512"
+    ],
+    [
+     "9c05e390048999766512-title-missing",
+     "warning",
+     "Page A / 9c05e390048999766512"
+    ],
+    [
+     "a58c1b49ab4c7ff96f00-alt-missing",
+     "error",
+     "Page C / a58c1b49ab4c7ff96f00"
+    ],
+    [
+     "c275e6e67726329c4c9c-clutter",
+     "warning",
+     "Page C"
+    ],
+    [
+     "c275e6e67726329c4c9c-page-title-missing",
+     "warning",
+     "Page C"
+    ],
+    [
+     "c445606db5b0c068b994-tab-layout-mismatch",
+     "warning",
+     "Page A"
+    ],
+    [
+     "d829760585346b0a0050-alt-missing",
+     "error",
+     "Page B / d829760585346b0a0050"
+    ]
+   ],
+   "status": "failed"
+  },
+  "SampleModel-DefaultState": {
+   "findings": [
+    [
+     "1090f4f2bad449b6a47c-page-title-missing",
+     "warning",
+     "Input Slicer"
+    ],
+    [
+     "1090f4f2bad449b6a47c-tab-layout-mismatch",
+     "warning",
+     "Input Slicer"
+    ],
+    [
+     "2fb9531b5bdd7fcdd86d-page-title-missing",
+     "warning",
+     "Date Relative"
+    ],
+    [
+     "2fb9531b5bdd7fcdd86d-tab-layout-mismatch",
+     "warning",
+     "Date Relative"
+    ],
+    [
+     "34d460570b6187fcacde-page-title-missing",
+     "warning",
+     "Date Picker"
+    ],
+    [
+     "34d460570b6187fcacde-tab-layout-mismatch",
+     "warning",
+     "Date Picker"
+    ],
+    [
+     "721a65a966acd261519d-page-title-missing",
+     "warning",
+     "Date Between"
+    ],
+    [
+     "721a65a966acd261519d-tab-layout-mismatch",
+     "warning",
+     "Date Between"
+    ],
+    [
+     "b6fc6a874e01301b90b0-page-title-missing",
+     "warning",
+     "Page 2"
+    ],
+    [
+     "b6fc6a874e01301b90b0-tab-layout-mismatch",
+     "warning",
+     "Page 2"
+    ],
+    [
+     "b84126137973afa03196-alt-placeholder",
+     "error",
+     "Standard Slicers / Chart Measure"
+    ],
+    [
+     "dc9cfe62e59b4b669f08-page-title-missing",
+     "warning",
+     "Standard Slicers"
+    ],
+    [
+     "dc9cfe62e59b4b669f08-tab-layout-mismatch",
+     "warning",
+     "Standard Slicers"
+    ],
+    [
+     "e4a1c7d20b9f43e6a5d8-page-title-missing",
+     "warning",
+     "Empty and All"
+    ],
+    [
+     "e4a1c7d20b9f43e6a5d8-tab-duplicate-1000",
+     "error",
+     "Empty and All"
+    ],
+    [
+     "e4a1c7d20b9f43e6a5d8-tab-layout-mismatch",
+     "warning",
+     "Empty and All"
+    ],
+    [
+     "f4dcb346d8c5e14655d3-page-title-missing",
+     "warning",
+     "Page 1"
+    ]
+   ],
+   "status": "failed"
+  },
+  "SampleModel-PQLAssert": {
+   "findings": [
+    [
+     "51ab84e49a469135920c-alt-missing",
+     "error",
+     "Page 2 / 51ab84e49a469135920c"
+    ],
+    [
+     "51ab84e49a469135920c-title-missing",
+     "warning",
+     "Page 2 / 51ab84e49a469135920c"
+    ],
+    [
+     "728cbd2f9c9dcf30440d-alt-missing",
+     "error",
+     "Page 3 / 728cbd2f9c9dcf30440d"
+    ],
+    [
+     "728cbd2f9c9dcf30440d-title-missing",
+     "warning",
+     "Page 3 / 728cbd2f9c9dcf30440d"
+    ],
+    [
+     "9140c926b86be6cf3760-alt-missing",
+     "error",
+     "Page 4 / 9140c926b86be6cf3760"
+    ],
+    [
+     "9140c926b86be6cf3760-title-missing",
+     "warning",
+     "Page 4 / 9140c926b86be6cf3760"
+    ],
+    [
+     "ReportSection-page-title-missing",
+     "warning",
+     "Page 1"
+    ],
+    [
+     "ReportSection-tab-layout-mismatch",
+     "warning",
+     "Page 1"
+    ],
+    [
+     "ae9c7ada95c7c5d294d3-alt-missing",
+     "error",
+     "Page 1 / MarvelFact"
+    ],
+    [
+     "cb9b48525e8e70780eb8-noncontrast-#41A4FF",
+     "error",
+     "Page 1 / Top Ten Appearances"
+    ],
+    [
+     "cdebc12e8cab59f864b6-page-title-missing",
+     "warning",
+     "Page 4"
+    ],
+    [
+     "f2054b40c53166dc4484-page-title-missing",
+     "warning",
+     "Page 2"
+    ],
+    [
+     "fb0533340c00746789ac-target-size",
+     "warning",
+     "Page 1 / Divider Line"
+    ]
+   ],
+   "status": "failed"
+  },
+  "ThinReport": {
+   "findings": [
+    [
+     "1ec0220db4a1a120db19-page-title-missing",
+     "warning",
+     "Page 2"
+    ],
+    [
+     "2524761709751832a270-alt-missing",
+     "error",
+     "Page 1 / Card with Title"
+    ],
+    [
+     "42303637da18cab42c69-title-missing",
+     "warning",
+     "Page 1 / 42303637da18cab42c69"
+    ],
+    [
+     "6c8284d4d466918cdb1c-clutter-medium",
+     "warning",
+     "Page 1"
+    ],
+    [
+     "6c8284d4d466918cdb1c-page-title-missing",
+     "warning",
+     "Page 1"
+    ],
+    [
+     "7a1f92c4d8b344e0a112-alt-missing",
+     "error",
+     "Page 1 / 7a1f92c4d8b344e0a112"
+    ],
+    [
+     "ae854917b1805e46dc69-alt-missing",
+     "error",
+     "Page 1 / ae854917b1805e46dc69"
+    ],
+    [
+     "bce4d7a0c0826ba2b322-alt-missing",
+     "error",
+     "Page 2 / bce4d7a0c0826ba2b322"
+    ]
+   ],
+   "status": "failed"
+  },
+  "Working Visuals": {
+   "findings": [
+    [
+     "52c8fb32b166701a40c0-alt-missing",
+     "error",
+     "Page 1 / 52c8fb32b166701a40c0"
+    ],
+    [
+     "52c8fb32b166701a40c0-title-missing",
+     "warning",
+     "Page 1 / 52c8fb32b166701a40c0"
+    ],
+    [
+     "5da315eb042003e41290-tab-layout-mismatch",
+     "warning",
+     "Page 1"
+    ],
+    [
+     "d829760585346b0a0050-alt-missing",
+     "error",
+     "Page 1 / d829760585346b0a0050"
+    ]
+   ],
+   "status": "failed"
+  }
+ },
+ "service": {
+  "Not Working Visuals": {
+   "findings": [
+    [
+     "144603c1297bb424d840-alt-missing",
+     "error",
+     "Page 2 / 144603c1297bb424d840"
+    ],
+    [
+     "144603c1297bb424d840-title-missing",
+     "warning",
+     "Page 2 / 144603c1297bb424d840"
+    ],
+    [
+     "14c428845591d434b53c-page-title-missing",
+     "warning",
+     "Page 1"
+    ],
+    [
+     "14c428845591d434b53c-tab-layout-mismatch",
+     "warning",
+     "Page 1"
+    ],
+    [
+     "9be253a594a2130c259a-alt-missing",
+     "error",
+     "Page 1 / 9be253a594a2130c259a"
+    ],
+    [
+     "d0e0f896e76232615d32-alt-missing",
+     "error",
+     "Page 1 / d0e0f896e76232615d32"
+    ],
+    [
+     "d0e0f896e76232615d32-title-missing",
+     "warning",
+     "Page 1 / d0e0f896e76232615d32"
+    ]
+   ],
+   "status": "failed"
+  },
+  "RLSTest-ThinReport": {
+   "findings": [
+    [
+     "481eef1a13d264ebe5de-alt-missing",
+     "error",
+     "Page 2 / 481eef1a13d264ebe5de"
+    ],
+    [
+     "481eef1a13d264ebe5de-title-missing",
+     "warning",
+     "Page 2 / 481eef1a13d264ebe5de"
+    ],
+    [
+     "612d474f3b1cafae45f9-alt-missing",
+     "error",
+     "Page 1 / 612d474f3b1cafae45f9"
+    ],
+    [
+     "76b3b7e1b330753127fa-page-title-missing",
+     "warning",
+     "Page 2"
+    ],
+    [
+     "76b3b7e1b330753127fa-tab-layout-mismatch",
+     "warning",
+     "Page 2"
+    ],
+    [
+     "8189e52cdb8f5fb2b2cf-page-title-missing",
+     "warning",
+     "Page 1"
+    ],
+    [
+     "8189e52cdb8f5fb2b2cf-tab-layout-mismatch",
+     "warning",
+     "Page 1"
+    ],
+    [
+     "9ca97b9d46aebc5cf345-alt-missing",
+     "error",
+     "Page 1 / 9ca97b9d46aebc5cf345"
+    ],
+    [
+     "f4364e5b41077311fa18-alt-missing",
+     "error",
+     "Page 2 / f4364e5b41077311fa18"
+    ]
+   ],
+   "status": "failed"
+  },
+  "RLSTest-WithBookmarks": {
+   "findings": [
+    [
+     "0e66f25d564bd6d4c710-page-title-missing",
+     "warning",
+     "Page 2"
+    ],
+    [
+     "0e66f25d564bd6d4c710-tab-layout-mismatch",
+     "warning",
+     "Page 2"
+    ],
+    [
+     "4ef1c6d50103a322676b-alt-missing",
+     "error",
+     "Page 1 / 4ef1c6d50103a322676b"
+    ],
+    [
+     "649f1f7f10c6be403a2d-alt-missing",
+     "error",
+     "Page 1 / 649f1f7f10c6be403a2d"
+    ],
+    [
+     "7dd92b68db890cebe277-alt-missing",
+     "error",
+     "Page 2 / 7dd92b68db890cebe277"
+    ],
+    [
+     "c8b7831205787013164b-alt-missing",
+     "error",
+     "Page 2 / c8b7831205787013164b"
+    ],
+    [
+     "fe83bc0c21cae0d63c03-page-title-missing",
+     "warning",
+     "Page 1"
+    ],
+    [
+     "fe83bc0c21cae0d63c03-tab-layout-mismatch",
+     "warning",
+     "Page 1"
+    ]
+   ],
+   "status": "failed"
+  },
+  "Report with Bookmarks": {
+   "findings": [
+    [
+     "0527edb48c081ba68836-alt-missing",
+     "error",
+     "Page 1 / 0527edb48c081ba68836"
+    ],
+    [
+     "0527edb48c081ba68836-title-missing",
+     "warning",
+     "Page 1 / 0527edb48c081ba68836"
+    ],
+    [
+     "52c8fb32b166701a40c0-alt-missing",
+     "error",
+     "Page 1 / 52c8fb32b166701a40c0"
+    ],
+    [
+     "52c8fb32b166701a40c0-title-missing",
+     "warning",
+     "Page 1 / 52c8fb32b166701a40c0"
+    ],
+    [
+     "5da315eb042003e41290-clutter",
+     "warning",
+     "Page 1"
+    ],
+    [
+     "5da315eb042003e41290-tab-layout-mismatch",
+     "warning",
+     "Page 1"
+    ],
+    [
+     "d829760585346b0a0050-alt-missing",
+     "error",
+     "Page 1 / d829760585346b0a0050"
+    ]
+   ],
+   "status": "failed"
+  },
+  "Report with Bookmarks - Broken Visuals": {
+   "findings": [
+    [
+     "0527edb48c081ba68836-alt-missing",
+     "error",
+     "Page B / 0527edb48c081ba68836"
+    ],
+    [
+     "0527edb48c081ba68836-title-missing",
+     "warning",
+     "Page B / 0527edb48c081ba68836"
+    ],
+    [
+     "52c8fb32b166701a40c0-alt-missing",
+     "error",
+     "Page B / 52c8fb32b166701a40c0"
+    ],
+    [
+     "52c8fb32b166701a40c0-title-missing",
+     "warning",
+     "Page B / 52c8fb32b166701a40c0"
+    ],
+    [
+     "5da315eb042003e41290-clutter",
+     "warning",
+     "Page B"
+    ],
+    [
+     "5da315eb042003e41290-tab-layout-mismatch",
+     "warning",
+     "Page B"
+    ],
+    [
+     "86afba28cc7855ea0150-alt-missing",
+     "error",
+     "Page A / 86afba28cc7855ea0150"
+    ],
+    [
+     "9c05e390048999766512-alt-missing",
+     "error",
+     "Page A / 9c05e390048999766512"
+    ],
+    [
+     "9c05e390048999766512-title-missing",
+     "warning",
+     "Page A / 9c05e390048999766512"
+    ],
+    [
+     "a58c1b49ab4c7ff96f00-alt-missing",
+     "error",
+     "Page C / a58c1b49ab4c7ff96f00"
+    ],
+    [
+     "c275e6e67726329c4c9c-clutter",
+     "warning",
+     "Page C"
+    ],
+    [
+     "c275e6e67726329c4c9c-page-title-missing",
+     "warning",
+     "Page C"
+    ],
+    [
+     "c445606db5b0c068b994-tab-layout-mismatch",
+     "warning",
+     "Page A"
+    ],
+    [
+     "d829760585346b0a0050-alt-missing",
+     "error",
+     "Page B / d829760585346b0a0050"
+    ]
+   ],
+   "status": "failed"
+  },
+  "SampleModel-DefaultState": {
+   "findings": [
+    [
+     "1090f4f2bad449b6a47c-page-title-missing",
+     "warning",
+     "Input Slicer"
+    ],
+    [
+     "1090f4f2bad449b6a47c-tab-layout-mismatch",
+     "warning",
+     "Input Slicer"
+    ],
+    [
+     "2fb9531b5bdd7fcdd86d-page-title-missing",
+     "warning",
+     "Date Relative"
+    ],
+    [
+     "2fb9531b5bdd7fcdd86d-tab-layout-mismatch",
+     "warning",
+     "Date Relative"
+    ],
+    [
+     "34d460570b6187fcacde-page-title-missing",
+     "warning",
+     "Date Picker"
+    ],
+    [
+     "34d460570b6187fcacde-tab-layout-mismatch",
+     "warning",
+     "Date Picker"
+    ],
+    [
+     "721a65a966acd261519d-page-title-missing",
+     "warning",
+     "Date Between"
+    ],
+    [
+     "721a65a966acd261519d-tab-layout-mismatch",
+     "warning",
+     "Date Between"
+    ],
+    [
+     "b6fc6a874e01301b90b0-page-title-missing",
+     "warning",
+     "Page 2"
+    ],
+    [
+     "b6fc6a874e01301b90b0-tab-layout-mismatch",
+     "warning",
+     "Page 2"
+    ],
+    [
+     "b84126137973afa03196-alt-placeholder",
+     "error",
+     "Standard Slicers / Chart Measure"
+    ],
+    [
+     "dc9cfe62e59b4b669f08-page-title-missing",
+     "warning",
+     "Standard Slicers"
+    ],
+    [
+     "dc9cfe62e59b4b669f08-tab-layout-mismatch",
+     "warning",
+     "Standard Slicers"
+    ],
+    [
+     "e4a1c7d20b9f43e6a5d8-page-title-missing",
+     "warning",
+     "Empty and All"
+    ],
+    [
+     "e4a1c7d20b9f43e6a5d8-tab-duplicate-1000",
+     "error",
+     "Empty and All"
+    ],
+    [
+     "e4a1c7d20b9f43e6a5d8-tab-layout-mismatch",
+     "warning",
+     "Empty and All"
+    ],
+    [
+     "f4dcb346d8c5e14655d3-page-title-missing",
+     "warning",
+     "Page 1"
+    ]
+   ],
+   "status": "failed"
+  },
+  "SampleModel-PQLAssert": {
+   "findings": [
+    [
+     "51ab84e49a469135920c-alt-missing",
+     "error",
+     "Page 2 / 51ab84e49a469135920c"
+    ],
+    [
+     "51ab84e49a469135920c-title-missing",
+     "warning",
+     "Page 2 / 51ab84e49a469135920c"
+    ],
+    [
+     "728cbd2f9c9dcf30440d-alt-missing",
+     "error",
+     "Page 3 / 728cbd2f9c9dcf30440d"
+    ],
+    [
+     "728cbd2f9c9dcf30440d-title-missing",
+     "warning",
+     "Page 3 / 728cbd2f9c9dcf30440d"
+    ],
+    [
+     "9140c926b86be6cf3760-alt-missing",
+     "error",
+     "Page 4 / 9140c926b86be6cf3760"
+    ],
+    [
+     "9140c926b86be6cf3760-title-missing",
+     "warning",
+     "Page 4 / 9140c926b86be6cf3760"
+    ],
+    [
+     "ReportSection-page-title-missing",
+     "warning",
+     "Page 1"
+    ],
+    [
+     "ReportSection-tab-layout-mismatch",
+     "warning",
+     "Page 1"
+    ],
+    [
+     "ae9c7ada95c7c5d294d3-alt-missing",
+     "error",
+     "Page 1 / MarvelFact"
+    ],
+    [
+     "cb9b48525e8e70780eb8-noncontrast-#41A4FF",
+     "error",
+     "Page 1 / Top Ten Appearances"
+    ],
+    [
+     "cdebc12e8cab59f864b6-page-title-missing",
+     "warning",
+     "Page 4"
+    ],
+    [
+     "f2054b40c53166dc4484-page-title-missing",
+     "warning",
+     "Page 2"
+    ],
+    [
+     "fb0533340c00746789ac-target-size",
+     "warning",
+     "Page 1 / Divider Line"
+    ]
+   ],
+   "status": "failed"
+  },
+  "ThinReport": {
+   "findings": [
+    [
+     "1ec0220db4a1a120db19-page-title-missing",
+     "warning",
+     "Page 2"
+    ],
+    [
+     "2524761709751832a270-alt-missing",
+     "error",
+     "Page 1 / Card with Title"
+    ],
+    [
+     "42303637da18cab42c69-title-missing",
+     "warning",
+     "Page 1 / 42303637da18cab42c69"
+    ],
+    [
+     "6c8284d4d466918cdb1c-clutter-medium",
+     "warning",
+     "Page 1"
+    ],
+    [
+     "6c8284d4d466918cdb1c-page-title-missing",
+     "warning",
+     "Page 1"
+    ],
+    [
+     "7a1f92c4d8b344e0a112-alt-missing",
+     "error",
+     "Page 1 / 7a1f92c4d8b344e0a112"
+    ],
+    [
+     "ae854917b1805e46dc69-alt-missing",
+     "error",
+     "Page 1 / ae854917b1805e46dc69"
+    ],
+    [
+     "bce4d7a0c0826ba2b322-alt-missing",
+     "error",
+     "Page 2 / bce4d7a0c0826ba2b322"
+    ]
+   ],
+   "status": "failed"
+  },
+  "Working Visuals": {
+   "findings": [
+    [
+     "52c8fb32b166701a40c0-alt-missing",
+     "error",
+     "Page 1 / 52c8fb32b166701a40c0"
+    ],
+    [
+     "52c8fb32b166701a40c0-title-missing",
+     "warning",
+     "Page 1 / 52c8fb32b166701a40c0"
+    ],
+    [
+     "5da315eb042003e41290-tab-layout-mismatch",
+     "warning",
+     "Page 1"
+    ],
+    [
+     "d829760585346b0a0050-alt-missing",
+     "error",
+     "Page 1 / d829760585346b0a0050"
+    ]
+   ],
+   "status": "failed"
+  }
+ },
+ "workspace": "fab-test-working-area"
+}

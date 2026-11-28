@@ -35,11 +35,13 @@ from typing import Any
 
 import yaml
 
+from ._authoring_output import add_input_flags, level, print_payload, resolve_inputs
 from ._bookmark_navigators import apply_navigator_answers, navigator_questions
+from ._config import ConfigError
 from ._pbir_slicers import Slicer, read_slicers
-from ._scan import find_artifact_dirs
 from ._slicer_calendar import CalendarError, resolve_contract, today, validate_calendar
 from ._slicer_contract import ENGINE, SELECT_ALL, ContractError, parse_contract
+from ._slicer_contract_lint import add_lint_parser, lint_main, paired_contract
 from ._slicer_contract_run import CONTRACT_SUFFIX, report_logical_id
 from ._slicer_init_calendar import (
     NAMED_BY,
@@ -55,35 +57,48 @@ from ._slicer_init_calendar import (
 )
 from ._slicer_init_existing import ExistingContractError, Owner, navigator_owner, read_existing, slicer_owner
 from ._slicer_init_output import (
+    TARGET_HELP,
+    InitError,
     add_output_flags,
     can_ask,
-    level,
+    find_report,
+    parse,
     pbir_refusal,
-    print_payload,
     questions_text,
+    result_line,
     summary_text,
+    with_next,
 )
-
-
-class InitError(Exception):
-    """A request the generator can't carry out; the message says how to fix it."""
+from ._tests_dir import flow_dir, search_roots
 
 
 def contract_main(argv: list[str]) -> int:
-    args = _parser().parse_args(argv)
+    args, refusal = parse(_parser(), argv)
+    return contract_args_main(args, refusal)
+
+
+def contract_args_main(args: argparse.Namespace, refusal: str | None = None) -> int:
+    """Execute an argparse-parsed contract verb."""
+    if refusal:  # a flag of `fab-test pbir` the verb doesn't take
+        print(f"  ✗ fab-test pbir contract: {refusal}", file=sys.stderr)
+        return 2
     try:
+        resolve_inputs(args)
+        if args.action == "lint":
+            return lint_main(args)
         report = _report(args)
+        args.contract_path = _contract_path(args, report)
         try:  # anything that would stop the write is found before the first question
-            existing, owners = read_existing(_contract_path(report), report, args.force)
+            existing, owners = read_existing(args.contract_path, report, args.force)
         except ExistingContractError as exc:
             raise InitError(str(exc)) from exc
-        questions = build_questions(report, args.as_of or today(), owners)
+        questions = build_questions(report, args.as_of or today(), owners, args.contract_path)
         if args.questions:
             print_payload(args, questions, questions_text, asked_for=True)
             return 0
         answers = _answers(args, questions)
         return _write(args, report, questions, answers, existing)
-    except (InitError, CalendarError, ContractError) as exc:
+    except (InitError, CalendarError, ContractError, ConfigError) as exc:
         print(f"  ✗ fab-test pbir contract: {exc}", file=sys.stderr)
         return 2
     except KeyboardInterrupt:  # Ctrl-C at a prompt
@@ -92,48 +107,34 @@ def contract_main(argv: list[str]) -> int:
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="fab-test pbir contract",
-                                     description="Build a report's slicer contract (`fab-test pbir` checks it)")
-    subs = parser.add_subparsers(dest="action", required=True)
+    parser = argparse.ArgumentParser(prog="fab-test pbir contract", description="Build (init) or check (lint) a "
+                                     "report's slicer contract; `fab-test pbir` runs it")
+    subs = parser.add_subparsers(dest="action", required=True, metavar="{init,lint}")
     init = subs.add_parser("init", help="Create or extend <Report>.Report.odcs.yaml, asking how to check each slicer")
-    init.add_argument("target", nargs="?", default=None, metavar="REPORT", help="Path to the .Report folder")
-    init.add_argument("--artifact", default=None, metavar="NAME", help="Report name to find under --artifact-dir")
-    init.add_argument("--artifact-dir", default=".", metavar="DIR", help="Where to look for --artifact [default: .]")
+    add_input_flags(init, f"Report to build the contract for: {TARGET_HELP}")
     init.add_argument("--as-of", default=None, dest="as_of", type=datetime.date.fromisoformat, metavar="YYYY-MM-DD",
                       help="Date used to suggest calendar formats [default: today]")
     init.add_argument("--questions", action="store_true", help="Print the questions and suggested answers, then stop")
     init.add_argument("--answers", default=None, metavar="FILE",
                       help="JSON answers by question id; unanswered questions take the suggestion")
-    init.add_argument("--dry-run", action="store_true", help="Print the contract instead of writing it")
+    init.add_argument("--dry-run", action="store_true", help="Show the contract that would be written; write nothing")
     init.add_argument("--force", action="store_true",
                       help="Replace rules that differ, and rewrite a commented contract")
-    init.add_argument("--format", choices=("text", "json"), default="text", dest="output_format",
-                      help="text for people, json for agents and scripts [default: text]")
     add_output_flags(init)
+    add_lint_parser(subs)
     return parser
 
 
 def _report(args: argparse.Namespace) -> Path:
-    if args.target:
-        report = Path(args.target)
-    elif args.artifact:
-        name = args.artifact if args.artifact.endswith(".Report") else f"{args.artifact}.Report"
-        found = [p for p in find_artifact_dirs(Path(args.artifact_dir), [".Report"]) if p.name == name]
-        if len(found) > 1:
-            raise InitError(f"--artifact {args.artifact} matches {len(found)} reports; pass the path to one: "
-                            + ", ".join(map(str, found)))
-        report = found[0] if found else Path(args.artifact_dir) / name
-    else:
-        raise InitError("name the report: a path to its .Report folder, or --artifact NAME")
-    if not (report / "definition" / "pages").is_dir():
-        raise InitError(f"{report} is not a PBIR report folder (no definition/pages)")
+    report = find_report(args)
     refusal = pbir_refusal(args, report.name)  # --report, --contract, ... belong to `fab-test pbir`
     if refusal:
         raise InitError(refusal)
     return report
 
 
-def build_questions(report: Path, as_of: datetime.date, owners: dict[str, Owner] | None = None) -> dict[str, Any]:
+def build_questions(report: Path, as_of: datetime.date, owners: dict[str, Owner] | None = None,
+                    contract: Path | None = None) -> dict[str, Any]:
     """The questions for ``report``; ``owners`` (each id an existing contract uses, and what it checks) keeps
     a rule's own id and gives no other question one already taken."""
     used: set[str] = set()
@@ -147,10 +148,11 @@ def build_questions(report: Path, as_of: datetime.date, owners: dict[str, Owner]
             report, lambda text, page: _rule_id(text, used, "rule", navigator_owner(page), owners))
     except (OSError, ValueError) as exc:
         raise InitError(f"{report}: a page or visual file can't be read ({exc})") from exc
-    questions += fiscal_questions(questions, existing_calendar(_contract_path(report)))
+    contract = contract or report.parent / f"{report.name}{CONTRACT_SUFFIX}"
+    questions += fiscal_questions(questions, existing_calendar(contract))
     for q in questions:
         q.pop("_fits", None)
-    return {"report": str(report), "contract": str(_contract_path(report)), "as_of": as_of.isoformat(),
+    return {"report": str(report), "contract": str(contract), "as_of": as_of.isoformat(),
             "questions": questions}
 
 
@@ -317,7 +319,7 @@ def _write(args: argparse.Namespace, report: Path, questions: dict, answers: dic
     rules = [(q, rule) for q, rule, _ in built if rule]
     fiscal_ids = [q["id"] for q, rule, follows in built
                   if follows and uses_fiscal(rule["implementation"]["selected"][0])]
-    path = _contract_path(report)
+    path = args.contract_path
     try:
         calendar = fiscal_calendar(answers, fiscal_ids, existing_calendar(path))
     except ValueError as exc:
@@ -340,12 +342,13 @@ def _write(args: argparse.Namespace, report: Path, questions: dict, answers: dic
         raise InitError("nothing was written:\n  " + "\n  ".join(problems))
     text = yaml.safe_dump(document, sort_keys=False, allow_unicode=True)
     if not args.dry_run:
+        path.parent.mkdir(parents=True, exist_ok=True)  # fab-tests/pbir/ on the first contract
         path.write_text(text, encoding="utf-8")
     verbose = contract if level(args) == "verbose" else None
-    print_payload(args, {"contract": str(path), "written": not args.dry_run, **summary,
-                         **({"content": text} if args.dry_run else {})},
+    print_payload(args, with_next({"contract": str(path), "written": not args.dry_run, **summary,
+                         **({"content": text} if args.dry_run else {})}, args),
                   lambda s: text if args.dry_run else summary_text(s, verbose, contract.calendar),
-                  asked_for=args.dry_run)
+                  asked_for=args.dry_run, as_line=result_line)
     return 0
 
 
@@ -392,5 +395,13 @@ def _named(items: list, name: str) -> dict:
     return items[-1]
 
 
-def _contract_path(report: Path) -> Path:
-    return report.parent / f"{report.name}{CONTRACT_SUFFIX}"
+def _contract_path(args: argparse.Namespace, report: Path) -> Path:
+    """The contract already pairing with the report, wherever it lives; else a new one in fab-tests/pbir/."""
+    beside = report.parent / f"{report.name}{CONTRACT_SUFFIX}"
+    existing = paired_contract(report, search_roots(args, report), required=False)
+    if existing is not None:
+        return existing
+    if beside.exists():
+        return beside
+    home = flow_dir(args, "pbir", report)
+    return home / beside.name if home else beside

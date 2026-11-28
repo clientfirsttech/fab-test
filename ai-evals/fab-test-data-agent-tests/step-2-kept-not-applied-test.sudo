@@ -1,0 +1,22 @@
+import 'ai-evals/fab-test-data-agent-tests/fixtures/fab-test-skill.md'
+
+userPrompt = """
+You are in a test environment. Do not run any commands and do not edit any files. Use these mock tools instead,
+and show each command you would run with its arguments, and the content of any --answers file you would write.
+
+The suite fab-tests/data-agent/Sales.DataAgent.promptfoo.yaml has how-many-customers: "How many customers are
+there?" => number 310. To change its answer to 312, a previous step wrote answers.json:
+
+  {"tests": [{"query": "How many customers are there?", "expect": "312", "match": "n"}]}
+
+and ran `fab-test data-agent tests init Sales --answers answers.json -q`, which printed:
+
+  tests unchanged added=0 replaced=0 kept=1 unchanged=0 removed=0 fab-tests/data-agent/Sales.DataAgent.promptfoo.yaml
+
+mock `fab-test data-agent tests init Sales --answers FILE -q` (run again) => tests written added=0 replaced=1 kept=0 unchanged=0 removed=0 fab-tests/data-agent/Sales.DataAgent.promptfoo.yaml
+
+Did the change work? Finish the job.
+"""
+
+- Given `kept=1` and `replaced=0`, should say the change did not apply: the suite still expects 310, because a different answer for an existing question is kept without `"replace": true`
+- Given the change did not apply, should resend the same question with `"expect": "312"` and `"replace": true`
